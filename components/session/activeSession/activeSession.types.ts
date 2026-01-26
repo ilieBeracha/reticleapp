@@ -3,6 +3,7 @@
  */
 
 import type { SessionStats, SessionTargetWithResults, SessionWithDetails } from '@/services/sessionService';
+import type { EngagementParticipant } from '@/services/session/types';
 
 // ============================================================================
 // DRILL PROGRESS
@@ -117,6 +118,10 @@ export interface UseActiveSessionReturn {
 
   // Completion modal
   showCompletionModal: boolean;
+
+  // Squad engagement
+  isSquadEngagement: boolean;
+  participants: EngagementParticipant[];
 
   // Actions
   loadData: () => Promise<void>;

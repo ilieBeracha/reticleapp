@@ -401,6 +401,80 @@ export async function remindActiveSession(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// SQUAD ENGAGEMENTS
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Notify a user they've been invited to a squad engagement
+ * Called for: Each invited participant
+ */
+export async function notifySquadEngagementInvite(
+  sessionId: string,
+  trainingId: string,
+  drillName: string,
+  commanderName: string,
+  teamName: string
+): Promise<string> {
+  return scheduleNotification({
+    title: 'Squad Engagement Invite',
+    body: `${commanderName} invited you to join "${drillName}" with ${teamName}`,
+    data: {
+      type: 'session',
+      screen: 'squadEngagementInvite',
+      id: sessionId,
+      trainingId,
+    },
+  });
+}
+
+/**
+ * Notify the commander that a participant joined
+ * Called for: Session owner (commander)
+ */
+export async function notifyParticipantJoined(
+  sessionId: string,
+  participantName: string,
+  drillName: string
+): Promise<string> {
+  return scheduleNotification({
+    title: 'Participant Joined',
+    body: `${participantName} joined the squad engagement "${drillName}"`,
+    data: { type: 'session', screen: 'activeSession', id: sessionId },
+  });
+}
+
+/**
+ * Notify the commander that a participant declined
+ * Called for: Session owner (commander)
+ */
+export async function notifyParticipantDeclined(
+  sessionId: string,
+  participantName: string,
+  drillName: string
+): Promise<string> {
+  return scheduleNotification({
+    title: 'Participant Declined',
+    body: `${participantName} declined the squad engagement "${drillName}"`,
+    data: { type: 'session', screen: 'activeSession', id: sessionId },
+  });
+}
+
+/**
+ * Notify all participants that the squad engagement is starting
+ * Called for: All joined participants
+ */
+export async function notifySquadEngagementStarting(
+  sessionId: string,
+  drillName: string
+): Promise<string> {
+  return scheduleNotification({
+    title: 'Squad Engagement Starting',
+    body: `"${drillName}" is starting now! Join your squad.`,
+    data: { type: 'session', screen: 'activeSession', id: sessionId },
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // TEAMS
 // ─────────────────────────────────────────────────────────────────────────────
 

@@ -142,7 +142,7 @@ export interface CommanderActionsSheetProps {
   visible: boolean;
   onClose: () => void;
   onAddDrill: () => void;
-  onAddCustomSession: () => void;
+  onAddCustomSession?: () => void;
   onAssignWeapon: () => void;
   onFinishTraining: () => void;
   onSettings: () => void;

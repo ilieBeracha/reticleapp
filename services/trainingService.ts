@@ -31,6 +31,7 @@ function buildDrillInsertPayload(drill: CreateTrainingDrillInput, trainingId: st
     name: drill.name,
     description: drill.description || null,
     drill_goal: drill.drill_goal,
+    engagement_mode: drill.engagement_mode ?? null,
     ...(drill.input_method ? { input_method: drill.input_method } : {}),
     target_type: drill.target_type,
     distance_m: drill.distance_m,

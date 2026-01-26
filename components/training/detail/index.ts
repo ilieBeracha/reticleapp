@@ -64,3 +64,11 @@ export { TrainingReadinessCard } from './TrainingReadinessCard';
 export { CustomSessionCard } from './CustomSessionCard';
 export type { CustomSessionConfig } from './CustomSessionCard';
 
+// Tab-based Training Components
+export { AddSessionButton } from './AddSessionButton';
+export type { AddSessionButtonProps } from './AddSessionButton';
+export { SessionTabs } from './SessionTabs';
+export type { SessionTabsProps } from './SessionTabs';
+export { TrainingSessionCard } from './TrainingSessionCard';
+export type { TrainingSessionCardProps } from './TrainingSessionCard';
+

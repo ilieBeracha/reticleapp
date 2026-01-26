@@ -6,8 +6,9 @@
  * (purpose toggle + SessionContextStep). On submit, closes sheet and adds to list.
  */
 
-import { SessionContextStep } from '@/components/session/creation';
+import { EngagementModeToggle, SessionContextStep } from '@/components/session/creation';
 import type { SessionContextState, SessionPurpose } from '@/components/session/creation/sessionCreation.types';
+import type { EngagementMode } from '@/services/session/types';
 import { useColors } from '@/hooks/ui/useColors';
 import { type TrainingDrillItem } from '@/services/drills';
 import { Ionicons } from '@expo/vector-icons';
@@ -47,8 +48,9 @@ interface SessionCardProps {
 
 function SessionCard({ session, index, total, onRemove, onMove, colors }: SessionCardProps) {
   const isGrouping = session.drill_goal === 'grouping';
+  const isSquad = session.config?.engagement_mode === 'squad';
   const purposeColor = isGrouping ? colors.blue : colors.orange;
-  const purposeLabel = isGrouping ? 'Grouping' : 'Engagement';
+  const purposeLabel = isGrouping ? 'Grouping' : isSquad ? 'Squad Engagement' : 'Engagement';
 
   return (
     <View style={[styles.sessionCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -124,10 +126,16 @@ function AddSessionSheet({ visible, onClose, onAdd }: AddSessionSheetProps) {
   const insets = useSafeAreaInsets();
   const [purpose, setPurpose] = useState<SessionPurpose>('grouping');
   const [context, setContext] = useState<SessionContextState>(DEFAULT_CONTEXT);
+  const [engagementMode, setEngagementMode] = useState<EngagementMode>('solo');
 
+  // Reset engagement mode when purpose changes
   const handlePurposeSelect = useCallback((p: SessionPurpose) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setPurpose(p);
+    // Reset to solo when switching away from engagement
+    if (p !== 'engagement') {
+      setEngagementMode('solo');
+    }
   }, []);
 
   const handleUpdateContext = useCallback((partial: Partial<SessionContextState>) => {
@@ -149,7 +157,7 @@ function AddSessionSheet({ visible, onClose, onAdd }: AddSessionSheetProps) {
     const newSession: TrainingDrillItem = {
       id: `session-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
       drill_id: '',
-      name: `${purpose === 'grouping' ? 'Grouping' : 'Engagement'} ${context.distance}m`,
+      name: `${purpose === 'grouping' ? 'Grouping' : engagementMode === 'squad' ? 'Squad Engagement' : 'Engagement'} ${context.distance}m`,
       description: context.notes || undefined,
       drill_goal: purpose,
       target_type: context.targetType === 'paper' || context.targetType === 'tactical' ? context.targetType : 'paper',
@@ -159,14 +167,17 @@ function AddSessionSheet({ visible, onClose, onAdd }: AddSessionSheetProps) {
         time_limit_seconds: context.timeLimit,
         position: mapPosition(context.position),
         strings_count: 1,
+        // Include engagement mode for engagement drills
+        ...(purpose === 'engagement' && { engagement_mode: engagementMode }),
       },
     };
 
     onAdd(newSession);
     // Reset for next time
     setContext(DEFAULT_CONTEXT);
+    setEngagementMode('solo');
     onClose();
-  }, [purpose, context, onAdd, onClose]);
+  }, [purpose, context, engagementMode, onAdd, onClose]);
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
@@ -219,6 +230,14 @@ function AddSessionSheet({ visible, onClose, onAdd }: AddSessionSheetProps) {
               </TouchableOpacity>
             </View>
           </View>
+
+          {/* Squad Mode Toggle - only for engagement */}
+          {purpose === 'engagement' && (
+            <EngagementModeToggle
+              value={engagementMode}
+              onChange={setEngagementMode}
+            />
+          )}
 
           {/* Session Details */}
           <SessionContextStep

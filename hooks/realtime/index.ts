@@ -73,6 +73,7 @@ export { useTrainingRealtime } from './useTrainingRealtime';
 export { useSessionRealtime } from './useSessionRealtime';
 export { useTeamRealtime } from './useTeamRealtime';
 export { useWeaponRealtime } from './useWeaponRealtime';
+export { useParticipantsRealtime } from './useParticipantsRealtime';
 
 // Types
 export type {
@@ -93,3 +94,5 @@ export type {
   TeamWeaponRecord,
   WeaponRequestRecord,
 } from './useWeaponRealtime';
+
+export type { ParticipantRecord } from './useParticipantsRealtime';

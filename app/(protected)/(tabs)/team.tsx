@@ -30,7 +30,6 @@ import { router } from 'expo-router';
 import {
   Activity,
   BarChart3,
-  BookOpen,
   Calendar,
   ChevronRight,
   Clock,
@@ -600,7 +599,6 @@ export default function TeamScreen() {
     handleTabChange,
     handleTrainingPress,
     handleCreateTraining,
-    handleOpenLibrary,
     handleOpenArmory,
     handleViewMembers,
     handleInviteMember,
@@ -740,7 +738,6 @@ export default function TeamScreen() {
                 )}
                 onTrainingPress={handleTrainingPress}
                 onCreateTraining={handleCreateTraining}
-                onOpenLibrary={handleOpenLibrary}
                 onOpenArmory={handleOpenArmory}
                 onViewMembers={handleViewMembers}
                 onInviteMember={handleInviteMember}
@@ -805,7 +802,6 @@ interface ManageTabProps {
   pastTrainings: TrainingWithDetails[];
   onTrainingPress: (training: TrainingWithDetails) => void;
   onCreateTraining: () => void;
-  onOpenLibrary: () => void;
   onViewMembers: () => void;
   onInviteMember: () => void;
   onTeamSettings: () => void;
@@ -822,7 +818,6 @@ function ManageTab({
   pastTrainings,
   onTrainingPress,
   onCreateTraining,
-  onOpenLibrary,
   onViewMembers,
   onInviteMember,
   onTeamSettings,
@@ -870,13 +865,6 @@ function ManageTab({
         >
           <Plus size={18} color={colors.background} strokeWidth={2.5} />
           <Text style={[manageStyles.primaryActionText, { color: colors.background }]}>New Training</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[manageStyles.secondaryAction, { backgroundColor: colors.card, borderColor: colors.border }]}
-          onPress={onOpenLibrary}
-          activeOpacity={0.7}
-        >
-          <BookOpen size={18} color={colors.text} />
         </TouchableOpacity>
         <TouchableOpacity
           style={[manageStyles.secondaryAction, { backgroundColor: colors.card, borderColor: colors.border }]}
@@ -997,16 +985,6 @@ function ManageTab({
               <Users size={15} color={colors.primary} />
             </View>
             <Text style={[manageStyles.menuItemText, { color: colors.text }]}>Members & Roles</Text>
-            <ChevronRight size={16} color={colors.border} />
-          </TouchableOpacity>
-
-          <View style={[manageStyles.menuDivider, { backgroundColor: colors.border }]} />
-
-          <TouchableOpacity style={manageStyles.menuItem} onPress={onOpenLibrary} activeOpacity={0.6}>
-            <View style={[manageStyles.menuIcon, { backgroundColor: '#3B82F612' }]}>
-              <BookOpen size={15} color="#3B82F6" />
-            </View>
-            <Text style={[manageStyles.menuItemText, { color: colors.text }]}>Drill Library</Text>
             <ChevronRight size={16} color={colors.border} />
           </TouchableOpacity>
 
@@ -1345,7 +1323,6 @@ interface UnifiedTeamTabProps {
   pastTrainings: TrainingWithDetails[];
   onTrainingPress: (training: TrainingWithDetails) => void;
   onCreateTraining: () => void;
-  onOpenLibrary: () => void;
   onOpenArmory: () => void;
   onViewMembers: () => void;
   onInviteMember: () => void;
@@ -1365,7 +1342,6 @@ function UnifiedTeamTab({
   pastTrainings,
   onTrainingPress,
   onCreateTraining,
-  onOpenLibrary,
   onOpenArmory,
   onViewMembers,
   onInviteMember,
@@ -1673,13 +1649,6 @@ function UnifiedTeamTab({
           </TouchableOpacity>
           <TouchableOpacity
             style={[unifiedStyles.secondaryAction, { backgroundColor: colors.card, borderColor: colors.border }]}
-            onPress={onOpenLibrary}
-            activeOpacity={0.7}
-          >
-            <BookOpen size={18} color={colors.text} />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[unifiedStyles.secondaryAction, { backgroundColor: colors.card, borderColor: colors.border }]}
             onPress={onInviteMember}
             activeOpacity={0.7}
           >
@@ -1833,16 +1802,6 @@ function UnifiedTeamTab({
                 <Shield size={15} color="#F59E0B" />
               </View>
               <Text style={[unifiedStyles.menuItemText, { color: colors.text }]}>Team Armory</Text>
-              <ChevronRight size={16} color={colors.border} />
-            </TouchableOpacity>
-
-            <View style={[unifiedStyles.menuDivider, { backgroundColor: colors.border }]} />
-
-            <TouchableOpacity style={unifiedStyles.menuItem} onPress={onOpenLibrary} activeOpacity={0.6}>
-              <View style={[unifiedStyles.menuIcon, { backgroundColor: '#3B82F612' }]}>
-                <BookOpen size={15} color="#3B82F6" />
-              </View>
-              <Text style={[unifiedStyles.menuItemText, { color: colors.text }]}>Drill Library</Text>
               <ChevronRight size={16} color={colors.border} />
             </TouchableOpacity>
 

@@ -112,6 +112,7 @@ export function mapSession(row: any): SessionWithDetails {
     session_mode: row.session_mode,
     status: row.status,
     watch_controlled: row.watch_controlled ?? false,
+    engagement_mode: row.engagement_mode ?? 'solo',
     started_at: row.started_at,
     ended_at: row.ended_at ?? null,
     created_at: row.created_at,

@@ -73,8 +73,8 @@ export function CommanderActionsSheet({
                 <Text style={[styles.gridLabel, { color: colors.text }]}>Add Drill</Text>
               </TouchableOpacity>
 
-              {/* Add Custom Session to plan - only during ongoing training */}
-              {isOngoing && (
+              {/* Add Custom Session to plan - only during ongoing training if callback provided */}
+              {isOngoing && onAddCustomSession && (
                 <TouchableOpacity
                   style={[styles.gridBtn, { backgroundColor: colors.card }]}
                   onPress={() => handleAction(onAddCustomSession)}

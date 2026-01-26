@@ -25,7 +25,8 @@ export async function getSessionTargets(sessionId: string): Promise<SessionTarge
       planned_shots,
       sequence_in_session,
       notes,
-      target_data
+      target_data,
+      participant_id
     `
     )
     .eq('session_id', sessionId)
@@ -58,6 +59,7 @@ export async function addSessionTarget(params: CreateTargetParams): Promise<Sess
       sequence_in_session: sequence,
       notes: params.notes ?? null,
       target_data: params.target_data ?? null,
+      participant_id: params.participant_id ?? null, // For squad sessions
     })
     .select()
     .single();

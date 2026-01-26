@@ -1,6 +1,65 @@
 import type { DrillGoal } from '@/types/workspace';
 
 // ============================================================================
+// ENGAGEMENT - The Atomic Execution Unit
+// ============================================================================
+
+/**
+ * Engagement is the atomic execution unit.
+ * Squad logic MUST live here.
+ * Training and Session must remain passive context.
+ *
+ * Mental model:
+ * - Training decides "who is around"
+ * - Session decides "what setup applies"
+ * - Engagement decides "what actually happened"
+ */
+
+/** Engagement mode: solo (individual) or squad (team participation) */
+export type EngagementMode = 'solo' | 'squad';
+
+/** Engagement execution status */
+export type EngagementStatus = 'pending' | 'active' | 'completed' | 'cancelled';
+
+/**
+ * Engagement record - represents a single execution of a session.
+ * Each session has at most one engagement.
+ */
+export interface Engagement {
+  id: string;
+  session_id: string;
+  engagement_mode: EngagementMode;
+  status: EngagementStatus;
+  started_at: string | null;
+  ended_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** State of a participant in a squad engagement */
+export type ParticipantState = 'pending' | 'joined' | 'left';
+
+/**
+ * A participant invited to a squad engagement.
+ * References engagement_id (NOT session_id).
+ */
+export interface EngagementParticipant {
+  id: string;
+  /** Reference to the engagement (execution unit) */
+  engagement_id: string;
+  /** @deprecated Use engagement_id. Will be removed after migration. */
+  session_id?: string;
+  user_id: string;
+  state: ParticipantState;
+  joined_at: string | null;
+  created_at: string;
+  updated_at: string;
+  /** Joined from user profile */
+  user_full_name?: string | null;
+  user_avatar_url?: string | null;
+}
+
+// ============================================================================
 // WEATHER DATA - Stored with session
 // ============================================================================
 
@@ -105,6 +164,13 @@ export interface BaseSessionConfig {
   // Start as pending (for watch selection flow)
   // When true, session is created as 'pending' and user must call activateSession()
   start_as_pending?: boolean;
+
+  /**
+   * @deprecated Pass engagement_mode when creating the engagement, not the session.
+   * This field is kept for backwards compatibility during migration.
+   * Use createEngagement({ session_id, engagement_mode }) instead.
+   */
+  engagement_mode?: EngagementMode;
 }
 
 /**
@@ -189,6 +255,11 @@ export interface SessionWithDetails {
   session_mode: 'solo' | 'group';
   status: 'pending' | 'active' | 'completed' | 'cancelled';
   watch_controlled: boolean; // Whether watch controls this session
+  /**
+   * @deprecated Use engagement.engagement_mode instead.
+   * This field is kept for backwards compatibility during migration.
+   */
+  engagement_mode?: EngagementMode;
   started_at: string;
   ended_at: string | null;
   created_at: string;
@@ -197,6 +268,8 @@ export interface SessionWithDetails {
   weather?: SessionWeatherData | null;
   // Optional aggregated stats (populated when requested)
   stats?: SessionAggregatedStats;
+  // Engagement (execution unit) - populated when fetched with engagement
+  engagement?: Engagement | null;
 }
 
 // ============================================================================
@@ -218,6 +291,8 @@ export interface SessionTarget {
   planned_shots: number | null;
   notes: string | null;
   target_data: Record<string, any> | null;
+  /** For squad sessions: links target to specific participant */
+  participant_id: string | null;
 }
 
 export interface CreateTargetParams {
@@ -228,6 +303,8 @@ export interface CreateTargetParams {
   planned_shots?: number | null;
   notes?: string | null;
   target_data?: Record<string, any> | null;
+  /** For squad sessions: links target to specific participant */
+  participant_id?: string | null;
 }
 
 // ============================================================================

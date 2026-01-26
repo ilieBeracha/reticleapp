@@ -10,15 +10,16 @@ import { useTrainingActions, useTrainingDetail } from '@/components/training';
 import {
   AddDrillModal,
   CommanderActionsSheet,
-  CustomSessionCard,
+  DrillChapter,
   StartTrainingSheet,
   TrainingHero,
   TrainingReadinessCard,
   TrainingSettingsModal,
-  type CustomSessionConfig,
   type ReadinessItem,
 } from '@/components/training/detail';
-import { StartDrillSheet } from '@/components/training/StartDrillSheet';
+import { ActiveSquadEngagementsCard } from '@/components/training/ActiveSquadEngagementsCard';
+import { SquadInvitationBanner } from '@/components/training/SquadInvitationBanner';
+import { EngagementModeToggle, InviteParticipantsPanel } from '@/components/session/creation';
 import { useAuth } from '@/contexts/AuthContext';
 import { useModals } from '@/contexts/ModalContext';
 import { useTrainingRealtime, useWeaponRealtime, type TeamWeaponRecord } from '@/hooks/realtime';
@@ -32,8 +33,9 @@ import {
   notifyWeaponRequestApproved,
   notifyWeaponRequestRejected,
 } from '@/services/notifications';
-import type { BaseSessionConfig } from '@/services/session/types';
+import type { BaseSessionConfig, EngagementMode } from '@/services/session/types';
 import { createSession, getTrainingSessionsWithStats, SessionWithDetails } from '@/services/sessionService';
+import { addParticipant, createEngagement } from '@/services/session/participants';
 import { addDrill } from '@/services/trainingService';
 import {
   cancelWeaponRequest,
@@ -59,6 +61,7 @@ import {
   ArrowLeft,
   BookOpen,
   CheckCircle2,
+  ChevronRight,
   Crosshair,
   MoreHorizontal,
   Package,
@@ -67,6 +70,7 @@ import {
   Smartphone,
   Target,
   Trophy,
+  Users,
   Watch,
   X,
 } from 'lucide-react-native';
@@ -393,7 +397,7 @@ function ParallaxScrollContent({
               </View>
               <Text style={[styles.roundSummaryHeadline, { color: colors.text }]}>{headline}</Text>
               <Text style={[styles.roundSummarySubtitle, { color: colors.textMuted }]}>
-                {completedCount}/{drills.length} objectives · {format(new Date(training.scheduled_at), 'MMM d')}
+                {completedCount}/{teamSessions.length} sessions · {format(new Date(training.scheduled_at), 'MMM d')}
               </Text>
               <View style={[styles.roundMetricsRow, { borderTopColor: colors.border }]}>
                 <View style={styles.roundMetric}>
@@ -427,114 +431,57 @@ function ParallaxScrollContent({
         })()}
 
         {/* ═══════════════════════════════════════════════════════════════════ */}
-        {/* OBJECTIVES - Commander-planned drills                              */}
+        {/* SQUAD INVITATION BANNER (for invitees with pending invitations)      */}
         {/* ═══════════════════════════════════════════════════════════════════ */}
-        {drills.length === 0 ? (
-          <View style={[styles.emptyDrills, { backgroundColor: colors.background, borderColor: colors.border }]}>
-            <View style={[styles.emptyIcon, { backgroundColor: colors.secondary }]}>
-              <BookOpen size={32} color={colors.textMuted} />
-            </View>
-            <Text style={[styles.emptyTitle, { color: colors.text }]}>No Objectives</Text>
-            <Text style={[styles.emptySubtitle, { color: colors.textMuted }]}>
-              {canManageTraining ? 'Use the menu (⋯) to add objectives' : 'Wait for your commander to set objectives'}
-            </Text>
+        {userId && training?.id && (
+          <SquadInvitationBanner
+            userId={userId}
+            trainingId={training.id}
+          />
+        )}
+
+        {/* ═══════════════════════════════════════════════════════════════════ */}
+        {/* ACTIVE SQUAD ENGAGEMENTS (joinable by team, commanders can invite)   */}
+        {/* ═══════════════════════════════════════════════════════════════════ */}
+        {userId && training?.id && training?.team_id && (
+          <ActiveSquadEngagementsCard
+            trainingId={training.id}
+            teamId={training.team_id}
+            userId={userId}
+            canManageTraining={canManageTraining}
+            teamName={training.team?.name}
+          />
+        )}
+
+        {/* ═══════════════════════════════════════════════════════════════════ */}
+        {/* DRILLS - Shows planned drills for this training                      */}
+        {/* ═══════════════════════════════════════════════════════════════════ */}
+        {drills.length > 0 && (isPlanned || isOngoing) && (
+          <View style={styles.drillsSection}>
+            <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>DRILLS</Text>
+            {drills.map((drill: any, index: number) => {
+              const progress = drillProgress.find((p: any) => p.drillId === drill.id);
+              const isCompleted = progress?.completed || false;
+              // Can start if training is ongoing and (first drill OR previous drill completed)
+              const previousCompleted = index === 0 || drillProgress.find((p: any) => p.drillId === drills[index - 1].id)?.completed;
+              const canStart = isOngoing && !isCompleted && previousCompleted;
+
+              return (
+                <DrillChapter
+                  key={drill.id}
+                  drill={drill}
+                  chapterNumber={index + 1}
+                  totalChapters={drills.length}
+                  isCompleted={isCompleted}
+                  canStart={canStart}
+                  onStart={() => onStartDrill(drill)}
+                  isStarting={startingDrillId === drill.id}
+                  colors={colors}
+                  hasWeapon={!!userWeapon}
+                />
+              );
+            })}
           </View>
-        ) : (
-          <>
-            <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>OBJECTIVES</Text>
-            <View style={[styles.drillsList, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              {drills.map((drill: any, index: number) => {
-                const progress = drillProgress.find((p: { drillId: string }) => p.drillId === drill.id);
-                const isCompleted = progress?.completed || false;
-
-                const previousDrillsCompleted = drillProgress
-                  .slice(0, index)
-                  .every((p: { completed: boolean }) => p.completed);
-                const canStartThisDrill = isOngoing && !isCompleted && previousDrillsCompleted;
-                const isStartingThis = (quickStartingDrillId || startingDrillId) === drill.id;
-                const canActuallyStart = canStartThisDrill && !!userWeapon;
-
-                const distance = drill.distance_m || drill.config?.distance_m || 25;
-                const rounds = drill.rounds_per_shooter || drill.config?.rounds || 5;
-                const isGrouping = drill.drill_goal === 'grouping';
-
-                return (
-                  <TouchableOpacity
-                    key={drill.id}
-                    style={[
-                      styles.drillRow,
-                      index < drills.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.border },
-                      isCompleted && { backgroundColor: colors.green + '05' },
-                      canStartThisDrill && { backgroundColor: colors.primary + '03' },
-                    ]}
-                    onPress={canActuallyStart ? () => onStartDrill(drill) : undefined}
-                    disabled={!canActuallyStart || isStartingThis}
-                    activeOpacity={0.7}
-                  >
-                    <View
-                      style={[
-                        styles.drillNumber,
-                        {
-                          backgroundColor: isCompleted
-                            ? colors.green + '15'
-                            : canStartThisDrill
-                              ? colors.primary + '15'
-                              : colors.secondary,
-                        },
-                      ]}
-                    >
-                      {isCompleted ? (
-                        <CheckCircle2 size={16} color={colors.green} />
-                      ) : (
-                        <Text
-                          style={[
-                            styles.drillNumberText,
-                            { color: canStartThisDrill ? colors.primary : colors.textMuted },
-                          ]}
-                        >
-                          {index + 1}
-                        </Text>
-                      )}
-                    </View>
-
-                    <View style={styles.drillInfo}>
-                      <Text
-                        style={[styles.drillName, { color: isCompleted ? colors.textMuted : colors.text }]}
-                        numberOfLines={1}
-                      >
-                        {drill.name}
-                      </Text>
-                      <View style={styles.drillMeta}>
-                        <Text style={[styles.drillMetaText, { color: colors.textMuted }]}>
-                          {distance}m · {rounds} rds
-                        </Text>
-                        <View
-                          style={[
-                            styles.drillTypeBadge,
-                            { backgroundColor: isGrouping ? colors.green + '12' : '#F59E0B12' },
-                          ]}
-                        >
-                          <Text style={[styles.drillTypeText, { color: isGrouping ? colors.green : '#F59E0B' }]}>
-                            {isGrouping ? 'Grouping' : 'Engagement'}
-                          </Text>
-                        </View>
-                      </View>
-                    </View>
-
-                    {isStartingThis ? (
-                      <ActivityIndicator size="small" color={colors.primary} />
-                    ) : canActuallyStart ? (
-                      <View style={[styles.drillAction, { backgroundColor: colors.primary }]}>
-                        <Play size={14} color="#fff" fill="#fff" />
-                      </View>
-                    ) : canStartThisDrill && weaponChecked && !userWeapon ? (
-                      <AlertCircle size={18} color={colors.orange} />
-                    ) : null}
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          </>
         )}
 
         {/* ═══════════════════════════════════════════════════════════════════ */}
@@ -594,32 +541,49 @@ function ParallaxScrollContent({
                       {sessions.map((s: any, idx: number) => {
                         const isCompleted = s.status === 'completed';
                         const isActive = s.status === 'active';
-                        const drillName = s.drill_config?.name || s.drill_name || 'Session';
-                        const isGrouping = s.drill_config?.drill_goal === 'grouping';
+                        const isPending = s.status === 'pending';
+                        const drillName = s.custom_drill_config?.name || s.drill_config?.name || s.drill_name || 'Session';
+                        const isGrouping = (s.custom_drill_config?.drill_goal || s.drill_config?.drill_goal) === 'grouping';
+                        const isSquad = s.engagement_mode === 'squad';
                         const accuracy = s.stats?.accuracy_pct
                           ?? (s.stats?.hits_total && s.stats?.shots_fired
                             ? Math.round((s.stats.hits_total / s.stats.shots_fired) * 100)
                             : null);
                         const groupSize = s.stats?.best_dispersion_cm;
-                        const distance = s.drill_config?.distance_m || '';
+                        const distance = s.custom_drill_config?.distance_m || s.drill_config?.distance_m || '';
                         const shots = s.stats?.shots_fired || 0;
 
+                        // Can open session if active or pending (not completed)
+                        const canOpen = !isCompleted && (isMe || canManageTraining);
+                        
+                        const handleSessionPress = () => {
+                          if (!canOpen) return;
+                          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                          router.push({
+                            pathname: '/(protected)/activeSession',
+                            params: { sessionId: s.id },
+                          });
+                        };
+
                         return (
-                          <View
+                          <TouchableOpacity
                             key={s.id}
                             style={[
                               styles.drillRow,
                               idx < sessions.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.border },
-                              isCompleted && { backgroundColor: colors.green + '03' },
+                              isCompleted && { backgroundColor: colors.green + '08' },
                               isActive && { backgroundColor: colors.orange + '05' },
                             ]}
+                            onPress={handleSessionPress}
+                            disabled={!canOpen}
+                            activeOpacity={canOpen ? 0.7 : 1}
                           >
                             <View
                               style={[
                                 styles.drillNumber,
                                 {
                                   backgroundColor: isCompleted
-                                    ? colors.green + '15'
+                                    ? colors.green + '20'
                                     : isActive
                                       ? colors.orange + '15'
                                       : colors.secondary,
@@ -630,19 +594,28 @@ function ParallaxScrollContent({
                                 <CheckCircle2 size={14} color={colors.green} />
                               ) : isActive ? (
                                 <Play size={14} color={colors.orange} />
+                              ) : isSquad ? (
+                                <Users size={14} color={colors.textMuted} />
                               ) : (
                                 <Target size={14} color={colors.textMuted} />
                               )}
                             </View>
                             <View style={styles.drillInfo}>
-                              <Text
-                                style={[styles.drillName, { color: isCompleted ? colors.textMuted : colors.text }]}
-                                numberOfLines={1}
-                              >
-                                {drillName}
-                              </Text>
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                <Text
+                                  style={[styles.drillName, { color: isCompleted ? colors.textMuted : colors.text }]}
+                                  numberOfLines={1}
+                                >
+                                  {drillName}
+                                </Text>
+                                {isSquad && !isCompleted && (
+                                  <View style={{ backgroundColor: colors.primary + '15', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                                    <Text style={{ color: colors.primary, fontSize: 10, fontWeight: '600' }}>SQUAD</Text>
+                                  </View>
+                                )}
+                              </View>
                               <Text style={[styles.drillMetaText, { color: colors.textMuted }]}>
-                                {distance ? `${distance}m · ` : ''}{shots > 0 ? `${shots} rds` : isActive ? 'In progress' : 'Pending'}
+                                {distance ? `${distance}m · ` : ''}{shots > 0 ? `${shots} rds` : isActive ? 'In progress' : isPending ? 'Not started' : 'Pending'}
                               </Text>
                             </View>
                             {isCompleted && (
@@ -665,7 +638,10 @@ function ParallaxScrollContent({
                                 <Text style={[styles.activeBadgeText, { color: colors.orange }]}>LIVE</Text>
                               </View>
                             )}
-                          </View>
+                            {canOpen && !isActive && (
+                              <ChevronRight size={18} color={colors.textMuted} />
+                            )}
+                          </TouchableOpacity>
                         );
                       })}
                     </View>
@@ -711,7 +687,6 @@ export default function TrainingDetailScreen() {
   const [showSettings, setShowSettings] = useState(false);
   const [showCommanderActions, setShowCommanderActions] = useState(false);
   const [showStartSheet, setShowStartSheet] = useState(false);
-  const [selectedDrillToStart, setSelectedDrillToStart] = useState<any>(null);
 
   const [teamSessions, setTeamSessions] = useState<SessionWithDetails[]>([]);
   const [loadingTeamProgress, setLoadingTeamProgress] = useState(false);
@@ -731,15 +706,18 @@ export default function TrainingDetailScreen() {
   const [addingDrill, setAddingDrill] = useState(false);
   const [drillSearch, setDrillSearch] = useState('');
 
-  // Custom session state
-  const [showCommanderCustomSession, setShowCommanderCustomSession] = useState(false);
-  const [addingCustomDrill, setAddingCustomDrill] = useState(false);
-
   // Watch preference for this training (asked once, remembered for all drills)
   // null = not asked yet, true = use watch, false = phone only
   const [trainingWatchPreference, setTrainingWatchPreference] = useState<boolean | null>(null);
   const [trainingSensitivity, setTrainingSensitivity] = useState(3.5); // Default: 3.5 (standard rifle)
   const [pendingDrillForWatch, setPendingDrillForWatch] = useState<any>(null);
+
+  // Squad session creation state
+  const [showSquadSheet, setShowSquadSheet] = useState(false);
+  const [squadSheetDrill, setSquadSheetDrill] = useState<any>(null);
+  const [engagementMode, setEngagementMode] = useState<EngagementMode>('solo');
+  const [invitedUserIds, setInvitedUserIds] = useState<string[]>([]);
+  const [creatingSquadSession, setCreatingSquadSession] = useState(false);
 
   // Garmin connection status
   const isWatchConnected = useIsGarminConnected();
@@ -784,10 +762,14 @@ export default function TrainingDetailScreen() {
 
   // Computed values
   const drills = training?.drills || [];
-  const completedCount = drillProgress.filter((p) => p.completed).length;
+  // Count completed sessions (not drills)
+  const completedCount = teamSessions.filter((s) => s.status === 'completed').length;
   const isOngoing = training?.status === 'ongoing';
   const isPlanned = training?.status === 'planned';
   const isFinished = training?.status === 'finished';
+
+  // Debug: Log drills and training status
+  console.log('[TrainingDetail] Drills:', drills.length, 'Status:', training?.status, 'Training ID:', training?.id);
 
   // Filtered drills for add drill modal
   const filteredDrills = useMemo(() => {
@@ -797,7 +779,6 @@ export default function TrainingDetailScreen() {
       (d) => d.name.toLowerCase().includes(query) || d.description?.toLowerCase().includes(query)
     );
   }, [availableDrills, drillSearch]);
-
 
   // ═══════════════════════════════════════════════════════════════════════════
   // DATA LOADING
@@ -988,17 +969,44 @@ export default function TrainingDetailScreen() {
   // HANDLERS
   // ═══════════════════════════════════════════════════════════════════════════
 
+  // Navigate to createSession with drill params (used when no weapon or for squad mode)
+  const navigateToCreateSession = useCallback(
+    (drill: any) => {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      router.push({
+        pathname: '/(protected)/createSession',
+        params: {
+          ...(training?.team_id && { teamId: training.team_id }),
+          ...(training?.id && { trainingId: training.id }),
+          purpose: drill.drill_goal || 'engagement',
+          distance: String(drill.distance_m || 25),
+          shots: String(drill.rounds_per_shooter || 5),
+          ...(drill.time_limit_seconds && { timeLimit: String(drill.time_limit_seconds) }),
+          ...(drill.position && { position: drill.position }),
+          targetType: drill.target_type || 'paper',
+          returnTo: 'trainingDetail',
+          returnId: training?.id,
+        },
+      });
+    },
+    [training?.team_id, training?.id]
+  );
+
   // Start a drill directly with given watch preference
   const startDrillWithPreference = useCallback(
-    async (drill: any, useWatch: boolean, _skipPrepView: boolean = false) => {
+    async (drill: any, useWatch: boolean, _skipPrepView: boolean = false, squadOptions?: { mode: EngagementMode; participants: string[] }) => {
       if (!userWeapon) {
-        setSelectedDrillToStart(drill);
+        navigateToCreateSession(drill);
         return;
       }
 
       setQuickStartingDrillId(drill.id);
       try {
         const sessionWeather = toSessionWeatherData(openWeather, 'openweathermap');
+
+        // Determine engagement mode - use squadOptions if provided, default to solo
+        const effectiveEngagementMode = squadOptions?.mode || 'solo';
+        const participantsToInvite = squadOptions?.participants || [];
 
         const config: BaseSessionConfig = {
           weapon_id: userWeapon.id,
@@ -1019,36 +1027,63 @@ export default function TrainingDetailScreen() {
           session_mode: 'solo',
           watch_controlled: useWatch,
           start_as_pending: false,
+          engagement_mode: effectiveEngagementMode,
         };
 
         const newSession = await createSession(config);
         await loadSessions();
 
-        // Navigate to activeSession
-        router.push({
-          pathname: '/(protected)/activeSession',
-          params: {
+        // For squad mode, create engagement and add participants
+        if (effectiveEngagementMode === 'squad') {
+          console.log('[TrainingDetail] Creating squad engagement...');
+          const engagement = await createEngagement({
             sessionId: newSession.id,
-            returnTo: 'trainingDetail',
-            returnId: training?.id,
-          },
-        });
+            engagementMode: 'squad',
+            status: 'pending', // Will be set to 'active' when commander starts
+          });
+
+          // Add invited participants
+          for (const userId of participantsToInvite) {
+            await addParticipant(engagement.id, userId);
+          }
+
+          console.log('[TrainingDetail] Squad engagement created:', engagement.id, 'with', participantsToInvite.length, 'participants');
+
+          // Navigate to squad lobby
+          router.push({
+            pathname: '/(protected)/squadLobby',
+            params: {
+              engagementId: engagement.id,
+              trainingId: training?.id,
+            },
+          });
+        } else {
+          // Navigate to activeSession for solo
+          router.push({
+            pathname: '/(protected)/activeSession',
+            params: {
+              sessionId: newSession.id,
+              returnTo: 'trainingDetail',
+              returnId: training?.id,
+            },
+          });
+        }
       } catch (error: any) {
         Alert.alert('Error', error.message || 'Failed to start session');
       } finally {
         setQuickStartingDrillId(null);
       }
     },
-    [userWeapon, training?.team_id, training?.id, openWeather, loadSessions, trainingSensitivity]
+    [userWeapon, training?.team_id, training?.id, openWeather, loadSessions, trainingSensitivity, navigateToCreateSession]
   );
 
   const handleStartDrill = useCallback(
     async (drill: any) => {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
-      // If no weapon assigned, fallback to sheet
+      // If no weapon assigned, navigate to createSession to configure
       if (!userWeapon) {
-        setSelectedDrillToStart(drill);
+        navigateToCreateSession(drill);
         return;
       }
 
@@ -1056,10 +1091,19 @@ export default function TrainingDetailScreen() {
       // and let the CapturePreferenceCard prompt the user
       if (isWatchConnected && trainingWatchPreference === null) {
         setPendingDrillForWatch(drill);
-        // Show a brief alert to guide the user to the capture mode selection
         Alert.alert('Choose Recording Mode', 'Select how to record your session using the card above the drills.', [
           { text: 'OK', style: 'default' },
         ]);
+        return;
+      }
+
+      // For engagement drills with a team, show squad mode selection
+      const isEngagement = drill.drill_goal !== 'grouping';
+      if (isEngagement && training?.team_id) {
+        setSquadSheetDrill(drill);
+        setEngagementMode('solo'); // Reset to solo
+        setInvitedUserIds([]); // Clear invited list
+        setShowSquadSheet(true);
         return;
       }
 
@@ -1067,7 +1111,7 @@ export default function TrainingDetailScreen() {
       const useWatch = isWatchConnected && trainingWatchPreference === true;
       await startDrillWithPreference(drill, useWatch);
     },
-    [userWeapon, isWatchConnected, trainingWatchPreference, startDrillWithPreference]
+    [userWeapon, isWatchConnected, trainingWatchPreference, training?.team_id, startDrillWithPreference, navigateToCreateSession]
   );
 
   // Handle capture preference selection (from inline card)
@@ -1090,6 +1134,30 @@ export default function TrainingDetailScreen() {
     [pendingDrillForWatch, startDrillWithPreference]
   );
 
+  // Handle squad sheet confirmation
+  const handleSquadSheetConfirm = useCallback(async () => {
+    if (!squadSheetDrill) return;
+
+    setCreatingSquadSession(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+    try {
+      const useWatch = isWatchConnected && trainingWatchPreference === true;
+      await startDrillWithPreference(squadSheetDrill, useWatch, false, {
+        mode: engagementMode,
+        participants: invitedUserIds,
+      });
+      
+      // Close sheet on success
+      setShowSquadSheet(false);
+      setSquadSheetDrill(null);
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to create session');
+    } finally {
+      setCreatingSquadSession(false);
+    }
+  }, [squadSheetDrill, engagementMode, invitedUserIds, isWatchConnected, trainingWatchPreference, startDrillWithPreference]);
+
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -1097,35 +1165,6 @@ export default function TrainingDetailScreen() {
     if (shouldLoadTeamData) await loadTeamProgress();
     setRefreshing(false);
   }, [refetch, shouldLoadTeamData, loadTeamProgress]);
-
-  // Commander: add a custom session config as a drill to the training plan
-  const handleAddCustomDrill = useCallback(
-    async (config: CustomSessionConfig) => {
-      if (!training?.id || addingCustomDrill) return;
-
-      setAddingCustomDrill(true);
-      try {
-        const drillName = `${config.purpose === 'grouping' ? 'Grouping' : 'Engagement'} ${config.distance}m`;
-        await addDrill(training.id, {
-          name: drillName,
-          drill_goal: config.purpose,
-          target_type: config.targetType,
-          distance_m: config.distance,
-          rounds_per_shooter: config.shotsPlanned,
-          time_limit_seconds: config.timeLimit ?? undefined,
-          position: config.position as any,
-        });
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        setShowCommanderCustomSession(false);
-        refetch();
-      } catch (error) {
-        Alert.alert('Error', 'Failed to add session to plan.');
-      } finally {
-        setAddingCustomDrill(false);
-      }
-    },
-    [training?.id, addingCustomDrill, refetch]
-  );
 
   const loadAvailableDrills = useCallback(async () => {
     if (!training?.team_id) return;
@@ -1421,10 +1460,6 @@ export default function TrainingDetailScreen() {
         visible={showCommanderActions}
         onClose={() => setShowCommanderActions(false)}
         onAddDrill={handleOpenAddDrill}
-        onAddCustomSession={() => {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-          setShowCommanderCustomSession(true);
-        }}
         onAssignWeapon={handleOpenWeaponManagement}
         onFinishTraining={handleFinishTraining}
         onSettings={() => setShowSettings(true)}
@@ -1440,15 +1475,6 @@ export default function TrainingDetailScreen() {
         colors={colors}
       />
 
-      <StartDrillSheet
-        visible={!!selectedDrillToStart}
-        onClose={() => setSelectedDrillToStart(null)}
-        drill={selectedDrillToStart}
-        trainingId={training?.id}
-        teamId={training?.team_id}
-        initialWeapon={userWeapon}
-      />
-
       <AddDrillModal
         visible={showAddDrill}
         onClose={() => setShowAddDrill(false)}
@@ -1462,16 +1488,95 @@ export default function TrainingDetailScreen() {
         colors={colors}
       />
 
-      {/* Commander: Custom Session → Add to Plan */}
-      <CustomSessionCard
-        visible={showCommanderCustomSession}
-        onClose={() => setShowCommanderCustomSession(false)}
-        hideTrigger
-        onStartSession={handleAddCustomDrill}
-        hasWeapon={true}
-        isStarting={addingCustomDrill}
-        isWatchConnected={false}
-      />
+      {/* Squad Session Sheet */}
+      <Modal
+        visible={showSquadSheet}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowSquadSheet(false)}
+      >
+        <View style={styles.weaponPickerOverlay}>
+          <TouchableOpacity
+            style={styles.weaponPickerBackdrop}
+            activeOpacity={1}
+            onPress={() => setShowSquadSheet(false)}
+          />
+          <View style={[styles.weaponPickerSheet, { backgroundColor: colors.card }]}>
+            {/* Header */}
+            <View style={styles.weaponPickerSheetHeader}>
+              <Text style={[styles.weaponPickerSheetTitle, { color: colors.text }]}>
+                Start Session
+              </Text>
+              <TouchableOpacity
+                onPress={() => setShowSquadSheet(false)}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <X size={20} color={colors.textMuted} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Drill Info */}
+            {squadSheetDrill && (
+              <View style={[styles.squadDrillInfo, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
+                <Text style={[styles.squadDrillName, { color: colors.text }]}>
+                  {squadSheetDrill.name || 'Engagement Drill'}
+                </Text>
+                <Text style={[styles.squadDrillMeta, { color: colors.textMuted }]}>
+                  {squadSheetDrill.distance_m && `${squadSheetDrill.distance_m}m`}
+                  {squadSheetDrill.distance_m && squadSheetDrill.rounds_per_shooter && ' · '}
+                  {squadSheetDrill.rounds_per_shooter && `${squadSheetDrill.rounds_per_shooter} rounds`}
+                </Text>
+              </View>
+            )}
+
+            {/* Engagement Mode Toggle */}
+            <View style={{ paddingHorizontal: 20 }}>
+              <EngagementModeToggle
+                value={engagementMode}
+                onChange={setEngagementMode}
+                disabled={creatingSquadSession}
+              />
+            </View>
+
+            {/* Invite Participants Panel (only for squad mode) */}
+            {engagementMode === 'squad' && training?.team_id && (
+              <View style={{ paddingHorizontal: 20 }}>
+                <InviteParticipantsPanel
+                  teamId={training.team_id}
+                  invitedUserIds={invitedUserIds}
+                  onInvitedChange={setInvitedUserIds}
+                />
+              </View>
+            )}
+
+            {/* Start Button */}
+            <TouchableOpacity
+              style={[
+                styles.squadStartButton,
+                { backgroundColor: colors.primary },
+                creatingSquadSession && { opacity: 0.7 },
+              ]}
+              onPress={handleSquadSheetConfirm}
+              disabled={creatingSquadSession}
+              activeOpacity={0.8}
+            >
+              {creatingSquadSession ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <>
+                  <Play size={18} color="#fff" fill="#fff" />
+                  <Text style={styles.squadStartButtonText}>
+                    {engagementMode === 'squad' 
+                      ? `Start Squad Session${invitedUserIds.length > 0 ? ` (${invitedUserIds.length + 1} shooters)` : ''}`
+                      : 'Start Solo Session'
+                    }
+                  </Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       {/* Weapon Picker Modal */}
       <Modal
@@ -1913,6 +2018,50 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     marginTop: 4,
   },
+  // Tab Content
+  tabContent: {
+    marginTop: 12,
+    gap: 12,
+  },
+  sessionsList: {
+    gap: 10,
+  },
+  emptyTab: {
+    alignItems: 'center',
+    paddingVertical: 32,
+    paddingHorizontal: 20,
+    borderRadius: 14,
+    borderWidth: 1,
+    gap: 8,
+  },
+  emptyTabTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginTop: 4,
+  },
+  emptyTabHint: {
+    fontSize: 12,
+    textAlign: 'center',
+  },
+  squadEngagementBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 14,
+    marginTop: 8,
+  },
+  squadEngagementBtnText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  drillsSection: {
+    marginTop: 20,
+    gap: 12,
+  },
   activitySection: {
     marginTop: 20,
     gap: 16,
@@ -2082,5 +2231,38 @@ const styles = StyleSheet.create({
   },
   weaponPickerEmptyText: {
     fontSize: 14,
+  },
+  // Squad Session Sheet Styles
+  squadDrillInfo: {
+    marginHorizontal: 20,
+    marginBottom: 16,
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  squadDrillName: {
+    fontSize: 16,
+    fontWeight: '600',
+    letterSpacing: -0.3,
+  },
+  squadDrillMeta: {
+    fontSize: 13,
+    marginTop: 4,
+  },
+  squadStartButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginHorizontal: 20,
+    marginTop: 16,
+    marginBottom: 8,
+    height: 52,
+    borderRadius: 14,
+    gap: 8,
+  },
+  squadStartButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
   },
 });

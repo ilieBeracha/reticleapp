@@ -29,6 +29,7 @@ function featureToSession(f: DashboardFeature): SessionWithDetails {
     session_mode: 'solo',
     status: 'completed', // Only completed sessions have features
     watch_controlled: false,
+    engagement_mode: 'solo',
     started_at: f.created_at,
     ended_at: null,
     created_at: f.created_at,

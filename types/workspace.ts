@@ -211,7 +211,11 @@ export interface TrainingDrill {
   target_size?: TargetSize | null;
   target_exposure_seconds?: number | null;
   movement_distance_m?: number | null;
-  
+
+  // === SQUAD ENGAGEMENT ===
+  /** For engagement drills: solo (default) or squad */
+  engagement_mode?: 'solo' | 'squad' | null;
+
   // === INSTANCE-SPECIFIC ===
   instance_notes?: string | null;          // Notes specific to this training
   notes?: string | null;                   // Legacy notes field
@@ -287,6 +291,10 @@ export interface CreateTrainingDrillInput {
   target_size?: TargetSize;
   target_exposure_seconds?: number;
   movement_distance_m?: number;
+
+  // === SQUAD ENGAGEMENT ===
+  /** For engagement drills: solo (default) or squad */
+  engagement_mode?: 'solo' | 'squad';
   
   // === INSTANCE-SPECIFIC ===
   instance_notes?: string;

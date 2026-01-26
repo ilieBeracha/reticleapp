@@ -7,10 +7,11 @@
 
 import { TargetCard } from '@/components/session/TargetCard';
 import { WeatherStrip } from '@/components/session/WeatherDisplay';
-import { COLORS, formatTime, SessionPrepView, styles, useActiveSession } from '@/components/session/activeSession';
+import { COLORS, formatTime, SessionPrepView, SquadSessionView, styles, useActiveSession } from '@/components/session/activeSession';
 import { PAPER_TYPE } from '@/constants';
 import { isGroupingPaper, isPaperTarget } from '@/constants/drill';
 import { useColors } from '@/hooks/ui/useColors';
+import { supabase } from '@/lib/supabase';
 import { useOpenWeather } from '@/hooks/useOpenWeather';
 import { isGroupingSession } from '@/utils/drillGoal';
 import { formatMaxShots } from '@/utils/drillShots';
@@ -31,7 +32,7 @@ import {
   X,
   Zap
 } from 'lucide-react-native';
-import { useCallback } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -252,9 +253,20 @@ export default function ActiveSessionScreen() {
     handleContinueWithoutWatch,
     handleRetryWatchConnection,
     canAddTarget,
+    isSquadEngagement,
+    participants,
+    loadData,
   } = useActiveSession({ sessionId });
 
   const { weather, loading: weatherLoading, error: weatherError } = useOpenWeather();
+
+  // Get current user ID for squad session commander check
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) setCurrentUserId(user.id);
+    });
+  }, []);
 
   const renderEmpty = useCallback(
     () => (
@@ -358,6 +370,31 @@ export default function ActiveSessionScreen() {
               }
         }
         onClose={handleClose}
+      />
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SQUAD SESSION: Collaborative data entry mode
+  // Show for any squad engagement (even with 0 participants - commander can start alone)
+  // ═══════════════════════════════════════════════════════════════════════════
+  if (isSquadEngagement) {
+    const isCommander = currentUserId === session.user_id;
+    return (
+      <SquadSessionView
+        sessionId={sessionId}
+        session={{
+          id: session.id,
+          user_id: session.user_id,
+          drill_name: session.drill_name,
+          drill_config: session.drill_config as any,
+          training_id: session.training_id,
+        }}
+        participants={participants}
+        targets={targets}
+        isCommander={isCommander}
+        onRefresh={loadData}
+        onEndSession={handleEndSession}
       />
     );
   }

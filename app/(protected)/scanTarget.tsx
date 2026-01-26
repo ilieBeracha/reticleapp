@@ -5,13 +5,14 @@ import { useLocalSearchParams } from 'expo-router';
 /**
  * SCAN TARGET - Paper Target Scanning
  *
- * Route: /(protected)/scanTarget?sessionId=xxx&distance=100&maxShots=30&drillGoal=grouping
+ * Route: /(protected)/scanTarget?sessionId=xxx&distance=100&maxShots=30&drillGoal=grouping&participantId=xxx
  *
  * Goes directly to camera for scanning paper targets.
  * drillGoal determines whether to save as grouping (dispersion only) or achievement (hit %)
+ * participantId is used for squad sessions to associate the target with a specific participant
  */
 export default function ScanTargetSheet() {
-  const { sessionId, distance, maxShots, bullets, locked, drillGoal, autoFinish } = useLocalSearchParams<{
+  const { sessionId, distance, maxShots, bullets, locked, drillGoal, autoFinish, participantId } = useLocalSearchParams<{
     sessionId: string;
     distance?: string;
     maxShots?: string;
@@ -20,6 +21,8 @@ export default function ScanTargetSheet() {
     locked?: string;
     drillGoal?: 'grouping' | 'achievement';
     autoFinish?: string;
+    /** For squad sessions: associates target with specific participant */
+    participantId?: string;
   }>();
 
   if (!sessionId) {
@@ -40,6 +43,7 @@ export default function ScanTargetSheet() {
       lockDistance={locked === '1'}
       paperType={paperType}
       autoFinishSession={autoFinish === '1'}
+      participantId={participantId}
     />
   );
 }

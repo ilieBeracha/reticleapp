@@ -30,7 +30,9 @@ import { useSessionStore } from '@/store/sessionStore';
 import { isGroupingDrill } from '@/utils/drillGoal';
 import { isInfiniteShots } from '@/utils/drillShots';
 
-import { useSessionRealtime } from '@/hooks/realtime';
+import { useParticipantsRealtime, useSessionRealtime } from '@/hooks/realtime';
+import { getSessionParticipants } from '@/services/session/participants';
+import type { EngagementParticipant } from '@/services/session/types';
 import { deriveDetectionConfig } from '@/utils/detectionSensitivity';
 import { SHOT_MARKING_ENABLED, TIMER_INTERVAL_MS, VIBRATE_ON_SHOT } from './activeSession.constants';
 import {
@@ -154,6 +156,9 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
   // Garmin notification tracking
   const garminNotifiedRef = useRef(false);
 
+  // Squad engagement participants
+  const [participants, setParticipants] = useState<EngagementParticipant[]>([]);
+
   // ============================================================================
   // DATA LOADING
   // ============================================================================
@@ -173,6 +178,12 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
       setSession(sessionData);
       setTargets(targetsData);
       setStats(statsData);
+
+      // Load participants for squad engagement sessions
+      if (sessionData?.engagement_mode === 'squad') {
+        const participantsData = await getSessionParticipants(sessionId);
+        setParticipants(participantsData);
+      }
     } catch (error) {
       console.error('[Session] Failed to load:', error);
     } finally {
@@ -542,6 +553,26 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
     ),
   });
 
+  // Squad engagement participants realtime
+  const isSquadEngagement = session?.engagement_mode === 'squad';
+  useParticipantsRealtime({
+    engagementId: session?.engagement?.id || null,
+    sessionId, // deprecated fallback
+    enabled: !!sessionId && isSquadEngagement,
+    onParticipantAdded: useCallback(() => {
+      console.log('[ActiveSession] Realtime: Participant added, refreshing...');
+      loadData();
+    }, [loadData]),
+    onParticipantChanged: useCallback(() => {
+      console.log('[ActiveSession] Realtime: Participant changed, refreshing...');
+      loadData();
+    }, [loadData]),
+    onParticipantRemoved: useCallback(() => {
+      console.log('[ActiveSession] Realtime: Participant removed, refreshing...');
+      loadData();
+    }, [loadData]),
+  });
+
   // ============================================================================
   // ACTIONS
   // ============================================================================
@@ -907,6 +938,10 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
 
     // Completion modal
     showCompletionModal,
+
+    // Squad engagement
+    isSquadEngagement,
+    participants,
 
     // Actions
     loadData,

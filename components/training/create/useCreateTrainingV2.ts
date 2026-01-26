@@ -343,6 +343,8 @@ export function useCreateTrainingV2({ teamIdParam }: UseCreateTrainingV2Params):
         time_limit_seconds: d.config.time_limit_seconds ?? undefined,
         strings_count: d.config.strings_count,
         position: d.config.position ?? undefined,
+        // Squad engagement mode
+        engagement_mode: d.config.engagement_mode ?? undefined,
         // Store canonical drill reference in notes for future reference
         notes: d.drill_id ? `canonical:${d.drill_id}` : undefined,
       }));

@@ -70,6 +70,8 @@ export interface DrillConfig {
   time_limit_seconds?: number | null;
   position?: ShootingPosition | null;
   strings_count: number;
+  /** For engagement drills: solo (default) or squad */
+  engagement_mode?: 'solo' | 'squad';
 }
 
 /**

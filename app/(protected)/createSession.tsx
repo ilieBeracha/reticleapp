@@ -1,20 +1,30 @@
 /**
  * CREATE SESSION - Single Page
  *
+ * Engagement is the atomic execution unit.
+ * Squad logic MUST live here.
+ * Training and Session must remain passive context.
+ *
  * All configuration in one view: purpose toggle, weapon, drill details.
  * Presets available via header bookmark icon.
  */
 
 import { CaptureModePickerInline, type CaptureMode } from '@/components/session/CaptureModePicker';
-import { SessionContextStep, useSessionCreation } from '@/components/session/creation';
+import {
+  EngagementModeToggle,
+  SessionContextStep,
+  useSessionCreation,
+} from '@/components/session/creation';
 import type { Position, SessionPurpose } from '@/components/session/creation/sessionCreation.types';
 import { DrillPresetPicker, PresetForm } from '@/components/shared/drills';
 import { CreateWeaponFlow, WeaponPicker } from '@/components/weapons';
 import { getCategoryConfig } from '@/constants/weaponCategories';
 import { useColors } from '@/hooks/ui/useColors';
 import { useOpenWeather } from '@/hooks/useOpenWeather';
+import { usePermissions } from '@/hooks/usePermissions';
 import type { DrillPreset } from '@/services/presetService';
-import type { BaseSessionConfig } from '@/services/session/types';
+import { createEngagement } from '@/services/session/participants';
+import type { BaseSessionConfig, EngagementMode } from '@/services/session/types';
 import { createSession, deleteSession, getMyActiveSession } from '@/services/sessionService';
 import { type UserWeapon } from '@/services/weaponService';
 import { toSessionWeatherData } from '@/services/weather';
@@ -32,9 +42,13 @@ export default function CreateSessionScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { loadSessions } = useSessionStore();
+  const { canManageTraining } = usePermissions();
 
   // Fetch weather in background (non-blocking)
   const { weather: openWeather } = useOpenWeather({ autoFetch: true });
+  
+  // Squad mode state
+  const [engagementMode, setEngagementMode] = useState<EngagementMode>('solo');
 
   const params = useLocalSearchParams<{
     editSessionId?: string;
@@ -48,10 +62,18 @@ export default function CreateSessionScreen() {
     targetType?: string;
     returnTo?: string;
     returnId?: string;
+    // Team context - when passed, this is a team session
+    teamId?: string;
+    trainingId?: string;
   }>();
 
   const isEditMode = !!params.editSessionId;
   const hasReturnDestination = !!params.returnTo;
+  
+  // Team context from params (NOT from store - explicit is better)
+  const teamId = params.teamId || null;
+  const trainingId = params.trainingId || null;
+  const isTeamSession = !!teamId;
 
   const [checkingSession, setCheckingSession] = useState(true);
   const [showPresetPicker, setShowPresetPicker] = useState(false);
@@ -136,6 +158,8 @@ export default function CreateSessionScreen() {
   );
 
   async function handleSubmit(config: BaseSessionConfig) {
+    const isSquadMode = engagementMode === 'squad';
+    
     try {
       // Attach weather data and capture mode
       const sessionWeather = toSessionWeatherData(openWeather, 'openweathermap');
@@ -145,6 +169,9 @@ export default function CreateSessionScreen() {
         ...config,
         weather: sessionWeather,
         watch_controlled: isWatchMode,
+        // Include team and training if this is a team session
+        team_id: teamId,
+        training_id: trainingId,
         // Include sensitivity in drill config when using watch
         drill_config: config.drill_config
           ? {
@@ -154,25 +181,52 @@ export default function CreateSessionScreen() {
           : null,
       };
 
+      // Step 1: Create session
       const session = await createSession(finalConfig);
+      
+      // Step 2: Create engagement
+      // Squad engagements start as 'pending' (waiting for participants)
+      // Solo engagements start as 'active' (ready to go)
+      const engagement = await createEngagement({
+        sessionId: session.id,
+        engagementMode,
+        status: isSquadMode ? 'pending' : 'active',
+      });
+
       await loadSessions();
 
-      // Navigate to activeSession with return info
-      router.replace({
-        pathname: '/(protected)/activeSession',
-        params: {
-          sessionId: session.id,
-          ...(hasReturnDestination && {
-            returnTo: params.returnTo,
-            returnId: params.returnId,
-          }),
-        },
-      });
+      // Navigate based on mode:
+      // - Squad mode: back to training detail (commander invites from there)
+      // - Solo mode: directly to active session
+      if (isSquadMode && trainingId) {
+        // Squad engagement created - go back to training where commander can invite
+        router.replace({
+          pathname: '/(protected)/trainingDetail',
+          params: { id: trainingId },
+        });
+      } else {
+        router.replace({
+          pathname: '/(protected)/activeSession',
+          params: {
+            sessionId: session.id,
+            engagementId: engagement.id,
+            ...(hasReturnDestination && {
+              returnTo: params.returnTo,
+              returnId: params.returnId,
+            }),
+          },
+        });
+      }
     } catch (error: any) {
       console.error('[CreateSession] Failed:', error);
       Alert.alert('Error', error.message || 'Failed to start session');
     }
   }
+
+  const handleModeChange = useCallback((mode: EngagementMode) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setEngagementMode(mode);
+  }, []);
 
   const handleStartPress = useCallback(() => {
     creation.submit();
@@ -285,6 +339,11 @@ export default function CreateSessionScreen() {
   }
 
   const hasWeapon = creation.state.context.weaponId !== null;
+  const isEngagementPurpose = creation.state.purpose === 'engagement';
+  // Squad toggle only shows for team sessions + engagement + commander permissions
+  const showSquadToggle = isTeamSession && isEngagementPurpose && canManageTraining;
+  const isSquadMode = engagementMode === 'squad';
+  
   const canStart =
     creation.state.purpose !== null &&
     hasWeapon &&
@@ -305,7 +364,9 @@ export default function CreateSessionScreen() {
           </TouchableOpacity>
 
           <View style={styles.headerCenter}>
-            <Text style={[styles.headerTitle, { color: colors.text }]}>New Session</Text>
+            <Text style={[styles.headerTitle, { color: colors.text }]}>
+              {isTeamSession ? 'Team Session' : 'New Session'}
+            </Text>
           </View>
 
           <TouchableOpacity
@@ -412,6 +473,26 @@ export default function CreateSessionScreen() {
           )}
         </View>
 
+        {/* Squad Mode Toggle - only for engagement with active team */}
+        {showSquadToggle && (
+          <View style={styles.squadSection}>
+            <EngagementModeToggle
+              value={engagementMode}
+              onChange={handleModeChange}
+              disabled={!hasWeapon}
+            />
+          </View>
+        )}
+
+        {/* Squad mode hint */}
+        {isSquadMode && (
+          <View style={[styles.squadHint, { backgroundColor: colors.card }]}>
+            <Text style={[styles.squadHintText, { color: colors.textMuted }]}>
+              Squad engagement will be created. Invite participants from the training screen.
+            </Text>
+          </View>
+        )}
+
         {/* Drill details (always visible) */}
         {creation.state.purpose && (
           <SessionContextStep
@@ -464,7 +545,9 @@ export default function CreateSessionScreen() {
             ) : (
               <>
                 <CornerDownRight size={18} color="#fff" fill="#fff" />
-                <Text style={styles.buttonText}>Start Session</Text>
+                <Text style={styles.buttonText}>
+                  {isSquadMode ? 'Create Squad Session' : 'Start Session'}
+                </Text>
               </>
             )}
           </TouchableOpacity>
@@ -609,6 +692,19 @@ const styles = StyleSheet.create({
   // Weapon section
   weaponSection: {
     marginBottom: 20,
+  },
+  // Squad section
+  squadSection: {
+    marginBottom: 16,
+  },
+  squadHint: {
+    padding: 12,
+    borderRadius: 10,
+    marginBottom: 16,
+  },
+  squadHintText: {
+    fontSize: 13,
+    textAlign: 'center',
   },
   // Capture mode section
   captureModeSection: {

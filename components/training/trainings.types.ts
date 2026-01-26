@@ -106,7 +106,6 @@ export interface UseTrainingsReturn {
   handleTabChange: (tab: InternalTab) => void;
   handleTrainingPress: (training: TrainingWithDetails) => void;
   handleCreateTraining: () => void;
-  handleOpenLibrary: () => void;
   handleOpenArmory: () => void;
   handleViewMembers: () => void;
   handleInviteMember: () => void;

@@ -6,15 +6,19 @@
 
 // Drill-related constants
 export {
-  DRILL_DEFAULTS, DRILL_GOAL,
-  DRILL_GOALS, INPUT_METHOD,
-  INPUT_METHODS, isEngagementGoal,
+  DRILL_DEFAULTS,
+  DRILL_GOAL,
+  DRILL_GOALS,
+  INPUT_METHOD,
+  INPUT_METHODS,
+  isEngagementGoal,
   isEngagementPaper,
   isGroupingGoal,
   isGroupingPaper,
   isPaperTarget,
   isTacticalTarget,
-  isValidDrillGoal, PAPER_TYPE,
+  isValidDrillGoal,
+  PAPER_TYPE,
   PAPER_TYPES,
   TARGET_TYPE,
   TARGET_TYPES
@@ -28,7 +32,8 @@ export {
   isGroupSession,
   isPendingSession,
   isSoloSession,
-  isTerminalStatus, SESSION_MODE,
+  isTerminalStatus,
+  SESSION_MODE,
   SESSION_MODES,
   SESSION_STATUS,
   SESSION_STATUSES,
@@ -46,9 +51,6 @@ export * from './garmin';
 
 // Weapon categories
 export * from './weaponCategories';
-
-// Drill library
-export * from './drillLibrary';
 
 // Category drills
 export * from './categoryDrills';

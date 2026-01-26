@@ -983,6 +983,8 @@ CREATE TABLE IF NOT EXISTS "public"."sessions" (
     "watch_controlled" boolean DEFAULT false,
     "weapon_id" "uuid",
     "weather" "jsonb",
+    "engagement_mode" "text" DEFAULT 'solo'::"text" NOT NULL,
+    CONSTRAINT "sessions_engagement_mode_check" CHECK (("engagement_mode" = ANY (ARRAY['solo'::"text", 'squad'::"text"]))),
     CONSTRAINT "sessions_session_mode_check" CHECK (("session_mode" = ANY (ARRAY['solo'::"text", 'group'::"text"]))),
     CONSTRAINT "sessions_status_check" CHECK (("status" = ANY (ARRAY['pending'::"text", 'active'::"text", 'completed'::"text", 'cancelled'::"text"])))
 );
@@ -998,6 +1000,10 @@ COMMENT ON COLUMN "public"."sessions"."drill_template_id" IS 'For quick practice
 
 
 COMMENT ON COLUMN "public"."sessions"."custom_drill_config" IS 'Inline drill configuration for quick practice sessions (no template reference)';
+
+
+
+COMMENT ON COLUMN "public"."sessions"."engagement_mode" IS 'DEPRECATED: Use engagements.engagement_mode instead';
 
 
 
@@ -1248,6 +1254,20 @@ ALTER FUNCTION "public"."generate_session_insights"("p_session_id" "uuid") OWNER
 
 COMMENT ON FUNCTION "public"."generate_session_insights"("p_session_id" "uuid") IS 'Manually trigger insight generation for a session. Computes features if needed, then calls Edge Function.';
 
+
+
+CREATE OR REPLACE FUNCTION "public"."get_engagement_session_owner"("eng_id" "uuid") RETURNS "uuid"
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+  SELECT s.user_id
+  FROM engagements e
+  JOIN sessions s ON s.id = e.session_id
+  WHERE e.id = eng_id;
+$$;
+
+
+ALTER FUNCTION "public"."get_engagement_session_owner"("eng_id" "uuid") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."get_insight_trigger_status"("p_user_id" "uuid") RETURNS TABLE("sessions_since_last" integer, "bullets_since_last" integer, "session_threshold" integer, "sessions_until_next" integer, "last_insight_at" timestamp with time zone)
@@ -1977,6 +1997,73 @@ COMMENT ON FUNCTION "public"."insert_sample_session_data"("p_user_id" "uuid") IS
 
 
 
+CREATE OR REPLACE FUNCTION "public"."is_engagement_owner"("eng_id" "uuid", "check_user_id" "uuid") RETURNS boolean
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+  SELECT EXISTS (
+    SELECT 1 
+    FROM engagements e
+    JOIN sessions s ON s.id = e.session_id
+    WHERE e.id = eng_id
+    AND s.user_id = check_user_id
+  );
+$$;
+
+
+ALTER FUNCTION "public"."is_engagement_owner"("eng_id" "uuid", "check_user_id" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."is_engagement_participant"("eng_id" "uuid", "check_user_id" "uuid") RETURNS boolean
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+  SELECT EXISTS (
+    SELECT 1 
+    FROM engagement_participants ep
+    WHERE ep.engagement_id = eng_id
+    AND ep.user_id = check_user_id
+  );
+$$;
+
+
+ALTER FUNCTION "public"."is_engagement_participant"("eng_id" "uuid", "check_user_id" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."is_engagement_team_member"("eng_id" "uuid", "check_user_id" "uuid") RETURNS boolean
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+  SELECT EXISTS (
+    SELECT 1 
+    FROM engagements e
+    JOIN sessions s ON s.id = e.session_id
+    JOIN team_members tm ON tm.team_id = s.team_id
+    WHERE e.id = eng_id
+    AND tm.user_id = check_user_id
+  );
+$$;
+
+
+ALTER FUNCTION "public"."is_engagement_team_member"("eng_id" "uuid", "check_user_id" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."is_squad_engagement"("eng_id" "uuid") RETURNS boolean
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+  SELECT EXISTS (
+    SELECT 1 
+    FROM engagements e
+    WHERE e.id = eng_id
+    AND e.engagement_mode = 'squad'
+  );
+$$;
+
+
+ALTER FUNCTION "public"."is_squad_engagement"("eng_id" "uuid") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."is_team_admin"("p_team_id" "uuid", "p_user_id" "uuid" DEFAULT "auth"."uid"()) RETURNS boolean
     LANGUAGE "sql" STABLE SECURITY DEFINER
     SET "search_path" TO 'public'
@@ -2407,6 +2494,36 @@ $$;
 
 
 ALTER FUNCTION "public"."shares_team_with"("p_other_user_id" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."update_engagement_participants_updated_at"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    AS $$
+BEGIN
+  NEW.updated_at = NOW();
+  -- Auto-set joined_at when state changes to 'joined'
+  IF NEW.state = 'joined' AND (OLD.state IS NULL OR OLD.state != 'joined') THEN
+    NEW.joined_at = NOW();
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."update_engagement_participants_updated_at"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."update_engagements_updated_at"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    AS $$
+BEGIN
+  NEW.updated_at = NOW();
+  RETURN NEW;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."update_engagements_updated_at"() OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."update_insight_triggers"("p_user_id" "uuid", "p_session_id" "uuid", "p_shots" integer) RETURNS TABLE("sessions_count" integer, "threshold_reached" boolean, "session_threshold" integer)
@@ -2876,6 +2993,67 @@ COMMENT ON COLUMN "public"."drills"."fixed_shots" IS 'If true, default_shots can
 
 
 
+CREATE TABLE IF NOT EXISTS "public"."engagement_participants" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "session_id" "uuid" NOT NULL,
+    "user_id" "uuid" NOT NULL,
+    "state" "text" DEFAULT 'pending'::"text" NOT NULL,
+    "joined_at" timestamp with time zone,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "engagement_id" "uuid" NOT NULL,
+    CONSTRAINT "engagement_participants_state_check" CHECK (("state" = ANY (ARRAY['pending'::"text", 'joined'::"text", 'left'::"text"])))
+);
+
+
+ALTER TABLE "public"."engagement_participants" OWNER TO "postgres";
+
+
+COMMENT ON TABLE "public"."engagement_participants" IS 'Tracks participants invited to squad engagement sessions';
+
+
+
+COMMENT ON COLUMN "public"."engagement_participants"."session_id" IS 'DEPRECATED: Use engagement_id instead. Will be dropped after code migration.';
+
+
+
+COMMENT ON COLUMN "public"."engagement_participants"."state" IS 'pending = invited but not responded, joined = actively participating, left = declined or left';
+
+
+
+COMMENT ON COLUMN "public"."engagement_participants"."joined_at" IS 'Timestamp when user joined (state changed to joined)';
+
+
+
+CREATE TABLE IF NOT EXISTS "public"."engagements" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "session_id" "uuid" NOT NULL,
+    "engagement_mode" "text" DEFAULT 'solo'::"text" NOT NULL,
+    "status" "text" DEFAULT 'pending'::"text" NOT NULL,
+    "started_at" timestamp with time zone,
+    "ended_at" timestamp with time zone,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    CONSTRAINT "engagements_engagement_mode_check" CHECK (("engagement_mode" = ANY (ARRAY['solo'::"text", 'squad'::"text"]))),
+    CONSTRAINT "engagements_status_check" CHECK (("status" = ANY (ARRAY['pending'::"text", 'active'::"text", 'completed'::"text", 'cancelled'::"text"])))
+);
+
+
+ALTER TABLE "public"."engagements" OWNER TO "postgres";
+
+
+COMMENT ON TABLE "public"."engagements" IS 'Execution unit. Squad logic lives here. Session is passive setup context.';
+
+
+
+COMMENT ON COLUMN "public"."engagements"."session_id" IS 'Reference to session setup (weapon, team, drill config)';
+
+
+
+COMMENT ON COLUMN "public"."engagements"."engagement_mode" IS 'solo = individual execution, squad = team members participating together';
+
+
+
 CREATE TABLE IF NOT EXISTS "public"."notification_history" (
     "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
     "user_id" "uuid" NOT NULL,
@@ -3061,6 +3239,7 @@ CREATE TABLE IF NOT EXISTS "public"."session_targets" (
     "planned_shots" integer,
     "target_data" "jsonb",
     "created_at" timestamp with time zone DEFAULT "now"(),
+    "participant_id" "uuid",
     CONSTRAINT "session_targets_target_type_check" CHECK (("target_type" = ANY (ARRAY['paper'::"text", 'tactical'::"text"])))
 );
 
@@ -3068,6 +3247,10 @@ ALTER TABLE ONLY "public"."session_targets" REPLICA IDENTITY FULL;
 
 
 ALTER TABLE "public"."session_targets" OWNER TO "postgres";
+
+
+COMMENT ON COLUMN "public"."session_targets"."participant_id" IS 'For squad sessions: links target result to specific participant. NULL for solo sessions.';
+
 
 
 CREATE TABLE IF NOT EXISTS "public"."session_timelines" (
@@ -3305,6 +3488,7 @@ CREATE TABLE IF NOT EXISTS "public"."training_drills" (
     "drill_id" "uuid",
     "instance_notes" "text",
     "input_method" "text",
+    "engagement_mode" "text",
     CONSTRAINT "training_drills_category_check" CHECK ((("category" IS NULL) OR ("category" = ANY (ARRAY['fundamentals'::"text", 'speed'::"text", 'accuracy'::"text", 'stress'::"text", 'tactical'::"text", 'competition'::"text", 'qualification'::"text"])))),
     CONSTRAINT "training_drills_difficulty_check" CHECK ((("difficulty" IS NULL) OR ("difficulty" = ANY (ARRAY['beginner'::"text", 'intermediate'::"text", 'advanced'::"text", 'expert'::"text"])))),
     CONSTRAINT "training_drills_input_method_check" CHECK ((("input_method" IS NULL) OR ("input_method" = ANY (ARRAY['scan'::"text", 'manual'::"text"])))),
@@ -3335,6 +3519,10 @@ COMMENT ON COLUMN "public"."training_drills"."drill_id" IS 'Reference to the sou
 
 
 COMMENT ON COLUMN "public"."training_drills"."instance_notes" IS 'Training-specific notes for this drill instance. Different from the drill''s core description.';
+
+
+
+COMMENT ON COLUMN "public"."training_drills"."engagement_mode" IS 'For engagement drills: solo (default) or squad';
 
 
 
@@ -3545,6 +3733,26 @@ ALTER TABLE ONLY "public"."drill_templates"
 
 ALTER TABLE ONLY "public"."drills"
     ADD CONSTRAINT "drills_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."engagement_participants"
+    ADD CONSTRAINT "engagement_participants_engagement_id_user_id_key" UNIQUE ("engagement_id", "user_id");
+
+
+
+ALTER TABLE ONLY "public"."engagement_participants"
+    ADD CONSTRAINT "engagement_participants_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."engagements"
+    ADD CONSTRAINT "engagements_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."engagements"
+    ADD CONSTRAINT "engagements_session_id_key" UNIQUE ("session_id");
 
 
 
@@ -3763,6 +3971,30 @@ ALTER TABLE ONLY "public"."team_invitations"
 
 
 
+CREATE INDEX "engagement_participants_engagement_id_idx" ON "public"."engagement_participants" USING "btree" ("engagement_id");
+
+
+
+CREATE INDEX "engagement_participants_session_id_idx" ON "public"."engagement_participants" USING "btree" ("session_id");
+
+
+
+CREATE INDEX "engagement_participants_state_idx" ON "public"."engagement_participants" USING "btree" ("state");
+
+
+
+CREATE INDEX "engagement_participants_user_id_idx" ON "public"."engagement_participants" USING "btree" ("user_id");
+
+
+
+CREATE INDEX "engagements_session_id_idx" ON "public"."engagements" USING "btree" ("session_id");
+
+
+
+CREATE INDEX "engagements_status_idx" ON "public"."engagements" USING "btree" ("status");
+
+
+
 CREATE INDEX "idx_drill_completions_drill" ON "public"."user_drill_completions" USING "btree" ("drill_id");
 
 
@@ -3840,6 +4072,10 @@ CREATE INDEX "idx_session_participants_session" ON "public"."session_participant
 
 
 CREATE INDEX "idx_session_participants_user" ON "public"."session_participants" USING "btree" ("user_id");
+
+
+
+CREATE INDEX "idx_session_targets_participant" ON "public"."session_targets" USING "btree" ("participant_id") WHERE ("participant_id" IS NOT NULL);
 
 
 
@@ -4071,6 +4307,14 @@ CREATE OR REPLACE TRIGGER "enforce_commander_constraints" BEFORE INSERT OR UPDAT
 
 
 
+CREATE OR REPLACE TRIGGER "engagement_participants_updated_at" BEFORE UPDATE ON "public"."engagement_participants" FOR EACH ROW EXECUTE FUNCTION "public"."update_engagement_participants_updated_at"();
+
+
+
+CREATE OR REPLACE TRIGGER "engagements_updated_at" BEFORE UPDATE ON "public"."engagements" FOR EACH ROW EXECUTE FUNCTION "public"."update_engagements_updated_at"();
+
+
+
 CREATE OR REPLACE TRIGGER "on_training_created" AFTER INSERT ON "public"."trainings" FOR EACH ROW EXECUTE FUNCTION "public"."notify_team_on_training_created"();
 
 
@@ -4122,6 +4366,26 @@ ALTER TABLE ONLY "public"."drill_templates"
 
 ALTER TABLE ONLY "public"."drill_templates"
     ADD CONSTRAINT "drill_templates_team_id_fkey" FOREIGN KEY ("team_id") REFERENCES "public"."teams"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."engagement_participants"
+    ADD CONSTRAINT "engagement_participants_engagement_id_fkey" FOREIGN KEY ("engagement_id") REFERENCES "public"."engagements"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."engagement_participants"
+    ADD CONSTRAINT "engagement_participants_session_id_fkey" FOREIGN KEY ("session_id") REFERENCES "public"."sessions"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."engagement_participants"
+    ADD CONSTRAINT "engagement_participants_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "auth"."users"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."engagements"
+    ADD CONSTRAINT "engagements_session_id_fkey" FOREIGN KEY ("session_id") REFERENCES "public"."sessions"("id") ON DELETE CASCADE;
 
 
 
@@ -4207,6 +4471,11 @@ ALTER TABLE ONLY "public"."session_stats"
 
 ALTER TABLE ONLY "public"."session_stats"
     ADD CONSTRAINT "session_stats_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."profiles"("id");
+
+
+
+ALTER TABLE ONLY "public"."session_targets"
+    ADD CONSTRAINT "session_targets_participant_id_fkey" FOREIGN KEY ("participant_id") REFERENCES "public"."profiles"("id") ON DELETE SET NULL;
 
 
 
@@ -4579,6 +4848,14 @@ CREATE POLICY "Commanders can view timelines from team trainings" ON "public"."s
 
 
 
+CREATE POLICY "Engagement owner can add participants" ON "public"."engagement_participants" FOR INSERT WITH CHECK ((("public"."get_engagement_session_owner"("engagement_id") = "auth"."uid"()) AND "public"."is_squad_engagement"("engagement_id")));
+
+
+
+CREATE POLICY "Engagement owner can delete participants" ON "public"."engagement_participants" FOR DELETE USING (("public"."get_engagement_session_owner"("engagement_id") = "auth"."uid"()));
+
+
+
 CREATE POLICY "Owners and commanders can add members" ON "public"."team_members" FOR INSERT WITH CHECK ("public"."is_team_admin"("team_id"));
 
 
@@ -4712,6 +4989,12 @@ CREATE POLICY "Team members can view teammates" ON "public"."team_members" FOR S
 
 
 CREATE POLICY "Users can cancel own pending requests" ON "public"."weapon_requests" FOR UPDATE USING ((("auth"."uid"() = "user_id") AND ("status" = 'pending'::"text"))) WITH CHECK (("status" = 'cancelled'::"text"));
+
+
+
+CREATE POLICY "Users can create engagements for their sessions" ON "public"."engagements" FOR INSERT WITH CHECK ((EXISTS ( SELECT 1
+   FROM "public"."sessions" "s"
+  WHERE (("s"."id" = "engagements"."session_id") AND ("s"."user_id" = "auth"."uid"())))));
 
 
 
@@ -4855,6 +5138,10 @@ CREATE POLICY "Users can update own notifications" ON "public"."notifications" F
 
 
 
+CREATE POLICY "Users can update own participant record" ON "public"."engagement_participants" FOR UPDATE USING (("user_id" = "auth"."uid"())) WITH CHECK (("user_id" = "auth"."uid"()));
+
+
+
 CREATE POLICY "Users can update own profile" ON "public"."profiles" FOR UPDATE USING (("id" = "auth"."uid"())) WITH CHECK (("id" = "auth"."uid"()));
 
 
@@ -4899,6 +5186,12 @@ CREATE POLICY "Users can update tactical results from own sessions" ON "public".
 
 
 
+CREATE POLICY "Users can update their own engagements" ON "public"."engagements" FOR UPDATE USING ((EXISTS ( SELECT 1
+   FROM "public"."sessions" "s"
+  WHERE (("s"."id" = "engagements"."session_id") AND ("s"."user_id" = "auth"."uid"())))));
+
+
+
 CREATE POLICY "Users can update their own personal drills" ON "public"."drill_templates" FOR UPDATE USING ((("owner_type" = 'user'::"text") AND ("owner_id" = "auth"."uid"()))) WITH CHECK ((("owner_type" = 'user'::"text") AND ("owner_id" = "auth"."uid"())));
 
 
@@ -4906,6 +5199,19 @@ CREATE POLICY "Users can update their own personal drills" ON "public"."drill_te
 CREATE POLICY "Users can update timelines for own sessions" ON "public"."session_timelines" FOR UPDATE USING ((EXISTS ( SELECT 1
    FROM "public"."sessions" "s"
   WHERE (("s"."id" = "session_timelines"."session_id") AND ("s"."user_id" = "auth"."uid"())))));
+
+
+
+CREATE POLICY "Users can view engagement participants" ON "public"."engagement_participants" FOR SELECT USING ((("user_id" = "auth"."uid"()) OR ("public"."get_engagement_session_owner"("engagement_id") = "auth"."uid"()) OR "public"."is_engagement_team_member"("engagement_id", "auth"."uid"())));
+
+
+
+CREATE POLICY "Users can view engagements" ON "public"."engagements" FOR SELECT USING (((EXISTS ( SELECT 1
+   FROM "public"."sessions" "s"
+  WHERE (("s"."id" = "engagements"."session_id") AND ("s"."user_id" = "auth"."uid"())))) OR "public"."is_engagement_participant"("id", "auth"."uid"()) OR (EXISTS ( SELECT 1
+   FROM ("public"."sessions" "s"
+     JOIN "public"."team_members" "tm" ON (("tm"."team_id" = "s"."team_id")))
+  WHERE (("s"."id" = "engagements"."session_id") AND ("tm"."user_id" = "auth"."uid"()))))));
 
 
 
@@ -5012,6 +5318,12 @@ CREATE POLICY "Users can view training drills" ON "public"."training_drills" FOR
 
 
 ALTER TABLE "public"."drill_templates" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."engagement_participants" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."engagements" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."notification_history" ENABLE ROW LEVEL SECURITY;
@@ -5236,6 +5548,12 @@ GRANT ALL ON FUNCTION "public"."generate_session_insights"("p_session_id" "uuid"
 
 
 
+GRANT ALL ON FUNCTION "public"."get_engagement_session_owner"("eng_id" "uuid") TO "anon";
+GRANT ALL ON FUNCTION "public"."get_engagement_session_owner"("eng_id" "uuid") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."get_engagement_session_owner"("eng_id" "uuid") TO "service_role";
+
+
+
 GRANT ALL ON FUNCTION "public"."get_insight_trigger_status"("p_user_id" "uuid") TO "anon";
 GRANT ALL ON FUNCTION "public"."get_insight_trigger_status"("p_user_id" "uuid") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."get_insight_trigger_status"("p_user_id" "uuid") TO "service_role";
@@ -5350,6 +5668,30 @@ GRANT ALL ON FUNCTION "public"."insert_sample_session_data"("p_user_id" "uuid") 
 
 
 
+GRANT ALL ON FUNCTION "public"."is_engagement_owner"("eng_id" "uuid", "check_user_id" "uuid") TO "anon";
+GRANT ALL ON FUNCTION "public"."is_engagement_owner"("eng_id" "uuid", "check_user_id" "uuid") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."is_engagement_owner"("eng_id" "uuid", "check_user_id" "uuid") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."is_engagement_participant"("eng_id" "uuid", "check_user_id" "uuid") TO "anon";
+GRANT ALL ON FUNCTION "public"."is_engagement_participant"("eng_id" "uuid", "check_user_id" "uuid") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."is_engagement_participant"("eng_id" "uuid", "check_user_id" "uuid") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."is_engagement_team_member"("eng_id" "uuid", "check_user_id" "uuid") TO "anon";
+GRANT ALL ON FUNCTION "public"."is_engagement_team_member"("eng_id" "uuid", "check_user_id" "uuid") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."is_engagement_team_member"("eng_id" "uuid", "check_user_id" "uuid") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."is_squad_engagement"("eng_id" "uuid") TO "anon";
+GRANT ALL ON FUNCTION "public"."is_squad_engagement"("eng_id" "uuid") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."is_squad_engagement"("eng_id" "uuid") TO "service_role";
+
+
+
 GRANT ALL ON FUNCTION "public"."is_team_admin"("p_team_id" "uuid", "p_user_id" "uuid") TO "anon";
 GRANT ALL ON FUNCTION "public"."is_team_admin"("p_team_id" "uuid", "p_user_id" "uuid") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."is_team_admin"("p_team_id" "uuid", "p_user_id" "uuid") TO "service_role";
@@ -5422,6 +5764,18 @@ GRANT ALL ON FUNCTION "public"."shares_team_with"("p_other_user_id" "uuid") TO "
 
 
 
+GRANT ALL ON FUNCTION "public"."update_engagement_participants_updated_at"() TO "anon";
+GRANT ALL ON FUNCTION "public"."update_engagement_participants_updated_at"() TO "authenticated";
+GRANT ALL ON FUNCTION "public"."update_engagement_participants_updated_at"() TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."update_engagements_updated_at"() TO "anon";
+GRANT ALL ON FUNCTION "public"."update_engagements_updated_at"() TO "authenticated";
+GRANT ALL ON FUNCTION "public"."update_engagements_updated_at"() TO "service_role";
+
+
+
 GRANT ALL ON FUNCTION "public"."update_insight_triggers"("p_user_id" "uuid", "p_session_id" "uuid", "p_shots" integer) TO "anon";
 GRANT ALL ON FUNCTION "public"."update_insight_triggers"("p_user_id" "uuid", "p_session_id" "uuid", "p_shots" integer) TO "authenticated";
 GRANT ALL ON FUNCTION "public"."update_insight_triggers"("p_user_id" "uuid", "p_session_id" "uuid", "p_shots" integer) TO "service_role";
@@ -5467,6 +5821,18 @@ GRANT ALL ON TABLE "public"."drill_templates" TO "service_role";
 GRANT ALL ON TABLE "public"."drills" TO "anon";
 GRANT ALL ON TABLE "public"."drills" TO "authenticated";
 GRANT ALL ON TABLE "public"."drills" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."engagement_participants" TO "anon";
+GRANT ALL ON TABLE "public"."engagement_participants" TO "authenticated";
+GRANT ALL ON TABLE "public"."engagement_participants" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."engagements" TO "anon";
+GRANT ALL ON TABLE "public"."engagements" TO "authenticated";
+GRANT ALL ON TABLE "public"."engagements" TO "service_role";
 
 
 

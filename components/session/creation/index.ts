@@ -1,16 +1,8 @@
 /**
  * Session Creation Module
  *
- * Unified session creation for both solo and training contexts.
- *
- * Components:
- * - SessionCreationForm: Unified form component (use this for new implementations)
- * - SessionIntentStep: Goal selection (grouping/engagement)
- * - SessionContextStep: Session details (weapon, distance, etc.)
- *
- * After form submission:
- * - SessionPrepView handles watch/phone selection
- * - activeSession.tsx handles scan/manual (based on drill config)
+ * All session creation happens through createSession.tsx screen.
+ * This module provides the components used by that screen.
  */
 
 // Types
@@ -19,26 +11,11 @@ export * from './sessionCreation.types';
 // Constants
 export * from './sessionCreation.constants';
 
-// Hook (legacy - consider using SessionCreationForm directly)
+// Hook
 export { useSessionCreation } from './useSessionCreation';
 export type { TrainingContext, UseSessionCreationOptions, UseSessionCreationReturn } from './useSessionCreation';
 
-// Unified Form Component (recommended)
-export { SessionCreationForm } from './SessionCreationForm';
-export type {
-  DrillContext,
-  TrainingContext as FormTrainingContext, SessionCreationFormProps,
-  SessionFormValues
-} from './SessionCreationForm';
-
-// Modal/Sheet wrapper (drop-in replacement for StartDrillSheet)
-export { SessionCreationSheet } from './SessionCreationSheet';
-export type { SessionCreationSheetProps } from './SessionCreationSheet';
-
-// Step Components (used internally by SessionCreationForm)
+// Components used by createSession.tsx
 export { SessionContextStep } from './SessionContextStep';
-export { SessionIntentStep } from './SessionIntentStep';
-
-// Note: SessionWeaponStep is still available but no longer used as a separate step
-// Weapon selection is now integrated as a sheet in the Details step
-export { SessionWeaponStep } from './SessionWeaponStep';
+export { EngagementModeToggle } from './EngagementModeToggle';
+export { InviteParticipantsPanel } from './InviteParticipantsPanel';

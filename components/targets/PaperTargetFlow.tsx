@@ -32,6 +32,8 @@ interface PaperTargetFlowProps {
   lockDistance?: boolean;
   paperType?: PaperType; // grouping (dispersion) or achievement (hit %)
   autoFinishSession?: boolean;
+  /** For squad sessions: associates target with specific participant */
+  participantId?: string;
   onComplete?: () => void;
   onCancel?: () => void;
 }
@@ -43,6 +45,7 @@ export function PaperTargetFlow({
   lockDistance = false,
   paperType: propPaperType = 'grouping',
   autoFinishSession = false,
+  participantId,
   onComplete,
   onCancel,
 }: PaperTargetFlowProps) {
@@ -223,6 +226,7 @@ export function PaperTargetFlow({
         // - hits_total = detected holes (all detected are hits on paper)
         // - planned_shots = drill's max shots cap for tracking (null = infinite)
         // - actual_shots_declared = optional user input for accurate accuracy %
+        // - participant_id = for squad sessions, links to specific participant
         await addTargetWithPaperResult({
           session_id: sessionId,
           distance_m: distance,
@@ -230,6 +234,7 @@ export function PaperTargetFlow({
           planned_shots: finiteShotsOrNull(maxShots),
           notes: paperNotes || null,
           target_data: null,
+          participant_id: participantId, // For squad sessions
           paper_type: paperType,
           bullets_fired: detectionCount, // Scan determines actual shots
           hits_total: detectionCount, // All detected holes are hits

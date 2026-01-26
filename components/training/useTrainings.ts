@@ -200,11 +200,6 @@ export function useTrainings(): UseTrainingsReturn {
     router.push(`/(protected)/createTraining?teamId=${activeTeamId}` as any);
   }, [activeTeamId]);
 
-  const handleOpenLibrary = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    router.push('/(protected)/drillLibrary' as any);
-  }, []);
-
   const handleViewMembers = useCallback(() => {
     if (!activeTeamId) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -271,7 +266,6 @@ export function useTrainings(): UseTrainingsReturn {
     handleTabChange,
     handleTrainingPress,
     handleCreateTraining,
-    handleOpenLibrary,
     handleOpenArmory,
     handleViewMembers,
     handleInviteMember,

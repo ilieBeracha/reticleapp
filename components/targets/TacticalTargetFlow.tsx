@@ -317,6 +317,8 @@ interface TacticalTargetFlowProps {
   /** When true, shows group size (cm) input instead of hits counter */
   isGrouping?: boolean;
   showTimeInput?: boolean;
+  /** For squad sessions: associates target with specific participant */
+  participantId?: string;
   onComplete?: () => void;
   onCancel?: () => void;
 }
@@ -329,6 +331,7 @@ export function TacticalTargetFlow({
   lockBullets = false,
   isGrouping = false,
   showTimeInput = true,
+  participantId,
   onComplete,
   onCancel,
 }: TacticalTargetFlowProps) {
@@ -406,6 +409,7 @@ export function TacticalTargetFlow({
           distance_m: distance,
           lane_number: null,
           planned_shots: groupingShots,
+          participant_id: participantId, // For squad sessions
           paper_type: PAPER_TYPE.GROUPING,
           bullets_fired: groupingShots,
           dispersion_cm: parseFloat(groupSizeCm),
@@ -420,6 +424,7 @@ export function TacticalTargetFlow({
           distance_m: distance,
           lane_number: null,
           planned_shots: bullets, // From drill config
+          participant_id: participantId, // For squad sessions
           bullets_fired: bullets, // How many were actually fired
           hits: hits, // How many hit
           is_stage_cleared: stageCleared,

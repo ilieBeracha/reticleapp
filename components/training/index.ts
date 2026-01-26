@@ -1,14 +1,8 @@
 // Components
+export { ActiveSquadEngagementsCard } from './ActiveSquadEngagementsCard';
 export { DrillCard } from './DrillCard';
-export { DrillsSection } from './DrillsSection';
-export { InfoCards } from './InfoCards';
 export { ParticipantInsights } from './ParticipantInsights';
-export { SessionCard } from './SessionCard';
-export { SessionsSection } from './SessionsSection';
-export { TrainingActions } from './TrainingActions';
-export { TrainingHeader } from './TrainingHeader';
-export { TrainingStartModal } from './TrainingStartModal';
-export { TrainingSummary } from './TrainingSummary';
+export { SquadInvitationBanner } from './SquadInvitationBanner';
 
 // Hooks
 export { useTrainingActions, useTrainingDetail } from './hooks';
@@ -25,5 +19,3 @@ export type {
     TrainingStatus,
     TrainingWithDetails
 } from './types';
-
-export type { AggregateStats, ParticipantStats } from './TrainingSummary';

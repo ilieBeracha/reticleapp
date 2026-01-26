@@ -4,16 +4,8 @@
  * Organized components for the active session screen
  */
 
-// Active session components
-export { EmptyTargets } from './EmptyTargets';
-export { SessionHeader } from './SessionHeader';
-export { StatCard } from './StatCard';
 export { TargetCard } from './TargetCard';
-export { TargetDetailModal } from './TargetDetailModal';
-
 // Prompts
-export { SaveDrillPrompt } from './SaveDrillPrompt';
-export { useWatchControlPrompt, WatchControlPrompt } from './WatchControlPrompt';
 
 // Capture mode selection
 export { CaptureModePicker, CaptureModePickerInline } from './CaptureModePicker';

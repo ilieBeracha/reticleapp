@@ -196,6 +196,9 @@ export async function createSession(params: CreateSessionParams | BaseSessionCon
   // Always set started_at - database requires it. Status indicates pending vs active.
   const startedAt = new Date().toISOString();
 
+  // Engagement mode - only valid for engagement drills, defaults to 'solo'
+  const engagementMode = config.engagement_mode ?? 'solo';
+
   // Direct insert for all sessions (RLS handles permissions)
   const { data, error } = await supabase
     .from('sessions')
@@ -209,6 +212,7 @@ export async function createSession(params: CreateSessionParams | BaseSessionCon
       custom_drill_config: customDrillConfig,
       session_mode: config.session_mode,
       watch_controlled: config.watch_controlled,
+      engagement_mode: engagementMode, // solo or squad
       status,
       started_at: startedAt,
       weather: config.weather ?? null, // Weather data from OpenWeatherMap
@@ -674,6 +678,8 @@ export async function addTargetWithPaperResult(params: {
   planned_shots?: number | null;
   notes?: string | null;
   target_data?: Record<string, any> | null;
+  /** For squad sessions: links target to specific participant */
+  participant_id?: string | null;
   // Paper result params
   paper_type: PaperType;
   bullets_fired: number;
@@ -704,6 +710,7 @@ export async function addTargetWithPaperResult(params: {
     planned_shots: params.planned_shots ?? params.bullets_fired,
     notes: params.notes,
     target_data: params.target_data,
+    participant_id: params.participant_id, // For squad sessions
   });
   console.log('[SessionService] Target created:', target.id);
 
@@ -740,6 +747,8 @@ export async function addTargetWithTacticalResult(params: {
   planned_shots?: number | null;
   notes?: string | null;
   target_data?: Record<string, any> | null;
+  /** For squad sessions: links target to specific participant */
+  participant_id?: string | null;
   // Tactical result params
   bullets_fired: number;
   hits: number;
@@ -762,6 +771,7 @@ export async function addTargetWithTacticalResult(params: {
     planned_shots: params.planned_shots ?? params.bullets_fired,
     notes: params.notes,
     target_data: params.target_data,
+    participant_id: params.participant_id, // For squad sessions
   });
 
   // Then save the tactical result
