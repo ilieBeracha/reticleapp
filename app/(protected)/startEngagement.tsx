@@ -28,17 +28,17 @@ import { supabase } from '@/lib/supabase';
 import type { DrillPreset } from '@/services/presetService';
 import { createEngagement } from '@/services/session/participants';
 import type { DrillGoal, EngagementMode } from '@/services/session/types';
-import { getOrCreateSetupSession, deleteSession, getMyActiveSession } from '@/services/sessionService';
+import { deleteSession, getMyActiveSession, getOrCreateSetupSession } from '@/services/sessionService';
 import { getUserWeapon, type UserWeapon } from '@/services/weaponService';
 import { toSessionWeatherData } from '@/services/weather';
-import { useSessionStore } from '@/store/sessionStore';
 import { useGarminDevice, useIsGarminConnected } from '@/store/garminStore';
+import { useSessionStore } from '@/store/sessionStore';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from 'expo-router';
-import { ChevronRight, CornerDownRight, Crosshair, Minus, Plus, Target, Users } from 'lucide-react-native';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { ChevronRight, CornerDownRight, Crosshair, Minus, Plus, Target } from 'lucide-react-native';
+import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -90,7 +90,7 @@ export default function StartEngagementScreen() {
     drillName?: string;
     // Execution policy: how strict is the drill configuration?
     // 'locked' = must execute exactly as defined
-    // 'guided' = defaults pre-filled, user may change  
+    // 'guided' = defaults pre-filled, user may change
     // 'free' = no constraints, full freedom
     executionPolicy?: 'locked' | 'guided' | 'free';
     // Engagement mode: solo or squad (from commander config)
@@ -103,38 +103,39 @@ export default function StartEngagementScreen() {
   const teamId = params.teamId || null;
   const trainingId = params.trainingId || null;
   const isTeamContext = !!teamId;
-  
+
   // Execution Policy - explicit control over configuration freedom
   // Default to 'free' for solo practice (no drill context)
   const executionPolicy = params.executionPolicy || 'free';
   const drillName = params.drillName || null;
-  
+
   // Derived flags from policy
   const isConfigLocked = executionPolicy === 'locked';
   const hasPrefilledConfig = executionPolicy === 'locked' || executionPolicy === 'guided';
 
+  // Goal is ALWAYS locked when coming from a training drill (regardless of policy)
+  // The drill type (grouping/engagement) is set by commander and cannot be changed
+  const isFromTrainingDrill = !!trainingId && !!params.purpose;
+  const isGoalLocked = isFromTrainingDrill;
+
   // ═══════════════════════════════════════════════════════════════════════════
   // ENGAGEMENT CONFIG STATE (what users actually configure)
   // ═══════════════════════════════════════════════════════════════════════════
-  
-  const [drillGoal, setDrillGoal] = useState<DrillGoalType>(
-    (params.purpose as DrillGoalType) || 'grouping'
-  );
+
+  const [drillGoal, setDrillGoal] = useState<DrillGoalType>((params.purpose as DrillGoalType) || 'grouping');
   // Engagement mode from commander config (or default to solo)
   // Grouping drills are ALWAYS solo (enforced)
-  const initialEngagementMode = (params.purpose === 'grouping') ? 'solo' : (params.engagementMode || 'solo');
+  const initialEngagementMode = params.purpose === 'grouping' ? 'solo' : params.engagementMode || 'solo';
   const [engagementMode, setEngagementMode] = useState<EngagementMode>(initialEngagementMode);
   const [distance, setDistance] = useState(params.distance ? parseInt(params.distance, 10) : 25);
   const [rounds, setRounds] = useState(params.shots ? parseInt(params.shots, 10) : 5);
   const [position, setPosition] = useState<Position>((params.position as Position) || 'standing');
-  const [timeLimit, setTimeLimit] = useState<number | null>(
-    params.timeLimit ? parseInt(params.timeLimit, 10) : null
-  );
+  const [timeLimit, setTimeLimit] = useState<number | null>(params.timeLimit ? parseInt(params.timeLimit, 10) : null);
 
   // ═══════════════════════════════════════════════════════════════════════════
   // SETUP STATE (for invisible Session)
   // ═══════════════════════════════════════════════════════════════════════════
-  
+
   const [weapon, setWeapon] = useState<UserWeapon | null>(null);
   const [loadingWeapon, setLoadingWeapon] = useState(true);
   const [captureMode, setCaptureMode] = useState<CaptureMode>('phone');
@@ -155,7 +156,9 @@ export default function StartEngagementScreen() {
   useEffect(() => {
     async function loadDefaultWeapon() {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
         if (!user) return;
 
         // Get user's most recently used weapon
@@ -233,7 +236,9 @@ export default function StartEngagementScreen() {
       }
 
       check();
-      return () => { cancelled = true; };
+      return () => {
+        cancelled = true;
+      };
     }, [])
   );
 
@@ -243,7 +248,7 @@ export default function StartEngagementScreen() {
 
   // Grouping is ALWAYS solo - enforce canonical rule
   const effectiveEngagementMode: EngagementMode = drillGoal === 'grouping' ? 'solo' : engagementMode;
-  
+
   // Squad toggle only for engagement + team context + commander
   const showSquadToggle = drillGoal === 'engagement' && isTeamContext && canManageTraining;
 
@@ -260,7 +265,10 @@ export default function StartEngagementScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
     try {
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
       if (userError || !user) throw new Error('Not authenticated');
 
       // Step 1: Get or create Session (INVISIBLE to user)
@@ -318,8 +326,21 @@ export default function StartEngagementScreen() {
       setIsSubmitting(false);
     }
   }, [
-    weapon, drillGoal, effectiveEngagementMode, distance, rounds, position, timeLimit,
-    teamId, trainingId, openWeather, captureMode, sensitivity, loadSessions, params, isSubmitting
+    weapon,
+    drillGoal,
+    effectiveEngagementMode,
+    distance,
+    rounds,
+    position,
+    timeLimit,
+    teamId,
+    trainingId,
+    openWeather,
+    captureMode,
+    sensitivity,
+    loadSessions,
+    params,
+    isSubmitting,
   ]);
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -347,15 +368,18 @@ export default function StartEngagementScreen() {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   }, []);
 
-  const handleWeaponCreated = useCallback(async (weaponId: string) => {
-    setShowCreateWeapon(false);
-    try {
-      const w = await getUserWeapon(weaponId);
-      if (w) handleWeaponSelect(w);
-    } catch (error) {
-      console.error('[StartEngagement] Failed to fetch weapon:', error);
-    }
-  }, [handleWeaponSelect]);
+  const handleWeaponCreated = useCallback(
+    async (weaponId: string) => {
+      setShowCreateWeapon(false);
+      try {
+        const w = await getUserWeapon(weaponId);
+        if (w) handleWeaponSelect(w);
+      } catch (error) {
+        console.error('[StartEngagement] Failed to fetch weapon:', error);
+      }
+    },
+    [handleWeaponSelect]
+  );
 
   const handlePresetSelect = useCallback((preset: DrillPreset) => {
     setShowPresetPicker(false);
@@ -367,19 +391,22 @@ export default function StartEngagementScreen() {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   }, []);
 
-  const handlePresetCreated = useCallback((preset: DrillPreset) => {
-    setShowPresetForm(false);
-    handlePresetSelect(preset);
-  }, [handlePresetSelect]);
+  const handlePresetCreated = useCallback(
+    (preset: DrillPreset) => {
+      setShowPresetForm(false);
+      handlePresetSelect(preset);
+    },
+    [handlePresetSelect]
+  );
 
   const adjustDistance = useCallback((delta: number) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setDistance(d => Math.max(1, d + delta));
+    setDistance((d) => Math.max(1, d + delta));
   }, []);
 
   const adjustRounds = useCallback((delta: number) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setRounds(r => Math.max(1, r + delta));
+    setRounds((r) => Math.max(1, r + delta));
   }, []);
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -398,10 +425,7 @@ export default function StartEngagementScreen() {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
-        <TouchableOpacity
-          style={[styles.headerBtn, { backgroundColor: colors.card }]}
-          onPress={() => router.back()}
-        >
+        <TouchableOpacity style={[styles.headerBtn, { backgroundColor: colors.card }]} onPress={() => router.back()}>
           <Ionicons name="close" size={18} color={colors.text} />
         </TouchableOpacity>
 
@@ -420,229 +444,336 @@ export default function StartEngagementScreen() {
         {isConfigLocked && <View style={{ width: 36 }} />}
       </View>
 
-      <KeyboardAvoidingView
-        style={styles.keyboardView}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
+      <KeyboardAvoidingView style={styles.keyboardView} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <ScrollView
           style={styles.scroll}
           contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 100 }]}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          {/* Execution Policy Banner */}
-          {executionPolicy !== 'free' && drillName && (
-            <View style={[
-              styles.lockedBanner, 
-              { 
-                backgroundColor: isConfigLocked ? colors.blue + '15' : colors.green + '15', 
-                borderColor: isConfigLocked ? colors.blue : colors.green 
-              }
-            ]}>
-              <Target size={16} color={isConfigLocked ? colors.blue : colors.green} />
-              <View style={styles.lockedBannerText}>
-                <Text style={[styles.lockedTitle, { color: colors.text }]}>
-                  {drillName}
-                </Text>
-                <Text style={[styles.lockedHint, { color: colors.textMuted }]}>
-                  {isConfigLocked 
-                    ? 'Configuration locked by commander' 
-                    : 'Guided drill — you may adjust settings'}
-                </Text>
+          {/* ═══════════════════════════════════════════════════════════════════════════
+              LOCKED CONFIG: Show read-only overview instead of disabled form
+              ═══════════════════════════════════════════════════════════════════════════ */}
+          {isConfigLocked && drillName ? (
+            <>
+              {/* Drill Overview Card */}
+              <View style={[styles.overviewCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <View style={styles.overviewHeader}>
+                  <View style={[styles.overviewIcon, { backgroundColor: colors.blue + '15' }]}>
+                    <Target size={20} color={colors.blue} />
+                  </View>
+                  <View style={styles.overviewHeaderText}>
+                    <Text style={[styles.overviewTitle, { color: colors.text }]}>{drillName}</Text>
+                    <Text style={[styles.overviewSubtitle, { color: colors.textMuted }]}>
+                      Configuration locked by commander
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={[styles.overviewDivider, { backgroundColor: colors.border }]} />
+
+                <View style={styles.overviewGrid}>
+                  {/* Goal */}
+                  <View style={styles.overviewItem}>
+                    <Text style={[styles.overviewLabel, { color: colors.textMuted }]}>Goal</Text>
+                    <View style={styles.overviewValueRow}>
+                      {drillGoal === 'grouping' ? (
+                        <Crosshair size={14} color={colors.primary} />
+                      ) : (
+                        <Target size={14} color={colors.orange} />
+                      )}
+                      <Text style={[styles.overviewValue, { color: colors.text }]}>
+                        {drillGoal === 'grouping' ? 'Grouping' : 'Engagement'}
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* Mode (if engagement) */}
+                  {drillGoal === 'engagement' && (
+                    <View style={styles.overviewItem}>
+                      <Text style={[styles.overviewLabel, { color: colors.textMuted }]}>Mode</Text>
+                      <Text style={[styles.overviewValue, { color: colors.text }]}>
+                        {effectiveEngagementMode === 'squad' ? 'Squad' : 'Solo'}
+                      </Text>
+                    </View>
+                  )}
+
+                  {/* Distance */}
+                  <View style={styles.overviewItem}>
+                    <Text style={[styles.overviewLabel, { color: colors.textMuted }]}>Distance</Text>
+                    <Text style={[styles.overviewValue, { color: colors.text }]}>{distance}m</Text>
+                  </View>
+
+                  {/* Rounds */}
+                  <View style={styles.overviewItem}>
+                    <Text style={[styles.overviewLabel, { color: colors.textMuted }]}>Rounds</Text>
+                    <Text style={[styles.overviewValue, { color: colors.text }]}>{rounds} rds</Text>
+                  </View>
+
+                  {/* Position */}
+                  <View style={styles.overviewItem}>
+                    <Text style={[styles.overviewLabel, { color: colors.textMuted }]}>Position</Text>
+                    <Text style={[styles.overviewValue, { color: colors.text }]}>
+                      {POSITIONS.find((p) => p.value === position)?.label || position}
+                    </Text>
+                  </View>
+
+                  {/* Time Limit (if set) */}
+                  {timeLimit && (
+                    <View style={styles.overviewItem}>
+                      <Text style={[styles.overviewLabel, { color: colors.textMuted }]}>Time Limit</Text>
+                      <Text style={[styles.overviewValue, { color: colors.text }]}>{timeLimit}s</Text>
+                    </View>
+                  )}
+                </View>
               </View>
-            </View>
-          )}
 
-          {/* Goal Toggle */}
-          <View style={styles.section}>
-            <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>GOAL</Text>
-            <View style={[styles.goalToggle, { backgroundColor: colors.card, borderColor: colors.border, opacity: isConfigLocked ? 0.6 : 1 }]}>
-              <TouchableOpacity
-                style={[
-                  styles.goalOption,
-                  drillGoal === 'grouping' && { backgroundColor: colors.primary },
-                ]}
-                onPress={() => !isConfigLocked && handleGoalChange('grouping')}
-                disabled={isConfigLocked}
-                activeOpacity={isConfigLocked ? 1 : 0.7}
-              >
-                <Crosshair size={16} color={drillGoal === 'grouping' ? '#fff' : colors.textMuted} />
-                <Text style={[styles.goalText, { color: drillGoal === 'grouping' ? '#fff' : colors.text }]}>
-                  Grouping
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.goalOption,
-                  drillGoal === 'engagement' && { backgroundColor: colors.orange },
-                ]}
-                onPress={() => !isConfigLocked && handleGoalChange('engagement')}
-                disabled={isConfigLocked}
-                activeOpacity={isConfigLocked ? 1 : 0.7}
-              >
-                <Target size={16} color={drillGoal === 'engagement' ? '#fff' : colors.textMuted} />
-                <Text style={[styles.goalText, { color: drillGoal === 'engagement' ? '#fff' : colors.text }]}>
-                  Engagement
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          {/* Weapon (for setup - invisible session param) */}
-          <View style={styles.section}>
-            <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>WEAPON</Text>
-            {loadingWeapon ? (
-              <View style={[styles.weaponCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                <ActivityIndicator size="small" color={colors.textMuted} />
-                <Text style={[styles.weaponLoadingText, { color: colors.textMuted }]}>Loading...</Text>
-              </View>
-            ) : weapon ? (
-              <TouchableOpacity
-                style={[styles.weaponCard, { backgroundColor: colors.card, borderColor: colors.border }]}
-                onPress={() => setShowWeaponPicker(true)}
-              >
-                <View style={[styles.weaponIcon, { backgroundColor: colors.primary + '15' }]}>
-                  <Crosshair size={20} color={colors.primary} />
-                </View>
-                <View style={styles.weaponInfo}>
-                  <Text style={[styles.weaponName, { color: colors.text }]}>{weapon.name}</Text>
-                  <Text style={[styles.weaponHint, { color: colors.textMuted }]}>Tap to change</Text>
-                </View>
-                <ChevronRight size={18} color={colors.textMuted} />
-              </TouchableOpacity>
-            ) : (
-              <TouchableOpacity
-                style={[styles.weaponEmpty, { backgroundColor: colors.card, borderColor: colors.primary }]}
-                onPress={() => setShowWeaponPicker(true)}
-              >
-                <View style={[styles.weaponIcon, { backgroundColor: colors.primary + '10' }]}>
-                  <Target size={24} color={colors.primary} />
-                </View>
-                <View style={styles.weaponInfo}>
-                  <Text style={[styles.weaponName, { color: colors.text }]}>Select Weapon</Text>
-                  <Text style={[styles.weaponHint, { color: colors.textMuted }]}>Required</Text>
-                </View>
-                <View style={[styles.addBtn, { backgroundColor: colors.primary }]}>
-                  <Plus size={16} color="#fff" />
-                </View>
-              </TouchableOpacity>
-            )}
-          </View>
-
-          {/* Squad Toggle - only for engagement */}
-          {showSquadToggle && (
-            <View style={[styles.section, isConfigLocked && styles.lockedSection]}>
-              <EngagementModeToggle
-                value={engagementMode}
-                onChange={setEngagementMode}
-                disabled={!weapon || isConfigLocked}
-              />
-              {isConfigLocked && (
-                <Text style={[styles.lockedHint, { color: colors.textMuted }]}>
-                  Commander locked: {engagementMode === 'squad' ? 'Squad' : 'Solo'}
-                </Text>
-              )}
-            </View>
-          )}
-
-          {/* Distance */}
-          <View style={[styles.section, isConfigLocked && styles.lockedSection]}>
-            <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>DISTANCE (meters)</Text>
-            <View style={[styles.counterRow, { backgroundColor: colors.card, borderColor: colors.border, opacity: isConfigLocked ? 0.6 : 1 }]}>
-              <TouchableOpacity
-                style={[styles.counterBtn, { backgroundColor: colors.secondary }]}
-                onPress={() => adjustDistance(-5)}
-                disabled={isConfigLocked}
-              >
-                <Minus size={18} color={colors.text} />
-              </TouchableOpacity>
-              <TextInput
-                style={[styles.counterInput, { color: colors.text }]}
-                value={String(distance)}
-                onChangeText={(t) => !isConfigLocked && setDistance(parseInt(t, 10) || 0)}
-                keyboardType="number-pad"
-                selectTextOnFocus
-                editable={!isConfigLocked}
-              />
-              <Text style={[styles.counterUnit, { color: colors.textMuted }]}>m</Text>
-              <TouchableOpacity
-                style={[styles.counterBtn, { backgroundColor: colors.secondary }]}
-                onPress={() => adjustDistance(5)}
-                disabled={isConfigLocked}
-              >
-                <Plus size={18} color={colors.text} />
-              </TouchableOpacity>
-            </View>
-            {!isConfigLocked && (
-              <View style={styles.quickDistances}>
-                {COMMON_DISTANCES.map((d) => (
+              {/* Weapon Selection (always editable) */}
+              <View style={styles.section}>
+                <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>SELECT YOUR WEAPON</Text>
+                {loadingWeapon ? (
+                  <View style={[styles.weaponCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                    <ActivityIndicator size="small" color={colors.textMuted} />
+                    <Text style={[styles.weaponLoadingText, { color: colors.textMuted }]}>Loading...</Text>
+                  </View>
+                ) : weapon ? (
                   <TouchableOpacity
-                    key={d}
-                    style={[
-                      styles.quickBtn,
-                      { backgroundColor: distance === d ? colors.primary : colors.card, borderColor: colors.border },
-                    ]}
-                    onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setDistance(d); }}
+                    style={[styles.weaponCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+                    onPress={() => setShowWeaponPicker(true)}
                   >
-                    <Text style={[styles.quickBtnText, { color: distance === d ? '#fff' : colors.text }]}>{d}</Text>
+                    <View style={[styles.weaponIcon, { backgroundColor: colors.primary + '15' }]}>
+                      <Crosshair size={20} color={colors.primary} />
+                    </View>
+                    <View style={styles.weaponInfo}>
+                      <Text style={[styles.weaponName, { color: colors.text }]}>{weapon.name}</Text>
+                      <Text style={[styles.weaponHint, { color: colors.textMuted }]}>Tap to change</Text>
+                    </View>
+                    <ChevronRight size={18} color={colors.textMuted} />
                   </TouchableOpacity>
-                ))}
+                ) : (
+                  <TouchableOpacity
+                    style={[styles.weaponEmpty, { backgroundColor: colors.card, borderColor: colors.primary }]}
+                    onPress={() => setShowWeaponPicker(true)}
+                  >
+                    <View style={[styles.weaponIcon, { backgroundColor: colors.primary + '10' }]}>
+                      <Target size={24} color={colors.primary} />
+                    </View>
+                    <View style={styles.weaponInfo}>
+                      <Text style={[styles.weaponName, { color: colors.text }]}>Select Weapon</Text>
+                      <Text style={[styles.weaponHint, { color: colors.textMuted }]}>Required to start</Text>
+                    </View>
+                    <View style={[styles.addBtn, { backgroundColor: colors.primary }]}>
+                      <Plus size={16} color="#fff" />
+                    </View>
+                  </TouchableOpacity>
+                )}
               </View>
-            )}
-          </View>
+            </>
+          ) : (
+            <>
+              {/* ═══════════════════════════════════════════════════════════════════════════
+                  EDITABLE CONFIG: Normal form (free or guided policy)
+                  ═══════════════════════════════════════════════════════════════════════════ */}
 
-          {/* Rounds */}
-          <View style={[styles.section, isConfigLocked && styles.lockedSection]}>
-            <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>ROUNDS</Text>
-            <View style={[styles.counterRow, { backgroundColor: colors.card, borderColor: colors.border, opacity: isConfigLocked ? 0.6 : 1 }]}>
-              <TouchableOpacity
-                style={[styles.counterBtn, { backgroundColor: colors.secondary }]}
-                onPress={() => adjustRounds(-1)}
-                disabled={isConfigLocked}
-              >
-                <Minus size={18} color={colors.text} />
-              </TouchableOpacity>
-              <TextInput
-                style={[styles.counterInput, { color: colors.text }]}
-                value={String(rounds)}
-                onChangeText={(t) => !isConfigLocked && setRounds(parseInt(t, 10) || 0)}
-                keyboardType="number-pad"
-                selectTextOnFocus
-                editable={!isConfigLocked}
-              />
-              <Text style={[styles.counterUnit, { color: colors.textMuted }]}>rds</Text>
-              <TouchableOpacity
-                style={[styles.counterBtn, { backgroundColor: colors.secondary }]}
-                onPress={() => adjustRounds(1)}
-                disabled={isConfigLocked}
-              >
-                <Plus size={18} color={colors.text} />
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          {/* Position */}
-          <View style={[styles.section, isConfigLocked && styles.lockedSection]}>
-            <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>POSITION</Text>
-            <View style={[styles.positionRow, { opacity: isConfigLocked ? 0.6 : 1 }]}>
-              {POSITIONS.map((p) => (
-                <TouchableOpacity
-                  key={p.value}
-                  style={[
-                    styles.positionBtn,
-                    { backgroundColor: position === p.value ? colors.primary : colors.card, borderColor: colors.border },
-                  ]}
-                  onPress={() => { if (!isConfigLocked) { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setPosition(p.value); } }}
-                  disabled={isConfigLocked}
-                  activeOpacity={isConfigLocked ? 1 : 0.7}
+              {/* Guided Drill Banner */}
+              {executionPolicy === 'guided' && drillName && (
+                <View
+                  style={[styles.lockedBanner, { backgroundColor: colors.green + '15', borderColor: colors.green }]}
                 >
-                  <Text style={[styles.positionText, { color: position === p.value ? '#fff' : colors.text }]}>
-                    {p.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
+                  <Target size={16} color={colors.green} />
+                  <View style={styles.lockedBannerText}>
+                    <Text style={[styles.lockedTitle, { color: colors.text }]}>{drillName}</Text>
+                    <Text style={[styles.lockedHint, { color: colors.textMuted }]}>
+                      Guided drill — you may adjust settings
+                    </Text>
+                  </View>
+                </View>
+              )}
+
+              {/* Goal Toggle - locked when from training drill (any policy) */}
+              <View style={[styles.section, isGoalLocked && styles.lockedSection]}>
+                <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>GOAL</Text>
+                <View
+                  style={[
+                    styles.goalToggle,
+                    { backgroundColor: colors.card, borderColor: colors.border, opacity: isGoalLocked ? 0.6 : 1 },
+                  ]}
+                >
+                  <TouchableOpacity
+                    style={[styles.goalOption, drillGoal === 'grouping' && { backgroundColor: colors.primary }]}
+                    onPress={() => !isGoalLocked && handleGoalChange('grouping')}
+                    disabled={isGoalLocked}
+                    activeOpacity={isGoalLocked ? 1 : 0.7}
+                  >
+                    <Crosshair size={16} color={drillGoal === 'grouping' ? '#fff' : colors.textMuted} />
+                    <Text style={[styles.goalText, { color: drillGoal === 'grouping' ? '#fff' : colors.text }]}>
+                      Grouping
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.goalOption, drillGoal === 'engagement' && { backgroundColor: colors.orange }]}
+                    onPress={() => !isGoalLocked && handleGoalChange('engagement')}
+                    disabled={isGoalLocked}
+                    activeOpacity={isGoalLocked ? 1 : 0.7}
+                  >
+                    <Target size={16} color={drillGoal === 'engagement' ? '#fff' : colors.textMuted} />
+                    <Text style={[styles.goalText, { color: drillGoal === 'engagement' ? '#fff' : colors.text }]}>
+                      Engagement
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+                {isGoalLocked && (
+                  <Text style={[styles.lockedHint, { color: colors.textMuted }]}>Drill type set by commander</Text>
+                )}
+              </View>
+
+              {/* Weapon (for setup - invisible session param) */}
+              <View style={styles.section}>
+                <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>WEAPON</Text>
+                {loadingWeapon ? (
+                  <View style={[styles.weaponCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                    <ActivityIndicator size="small" color={colors.textMuted} />
+                    <Text style={[styles.weaponLoadingText, { color: colors.textMuted }]}>Loading...</Text>
+                  </View>
+                ) : weapon ? (
+                  <TouchableOpacity
+                    style={[styles.weaponCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+                    onPress={() => setShowWeaponPicker(true)}
+                  >
+                    <View style={[styles.weaponIcon, { backgroundColor: colors.primary + '15' }]}>
+                      <Crosshair size={20} color={colors.primary} />
+                    </View>
+                    <View style={styles.weaponInfo}>
+                      <Text style={[styles.weaponName, { color: colors.text }]}>{weapon.name}</Text>
+                      <Text style={[styles.weaponHint, { color: colors.textMuted }]}>Tap to change</Text>
+                    </View>
+                    <ChevronRight size={18} color={colors.textMuted} />
+                  </TouchableOpacity>
+                ) : (
+                  <TouchableOpacity
+                    style={[styles.weaponEmpty, { backgroundColor: colors.card, borderColor: colors.primary }]}
+                    onPress={() => setShowWeaponPicker(true)}
+                  >
+                    <View style={[styles.weaponIcon, { backgroundColor: colors.primary + '10' }]}>
+                      <Target size={24} color={colors.primary} />
+                    </View>
+                    <View style={styles.weaponInfo}>
+                      <Text style={[styles.weaponName, { color: colors.text }]}>Select Weapon</Text>
+                      <Text style={[styles.weaponHint, { color: colors.textMuted }]}>Required</Text>
+                    </View>
+                    <View style={[styles.addBtn, { backgroundColor: colors.primary }]}>
+                      <Plus size={16} color="#fff" />
+                    </View>
+                  </TouchableOpacity>
+                )}
+              </View>
+
+              {/* Squad Toggle - only for engagement */}
+              {showSquadToggle && (
+                <View style={styles.section}>
+                  <EngagementModeToggle value={engagementMode} onChange={setEngagementMode} disabled={!weapon} />
+                </View>
+              )}
+
+              {/* Distance */}
+              <View style={styles.section}>
+                <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>DISTANCE (meters)</Text>
+                <View style={[styles.counterRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                  <TouchableOpacity
+                    style={[styles.counterBtn, { backgroundColor: colors.secondary }]}
+                    onPress={() => adjustDistance(-5)}
+                  >
+                    <Minus size={18} color={colors.text} />
+                  </TouchableOpacity>
+                  <TextInput
+                    style={[styles.counterInput, { color: colors.text }]}
+                    value={String(distance)}
+                    onChangeText={(t) => setDistance(parseInt(t, 10) || 0)}
+                    keyboardType="number-pad"
+                    selectTextOnFocus
+                  />
+                  <Text style={[styles.counterUnit, { color: colors.textMuted }]}>m</Text>
+                  <TouchableOpacity
+                    style={[styles.counterBtn, { backgroundColor: colors.secondary }]}
+                    onPress={() => adjustDistance(5)}
+                  >
+                    <Plus size={18} color={colors.text} />
+                  </TouchableOpacity>
+                </View>
+                <View style={styles.quickDistances}>
+                  {COMMON_DISTANCES.map((d) => (
+                    <TouchableOpacity
+                      key={d}
+                      style={[
+                        styles.quickBtn,
+                        { backgroundColor: distance === d ? colors.primary : colors.card, borderColor: colors.border },
+                      ]}
+                      onPress={() => {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                        setDistance(d);
+                      }}
+                    >
+                      <Text style={[styles.quickBtnText, { color: distance === d ? '#fff' : colors.text }]}>{d}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              {/* Rounds */}
+              <View style={styles.section}>
+                <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>ROUNDS</Text>
+                <View style={[styles.counterRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                  <TouchableOpacity
+                    style={[styles.counterBtn, { backgroundColor: colors.secondary }]}
+                    onPress={() => adjustRounds(-1)}
+                  >
+                    <Minus size={18} color={colors.text} />
+                  </TouchableOpacity>
+                  <TextInput
+                    style={[styles.counterInput, { color: colors.text }]}
+                    value={String(rounds)}
+                    onChangeText={(t) => setRounds(parseInt(t, 10) || 0)}
+                    keyboardType="number-pad"
+                    selectTextOnFocus
+                  />
+                  <Text style={[styles.counterUnit, { color: colors.textMuted }]}>rds</Text>
+                  <TouchableOpacity
+                    style={[styles.counterBtn, { backgroundColor: colors.secondary }]}
+                    onPress={() => adjustRounds(1)}
+                  >
+                    <Plus size={18} color={colors.text} />
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {/* Position */}
+              <View style={styles.section}>
+                <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>POSITION</Text>
+                <View style={styles.positionRow}>
+                  {POSITIONS.map((p) => (
+                    <TouchableOpacity
+                      key={p.value}
+                      style={[
+                        styles.positionBtn,
+                        {
+                          backgroundColor: position === p.value ? colors.primary : colors.card,
+                          borderColor: colors.border,
+                        },
+                      ]}
+                      onPress={() => {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                        setPosition(p.value);
+                      }}
+                    >
+                      <Text style={[styles.positionText, { color: position === p.value ? '#fff' : colors.text }]}>
+                        {p.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            </>
+          )}
 
           {/* Capture Mode */}
           {isWatchConnected && (
@@ -662,9 +793,7 @@ export default function StartEngagementScreen() {
 
       {/* Bottom CTA */}
       <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 16, backgroundColor: colors.background }]}>
-        {!weapon && (
-          <Text style={[styles.hint, { color: colors.orange }]}>Select a weapon to continue</Text>
-        )}
+        {!weapon && <Text style={[styles.hint, { color: colors.orange }]}>Select a weapon to continue</Text>}
         <TouchableOpacity
           style={[
             styles.startBtn,
@@ -679,8 +808,11 @@ export default function StartEngagementScreen() {
             <>
               <CornerDownRight size={18} color="#fff" fill="#fff" />
               <Text style={styles.startBtnText}>
-                {drillGoal === 'grouping' ? 'Run Grouping' : 
-                  effectiveEngagementMode === 'squad' ? 'Start Squad Engagement' : 'Start Engagement'}
+                {drillGoal === 'grouping'
+                  ? 'Run Grouping'
+                  : effectiveEngagementMode === 'squad'
+                    ? 'Start Squad Engagement'
+                    : 'Start Engagement'}
               </Text>
             </>
           )}
@@ -688,35 +820,67 @@ export default function StartEngagementScreen() {
       </View>
 
       {/* Modals */}
-      <Modal visible={showWeaponPicker} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowWeaponPicker(false)}>
+      <Modal
+        visible={showWeaponPicker}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowWeaponPicker(false)}
+      >
         <WeaponPicker
           selectedWeaponId={weapon?.id || null}
           onSelect={handleWeaponSelect}
           onClose={() => setShowWeaponPicker(false)}
-          onAddNew={() => { setShowWeaponPicker(false); setShowCreateWeapon(true); }}
+          onAddNew={() => {
+            setShowWeaponPicker(false);
+            setShowCreateWeapon(true);
+          }}
         />
       </Modal>
 
-      <Modal visible={showCreateWeapon} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowCreateWeapon(false)}>
+      <Modal
+        visible={showCreateWeapon}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowCreateWeapon(false)}
+      >
         <CreateWeaponFlow
           onComplete={handleWeaponCreated}
-          onCancel={() => { setShowCreateWeapon(false); setShowWeaponPicker(true); }}
+          onCancel={() => {
+            setShowCreateWeapon(false);
+            setShowWeaponPicker(true);
+          }}
         />
       </Modal>
 
-      <Modal visible={showPresetPicker} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowPresetPicker(false)}>
+      <Modal
+        visible={showPresetPicker}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowPresetPicker(false)}
+      >
         <DrillPresetPicker
           onSelect={handlePresetSelect}
-          onCreateNew={() => { setShowPresetPicker(false); setShowPresetForm(true); }}
+          onCreateNew={() => {
+            setShowPresetPicker(false);
+            setShowPresetForm(true);
+          }}
           onClose={() => setShowPresetPicker(false)}
           filterByPurpose={drillGoal}
         />
       </Modal>
 
-      <Modal visible={showPresetForm} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowPresetForm(false)}>
+      <Modal
+        visible={showPresetForm}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowPresetForm(false)}
+      >
         <PresetForm
           onComplete={handlePresetCreated}
-          onCancel={() => { setShowPresetForm(false); setShowPresetPicker(true); }}
+          onCancel={() => {
+            setShowPresetForm(false);
+            setShowPresetPicker(true);
+          }}
         />
       </Modal>
     </View>
@@ -726,7 +890,13 @@ export default function StartEngagementScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingBottom: 8 },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingBottom: 8,
+  },
   headerBtn: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   headerTitle: { fontSize: 16, fontWeight: '600', letterSpacing: -0.3 },
   keyboardView: { flex: 1 },
@@ -735,21 +905,107 @@ const styles = StyleSheet.create({
   section: { marginBottom: 24 },
   sectionLabel: { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 10 },
   lockedSection: { opacity: 0.8 },
-  
+
   // Locked drill banner
-  lockedBanner: { flexDirection: 'row', alignItems: 'center', padding: 14, borderRadius: 12, borderWidth: 1, marginBottom: 20, gap: 12 },
+  lockedBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 20,
+    gap: 12,
+  },
   lockedBannerText: { flex: 1, gap: 2 },
   lockedTitle: { fontSize: 15, fontWeight: '600', letterSpacing: -0.3 },
   lockedHint: { fontSize: 12, fontWeight: '500' },
-  
+
+  // Overview card (for locked drills)
+  overviewCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 16,
+    marginBottom: 24,
+  },
+  overviewHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  overviewIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  overviewHeaderText: {
+    flex: 1,
+    gap: 2,
+  },
+  overviewTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    letterSpacing: -0.3,
+  },
+  overviewSubtitle: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  overviewDivider: {
+    height: 1,
+    marginVertical: 16,
+  },
+  overviewGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 16,
+  },
+  overviewItem: {
+    minWidth: '45%',
+    gap: 4,
+  },
+  overviewLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  overviewValueRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  overviewValue: {
+    fontSize: 15,
+    fontWeight: '600',
+    letterSpacing: -0.2,
+  },
+
   // Goal toggle
   goalToggle: { flexDirection: 'row', borderRadius: 12, borderWidth: 1, padding: 4, gap: 4 },
-  goalOption: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 12, borderRadius: 9 },
+  goalOption: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    borderRadius: 9,
+  },
   goalText: { fontSize: 14, fontWeight: '600', letterSpacing: -0.2 },
 
   // Weapon
   weaponCard: { flexDirection: 'row', alignItems: 'center', padding: 12, borderRadius: 12, borderWidth: 1, gap: 10 },
-  weaponEmpty: { flexDirection: 'row', alignItems: 'center', padding: 12, borderRadius: 12, borderWidth: 1.5, borderStyle: 'dashed', gap: 10 },
+  weaponEmpty: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    gap: 10,
+  },
   weaponIcon: { width: 40, height: 40, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   weaponInfo: { flex: 1, gap: 2 },
   weaponName: { fontSize: 15, fontWeight: '600', letterSpacing: -0.3 },
@@ -762,7 +1018,7 @@ const styles = StyleSheet.create({
   counterBtn: { width: 40, height: 40, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   counterInput: { flex: 1, fontSize: 24, fontWeight: '700', textAlign: 'center', letterSpacing: -0.5 },
   counterUnit: { fontSize: 14, fontWeight: '500', marginRight: 8 },
-  
+
   // Quick distances
   quickDistances: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 },
   quickBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8, borderWidth: 1 },
@@ -776,6 +1032,13 @@ const styles = StyleSheet.create({
   // Bottom
   bottomBar: { position: 'absolute', bottom: 0, left: 0, right: 0, paddingHorizontal: 20 },
   hint: { fontSize: 12, fontWeight: '500', textAlign: 'center', marginBottom: 10 },
-  startBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, height: 52, borderRadius: 14 },
+  startBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    height: 52,
+    borderRadius: 14,
+  },
   startBtnText: { fontSize: 16, fontWeight: '600', color: '#fff', letterSpacing: -0.2 },
 });

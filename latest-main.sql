@@ -983,8 +983,6 @@ CREATE TABLE IF NOT EXISTS "public"."sessions" (
     "watch_controlled" boolean DEFAULT false,
     "weapon_id" "uuid",
     "weather" "jsonb",
-    "engagement_mode" "text" DEFAULT 'solo'::"text" NOT NULL,
-    CONSTRAINT "sessions_engagement_mode_check" CHECK (("engagement_mode" = ANY (ARRAY['solo'::"text", 'squad'::"text"]))),
     CONSTRAINT "sessions_session_mode_check" CHECK (("session_mode" = ANY (ARRAY['solo'::"text", 'group'::"text"]))),
     CONSTRAINT "sessions_status_check" CHECK (("status" = ANY (ARRAY['pending'::"text", 'active'::"text", 'completed'::"text", 'cancelled'::"text"])))
 );
@@ -1000,10 +998,6 @@ COMMENT ON COLUMN "public"."sessions"."drill_template_id" IS 'For quick practice
 
 
 COMMENT ON COLUMN "public"."sessions"."custom_drill_config" IS 'Inline drill configuration for quick practice sessions (no template reference)';
-
-
-
-COMMENT ON COLUMN "public"."sessions"."engagement_mode" IS 'DEPRECATED: Use engagements.engagement_mode instead';
 
 
 
@@ -2995,12 +2989,10 @@ COMMENT ON COLUMN "public"."drills"."fixed_shots" IS 'If true, default_shots can
 
 CREATE TABLE IF NOT EXISTS "public"."engagement_participants" (
     "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
-    "session_id" "uuid" NOT NULL,
     "user_id" "uuid" NOT NULL,
     "state" "text" DEFAULT 'pending'::"text" NOT NULL,
     "joined_at" timestamp with time zone,
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "engagement_id" "uuid" NOT NULL,
     CONSTRAINT "engagement_participants_state_check" CHECK (("state" = ANY (ARRAY['pending'::"text", 'joined'::"text", 'left'::"text"])))
 );
@@ -3009,19 +3001,19 @@ CREATE TABLE IF NOT EXISTS "public"."engagement_participants" (
 ALTER TABLE "public"."engagement_participants" OWNER TO "postgres";
 
 
-COMMENT ON TABLE "public"."engagement_participants" IS 'Tracks participants invited to squad engagement sessions';
+COMMENT ON TABLE "public"."engagement_participants" IS 'Participants in squad engagements. Async consent model.';
 
 
 
-COMMENT ON COLUMN "public"."engagement_participants"."session_id" IS 'DEPRECATED: Use engagement_id instead. Will be dropped after code migration.';
-
-
-
-COMMENT ON COLUMN "public"."engagement_participants"."state" IS 'pending = invited but not responded, joined = actively participating, left = declined or left';
+COMMENT ON COLUMN "public"."engagement_participants"."state" IS 'pending = invited, joined = acknowledged/participated, left = declined';
 
 
 
 COMMENT ON COLUMN "public"."engagement_participants"."joined_at" IS 'Timestamp when user joined (state changed to joined)';
+
+
+
+COMMENT ON COLUMN "public"."engagement_participants"."engagement_id" IS 'Reference to the engagement (execution unit) - ONLY reference, never session_id';
 
 
 
@@ -3030,19 +3022,20 @@ CREATE TABLE IF NOT EXISTS "public"."engagements" (
     "session_id" "uuid" NOT NULL,
     "engagement_mode" "text" DEFAULT 'solo'::"text" NOT NULL,
     "status" "text" DEFAULT 'pending'::"text" NOT NULL,
-    "started_at" timestamp with time zone,
-    "ended_at" timestamp with time zone,
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "shooter_id" "uuid",
+    "training_id" "uuid",
+    "drill_goal" "text",
+    CONSTRAINT "engagements_drill_goal_check" CHECK (("drill_goal" = ANY (ARRAY['grouping'::"text", 'engagement'::"text"]))),
     CONSTRAINT "engagements_engagement_mode_check" CHECK (("engagement_mode" = ANY (ARRAY['solo'::"text", 'squad'::"text"]))),
-    CONSTRAINT "engagements_status_check" CHECK (("status" = ANY (ARRAY['pending'::"text", 'active'::"text", 'completed'::"text", 'cancelled'::"text"])))
+    CONSTRAINT "engagements_status_check" CHECK (("status" = ANY (ARRAY['completed'::"text", 'aborted'::"text"])))
 );
 
 
 ALTER TABLE "public"."engagements" OWNER TO "postgres";
 
 
-COMMENT ON TABLE "public"."engagements" IS 'Execution unit. Squad logic lives here. Session is passive setup context.';
+COMMENT ON TABLE "public"."engagements" IS 'Atomic execution unit. Squad logic lives here. Training and Session are passive context.';
 
 
 
@@ -3050,7 +3043,23 @@ COMMENT ON COLUMN "public"."engagements"."session_id" IS 'Reference to session s
 
 
 
-COMMENT ON COLUMN "public"."engagements"."engagement_mode" IS 'solo = individual execution, squad = team members participating together';
+COMMENT ON COLUMN "public"."engagements"."engagement_mode" IS 'solo = individual, squad = async team participation. Grouping is ALWAYS solo.';
+
+
+
+COMMENT ON COLUMN "public"."engagements"."status" IS 'completed = finished successfully, aborted = cancelled/incomplete';
+
+
+
+COMMENT ON COLUMN "public"."engagements"."shooter_id" IS 'The user who executed this engagement';
+
+
+
+COMMENT ON COLUMN "public"."engagements"."training_id" IS 'Optional link to training context';
+
+
+
+COMMENT ON COLUMN "public"."engagements"."drill_goal" IS 'Primary classification: grouping (ALWAYS solo) or engagement (can be squad)';
 
 
 
@@ -3454,8 +3463,8 @@ CREATE TABLE IF NOT EXISTS "public"."training_drills" (
     "order_index" integer NOT NULL,
     "name" "text" NOT NULL,
     "target_type" "text" NOT NULL,
-    "distance_m" integer NOT NULL,
-    "rounds_per_shooter" integer NOT NULL,
+    "distance_m" integer,
+    "rounds_per_shooter" integer,
     "time_limit_seconds" integer,
     "position" "text",
     "weapon_category" "text",
@@ -3488,9 +3497,12 @@ CREATE TABLE IF NOT EXISTS "public"."training_drills" (
     "drill_id" "uuid",
     "instance_notes" "text",
     "input_method" "text",
-    "engagement_mode" "text",
+    "execution_policy" "text" DEFAULT 'locked'::"text",
+    "engagement_mode" "text" DEFAULT 'solo'::"text",
     CONSTRAINT "training_drills_category_check" CHECK ((("category" IS NULL) OR ("category" = ANY (ARRAY['fundamentals'::"text", 'speed'::"text", 'accuracy'::"text", 'stress'::"text", 'tactical'::"text", 'competition'::"text", 'qualification'::"text"])))),
     CONSTRAINT "training_drills_difficulty_check" CHECK ((("difficulty" IS NULL) OR ("difficulty" = ANY (ARRAY['beginner'::"text", 'intermediate'::"text", 'advanced'::"text", 'expert'::"text"])))),
+    CONSTRAINT "training_drills_engagement_mode_check" CHECK (("engagement_mode" = ANY (ARRAY['solo'::"text", 'squad'::"text"]))),
+    CONSTRAINT "training_drills_execution_policy_check" CHECK (("execution_policy" = ANY (ARRAY['locked'::"text", 'guided'::"text", 'free'::"text"]))),
     CONSTRAINT "training_drills_input_method_check" CHECK ((("input_method" IS NULL) OR ("input_method" = ANY (ARRAY['scan'::"text", 'manual'::"text"])))),
     CONSTRAINT "training_drills_min_accuracy_percent_check" CHECK ((("min_accuracy_percent" IS NULL) OR (("min_accuracy_percent" >= 0) AND ("min_accuracy_percent" <= 100)))),
     CONSTRAINT "training_drills_movement_type_check" CHECK ((("movement_type" IS NULL) OR ("movement_type" = ANY (ARRAY['none'::"text", 'advance'::"text", 'retreat'::"text", 'lateral'::"text", 'diagonal'::"text", 'freestyle'::"text"])))),
@@ -3510,6 +3522,14 @@ COMMENT ON TABLE "public"."training_drills" IS 'Drill instances within a trainin
 
 
 
+COMMENT ON COLUMN "public"."training_drills"."distance_m" IS 'Distance in meters. NULL means soldier chooses at execution time (guided/free policy).';
+
+
+
+COMMENT ON COLUMN "public"."training_drills"."rounds_per_shooter" IS 'Number of rounds. NULL means soldier chooses at execution time (guided/free policy).';
+
+
+
 COMMENT ON COLUMN "public"."training_drills"."drill_template_id" IS 'Reference to source drill template. If set, template values are used as defaults.';
 
 
@@ -3522,7 +3542,11 @@ COMMENT ON COLUMN "public"."training_drills"."instance_notes" IS 'Training-speci
 
 
 
-COMMENT ON COLUMN "public"."training_drills"."engagement_mode" IS 'For engagement drills: solo (default) or squad';
+COMMENT ON COLUMN "public"."training_drills"."execution_policy" IS 'How strictly soldiers must follow this drill config: locked (exact), guided (defaults), free (label only).';
+
+
+
+COMMENT ON COLUMN "public"."training_drills"."engagement_mode" IS 'How the drill should be executed: solo (individual) or squad (team participation). Grouping drills must always be solo.';
 
 
 
@@ -3975,10 +3999,6 @@ CREATE INDEX "engagement_participants_engagement_id_idx" ON "public"."engagement
 
 
 
-CREATE INDEX "engagement_participants_session_id_idx" ON "public"."engagement_participants" USING "btree" ("session_id");
-
-
-
 CREATE INDEX "engagement_participants_state_idx" ON "public"."engagement_participants" USING "btree" ("state");
 
 
@@ -3987,11 +4007,23 @@ CREATE INDEX "engagement_participants_user_id_idx" ON "public"."engagement_parti
 
 
 
+CREATE INDEX "engagements_drill_goal_idx" ON "public"."engagements" USING "btree" ("drill_goal");
+
+
+
 CREATE INDEX "engagements_session_id_idx" ON "public"."engagements" USING "btree" ("session_id");
 
 
 
+CREATE INDEX "engagements_shooter_id_idx" ON "public"."engagements" USING "btree" ("shooter_id");
+
+
+
 CREATE INDEX "engagements_status_idx" ON "public"."engagements" USING "btree" ("status");
+
+
+
+CREATE INDEX "engagements_training_id_idx" ON "public"."engagements" USING "btree" ("training_id");
 
 
 
@@ -4375,17 +4407,22 @@ ALTER TABLE ONLY "public"."engagement_participants"
 
 
 ALTER TABLE ONLY "public"."engagement_participants"
-    ADD CONSTRAINT "engagement_participants_session_id_fkey" FOREIGN KEY ("session_id") REFERENCES "public"."sessions"("id") ON DELETE CASCADE;
-
-
-
-ALTER TABLE ONLY "public"."engagement_participants"
     ADD CONSTRAINT "engagement_participants_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "auth"."users"("id") ON DELETE CASCADE;
 
 
 
 ALTER TABLE ONLY "public"."engagements"
     ADD CONSTRAINT "engagements_session_id_fkey" FOREIGN KEY ("session_id") REFERENCES "public"."sessions"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."engagements"
+    ADD CONSTRAINT "engagements_shooter_id_fkey" FOREIGN KEY ("shooter_id") REFERENCES "public"."profiles"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."engagements"
+    ADD CONSTRAINT "engagements_training_id_fkey" FOREIGN KEY ("training_id") REFERENCES "public"."trainings"("id") ON DELETE SET NULL;
 
 
 
