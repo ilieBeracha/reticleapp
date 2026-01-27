@@ -20,6 +20,7 @@ import type {
   Engagement,
   EngagementMode,
   EngagementParticipant,
+  EngagementRole,
   EngagementStatus,
   ParticipantState,
 } from './types';
@@ -33,11 +34,7 @@ import { enforceEngagementMode } from './types';
  * Get engagement by ID.
  */
 export async function getEngagement(engagementId: string): Promise<Engagement | null> {
-  const { data, error } = await supabase
-    .from('engagements')
-    .select('*')
-    .eq('id', engagementId)
-    .single();
+  const { data, error } = await supabase.from('engagements').select('*').eq('id', engagementId).single();
 
   if (error) {
     if (error.code === 'PGRST116') return null; // Not found
@@ -49,14 +46,8 @@ export async function getEngagement(engagementId: string): Promise<Engagement | 
 /**
  * Get engagement by session ID.
  */
-export async function getEngagementBySessionId(
-  sessionId: string
-): Promise<Engagement | null> {
-  const { data, error } = await supabase
-    .from('engagements')
-    .select('*')
-    .eq('session_id', sessionId)
-    .single();
+export async function getEngagementBySessionId(sessionId: string): Promise<Engagement | null> {
+  const { data, error } = await supabase.from('engagements').select('*').eq('session_id', sessionId).single();
 
   if (error) {
     if (error.code === 'PGRST116') return null; // Not found
@@ -72,7 +63,7 @@ export async function getEngagementBySessionId(
 /**
  * Create an engagement for a session.
  * This is the entry point for starting any execution (solo or squad).
- * 
+ *
  * CANONICAL RULES:
  * - Grouping engagements are ALWAYS solo (enforced)
  * - Squad engagements require drill_goal = 'engagement'
@@ -86,14 +77,7 @@ export async function createEngagement(params: {
   requestedMode?: EngagementMode;
   status?: EngagementStatus;
 }): Promise<Engagement> {
-  const { 
-    sessionId, 
-    shooterId, 
-    drillGoal, 
-    trainingId = null, 
-    requestedMode,
-    status = 'completed' 
-  } = params;
+  const { sessionId, shooterId, drillGoal, trainingId = null, requestedMode, status = 'completed' } = params;
 
   // MANDATORY: Enforce engagement mode based on drill goal
   // Grouping is ALWAYS solo - this is non-negotiable
@@ -113,6 +97,18 @@ export async function createEngagement(params: {
     .single();
 
   if (error) throw error;
+
+  // For squad/group engagements, auto-add creator as joined participant
+  if (engagementMode === 'squad' || engagementMode === 'group') {
+    await supabase.from('engagement_participants').insert({
+      engagement_id: data.id,
+      user_id: shooterId,
+      state: 'joined', // Creator is automatically joined, not pending
+      role: 'shooter',
+      joined_at: new Date().toISOString(),
+    });
+  }
+
   return data;
 }
 
@@ -121,18 +117,18 @@ export async function createEngagement(params: {
  *
  * Status values: 'pending' (lobby), 'active' (in progress), 'completed', 'cancelled'
  */
-export async function updateEngagementStatus(
-  engagementId: string,
-  status: EngagementStatus
-): Promise<Engagement> {
+export async function updateEngagementStatus(engagementId: string, status: EngagementStatus): Promise<Engagement> {
   const { data, error } = await supabase
     .from('engagements')
     .update({ status })
     .eq('id', engagementId)
     .select('*')
-    .single();
+    .maybeSingle();
 
   if (error) throw error;
+  if (!data) {
+    throw new Error('Engagement not found or already completed');
+  }
   return data;
 }
 
@@ -177,13 +173,11 @@ export async function startEngagement(engagementId: string): Promise<Engagement>
  * Get all participants for an engagement.
  * Includes user profile data (name, avatar).
  */
-export async function getEngagementParticipants(
-  engagementId: string
-): Promise<EngagementParticipant[]> {
-  // Get participants with their contribution (shots/hits)
+export async function getEngagementParticipants(engagementId: string): Promise<EngagementParticipant[]> {
+  // Get participants with their contribution (shots/hits) and role
   const { data: participants, error } = await supabase
     .from('engagement_participants')
-    .select('id, engagement_id, user_id, state, joined_at, created_at, shots_fired, hits')
+    .select('id, engagement_id, user_id, state, role, joined_at, created_at, shots_fired, hits')
     .eq('engagement_id', engagementId)
     .order('created_at', { ascending: true });
 
@@ -192,10 +186,7 @@ export async function getEngagementParticipants(
 
   // Get profiles for all participant user IDs
   const userIds = participants.map((p) => p.user_id);
-  const { data: profiles } = await supabase
-    .from('profiles')
-    .select('id, full_name, avatar_url')
-    .in('id', userIds);
+  const { data: profiles } = await supabase.from('profiles').select('id, full_name, avatar_url').in('id', userIds);
 
   const profileMap = new Map((profiles || []).map((p) => [p.id, p]));
 
@@ -207,6 +198,7 @@ export async function getEngagementParticipants(
       engagement_id: row.engagement_id,
       user_id: row.user_id,
       state: row.state,
+      role: row.role || 'shooter',
       joined_at: row.joined_at,
       created_at: row.created_at,
       shots_fired: row.shots_fired || null,
@@ -221,9 +213,7 @@ export async function getEngagementParticipants(
  * @deprecated Use getEngagementParticipants instead.
  * This function is kept for backwards compatibility during migration.
  */
-export async function getSessionParticipants(
-  sessionId: string
-): Promise<EngagementParticipant[]> {
+export async function getSessionParticipants(sessionId: string): Promise<EngagementParticipant[]> {
   // First get the engagement for this session
   const engagement = await getEngagementBySessionId(sessionId);
   if (!engagement) return [];
@@ -290,10 +280,7 @@ export async function getEligibleParticipants(
 
   // Get profiles for eligible members
   const userIds = eligibleMembers.map((m) => m.user_id);
-  const { data: profiles } = await supabase
-    .from('profiles')
-    .select('id, full_name, avatar_url')
-    .in('id', userIds);
+  const { data: profiles } = await supabase.from('profiles').select('id, full_name, avatar_url').in('id', userIds);
 
   const profileMap = new Map((profiles || []).map((p) => [p.id, p]));
 
@@ -314,7 +301,8 @@ export async function getEligibleParticipants(
 
 /**
  * Add a participant to a squad engagement.
- * 
+ * Handles re-invitations: if participant exists with 'left' or 'declined' state, resets to 'pending'.
+ *
  * CANONICAL RULES:
  * - Participants acknowledge/consent asynchronously
  * - Commander decides who participates
@@ -322,33 +310,64 @@ export async function getEligibleParticipants(
  */
 export async function addParticipant(
   engagementId: string,
-  userId: string
+  userId: string,
+  role: EngagementRole = 'shooter'
 ): Promise<EngagementParticipant> {
-  const { data, error } = await supabase
+  // Check if participant already exists (for re-invitation)
+  const { data: existing } = await supabase
     .from('engagement_participants')
-    .insert({
-      engagement_id: engagementId,
-      user_id: userId,
-      state: 'joined',
-      joined_at: new Date().toISOString(),
-    })
-    .select('id, engagement_id, user_id, state, joined_at, created_at, shots_fired, hits')
-    .single();
+    .select('id, state')
+    .eq('engagement_id', engagementId)
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  let data;
+  let error;
+
+  if (existing) {
+    // Re-invitation: reset state to pending
+    const result = await supabase
+      .from('engagement_participants')
+      .update({
+        state: 'pending',
+        role,
+        joined_at: null, // Reset joined_at
+        shots_fired: null, // Reset results
+        hits: null,
+      })
+      .eq('id', existing.id)
+      .select('id, engagement_id, user_id, state, role, joined_at, created_at, shots_fired, hits')
+      .single();
+    data = result.data;
+    error = result.error;
+  } else {
+    // New participant
+    const result = await supabase
+      .from('engagement_participants')
+      .insert({
+        engagement_id: engagementId,
+        user_id: userId,
+        state: 'pending', // Start as pending, user must accept
+        role,
+      })
+      .select('id, engagement_id, user_id, state, role, joined_at, created_at, shots_fired, hits')
+      .single();
+    data = result.data;
+    error = result.error;
+  }
 
   if (error) throw error;
+  if (!data) throw new Error('Failed to add participant');
 
   // Get profile for this user
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('full_name, avatar_url')
-    .eq('id', userId)
-    .single();
+  const { data: profile } = await supabase.from('profiles').select('full_name, avatar_url').eq('id', userId).single();
 
   return {
     id: data.id,
     engagement_id: data.engagement_id,
     user_id: data.user_id,
     state: data.state,
+    role: data.role || 'shooter',
     joined_at: data.joined_at,
     created_at: data.created_at,
     shots_fired: data.shots_fired || null,
@@ -367,28 +386,85 @@ export async function updateParticipantState(
   userId: string,
   state: ParticipantState
 ): Promise<EngagementParticipant> {
+  const updateData: { state: ParticipantState; joined_at?: string } = { state };
+
+  // Set joined_at when accepting (pending → joined)
+  if (state === 'joined') {
+    updateData.joined_at = new Date().toISOString();
+  }
+
   const { data, error } = await supabase
     .from('engagement_participants')
-    .update({ state })
+    .update(updateData)
     .eq('engagement_id', engagementId)
     .eq('user_id', userId)
-    .select('id, engagement_id, user_id, state, joined_at, created_at, shots_fired, hits')
+    .select('id, engagement_id, user_id, state, role, joined_at, created_at, shots_fired, hits')
     .single();
 
   if (error) throw error;
 
   // Get profile for this user
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('full_name, avatar_url')
-    .eq('id', userId)
-    .single();
+  const { data: profile } = await supabase.from('profiles').select('full_name, avatar_url').eq('id', userId).single();
 
   return {
     id: data.id,
     engagement_id: data.engagement_id,
     user_id: data.user_id,
     state: data.state,
+    role: data.role || 'shooter',
+    joined_at: data.joined_at,
+    created_at: data.created_at,
+    shots_fired: data.shots_fired || null,
+    hits: data.hits || null,
+    user_full_name: profile?.full_name || null,
+    user_avatar_url: profile?.avatar_url || null,
+  };
+}
+
+/**
+ * Accept an invitation to join a squad engagement.
+ * Changes state from 'pending' to 'joined'.
+ */
+export async function acceptInvite(engagementId: string, userId: string): Promise<EngagementParticipant> {
+  return updateParticipantState(engagementId, userId, 'joined');
+}
+
+/**
+ * Decline an invitation to join a squad engagement.
+ * Changes state from 'pending' to 'declined'.
+ */
+export async function declineInvite(engagementId: string, userId: string): Promise<EngagementParticipant> {
+  return updateParticipantState(engagementId, userId, 'declined');
+}
+
+/**
+ * Update a participant's role (shooter/spotter).
+ * Commander can change roles before starting the engagement.
+ */
+export async function updateParticipantRole(
+  engagementId: string,
+  userId: string,
+  role: EngagementRole
+): Promise<EngagementParticipant> {
+  const { data, error } = await supabase
+    .from('engagement_participants')
+    .update({ role })
+    .eq('engagement_id', engagementId)
+    .eq('user_id', userId)
+    .select('id, engagement_id, user_id, state, role, joined_at, created_at, shots_fired, hits')
+    .single();
+
+  if (error) throw error;
+
+  // Get profile for this user
+  const { data: profile } = await supabase.from('profiles').select('full_name, avatar_url').eq('id', userId).single();
+
+  return {
+    id: data.id,
+    engagement_id: data.engagement_id,
+    user_id: data.user_id,
+    state: data.state,
+    role: data.role || 'shooter',
     joined_at: data.joined_at,
     created_at: data.created_at,
     shots_fired: data.shots_fired || null,
@@ -416,23 +492,20 @@ export async function updateParticipantResults(
     })
     .eq('engagement_id', engagementId)
     .eq('user_id', userId)
-    .select('id, engagement_id, user_id, state, joined_at, created_at, shots_fired, hits')
+    .select('id, engagement_id, user_id, state, role, joined_at, created_at, shots_fired, hits')
     .single();
 
   if (error) throw error;
 
   // Get profile for this user
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('full_name, avatar_url')
-    .eq('id', userId)
-    .single();
+  const { data: profile } = await supabase.from('profiles').select('full_name, avatar_url').eq('id', userId).single();
 
   return {
     id: data.id,
     engagement_id: data.engagement_id,
     user_id: data.user_id,
     state: data.state,
+    role: data.role || 'shooter',
     joined_at: data.joined_at,
     created_at: data.created_at,
     shots_fired: data.shots_fired || null,
@@ -446,10 +519,7 @@ export async function updateParticipantResults(
  * Remove a participant from an engagement.
  * Only the engagement owner can remove participants.
  */
-export async function removeParticipant(
-  engagementId: string,
-  userId: string
-): Promise<void> {
+export async function removeParticipant(engagementId: string, userId: string): Promise<void> {
   const { error } = await supabase
     .from('engagement_participants')
     .delete()
@@ -465,23 +535,25 @@ export async function removeParticipant(
 
 /**
  * Check if a squad engagement has participants.
- * 
+ *
  * CANONICAL: Squad engagements are async - participants acknowledge/consent
  * This helper checks if any participants have joined.
  */
-export function hasJoinedParticipants(
-  participants: EngagementParticipant[]
-): boolean {
+export function hasJoinedParticipants(participants: EngagementParticipant[]): boolean {
   return participants.some((p) => p.state === 'joined');
 }
 
 /**
  * Get count of participants by state.
  */
-export function getParticipantCounts(
-  participants: EngagementParticipant[]
-): { pending: number; joined: number; left: number; total: number } {
-  const counts = { pending: 0, joined: 0, left: 0, total: participants.length };
+export function getParticipantCounts(participants: EngagementParticipant[]): {
+  pending: number;
+  joined: number;
+  declined: number;
+  left: number;
+  total: number;
+} {
+  const counts = { pending: 0, joined: 0, declined: 0, left: 0, total: participants.length };
   for (const p of participants) {
     counts[p.state]++;
   }

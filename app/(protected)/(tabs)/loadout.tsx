@@ -369,14 +369,16 @@ export default function LoadoutScreen() {
 
   const handleWeaponPress = useCallback((weapon: AccessibleWeapon) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    // Navigate to weapon detail - for team weapons, we may need different handling
-    if (weapon.source === 'personal' && weapon.userWeapon) {
+
+    // If weapon has a userWeapon (personal copy), use personal fetch
+    // This includes team_assigned weapons that are linked to user_weapons
+    if (weapon.userWeapon) {
       router.push({
         pathname: '/(protected)/weaponDetail',
-        params: { weaponId: weapon.id },
+        params: { weaponId: weapon.id, source: weapon.source },
       } as any);
     } else {
-      // For team weapons, show info but don't allow editing (they're managed in Team tab)
+      // Pure team weapons (team_pool or unlinked team_assigned)
       router.push({
         pathname: '/(protected)/weaponDetail',
         params: { weaponId: weapon.id, source: weapon.source },

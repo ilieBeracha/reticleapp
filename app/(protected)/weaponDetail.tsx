@@ -103,8 +103,6 @@ export default function WeaponDetailScreen() {
   const insets = useSafeAreaInsets();
   const { weaponId, source } = useLocalSearchParams<{ weaponId: string; source?: WeaponSource }>();
 
-  const isTeamWeapon = source === 'team_assigned' || source === 'team_pool';
-
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [weapon, setWeapon] = useState<DisplayWeapon | null>(null);
@@ -113,6 +111,13 @@ export default function WeaponDetailScreen() {
   const [recentSessions, setRecentSessions] = useState<RecentSession[]>([]);
   const [editingNotes, setEditingNotes] = useState(false);
   const [notes, setNotes] = useState('');
+  // Track if data came from user_weapons (editable) vs team_weapons (read-only)
+  const [isFromUserWeapons, setIsFromUserWeapons] = useState(false);
+
+  // Derived: is this a read-only team weapon? (not in user's personal collection)
+  const isTeamWeapon = !isFromUserWeapons && (source === 'team_assigned' || source === 'team_pool');
+  // Derived: does this weapon have team context? (for showing team badges)
+  const hasTeamContext = weapon?.team_id != null;
 
   const loadData = useCallback(async () => {
     if (!weaponId) return;
@@ -120,13 +125,16 @@ export default function WeaponDetailScreen() {
     try {
       let weaponData: DisplayWeapon | null = null;
 
-      if (isTeamWeapon) {
-        // Fetch team weapon
+      // For team_pool, always fetch from team_weapons
+      // For team_assigned, try user_weapons first (user may have a linked personal copy)
+      // For personal (no source), fetch from user_weapons
+      let fromUserWeapons = false;
+
+      if (source === 'team_pool') {
+        // Pure team pool weapon
         const teamWeapon = await getTeamWeapon(weaponId);
         if (teamWeapon) {
-          // Get team name
           const { data: teamData } = await supabase.from('teams').select('name').eq('id', teamWeapon.team_id).single();
-
           weaponData = {
             id: teamWeapon.id,
             name: teamWeapon.name,
@@ -138,8 +146,52 @@ export default function WeaponDetailScreen() {
             team_name: teamData?.name || 'Team',
           };
         }
+      } else if (source === 'team_assigned') {
+        // Team assigned - could be in user_weapons (linked) or team_weapons (unlinked)
+        // Try user_weapons first
+        const userWeapon = await getUserWeapon(weaponId);
+        if (userWeapon) {
+          fromUserWeapons = true;
+          // Found in user_weapons - use it with team context
+          const teamId = userWeapon.team_weapon_id
+            ? (await getTeamWeapon(userWeapon.team_weapon_id))?.team_id
+            : null;
+          const teamName = teamId
+            ? (await supabase.from('teams').select('name').eq('id', teamId).single()).data?.name
+            : null;
+
+          weaponData = {
+            id: userWeapon.id,
+            name: userWeapon.name,
+            category: userWeapon.category,
+            caliber: userWeapon.caliber,
+            notes: userWeapon.personal_notes,
+            created_at: userWeapon.created_at,
+            personal_zero_distance_m: userWeapon.personal_zero_distance_m,
+            personal_notes: userWeapon.personal_notes,
+            team_id: teamId ?? undefined,
+            team_name: teamName ?? undefined,
+          };
+        } else {
+          // Not in user_weapons, try team_weapons
+          const teamWeapon = await getTeamWeapon(weaponId);
+          if (teamWeapon) {
+            const { data: teamData } = await supabase.from('teams').select('name').eq('id', teamWeapon.team_id).single();
+            weaponData = {
+              id: teamWeapon.id,
+              name: teamWeapon.name,
+              category: teamWeapon.category,
+              caliber: teamWeapon.caliber,
+              notes: teamWeapon.notes,
+              created_at: teamWeapon.created_at,
+              team_id: teamWeapon.team_id,
+              team_name: teamData?.name || 'Team',
+            };
+          }
+        }
       } else {
-        // Fetch personal weapon
+        // Personal weapon (no source or source === 'personal')
+        fromUserWeapons = true;
         const userWeapon = await getUserWeapon(weaponId);
         if (userWeapon) {
           weaponData = {
@@ -154,6 +206,8 @@ export default function WeaponDetailScreen() {
           };
         }
       }
+
+      setIsFromUserWeapons(fromUserWeapons);
 
       if (!weaponData) {
         router.back();
@@ -191,7 +245,7 @@ export default function WeaponDetailScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [weaponId, isTeamWeapon]);
+  }, [weaponId, source]);
 
   useEffect(() => {
     loadData();
@@ -337,8 +391,8 @@ export default function WeaponDetailScreen() {
       >
         {/* Hero Section */}
         <View style={[s.heroCard, { backgroundColor: colors.card }]}>
-          <View style={[s.heroIcon, { backgroundColor: isTeamWeapon ? '#3B82F615' : `${colors.primary}15` }]}>
-            {getCategoryIcon(weapon.category, isTeamWeapon ? '#3B82F6' : colors.primary, 28)}
+          <View style={[s.heroIcon, { backgroundColor: hasTeamContext ? '#3B82F615' : `${colors.primary}15` }]}>
+            {getCategoryIcon(weapon.category, hasTeamContext ? '#3B82F6' : colors.primary, 28)}
           </View>
           <View style={s.heroInfo}>
             <Text style={[s.heroName, { color: colors.text }]}>{weapon.name}</Text>
@@ -353,6 +407,11 @@ export default function WeaponDetailScreen() {
               <Text style={[s.teamBadgeText, { color: source === 'team_assigned' ? '#3B82F6' : '#8B5CF6' }]}>
                 {source === 'team_assigned' ? 'Assigned' : 'Pool'}
               </Text>
+            </View>
+          ) : hasTeamContext ? (
+            <View style={[s.teamBadge, { backgroundColor: '#3B82F615' }]}>
+              <Users size={12} color="#3B82F6" />
+              <Text style={[s.teamBadgeText, { color: '#3B82F6' }]}>Team</Text>
             </View>
           ) : isDefault ? (
             <View style={s.defaultBadge}>

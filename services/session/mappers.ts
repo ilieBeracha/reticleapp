@@ -99,7 +99,26 @@ export function mapSession(row: any): SessionWithDetails {
   // Map engagement if present (for squad/group sessions)
   // Note: engagement is a one-to-many relation, so it comes as an array from Supabase
   const engagementData = row.engagement;
-  const engagement = Array.isArray(engagementData) ? engagementData[0] : engagementData;
+  const rawEngagement = Array.isArray(engagementData) ? engagementData[0] : engagementData;
+  
+  // Map engagement with participants
+  const engagement = rawEngagement ? {
+    ...rawEngagement,
+    engagement_participants: rawEngagement.engagement_participants?.map((p: any) => ({
+      id: p.id,
+      engagement_id: rawEngagement.id,
+      user_id: p.user_id,
+      state: p.state,
+      role: p.role,
+      shots_fired: p.shots_fired ?? null,
+      hits: p.hits ?? null,
+      joined_at: p.joined_at ?? null,
+      created_at: p.created_at,
+      // Note: user_full_name needs to be fetched separately (no FK relation to profiles)
+      user_full_name: null,
+      user_avatar_url: null,
+    })) ?? [],
+  } : null;
 
   return {
     id: row.id,

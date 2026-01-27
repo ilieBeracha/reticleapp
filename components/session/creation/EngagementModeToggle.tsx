@@ -5,14 +5,19 @@
  * Squad logic MUST live here.
  * Training and Session must remain passive context.
  *
- * Toggle between Solo and Squad engagement modes.
+ * Toggle between Solo, Squad, and Group engagement modes.
  * Only shown when drill_goal === 'engagement'.
  * Grouping sessions are ALWAYS solo - no toggle shown.
+ *
+ * Modes:
+ * - Solo: Individual execution, full target tracking
+ * - Squad: Team execution with detailed individual targets
+ * - Group: Team execution with simple shots/hits entry per person
  */
 
 import { useColors } from '@/hooks/ui/useColors';
 import * as Haptics from 'expo-haptics';
-import { User, Users } from 'lucide-react-native';
+import { User, Users, UsersRound } from 'lucide-react-native';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import type { EngagementMode } from '../shared';
@@ -37,6 +42,7 @@ export function EngagementModeToggle({ value, onChange, disabled = false }: Enga
 
   const isSolo = value === 'solo';
   const isSquad = value === 'squad';
+  const isGroup = value === 'group';
 
   return (
     <View style={styles.container}>
@@ -62,6 +68,17 @@ export function EngagementModeToggle({ value, onChange, disabled = false }: Enga
         >
           <Users size={16} color={isSquad ? '#fff' : colors.textMuted} strokeWidth={2} />
           <Text style={[styles.optionText, { color: isSquad ? '#fff' : colors.text }]}>Squad</Text>
+        </TouchableOpacity>
+
+        {/* Group Option */}
+        <TouchableOpacity
+          style={[styles.option, isGroup && { backgroundColor: colors.primary }]}
+          onPress={() => handlePress('group')}
+          disabled={disabled}
+          activeOpacity={0.7}
+        >
+          <UsersRound size={16} color={isGroup ? '#fff' : colors.textMuted} strokeWidth={2} />
+          <Text style={[styles.optionText, { color: isGroup ? '#fff' : colors.text }]}>Group</Text>
         </TouchableOpacity>
       </View>
     </View>

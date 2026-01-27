@@ -40,6 +40,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   UIManager,
   View,
@@ -185,19 +186,31 @@ interface AddSessionSheetProps {
 function AddSessionSheet({ visible, onClose, onAdd }: AddSessionSheetProps) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+
+  // Step state
+  const [step, setStep] = useState<1 | 2>(1);
+
+  // Step 1: Goal + Mode + Policy
   const [purpose, setPurpose] = useState<SessionPurpose>('grouping');
-  const [context, setContext] = useState<SessionContextState>(EMPTY_CONTEXT);
-  const [executionPolicy, setExecutionPolicy] = useState<ExecutionPolicy>('locked');
   const [engagementMode, setEngagementMode] = useState<'solo' | 'squad'>('solo');
+  const [executionPolicy, setExecutionPolicy] = useState<ExecutionPolicy>('locked');
+
+  // Step 2: Configuration
+  const [context, setContext] = useState<SessionContextState>(EMPTY_CONTEXT);
+  const [customDistanceEditing, setCustomDistanceEditing] = useState(false);
+  const [customDistanceText, setCustomDistanceText] = useState('');
   const [validationError, setValidationError] = useState<string | null>(null);
 
   // Grouping drills are ALWAYS solo (enforced by canonical model)
   const effectiveEngagementMode = purpose === 'grouping' ? 'solo' : engagementMode;
 
+  // Check if step 2 is needed (free mode skips config)
+  const needsStep2 = executionPolicy !== 'free' || effectiveEngagementMode === 'squad';
+
   const handlePurposeSelect = useCallback((p: SessionPurpose) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setPurpose(p);
-    // Reset to solo when switching to grouping
+    // Reset to solo when switching to grouping (grouping is always solo)
     if (p === 'grouping') {
       setEngagementMode('solo');
     }
@@ -206,7 +219,6 @@ function AddSessionSheet({ visible, onClose, onAdd }: AddSessionSheetProps) {
   const handlePolicySelect = useCallback((p: ExecutionPolicy) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setExecutionPolicy(p);
-    setValidationError(null); // Clear error when policy changes
   }, []);
 
   const handleEngagementModeSelect = useCallback((mode: 'solo' | 'squad') => {
@@ -221,6 +233,35 @@ function AddSessionSheet({ visible, onClose, onAdd }: AddSessionSheetProps) {
   const handleUpdateContext = useCallback((partial: Partial<SessionContextState>) => {
     setContext((prev) => ({ ...prev, ...partial }));
   }, []);
+
+  const handleNextStep = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    // Reset context when moving to step 2 to avoid stale values
+    setContext(EMPTY_CONTEXT);
+    setCustomDistanceEditing(false);
+    setCustomDistanceText('');
+    setValidationError(null);
+    setStep(2);
+  }, []);
+
+  const handleBackStep = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setStep(1);
+    setValidationError(null);
+  }, []);
+
+  const handleClose = useCallback(() => {
+    // Reset all state
+    setStep(1);
+    setPurpose('grouping');
+    setEngagementMode('solo');
+    setExecutionPolicy('locked');
+    setContext(EMPTY_CONTEXT);
+    setCustomDistanceEditing(false);
+    setCustomDistanceText('');
+    setValidationError(null);
+    onClose();
+  }, [onClose]);
 
   const mapPosition = (pos: string | null): 'standing' | 'kneeling' | 'prone' | 'sitting' | null => {
     if (!pos || pos === 'any') return null;
@@ -268,7 +309,7 @@ function AddSessionSheet({ visible, onClose, onAdd }: AddSessionSheetProps) {
     const nameParts = [purpose === 'grouping' ? 'Grouping' : 'Engagement'];
     if (hasDistance) nameParts.push(`${context.distance}m`);
     if (effectiveEngagementMode === 'squad') nameParts.push('(Squad)');
-    
+
     const newSession: TrainingDrillItem = {
       id: `session-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
       drill_id: '',
@@ -290,22 +331,51 @@ function AddSessionSheet({ visible, onClose, onAdd }: AddSessionSheetProps) {
 
     onAdd(newSession);
     // Reset for next time
-    setContext(EMPTY_CONTEXT);
-    setExecutionPolicy('locked');
+    setStep(1);
+    setPurpose('grouping');
     setEngagementMode('solo');
+    setExecutionPolicy('locked');
+    setContext(EMPTY_CONTEXT);
+    setCustomDistanceEditing(false);
+    setCustomDistanceText('');
+    setValidationError(null);
     onClose();
   }, [purpose, context, executionPolicy, effectiveEngagementMode, onAdd, onClose]);
 
+  // Get step title
+  const stepTitle = step === 1 ? 'Drill Type' : 'Configuration';
+
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={handleClose}>
       <View style={[styles.sheetContainer, { backgroundColor: colors.background }]}>
         {/* Header */}
         <View style={styles.sheetHeader}>
-          <TouchableOpacity style={[styles.sheetCloseBtn, { backgroundColor: colors.card }]} onPress={onClose}>
-            <Ionicons name="close" size={20} color={colors.text} />
+          <TouchableOpacity
+            style={[styles.sheetCloseBtn, { backgroundColor: colors.card }]}
+            onPress={step === 1 ? handleClose : handleBackStep}
+          >
+            <Ionicons name={step === 1 ? 'close' : 'chevron-back'} size={20} color={colors.text} />
           </TouchableOpacity>
-          <Text style={[styles.sheetTitle, { color: colors.text }]}>Add Drill</Text>
+          <View style={styles.sheetHeaderCenter}>
+            <Text style={[styles.sheetTitle, { color: colors.text }]}>{stepTitle}</Text>
+            <Text style={[styles.sheetStep, { color: colors.textMuted }]}>
+              Step {step} of {needsStep2 ? 2 : 1}
+            </Text>
+          </View>
           <View style={{ width: 40 }} />
+        </View>
+
+        {/* Progress bar */}
+        <View style={[styles.progressBar, { backgroundColor: colors.border }]}>
+          <View
+            style={[
+              styles.progressFill,
+              {
+                backgroundColor: colors.primary,
+                width: step === 1 ? (needsStep2 ? '50%' : '100%') : '100%',
+              }
+            ]}
+          />
         </View>
 
         {/* Form */}
@@ -315,225 +385,341 @@ function AddSessionSheet({ visible, onClose, onAdd }: AddSessionSheetProps) {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          {/* Purpose Toggle */}
-          <View style={styles.purposeRow}>
-            <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>Goal</Text>
-            <View style={[styles.purposeToggle, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <TouchableOpacity
-                style={[
-                  styles.purposeOption,
-                  purpose === 'grouping' && [styles.purposeOptionActive, { backgroundColor: colors.primary }],
-                ]}
-                onPress={() => handlePurposeSelect('grouping')}
-                activeOpacity={0.7}
-              >
-                <Crosshair size={16} color={purpose === 'grouping' ? '#fff' : colors.textMuted} />
-                <Text style={[styles.purposeText, { color: purpose === 'grouping' ? '#fff' : colors.text }]}>
-                  Grouping
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.purposeOption,
-                  purpose === 'engagement' && [styles.purposeOptionActive, { backgroundColor: colors.orange }],
-                ]}
-                onPress={() => handlePurposeSelect('engagement')}
-                activeOpacity={0.7}
-              >
-                <Target size={16} color={purpose === 'engagement' ? '#fff' : colors.textMuted} />
-                <Text style={[styles.purposeText, { color: purpose === 'engagement' ? '#fff' : colors.text }]}>
-                  Engagement
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          {/* Execution Policy - Only show for solo mode (squad is always free) */}
-          {effectiveEngagementMode !== 'squad' && (
-            <View style={styles.policySection}>
-              <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>Execution Policy</Text>
-              <Text style={[styles.policyHint, { color: colors.textMuted }]}>
-                How strictly must soldiers follow this configuration?
-              </Text>
-              <View style={[styles.policyToggle, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                <TouchableOpacity
-                  style={[
-                    styles.policyOption,
-                    executionPolicy === 'locked' && [styles.policyOptionActive, { backgroundColor: colors.blue }],
-                  ]}
-                  onPress={() => handlePolicySelect('locked')}
-                  activeOpacity={0.7}
-                >
-                  <Lock size={14} color={executionPolicy === 'locked' ? '#fff' : colors.textMuted} />
-                  <Text style={[styles.policyText, { color: executionPolicy === 'locked' ? '#fff' : colors.text }]}>
-                    Locked
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[
-                    styles.policyOption,
-                    executionPolicy === 'guided' && [styles.policyOptionActive, { backgroundColor: colors.green }],
-                  ]}
-                  onPress={() => handlePolicySelect('guided')}
-                  activeOpacity={0.7}
-                >
-                  <Sparkles size={14} color={executionPolicy === 'guided' ? '#fff' : colors.textMuted} />
-                  <Text style={[styles.policyText, { color: executionPolicy === 'guided' ? '#fff' : colors.text }]}>
-                    Guided
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[
-                    styles.policyOption,
-                    executionPolicy === 'free' && [styles.policyOptionActive, { backgroundColor: colors.orange }],
-                  ]}
-                  onPress={() => handlePolicySelect('free')}
-                  activeOpacity={0.7}
-                >
-                  <Unlock size={14} color={executionPolicy === 'free' ? '#fff' : colors.textMuted} />
-                  <Text style={[styles.policyText, { color: executionPolicy === 'free' ? '#fff' : colors.text }]}>
-                    Free
-                  </Text>
-                </TouchableOpacity>
-              </View>
-              <Text style={[styles.policyDesc, { color: colors.textMuted }]}>
-                {executionPolicy === 'locked' && 'Soldiers must execute exactly as defined'}
-                {executionPolicy === 'guided' && 'Defaults pre-filled, soldiers may adjust'}
-                {executionPolicy === 'free' && 'Drill is a label only, full freedom'}
-              </Text>
-            </View>
-          )}
-
-          {/* Engagement Mode - Solo vs Squad (only for Engagement drills) */}
-          <View style={styles.policySection}>
-            <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>Engagement Mode</Text>
-            <Text style={[styles.policyHint, { color: colors.textMuted }]}>
-              {purpose === 'grouping' 
-                ? 'Grouping drills are always individual'
-                : 'Can soldiers participate as a squad?'}
-            </Text>
-            <View style={[styles.policyToggle, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <TouchableOpacity
-                style={[
-                  styles.policyOption,
-                  effectiveEngagementMode === 'solo' && [styles.policyOptionActive, { backgroundColor: colors.primary }],
-                ]}
-                onPress={() => handleEngagementModeSelect('solo')}
-                disabled={purpose === 'grouping'}
-                activeOpacity={0.7}
-              >
-                <User size={14} color={effectiveEngagementMode === 'solo' ? '#fff' : colors.textMuted} />
-                <Text style={[styles.policyText, { color: effectiveEngagementMode === 'solo' ? '#fff' : colors.text }]}>
-                  Solo
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.policyOption,
-                  effectiveEngagementMode === 'squad' && [styles.policyOptionActive, { backgroundColor: colors.orange }],
-                  purpose === 'grouping' && { opacity: 0.4 },
-                ]}
-                onPress={() => handleEngagementModeSelect('squad')}
-                disabled={purpose === 'grouping'}
-                activeOpacity={0.7}
-              >
-                <Users size={14} color={effectiveEngagementMode === 'squad' ? '#fff' : colors.textMuted} />
-                <Text style={[styles.policyText, { color: effectiveEngagementMode === 'squad' ? '#fff' : colors.text }]}>
-                  Squad
-                </Text>
-              </TouchableOpacity>
-            </View>
-            <Text style={[styles.policyDesc, { color: colors.textMuted }]}>
-              {purpose === 'grouping' 
-                ? 'Individual execution only for grouping drills'
-                : effectiveEngagementMode === 'solo'
-                  ? 'Each soldier executes individually'
-                  : 'Squad members can participate together'}
-            </Text>
-          </View>
-
-          {/* Drill Configuration - Hidden when FREE or when SQUAD mode */}
-          {executionPolicy !== 'free' && effectiveEngagementMode !== 'squad' && (
+          {/* ═══════════════════════════════════════════════════════════════════
+              STEP 1: Goal + Mode + Policy
+          ═══════════════════════════════════════════════════════════════════ */}
+          {step === 1 && (
             <>
-              {executionPolicy === 'guided' && (
-                <View style={styles.optionalHeader}>
-                  <Text style={[styles.optionalLabel, { color: colors.textMuted }]}>
-                    SUGGESTED DEFAULTS (OPTIONAL)
+              {/* Purpose Toggle */}
+              <View style={styles.purposeRow}>
+                <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>Goal</Text>
+                <View style={[styles.purposeToggle, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                  <TouchableOpacity
+                    style={[
+                      styles.purposeOption,
+                      purpose === 'grouping' && [styles.purposeOptionActive, { backgroundColor: colors.primary }],
+                    ]}
+                    onPress={() => handlePurposeSelect('grouping')}
+                    activeOpacity={0.7}
+                  >
+                    <Crosshair size={16} color={purpose === 'grouping' ? '#fff' : colors.textMuted} />
+                    <Text style={[styles.purposeText, { color: purpose === 'grouping' ? '#fff' : colors.text }]}>
+                      Grouping
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.purposeOption,
+                      purpose === 'engagement' && [styles.purposeOptionActive, { backgroundColor: colors.orange }],
+                    ]}
+                    onPress={() => handlePurposeSelect('engagement')}
+                    activeOpacity={0.7}
+                  >
+                    <Target size={16} color={purpose === 'engagement' ? '#fff' : colors.textMuted} />
+                    <Text style={[styles.purposeText, { color: purpose === 'engagement' ? '#fff' : colors.text }]}>
+                      Engagement
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {/* Engagement Mode - Solo vs Squad */}
+              <View style={styles.policySection}>
+                <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>Mode</Text>
+                <Text style={[styles.policyHint, { color: colors.textMuted }]}>
+                  {purpose === 'grouping'
+                    ? 'Grouping drills are always individual'
+                    : 'Individual or team execution?'}
+                </Text>
+                <View style={[styles.policyToggle, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                  <TouchableOpacity
+                    style={[
+                      styles.policyOption,
+                      effectiveEngagementMode === 'solo' && [styles.policyOptionActive, { backgroundColor: colors.primary }],
+                    ]}
+                    onPress={() => handleEngagementModeSelect('solo')}
+                    disabled={purpose === 'grouping'}
+                    activeOpacity={0.7}
+                  >
+                    <User size={14} color={effectiveEngagementMode === 'solo' ? '#fff' : colors.textMuted} />
+                    <Text style={[styles.policyText, { color: effectiveEngagementMode === 'solo' ? '#fff' : colors.text }]}>
+                      Solo
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.policyOption,
+                      effectiveEngagementMode === 'squad' && [styles.policyOptionActive, { backgroundColor: colors.orange }],
+                      purpose === 'grouping' && { opacity: 0.4 },
+                    ]}
+                    onPress={() => handleEngagementModeSelect('squad')}
+                    disabled={purpose === 'grouping'}
+                    activeOpacity={0.7}
+                  >
+                    <Users size={14} color={effectiveEngagementMode === 'squad' ? '#fff' : colors.textMuted} />
+                    <Text style={[styles.policyText, { color: effectiveEngagementMode === 'squad' ? '#fff' : colors.text }]}>
+                      Squad
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {/* Execution Policy - Only show for solo mode */}
+              {effectiveEngagementMode !== 'squad' && (
+                <View style={styles.policySection}>
+                  <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>Flexibility</Text>
+                  <Text style={[styles.policyHint, { color: colors.textMuted }]}>
+                    How strictly must soldiers follow the configuration?
                   </Text>
-                  <Text style={[styles.optionalHint, { color: colors.textMuted }]}>
-                    Soldiers can adjust these values when executing
+                  <View style={[styles.policyToggle, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                    <TouchableOpacity
+                      style={[
+                        styles.policyOption,
+                        executionPolicy === 'locked' && [styles.policyOptionActive, { backgroundColor: colors.blue }],
+                      ]}
+                      onPress={() => handlePolicySelect('locked')}
+                      activeOpacity={0.7}
+                    >
+                      <Lock size={14} color={executionPolicy === 'locked' ? '#fff' : colors.textMuted} />
+                      <Text style={[styles.policyText, { color: executionPolicy === 'locked' ? '#fff' : colors.text }]}>
+                        Locked
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[
+                        styles.policyOption,
+                        executionPolicy === 'guided' && [styles.policyOptionActive, { backgroundColor: colors.green }],
+                      ]}
+                      onPress={() => handlePolicySelect('guided')}
+                      activeOpacity={0.7}
+                    >
+                      <Sparkles size={14} color={executionPolicy === 'guided' ? '#fff' : colors.textMuted} />
+                      <Text style={[styles.policyText, { color: executionPolicy === 'guided' ? '#fff' : colors.text }]}>
+                        Guided
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[
+                        styles.policyOption,
+                        executionPolicy === 'free' && [styles.policyOptionActive, { backgroundColor: colors.orange }],
+                      ]}
+                      onPress={() => handlePolicySelect('free')}
+                      activeOpacity={0.7}
+                    >
+                      <Unlock size={14} color={executionPolicy === 'free' ? '#fff' : colors.textMuted} />
+                      <Text style={[styles.policyText, { color: executionPolicy === 'free' ? '#fff' : colors.text }]}>
+                        Free
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                  <Text style={[styles.policyDesc, { color: colors.textMuted }]}>
+                    {executionPolicy === 'locked' && 'Soldiers must execute exactly as defined'}
+                    {executionPolicy === 'guided' && 'Defaults pre-filled, soldiers may adjust'}
+                    {executionPolicy === 'free' && 'Soldiers choose everything freely'}
                   </Text>
                 </View>
               )}
-              <SessionContextStep
-                purpose={purpose}
-                context={context}
-                onUpdateContext={handleUpdateContext}
-                onBack={() => {}}
-                hideWeaponSection
-              />
             </>
           )}
 
-          {/* Squad mode - minimal config with just distance */}
-          {effectiveEngagementMode === 'squad' && (
-            <View style={[styles.squadNotice, { backgroundColor: colors.primary + '10', borderColor: colors.primary }]}>
-              <Users size={20} color={colors.primary} />
-              <View style={styles.freeNoticeText}>
-                <Text style={[styles.freeNoticeTitle, { color: colors.text }]}>
-                  Squad Session
-                </Text>
-                <Text style={[styles.freeNoticeDesc, { color: colors.textMuted }]}>
-                  Team drill with shared results. Only distance is configured.
-                </Text>
-              </View>
-            </View>
-          )}
-
-          {/* Distance selector for squad mode (required) */}
-          {effectiveEngagementMode === 'squad' && (
-            <View style={styles.squadDistanceSection}>
-              <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>Distance</Text>
-              <View style={[styles.distanceRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                {[15, 25, 50, 100].map((d) => (
-                  <TouchableOpacity
-                    key={d}
-                    style={[
-                      styles.distanceOption,
-                      context.distance === d && [styles.distanceOptionActive, { backgroundColor: colors.primary }],
-                    ]}
-                    onPress={() => {
-                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                      handleUpdateContext({ distance: d });
-                    }}
-                  >
-                    <Text style={[styles.distanceText, { color: context.distance === d ? '#fff' : colors.text }]}>
-                      {d}m
+          {/* ═══════════════════════════════════════════════════════════════════
+              STEP 2: Configuration
+          ═══════════════════════════════════════════════════════════════════ */}
+          {step === 2 && (
+            <>
+              {/* Summary of Step 1 choices */}
+              <View style={[styles.summaryCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <View style={styles.summaryRow}>
+                  <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>Goal</Text>
+                  <View style={styles.summaryValue}>
+                    {purpose === 'grouping' ? (
+                      <Crosshair size={14} color={colors.primary} />
+                    ) : (
+                      <Target size={14} color={colors.orange} />
+                    )}
+                    <Text style={[styles.summaryText, { color: colors.text }]}>
+                      {purpose === 'grouping' ? 'Grouping' : 'Engagement'}
                     </Text>
-                  </TouchableOpacity>
-                ))}
+                  </View>
+                </View>
+                <View style={styles.summaryRow}>
+                  <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>Mode</Text>
+                  <View style={styles.summaryValue}>
+                    {effectiveEngagementMode === 'solo' ? (
+                      <User size={14} color={colors.primary} />
+                    ) : (
+                      <Users size={14} color={colors.orange} />
+                    )}
+                    <Text style={[styles.summaryText, { color: colors.text }]}>
+                      {effectiveEngagementMode === 'solo' ? 'Solo' : 'Squad'}
+                    </Text>
+                  </View>
+                </View>
+                {effectiveEngagementMode !== 'squad' && (
+                  <View style={styles.summaryRow}>
+                    <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>Flexibility</Text>
+                    <View style={styles.summaryValue}>
+                      {executionPolicy === 'locked' && <Lock size={14} color={colors.blue} />}
+                      {executionPolicy === 'guided' && <Sparkles size={14} color={colors.green} />}
+                      {executionPolicy === 'free' && <Unlock size={14} color={colors.orange} />}
+                      <Text style={[styles.summaryText, { color: colors.text }]}>
+                        {executionPolicy === 'locked' ? 'Locked' : executionPolicy === 'guided' ? 'Guided' : 'Free'}
+                      </Text>
+                    </View>
+                  </View>
+                )}
               </View>
-              {context.distance === 0 && (
-                <Text style={[styles.policyDesc, { color: colors.red }]}>
-                  Select a distance
-                </Text>
-              )}
-            </View>
-          )}
 
-          {/* Free policy notice - only for solo free mode */}
-          {executionPolicy === 'free' && effectiveEngagementMode !== 'squad' && (
-            <View style={[styles.freeNotice, { backgroundColor: colors.orange + '10', borderColor: colors.orange }]}>
-              <Unlock size={20} color={colors.orange} />
-              <View style={styles.freeNoticeText}>
-                <Text style={[styles.freeNoticeTitle, { color: colors.text }]}>
-                  Full Freedom Mode
-                </Text>
-                <Text style={[styles.freeNoticeDesc, { color: colors.textMuted }]}>
-                  Soldiers will choose their own distance, rounds, and position when executing this drill.
-                </Text>
-              </View>
-            </View>
+              {/* Drill Configuration - for locked/guided solo */}
+              {executionPolicy !== 'free' && effectiveEngagementMode !== 'squad' && (
+                <>
+                  {executionPolicy === 'guided' && (
+                    <View style={styles.optionalHeader}>
+                      <Text style={[styles.optionalLabel, { color: colors.textMuted }]}>
+                        SUGGESTED DEFAULTS (OPTIONAL)
+                      </Text>
+                      <Text style={[styles.optionalHint, { color: colors.textMuted }]}>
+                        Soldiers can adjust these values when executing
+                      </Text>
+                    </View>
+                  )}
+                  <SessionContextStep
+                    purpose={purpose}
+                    context={context}
+                    onUpdateContext={handleUpdateContext}
+                    onBack={() => {}}
+                    hideWeaponSection
+                  />
+                </>
+              )}
+
+              {/* Squad mode - distance only */}
+              {effectiveEngagementMode === 'squad' && (
+                <>
+                  <View style={[styles.squadNotice, { backgroundColor: colors.primary + '10', borderColor: colors.primary }]}>
+                    <Users size={20} color={colors.primary} />
+                    <View style={styles.freeNoticeText}>
+                      <Text style={[styles.freeNoticeTitle, { color: colors.text }]}>
+                        Squad Session
+                      </Text>
+                      <Text style={[styles.freeNoticeDesc, { color: colors.textMuted }]}>
+                        Team drill with shared results. Only distance is configured.
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.squadDistanceSection}>
+                    <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>Distance</Text>
+                    <View style={[styles.distanceRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                      {[15, 25, 50, 100].map((d) => {
+                        const isActive = context.distance === d && !customDistanceEditing;
+                        return (
+                          <TouchableOpacity
+                            key={d}
+                            style={[
+                              styles.distanceOption,
+                              isActive && [styles.distanceOptionActive, { backgroundColor: colors.primary }],
+                              customDistanceEditing && { opacity: 0.5 },
+                            ]}
+                            disabled={customDistanceEditing}
+                            onPress={() => {
+                              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                              handleUpdateContext({ distance: d });
+                              setCustomDistanceEditing(false);
+                            }}
+                          >
+                            <Text style={[styles.distanceText, { color: isActive ? '#fff' : colors.text }]}>
+                              {d}m
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                      {/* Custom distance input */}
+                      {customDistanceEditing ? (
+                        <View style={[styles.distanceOption, styles.distanceInputContainer, { borderColor: colors.primary }]}>
+                          <TextInput
+                            style={[styles.distanceInput, { color: colors.text }]}
+                            value={customDistanceText}
+                            onChangeText={setCustomDistanceText}
+                            onBlur={() => {
+                              const num = parseInt(customDistanceText, 10);
+                              if (!isNaN(num) && num > 0) {
+                                handleUpdateContext({ distance: num });
+                              }
+                              setCustomDistanceEditing(false);
+                            }}
+                            onSubmitEditing={() => {
+                              const num = parseInt(customDistanceText, 10);
+                              if (!isNaN(num) && num > 0) {
+                                handleUpdateContext({ distance: num });
+                              }
+                              setCustomDistanceEditing(false);
+                            }}
+                            keyboardType="number-pad"
+                            autoFocus
+                            selectTextOnFocus
+                            placeholder="0"
+                            placeholderTextColor={colors.textMuted}
+                          />
+                          <Text style={[styles.distanceInputSuffix, { color: colors.text }]}>m</Text>
+                        </View>
+                      ) : (
+                        <TouchableOpacity
+                          style={[
+                            styles.distanceOption,
+                            context.distance > 0 && ![15, 25, 50, 100].includes(context.distance) && [
+                              styles.distanceOptionActive,
+                              { backgroundColor: colors.primary },
+                            ],
+                          ]}
+                          onPress={() => {
+                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                            setCustomDistanceText(context.distance > 0 ? String(context.distance) : '');
+                            setCustomDistanceEditing(true);
+                          }}
+                        >
+                          <Text
+                            style={[
+                              styles.distanceText,
+                              {
+                                color:
+                                  context.distance > 0 && ![15, 25, 50, 100].includes(context.distance)
+                                    ? '#fff'
+                                    : colors.textMuted,
+                              },
+                            ]}
+                          >
+                            {context.distance > 0 && ![15, 25, 50, 100].includes(context.distance)
+                              ? `${context.distance}m`
+                              : 'Other'}
+                          </Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                    {context.distance === 0 && (
+                      <Text style={[styles.policyDesc, { color: colors.red }]}>
+                        Select a distance
+                      </Text>
+                    )}
+                  </View>
+                </>
+              )}
+
+              {/* Free policy notice - only for solo free mode (shouldn't reach here but safety) */}
+              {executionPolicy === 'free' && effectiveEngagementMode !== 'squad' && (
+                <View style={[styles.freeNotice, { backgroundColor: colors.orange + '10', borderColor: colors.orange }]}>
+                  <Unlock size={20} color={colors.orange} />
+                  <View style={styles.freeNoticeText}>
+                    <Text style={[styles.freeNoticeTitle, { color: colors.text }]}>
+                      Full Freedom Mode
+                    </Text>
+                    <Text style={[styles.freeNoticeDesc, { color: colors.textMuted }]}>
+                      Soldiers will choose their own distance, rounds, and position when executing this drill.
+                    </Text>
+                  </View>
+                </View>
+              )}
+            </>
           )}
         </ScrollView>
 
@@ -544,14 +730,31 @@ function AddSessionSheet({ visible, onClose, onAdd }: AddSessionSheetProps) {
               {validationError}
             </Text>
           )}
-          <TouchableOpacity
-            style={[styles.sheetSubmitBtn, { backgroundColor: colors.text }]}
-            onPress={handleSubmit}
-            activeOpacity={0.85}
-          >
-            <Plus size={18} color={colors.background} />
-            <Text style={[styles.sheetSubmitText, { color: colors.background }]}>Add Drill</Text>
-          </TouchableOpacity>
+          {step === 1 ? (
+            <TouchableOpacity
+              style={[styles.sheetSubmitBtn, { backgroundColor: colors.text }]}
+              onPress={needsStep2 ? handleNextStep : handleSubmit}
+              activeOpacity={0.85}
+            >
+              <Text style={[styles.sheetSubmitText, { color: colors.background }]}>
+                {needsStep2 ? 'Continue' : 'Add Drill'}
+              </Text>
+              {needsStep2 ? (
+                <Ionicons name="arrow-forward" size={18} color={colors.background} />
+              ) : (
+                <Plus size={18} color={colors.background} />
+              )}
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              style={[styles.sheetSubmitBtn, { backgroundColor: colors.text }]}
+              onPress={handleSubmit}
+              activeOpacity={0.85}
+            >
+              <Plus size={18} color={colors.background} />
+              <Text style={[styles.sheetSubmitText, { color: colors.background }]}>Add Drill</Text>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
     </Modal>
@@ -785,12 +988,29 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
   },
+  sheetHeaderCenter: {
+    alignItems: 'center',
+  },
+  sheetStep: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  progressBar: {
+    height: 3,
+    marginHorizontal: 20,
+    borderRadius: 1.5,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    borderRadius: 1.5,
+  },
   sheetScroll: {
     flex: 1,
   },
   sheetScrollContent: {
     paddingHorizontal: 20,
-    paddingTop: 8,
+    paddingTop: 20,
   },
   sheetFooter: {
     paddingHorizontal: 20,
@@ -819,14 +1039,14 @@ const styles = StyleSheet.create({
 
   // Purpose Toggle (in sheet)
   purposeRow: {
-    marginBottom: 8,
+    marginBottom: 20,
   },
   sectionLabel: {
     fontSize: 11,
     fontWeight: '600',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
-    marginBottom: 10,
+    marginBottom: 8,
   },
   purposeToggle: {
     flexDirection: 'row',
@@ -878,12 +1098,12 @@ const styles = StyleSheet.create({
 
   // Execution Policy Section (in sheet)
   policySection: {
-    marginBottom: 16,
+    marginBottom: 20,
   },
   policyHint: {
     fontSize: 12,
-    marginBottom: 10,
-    marginTop: -6,
+    marginBottom: 12,
+    marginTop: -4,
   },
   policyToggle: {
     flexDirection: 'row',
@@ -915,16 +1135,39 @@ const styles = StyleSheet.create({
   policyDesc: {
     fontSize: 11,
     textAlign: 'center',
-    marginTop: 8,
+    marginTop: 10,
     fontStyle: 'italic',
+  },
+
+  // Summary Card (Step 2)
+  summaryCard: {
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 20,
+    gap: 8,
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  summaryLabel: {
+    fontSize: 13,
+  },
+  summaryValue: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  summaryText: {
+    fontSize: 13,
+    fontWeight: '600',
   },
 
   // Optional header for guided mode
   optionalHeader: {
-    marginBottom: 8,
-    paddingTop: 8,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: 'rgba(128,128,128,0.2)',
+    marginBottom: 12,
   },
   optionalLabel: {
     fontSize: 11,
@@ -935,7 +1178,6 @@ const styles = StyleSheet.create({
   },
   optionalHint: {
     fontSize: 12,
-    marginBottom: 8,
   },
 
   // Free policy notice
@@ -946,7 +1188,6 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 12,
     borderWidth: 1,
-    marginTop: 8,
   },
   freeNoticeText: {
     flex: 1,
@@ -969,13 +1210,11 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 12,
     borderWidth: 1,
-    marginTop: 8,
+    marginBottom: 20,
   },
 
   // Squad distance section
-  squadDistanceSection: {
-    marginTop: 16,
-  },
+  squadDistanceSection: {},
   distanceRow: {
     flexDirection: 'row',
     borderRadius: 12,
@@ -999,6 +1238,24 @@ const styles = StyleSheet.create({
   distanceText: {
     fontSize: 14,
     fontWeight: '600',
+  },
+  distanceInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    paddingHorizontal: 8,
+    gap: 2,
+  },
+  distanceInput: {
+    fontSize: 14,
+    fontWeight: '600',
+    minWidth: 28,
+    textAlign: 'center',
+    paddingVertical: 0,
+  },
+  distanceInputSuffix: {
+    fontSize: 13,
+    fontWeight: '500',
   },
 });
 

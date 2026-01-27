@@ -522,6 +522,38 @@ export async function getRecentSessionsWithStats(
     // Attach stats to sessions
     return sessions.map((session) => {
       const rawStats = statsMap.get(session.id);
+      
+      // For squad/group engagements, calculate stats from participants
+      const engagement = session.engagement;
+      const isSquadOrGroup = engagement?.engagement_mode === 'squad' || engagement?.engagement_mode === 'group';
+      
+      if (isSquadOrGroup && engagement?.engagement_participants) {
+        const participants = engagement.engagement_participants;
+        const joinedParticipants = participants.filter((p: any) => p.state === 'joined');
+        
+        // Aggregate participant stats
+        let totalShots = 0;
+        let totalHits = 0;
+        joinedParticipants.forEach((p: any) => {
+          totalShots += p.shots_fired ?? 0;
+          totalHits += p.hits ?? 0;
+        });
+        
+        return {
+          ...session,
+          stats: {
+            shots_fired: totalShots,
+            hits_total: totalHits,
+            accuracy_pct: totalShots > 0 ? Math.round((totalHits / totalShots) * 100) : 0,
+            target_count: joinedParticipants.length, // Use participant count as "target count" for display
+            best_dispersion_cm: null, // Not applicable for squad sessions
+            avg_distance_m: session.drill_config?.distance_m ?? null,
+            // Custom squad stats
+            participant_count: joinedParticipants.length,
+          } as any,
+        };
+      }
+      
       return {
         ...session,
         stats: rawStats

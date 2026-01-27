@@ -67,17 +67,22 @@ export function SquadLobbyBanner({ trainingId, userId, onLobbyChanged }: SquadLo
         .eq('sessions.training_id', trainingId)
         .eq('sessions.user_id', userId)
         .in('engagement_mode', ['squad', 'group'])
-        .neq('sessions.status', 'completed') // Don't show for completed sessions
+        .in('status', ['pending', 'active']) // Only show pending or active engagements
         .order('created_at', { ascending: false })
         .limit(1);
 
       if (engError) throw engError;
+      
+      console.log('[SquadLobbyBanner] Query result:', engagements?.length || 0, 'engagements found');
+      
       if (!engagements?.length) {
+        console.log('[SquadLobbyBanner] No active engagements, hiding banner');
         setActiveLobby(null);
         return;
       }
 
       const engagement = engagements[0] as any;
+      console.log('[SquadLobbyBanner] Found engagement:', engagement.id, 'status:', engagement.status);
       const session = engagement.sessions as any;
 
       // Check if this engagement has any targets (results)
@@ -121,21 +126,30 @@ export function SquadLobbyBanner({ trainingId, userId, onLobbyChanged }: SquadLo
   }, [loadActiveLobby]);
 
   // Realtime subscription for engagement changes
+  // Uses debouncing to prevent rapid re-queries on burst updates
   useEffect(() => {
     if (!trainingId || !userId) return;
 
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+    const debouncedLoad = () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        loadActiveLobby();
+      }, 300); // 300ms debounce
+    };
+
+    const channelName = `squad-lobby-commander-${trainingId}-${userId}`;
     const channel = supabase
-      .channel(`squad-lobby-${trainingId}-${userId}`)
+      .channel(channelName)
       .on(
         'postgres_changes',
         {
           event: '*',
           schema: 'public',
           table: 'engagements',
+          filter: `training_id=eq.${trainingId}`,
         },
-        () => {
-          loadActiveLobby();
-        }
+        debouncedLoad
       )
       .on(
         'postgres_changes',
@@ -144,13 +158,12 @@ export function SquadLobbyBanner({ trainingId, userId, onLobbyChanged }: SquadLo
           schema: 'public',
           table: 'engagement_participants',
         },
-        () => {
-          loadActiveLobby();
-        }
+        debouncedLoad
       )
       .subscribe();
 
     return () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
       supabase.removeChannel(channel);
     };
   }, [trainingId, userId, loadActiveLobby]);

@@ -59,7 +59,13 @@ export interface HomeSession {
     accuracy: number;
     targets: number;
     bestDispersion?: number;
+    /** Participant count for squad/group engagements */
+    participantCount?: number;
   };
+  
+  // Squad/Group engagement info
+  isSquadEngagement?: boolean;
+  isGroupEngagement?: boolean;
 
   // Flags
   needsReview?: boolean; // Completed but not reviewed
@@ -108,16 +114,33 @@ export interface HomeState {
  */
 export function mapSessionToHomeSession(session: SessionWithDetails): HomeSession {
   const isTeam = !!session.team_id;
+  
+  // Check if this is a squad/group engagement
+  const engagementMode = session.engagement?.engagement_mode;
+  const isSquadEngagement = engagementMode === 'squad';
+  const isGroupEngagement = engagementMode === 'group';
+  const isSquadOrGroup = isSquadEngagement || isGroupEngagement;
 
   let state: HomeSessionState = 'completed';
   if (session.status === 'active') {
     state = 'active';
   } else if (session.status === 'completed') {
     // Check if needs review (has targets but low/no stats)
-    const hasTargets = (session.stats?.target_count ?? 0) > 0;
-    const hasLowStats = (session.stats?.shots_fired ?? 0) === 0;
-    state = hasTargets && hasLowStats ? 'unreviewed' : 'completed';
+    // For squad/group, check participant stats instead
+    if (isSquadOrGroup) {
+      const hasStats = (session.stats?.shots_fired ?? 0) > 0;
+      state = hasStats ? 'completed' : 'unreviewed';
+    } else {
+      const hasTargets = (session.stats?.target_count ?? 0) > 0;
+      const hasLowStats = (session.stats?.shots_fired ?? 0) === 0;
+      state = hasTargets && hasLowStats ? 'unreviewed' : 'completed';
+    }
   }
+
+  // Get participant count for squad/group sessions
+  const participantCount = isSquadOrGroup 
+    ? (session.stats as any)?.participant_count ?? session.engagement?.engagement_participants?.filter((p: any) => p.state === 'joined').length ?? 0
+    : undefined;
 
   return {
     id: session.id,
@@ -141,10 +164,13 @@ export function mapSessionToHomeSession(session: SessionWithDetails): HomeSessio
           accuracy: session.stats.accuracy_pct,
           targets: session.stats.target_count,
           bestDispersion: session.stats.best_dispersion_cm ?? undefined,
+          participantCount,
         }
       : undefined,
     needsReview: state === 'unreviewed',
     sourceSession: session,
+    isSquadEngagement,
+    isGroupEngagement,
   };
 }
 

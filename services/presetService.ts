@@ -1,6 +1,6 @@
 /**
  * presetService - Personal drill presets (saved configurations)
- * 
+ *
  * Personal presets are stored in drill_templates with owner_type='user'
  * They allow users to save their favorite drill configurations for quick access.
  */
@@ -63,15 +63,18 @@ export interface UpdatePresetInput {
  * Get all personal presets for the current user
  */
 export async function getMyPresets(): Promise<DrillPreset[]> {
-  const { data: { user } } = await supabase.auth.getUser();
-  
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
   if (!user) {
     throw new Error('Not authenticated');
   }
 
   const { data, error } = await supabase
     .from('drill_templates')
-    .select(`
+    .select(
+      `
       id,
       name,
       description,
@@ -85,7 +88,8 @@ export async function getMyPresets(): Promise<DrillPreset[]> {
       is_default,
       created_at,
       updated_at
-    `)
+    `
+    )
     .eq('owner_type', 'user')
     .eq('owner_id', user.id)
     .order('created_at', { ascending: false });
@@ -102,15 +106,18 @@ export async function getMyPresets(): Promise<DrillPreset[]> {
  * Get a single preset by ID
  */
 export async function getPreset(presetId: string): Promise<DrillPreset | null> {
-  const { data: { user } } = await supabase.auth.getUser();
-  
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
   if (!user) {
     throw new Error('Not authenticated');
   }
 
   const { data, error } = await supabase
     .from('drill_templates')
-    .select(`
+    .select(
+      `
       id,
       name,
       description,
@@ -124,7 +131,8 @@ export async function getPreset(presetId: string): Promise<DrillPreset | null> {
       is_default,
       created_at,
       updated_at
-    `)
+    `
+    )
     .eq('id', presetId)
     .eq('owner_type', 'user')
     .eq('owner_id', user.id)
@@ -143,8 +151,10 @@ export async function getPreset(presetId: string): Promise<DrillPreset | null> {
  * Get the Quick Start default drill (system default or user's custom default)
  */
 export async function getDefaultPreset(): Promise<DrillPreset | null> {
-  const { data: { user } } = await supabase.auth.getUser();
-  
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
   if (!user) {
     throw new Error('Not authenticated');
   }
@@ -152,11 +162,13 @@ export async function getDefaultPreset(): Promise<DrillPreset | null> {
   // First try to find user's custom default
   const { data: userDefault } = await supabase
     .from('drill_templates')
-    .select(`
+    .select(
+      `
       id, name, description, drill_goal, target_type, weapon_category,
       distance_m, rounds_per_shooter, time_limit_seconds,
       strings_count, is_default, created_at, updated_at
-    `)
+    `
+    )
     .eq('owner_type', 'user')
     .eq('owner_id', user.id)
     .eq('is_default', true)
@@ -190,8 +202,10 @@ export async function getDefaultPreset(): Promise<DrillPreset | null> {
  * Create a new personal preset
  */
 export async function createPreset(input: CreatePresetInput): Promise<DrillPreset> {
-  const { data: { user } } = await supabase.auth.getUser();
-  
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
   if (!user) {
     throw new Error('Not authenticated');
   }
@@ -229,8 +243,10 @@ export async function createPreset(input: CreatePresetInput): Promise<DrillPrese
  * Update an existing preset
  */
 export async function updatePreset(presetId: string, input: UpdatePresetInput): Promise<DrillPreset> {
-  const { data: { user } } = await supabase.auth.getUser();
-  
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
   if (!user) {
     throw new Error('Not authenticated');
   }
@@ -259,8 +275,10 @@ export async function updatePreset(presetId: string, input: UpdatePresetInput): 
  * Delete a preset
  */
 export async function deletePreset(presetId: string): Promise<void> {
-  const { data: { user } } = await supabase.auth.getUser();
-  
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
   if (!user) {
     throw new Error('Not authenticated');
   }
@@ -282,8 +300,10 @@ export async function deletePreset(presetId: string): Promise<void> {
  * Set a preset as the user's default (for Quick Start)
  */
 export async function setDefaultPreset(presetId: string): Promise<void> {
-  const { data: { user } } = await supabase.auth.getUser();
-  
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
   if (!user) {
     throw new Error('Not authenticated');
   }
@@ -336,4 +356,3 @@ export async function saveAsPreset(
     strings_count: config.strings_count,
   });
 }
-

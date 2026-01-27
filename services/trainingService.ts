@@ -643,14 +643,16 @@ export async function getMyTrainingStats(): Promise<{
   }
 
   // Count trainings by status without fetching rows (bounded payload).
-  const base = supabase.from('trainings').select('id', { count: 'exact', head: true }).in('team_id', teamIds);
-
-  const [{ count: totalCount, error: totalError }, { count: upcomingCount, error: upcomingError }, { count: completedCount, error: completedError }] =
-    await Promise.all([
-      base,
-      base.in('status', ['planned', 'ongoing']),
-      base.eq('status', 'finished'),
-    ]);
+  // NOTE: Each query needs its own builder - Supabase builders are mutable!
+  const [
+    { count: totalCount, error: totalError },
+    { count: upcomingCount, error: upcomingError },
+    { count: completedCount, error: completedError },
+  ] = await Promise.all([
+    supabase.from('trainings').select('id', { count: 'exact', head: true }).in('team_id', teamIds),
+    supabase.from('trainings').select('id', { count: 'exact', head: true }).in('team_id', teamIds).in('status', ['planned', 'ongoing']),
+    supabase.from('trainings').select('id', { count: 'exact', head: true }).in('team_id', teamIds).eq('status', 'finished'),
+  ]);
 
   if (totalError || upcomingError || completedError) {
     console.error('Failed to fetch training stats:', totalError || upcomingError || completedError);

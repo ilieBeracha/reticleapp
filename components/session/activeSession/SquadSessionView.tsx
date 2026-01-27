@@ -90,8 +90,9 @@ export function SquadSessionView({
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [showParticipants, setShowParticipants] = useState(true);
   const [showResultsSheet, setShowResultsSheet] = useState(false);
+  const [showHitsSheet, setShowHitsSheet] = useState(false);
   const [shotCount, setShotCount] = useState(0);
-  const [hitCount, setHitCount] = useState(0);
+  const [totalHitsCount, setTotalHitsCount] = useState(0);
   const [saving, setSaving] = useState(false);
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -109,6 +110,11 @@ export function SquadSessionView({
   const groupTotals = calculateGroupTotals(participants);
   const myParticipant = participants.find((p) => p.user_id === currentUserId);
   const hasSubmitted = myParticipant && (myParticipant.shots_fired || 0) > 0;
+  
+  // Check if all participants have submitted their shots
+  const shooters = participants.filter((p) => p.role === 'shooter');
+  const allShotsSubmitted = shooters.length > 0 && shooters.every((p) => (p.shots_fired || 0) > 0);
+  const hasAnyHits = groupTotals.totalHits > 0;
 
   // ─────────────────────────────────────────────────────────────────────────────
   // Handlers
@@ -116,23 +122,24 @@ export function SquadSessionView({
   const handleOpenResultsSheet = () => {
     // Pre-fill with existing values if any
     setShotCount(myParticipant?.shots_fired || 0);
-    setHitCount(myParticipant?.hits || 0);
     setShowResultsSheet(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  };
+
+  const handleOpenHitsSheet = () => {
+    // Pre-fill with existing total hits
+    setTotalHitsCount(groupTotals.totalHits);
+    setShowHitsSheet(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   };
 
   const handleSaveResults = async () => {
     if (!currentUserId || !engagementId) return;
 
-    // Validate hits <= shots
-    if (hitCount > shotCount) {
-      Alert.alert('Invalid Entry', 'Hits cannot exceed shots fired.');
-      return;
-    }
-
     setSaving(true);
     try {
-      await updateParticipantResults(engagementId, currentUserId, shotCount, hitCount);
+      // Save shots only (hits = 0 for individual entry)
+      await updateParticipantResults(engagementId, currentUserId, shotCount, 0);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setShowResultsSheet(false);
       onRefresh();
@@ -140,6 +147,40 @@ export function SquadSessionView({
       console.error('[SquadSessionView] Failed to save:', error);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       Alert.alert('Error', 'Failed to save results. Please try again.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSaveTotalHits = async () => {
+    if (!engagementId) return;
+
+    // Validate hits <= total shots
+    if (totalHitsCount > groupTotals.totalShotsFired) {
+      Alert.alert('Invalid Entry', 'Total hits cannot exceed total shots fired.');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      // Distribute hits to the first shooter (commander) for simplicity
+      // This keeps the total hits tracked at the group level
+      const commanderParticipant = participants.find((p) => p.user_id === session.user_id);
+      if (commanderParticipant) {
+        await updateParticipantResults(
+          engagementId,
+          commanderParticipant.user_id,
+          commanderParticipant.shots_fired || 0,
+          totalHitsCount
+        );
+      }
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setShowHitsSheet(false);
+      onRefresh();
+    } catch (error) {
+      console.error('[SquadSessionView] Failed to save hits:', error);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      Alert.alert('Error', 'Failed to save hits. Please try again.');
     } finally {
       setSaving(false);
     }
@@ -172,9 +213,9 @@ export function SquadSessionView({
     setShotCount((prev) => Math.max(0, prev + delta));
   };
 
-  const adjustHits = (delta: number) => {
+  const adjustTotalHits = (delta: number) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setHitCount((prev) => Math.max(0, Math.min(shotCount, prev + delta)));
+    setTotalHitsCount((prev) => Math.max(0, Math.min(groupTotals.totalShotsFired, prev + delta)));
   };
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -269,8 +310,7 @@ export function SquadSessionView({
               const isMe = p.user_id === currentUserId;
               const isOwner = p.user_id === session.user_id;
               const hasData = (p.shots_fired || 0) > 0;
-              const accuracy =
-                p.shots_fired && p.shots_fired > 0 ? Math.round(((p.hits || 0) / p.shots_fired) * 100) : 0;
+              const isShooter = p.role === 'shooter';
 
               return (
                 <View
@@ -306,7 +346,11 @@ export function SquadSessionView({
                       {isOwner && <Crown size={12} color={colors.orange} />}
                     </View>
                     <Text style={[styles.participantMeta, { color: colors.textMuted }]}>
-                      {hasData ? `${p.shots_fired} shots • ${p.hits || 0} hits • ${accuracy}%` : 'Not reported yet'}
+                      {!isShooter 
+                        ? 'Spotter' 
+                        : hasData 
+                          ? `${p.shots_fired} shots` 
+                          : 'Not reported yet'}
                     </Text>
                   </View>
 
@@ -326,7 +370,7 @@ export function SquadSessionView({
         {!isViewOnly && hasSubmitted && (
           <View style={[styles.myResultsCard, { backgroundColor: colors.card }]}>
             <View style={styles.myResultsHeader}>
-              <Text style={[styles.myResultsTitle, { color: colors.text }]}>Your Results</Text>
+              <Text style={[styles.myResultsTitle, { color: colors.text }]}>Your Shots</Text>
               <View style={[styles.checkBadge, { backgroundColor: colors.green + '15' }]}>
                 <Check size={12} color={colors.green} />
               </View>
@@ -334,37 +378,22 @@ export function SquadSessionView({
             <View style={styles.myResultsStats}>
               <View style={styles.myResultsStat}>
                 <Text style={[styles.myResultsValue, { color: colors.text }]}>{myParticipant?.shots_fired || 0}</Text>
-                <Text style={[styles.myResultsLabel, { color: colors.textMuted }]}>shots</Text>
-              </View>
-              <View style={[styles.myResultsDivider, { backgroundColor: colors.border }]} />
-              <View style={styles.myResultsStat}>
-                <Text style={[styles.myResultsValue, { color: colors.text }]}>{myParticipant?.hits || 0}</Text>
-                <Text style={[styles.myResultsLabel, { color: colors.textMuted }]}>hits</Text>
-              </View>
-              <View style={[styles.myResultsDivider, { backgroundColor: colors.border }]} />
-              <View style={styles.myResultsStat}>
-                <Text style={[styles.myResultsValue, { color: colors.green }]}>
-                  {myParticipant?.shots_fired && myParticipant.shots_fired > 0
-                    ? Math.round(((myParticipant.hits || 0) / myParticipant.shots_fired) * 100)
-                    : 0}
-                  %
-                </Text>
-                <Text style={[styles.myResultsLabel, { color: colors.textMuted }]}>accuracy</Text>
+                <Text style={[styles.myResultsLabel, { color: colors.textMuted }]}>shots fired</Text>
               </View>
             </View>
             <TouchableOpacity
               style={[styles.updateBtn, { backgroundColor: colors.secondary }]}
               onPress={handleOpenResultsSheet}
             >
-              <Text style={[styles.updateBtnText, { color: colors.text }]}>Update Results</Text>
+              <Text style={[styles.updateBtnText, { color: colors.text }]}>Update Shots</Text>
             </TouchableOpacity>
           </View>
         )}
 
         {/* ─────────────────────────────────────────────────────────────────────── */}
-        {/* Add Results Button (if not submitted yet)                              */}
+        {/* Add Shots Button (if not submitted yet)                                */}
         {/* ─────────────────────────────────────────────────────────────────────── */}
-        {!isViewOnly && !hasSubmitted && (
+        {!isViewOnly && !hasSubmitted && myParticipant?.role === 'shooter' && (
           <TouchableOpacity
             style={[styles.addResultsCard, { backgroundColor: colors.primary }]}
             onPress={handleOpenResultsSheet}
@@ -372,11 +401,48 @@ export function SquadSessionView({
           >
             <Target size={24} color="#fff" />
             <View style={styles.addResultsText}>
-              <Text style={styles.addResultsTitle}>Enter Your Results</Text>
-              <Text style={styles.addResultsSubtitle}>Add your shots and hits</Text>
+              <Text style={styles.addResultsTitle}>Enter Your Shots</Text>
+              <Text style={styles.addResultsSubtitle}>Record how many shots you fired</Text>
             </View>
             <Plus size={20} color="#fff" />
           </TouchableOpacity>
+        )}
+
+        {/* ─────────────────────────────────────────────────────────────────────── */}
+        {/* Add Total Hits (Commander only, after all shots submitted)             */}
+        {/* ─────────────────────────────────────────────────────────────────────── */}
+        {isCommander && allShotsSubmitted && (
+          <TouchableOpacity
+            style={[
+              styles.addResultsCard, 
+              { backgroundColor: hasAnyHits ? colors.card : colors.green, borderWidth: hasAnyHits ? 1 : 0, borderColor: colors.border }
+            ]}
+            onPress={handleOpenHitsSheet}
+            activeOpacity={0.8}
+          >
+            <Target size={24} color={hasAnyHits ? colors.green : '#fff'} />
+            <View style={styles.addResultsText}>
+              <Text style={[styles.addResultsTitle, { color: hasAnyHits ? colors.text : '#fff' }]}>
+                {hasAnyHits ? `Total Hits: ${groupTotals.totalHits}` : 'Add Total Hits'}
+              </Text>
+              <Text style={[styles.addResultsSubtitle, { color: hasAnyHits ? colors.textMuted : 'rgba(255,255,255,0.8)' }]}>
+                {hasAnyHits ? `${groupTotals.accuracy}% accuracy · Tap to update` : 'Enter combined hits for all shooters'}
+              </Text>
+            </View>
+            {!hasAnyHits && <Plus size={20} color="#fff" />}
+          </TouchableOpacity>
+        )}
+
+        {/* Waiting for shots message */}
+        {isCommander && !allShotsSubmitted && shooters.length > 0 && (
+          <View style={[styles.waitingCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Text style={[styles.waitingText, { color: colors.textMuted }]}>
+              Waiting for all shooters to report shots before adding total hits
+            </Text>
+            <Text style={[styles.waitingSubtext, { color: colors.textMuted }]}>
+              {shooters.filter((p) => (p.shots_fired || 0) > 0).length}/{shooters.length} shooters reported
+            </Text>
+          </View>
         )}
       </ScrollView>
 
@@ -396,7 +462,7 @@ export function SquadSessionView({
       )}
 
       {/* ═══════════════════════════════════════════════════════════════════════ */}
-      {/* Results Entry Bottom Sheet                                              */}
+      {/* Shots Entry Bottom Sheet                                                */}
       {/* ═══════════════════════════════════════════════════════════════════════ */}
       <Modal
         visible={showResultsSheet}
@@ -413,7 +479,7 @@ export function SquadSessionView({
               {/* Handle */}
               <View style={[styles.sheetHandle, { backgroundColor: colors.border }]} />
 
-              <Text style={[styles.sheetTitle, { color: colors.text }]}>Enter Your Results</Text>
+              <Text style={[styles.sheetTitle, { color: colors.text }]}>Enter Your Shots</Text>
 
               {/* Shots Counter */}
               <View style={styles.counterSection}>
@@ -453,36 +519,6 @@ export function SquadSessionView({
                 </View>
               </View>
 
-              {/* Hits Counter */}
-              <View style={styles.counterSection}>
-                <Text style={[styles.counterLabel, { color: colors.textMuted }]}>HITS</Text>
-                <View style={styles.counterRow}>
-                  <TouchableOpacity
-                    style={[styles.counterBtn, { backgroundColor: colors.secondary }]}
-                    onPress={() => adjustHits(-1)}
-                    disabled={hitCount <= 0}
-                  >
-                    <Minus size={22} color={hitCount <= 0 ? colors.textMuted : colors.text} />
-                  </TouchableOpacity>
-                  <View style={styles.counterValue}>
-                    <Text style={[styles.counterNumber, { color: colors.green }]}>{hitCount}</Text>
-                  </View>
-                  <TouchableOpacity
-                    style={[styles.counterBtn, { backgroundColor: colors.secondary }]}
-                    onPress={() => adjustHits(1)}
-                    disabled={hitCount >= shotCount}
-                  >
-                    <Plus size={22} color={hitCount >= shotCount ? colors.textMuted : colors.text} />
-                  </TouchableOpacity>
-                </View>
-                {/* Accuracy preview */}
-                {shotCount > 0 && (
-                  <Text style={[styles.accuracyPreview, { color: colors.textMuted }]}>
-                    {Math.round((hitCount / shotCount) * 100)}% accuracy
-                  </Text>
-                )}
-              </View>
-
               {/* Save Button */}
               <TouchableOpacity
                 style={[styles.saveBtn, { backgroundColor: shotCount > 0 ? colors.green : colors.secondary }]}
@@ -495,8 +531,96 @@ export function SquadSessionView({
                   <>
                     <Check size={18} color={shotCount > 0 ? '#fff' : colors.textMuted} />
                     <Text style={[styles.saveBtnText, { color: shotCount > 0 ? '#fff' : colors.textMuted }]}>
-                      Save Results
+                      Save Shots
                     </Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </Animated.View>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* ═══════════════════════════════════════════════════════════════════════ */}
+      {/* Total Hits Entry Bottom Sheet (Commander only)                          */}
+      {/* ═══════════════════════════════════════════════════════════════════════ */}
+      <Modal
+        visible={showHitsSheet}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowHitsSheet(false)}
+      >
+        <TouchableOpacity style={styles.sheetOverlay} activeOpacity={1} onPress={() => setShowHitsSheet(false)}>
+          <TouchableOpacity activeOpacity={1} onPress={(e) => e.stopPropagation()}>
+            <Animated.View
+              entering={FadeInDown.duration(200)}
+              style={[styles.sheet, { backgroundColor: colors.card, paddingBottom: insets.bottom + 20 }]}
+            >
+              {/* Handle */}
+              <View style={[styles.sheetHandle, { backgroundColor: colors.border }]} />
+
+              <Text style={[styles.sheetTitle, { color: colors.text }]}>Total Hits</Text>
+              <Text style={[styles.sheetSubtitle, { color: colors.textMuted }]}>
+                Combined hits for all {shooters.length} shooter{shooters.length !== 1 ? 's' : ''} ({groupTotals.totalShotsFired} total shots)
+              </Text>
+
+              {/* Hits Counter */}
+              <View style={styles.counterSection}>
+                <Text style={[styles.counterLabel, { color: colors.textMuted }]}>TOTAL HITS</Text>
+                <View style={styles.counterRow}>
+                  <TouchableOpacity
+                    style={[styles.counterBtn, { backgroundColor: colors.secondary }]}
+                    onPress={() => adjustTotalHits(-1)}
+                    disabled={totalHitsCount <= 0}
+                  >
+                    <Minus size={22} color={totalHitsCount <= 0 ? colors.textMuted : colors.text} />
+                  </TouchableOpacity>
+                  <View style={styles.counterValue}>
+                    <Text style={[styles.counterNumber, { color: colors.green }]}>{totalHitsCount}</Text>
+                  </View>
+                  <TouchableOpacity
+                    style={[styles.counterBtn, { backgroundColor: colors.secondary }]}
+                    onPress={() => adjustTotalHits(1)}
+                    disabled={totalHitsCount >= groupTotals.totalShotsFired}
+                  >
+                    <Plus size={22} color={totalHitsCount >= groupTotals.totalShotsFired ? colors.textMuted : colors.text} />
+                  </TouchableOpacity>
+                </View>
+                {/* Quick add */}
+                <View style={styles.quickAdd}>
+                  {[5, 10, 20, 30].map((n) => (
+                    <TouchableOpacity
+                      key={n}
+                      style={[styles.quickAddBtn, { backgroundColor: colors.secondary }]}
+                      onPress={() => {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                        setTotalHitsCount(Math.min(groupTotals.totalShotsFired, totalHitsCount + n));
+                      }}
+                    >
+                      <Text style={[styles.quickAddText, { color: colors.text }]}>+{n}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+                {/* Accuracy preview */}
+                {groupTotals.totalShotsFired > 0 && (
+                  <Text style={[styles.accuracyPreview, { color: colors.textMuted }]}>
+                    {Math.round((totalHitsCount / groupTotals.totalShotsFired) * 100)}% accuracy
+                  </Text>
+                )}
+              </View>
+
+              {/* Save Button */}
+              <TouchableOpacity
+                style={[styles.saveBtn, { backgroundColor: colors.green }]}
+                onPress={handleSaveTotalHits}
+                disabled={saving}
+              >
+                {saving ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <>
+                    <Check size={18} color="#fff" />
+                    <Text style={[styles.saveBtnText, { color: '#fff' }]}>Save Total Hits</Text>
                   </>
                 )}
               </TouchableOpacity>
@@ -766,6 +890,24 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
 
+  // Waiting card
+  waitingCard: {
+    borderRadius: 14,
+    padding: 16,
+    borderWidth: 1,
+    alignItems: 'center',
+  },
+  waitingText: {
+    fontSize: 14,
+    fontWeight: '500',
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  waitingSubtext: {
+    fontSize: 12,
+    textAlign: 'center',
+  },
+
   // Bottom bar
   bottomBar: {
     position: 'absolute',
@@ -811,6 +953,11 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '700',
     letterSpacing: -0.3,
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  sheetSubtitle: {
+    fontSize: 14,
     textAlign: 'center',
     marginBottom: 24,
   },

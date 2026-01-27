@@ -24,6 +24,10 @@ export function SessionCard({ session, onPress, compact = false }: SessionCardPr
   // Determine if this is a grouping session
   const isGrouping = isGroupingSession(session);
   
+  // Check if this is a squad/group engagement
+  const engagementMode = session.engagement?.engagement_mode;
+  const isSquadOrGroup = engagementMode === 'squad' || engagementMode === 'group';
+  
   // Calculate stats
   const accuracy = calculateAccuracy(session);
   const durationMins = getSessionDurationMinutes(session);
@@ -35,10 +39,17 @@ export function SessionCard({ session, onPress, compact = false }: SessionCardPr
   const statusColor = STATUS_COLORS[session.status] || colors.textMuted;
   const bestDispersion = session.stats?.best_dispersion_cm;
   
-  // Drill goal icon
-  const goalIcon = isGrouping 
-    ? 'ellipse-outline' 
-    : 'trophy-outline';
+  // Get participant count for squad/group sessions
+  const participantCount = isSquadOrGroup 
+    ? (session.stats as any)?.participant_count ?? session.engagement?.engagement_participants?.filter((p: any) => p.state === 'joined').length ?? 0
+    : 0;
+  
+  // Drill goal icon - squad/group uses people icon
+  const goalIcon = isSquadOrGroup
+    ? 'people-outline'
+    : isGrouping 
+      ? 'ellipse-outline' 
+      : 'trophy-outline';
     
   // Source badge
   const isWatch = session.watch_controlled;
@@ -63,11 +74,13 @@ export function SessionCard({ session, onPress, compact = false }: SessionCardPr
           </View>
         </View>
         <View style={styles.compactRight}>
-          {/* Compact stat: group size for grouping, hits for engagement */}
-          <Text style={[styles.compactStat, { color: isGrouping ? colors.orange : colors.text }]}>
-            {isGrouping 
-              ? (bestDispersion != null ? `${bestDispersion.toFixed(1)}cm` : `${shots}`)
-              : `${hits}/${shots}`
+          {/* Compact stat: squad/group shows participants, grouping shows group size, engagement shows hits */}
+          <Text style={[styles.compactStat, { color: isSquadOrGroup ? colors.primary : isGrouping ? colors.orange : colors.text }]}>
+            {isSquadOrGroup
+              ? `${participantCount} · ${shots}`
+              : isGrouping 
+                ? (bestDispersion != null ? `${bestDispersion.toFixed(1)}cm` : `${shots}`)
+                : `${hits}/${shots}`
             }
           </Text>
           <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
@@ -103,17 +116,46 @@ export function SessionCard({ session, onPress, compact = false }: SessionCardPr
         </View>
       </View>
 
-      {/* Stats Row - Different for grouping vs engagement */}
+      {/* Stats Row - Different for squad/group, grouping, and solo engagement */}
       <View style={styles.statsRow}>
-        {/* Shots */}
-        <View style={styles.stat}>
-          <Text style={[styles.statValue, { color: colors.text }]}>{shots}</Text>
-          <Text style={[styles.statLabel, { color: colors.textMuted }]}>shots</Text>
-        </View>
-
-        {isGrouping ? (
-          // GROUPING: Show group size (cm) - NO accuracy
+        {isSquadOrGroup ? (
+          // SQUAD/GROUP: Show participants, shots, hits - NO accuracy %
           <>
+            {/* Participants */}
+            <View style={styles.stat}>
+              <Text style={[styles.statValue, { color: colors.primary }]}>{participantCount}</Text>
+              <Text style={[styles.statLabel, { color: colors.textMuted }]}>shooters</Text>
+            </View>
+
+            {/* Shots */}
+            <View style={styles.stat}>
+              <Text style={[styles.statValue, { color: colors.text }]}>{shots}</Text>
+              <Text style={[styles.statLabel, { color: colors.textMuted }]}>shots</Text>
+            </View>
+
+            {/* Hits */}
+            <View style={styles.stat}>
+              <Text style={[styles.statValue, { color: colors.text }]}>{hits}</Text>
+              <Text style={[styles.statLabel, { color: colors.textMuted }]}>hits</Text>
+            </View>
+
+            {/* Distance */}
+            <View style={styles.stat}>
+              <Text style={[styles.statValue, { color: distance ? colors.text : colors.textMuted }]}>
+                {distance ? `${distance}m` : '—'}
+              </Text>
+              <Text style={[styles.statLabel, { color: colors.textMuted }]}>dist</Text>
+            </View>
+          </>
+        ) : isGrouping ? (
+          // GROUPING: Show shots, group size, distance, time - NO accuracy
+          <>
+            {/* Shots */}
+            <View style={styles.stat}>
+              <Text style={[styles.statValue, { color: colors.text }]}>{shots}</Text>
+              <Text style={[styles.statLabel, { color: colors.textMuted }]}>shots</Text>
+            </View>
+
             {/* Group Size */}
             <View style={styles.stat}>
               <Text style={[styles.statValue, { color: bestDispersion != null ? colors.orange : colors.textMuted }]}>
@@ -139,8 +181,14 @@ export function SessionCard({ session, onPress, compact = false }: SessionCardPr
             </View>
           </>
         ) : (
-          // ENGAGEMENT: Show hits/accuracy
+          // SOLO ENGAGEMENT: Show shots, hits, accuracy, distance, time
           <>
+            {/* Shots */}
+            <View style={styles.stat}>
+              <Text style={[styles.statValue, { color: colors.text }]}>{shots}</Text>
+              <Text style={[styles.statLabel, { color: colors.textMuted }]}>shots</Text>
+            </View>
+
             {/* Hits */}
             <View style={styles.stat}>
               <Text style={[styles.statValue, { color: colors.text }]}>

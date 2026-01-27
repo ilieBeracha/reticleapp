@@ -1,30 +1,32 @@
 /**
  * Active Session Module
  *
- * Session execution phase (steps 4-5 of the mental model):
+ * Session execution phase - where the actual shooting happens.
  *
  * ┌─────────────────────────────────────────────────────────────────────────┐
  * │  ACTIVE SESSION                                                         │
  * ├─────────────────────────────────────────────────────────────────────────┤
  * │                                                                         │
- * │  TYPES                                                                  │
- * │  ├── DrillProgress      → Completion tracking                          │
- * │  ├── NextTargetPlan     → Remaining shots/targets                      │
- * │  ├── SessionMode        → solo | training                              │
- * │  ├── WatchState         → Watch connection state                       │
- * │  └── SessionScore       → Computed score                               │
+ * │  VIEWS (what gets rendered)                                             │
+ * │  ├── SessionPrepView    → Pending status, waiting to start              │
+ * │  ├── SoloSessionView    → Solo practice, full features                  │
+ * │  ├── TeamTrainingView   → Team training, focused/locked                 │
+ * │  ├── SquadSessionView   → Squad engagement, collaborative               │
+ * │  ├── GroupSessionView   → Group engagement, simple entry                │
+ * │  └── Watch views        → When watch controls the session               │
  * │                                                                         │
- * │  VIEWS                                                                  │
- * │  ├── SessionPrepView    → Pre-session setup                            │
- * │  └── SquadSessionView   → Squad engagement view                        │
+ * │  COMPONENTS (reusable pieces)                                           │
+ * │  ├── HeroTarget         → Large preview of latest target                │
+ * │  ├── CompactStats       → Horizontal stats bar                          │
+ * │  └── DrillBanner        → Drill requirements and progress               │
  * │                                                                         │
  * │  HOOK                                                                   │
- * │  └── useActiveSession   → All stateful logic                           │
+ * │  └── useActiveSession   → All stateful logic for session screen         │
  * │                                                                         │
  * │  HELPERS                                                                │
- * │  ├── formatTime         → MM:SS formatting                             │
- * │  ├── calculateAccuracy  → Accuracy computation                         │
- * │  └── buildWatchPayload  → Watch communication                          │
+ * │  ├── formatTime         → MM:SS formatting                              │
+ * │  ├── calculateAccuracy  → Accuracy computation                          │
+ * │  └── buildWatchPayload  → Watch communication                           │
  * │                                                                         │
  * └─────────────────────────────────────────────────────────────────────────┘
  */
@@ -60,7 +62,20 @@ export { styles } from './activeSession.styles';
 export { useActiveSession } from './useActiveSession';
 
 // ═══════════════════════════════════════════════════════════════════════════
-// VIEWS
+// COMPONENTS (reusable UI pieces)
 // ═══════════════════════════════════════════════════════════════════════════
 
-export { SessionPrepView, SquadSessionView, SquadParticipantsCard, GroupSessionView } from './views';
+export { CompactStats, DrillBanner, HeroTarget } from './components';
+
+// ═══════════════════════════════════════════════════════════════════════════
+// VIEWS (full screen components)
+// ═══════════════════════════════════════════════════════════════════════════
+
+export {
+    GroupSessionView,
+    // Main views
+    SessionPrepView,
+    SoloSessionView, SquadParticipantsCard, SquadSessionView, TeamTrainingView,
+    // Watch views
+    WatchFailedView, WatchPreviewView, WatchStartingView, WatchWaitingView
+} from './views';

@@ -26,7 +26,7 @@ import { useOpenWeather } from '@/hooks/useOpenWeather';
 import { usePermissions } from '@/hooks/usePermissions';
 import { supabase } from '@/lib/supabase';
 import type { DrillPreset } from '@/services/presetService';
-import { addParticipant, createEngagement } from '@/services/session/participants';
+import { createEngagement } from '@/services/session/participants';
 import type { DrillGoal, EngagementMode } from '@/services/session/types';
 import { deleteSession, getMyActiveSession, getOrCreateSetupSession } from '@/services/sessionService';
 import { getUserWeapon, type UserWeapon } from '@/services/weaponService';
@@ -432,6 +432,7 @@ export default function StartEngagementScreen() {
       // Step 2: Create Engagement (the actual execution unit)
       // Squad/group engagements start as 'pending' (in lobby, waiting to start)
       // Solo engagements start as 'completed' (immediate execution)
+      // NOTE: createEngagement auto-adds the creator as a joined participant for squad/group
       const engagement = await createEngagement({
         sessionId: session.id,
         shooterId: user.id,
@@ -440,12 +441,6 @@ export default function StartEngagementScreen() {
         requestedMode: effectiveEngagementMode,
         status: isTeamMode ? 'pending' : 'completed',
       });
-
-      // Step 2b: For squad/group, add commander as first participant
-      // This ensures commander can also record their shots
-      if (effectiveEngagementMode === 'squad' || effectiveEngagementMode === 'group') {
-        await addParticipant(engagement.id, user.id);
-      }
 
       await loadSessions();
 

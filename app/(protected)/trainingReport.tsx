@@ -12,6 +12,7 @@ import { ParticipantInsights } from '@/components/training/ParticipantInsights';
 import { useAuth } from '@/contexts/AuthContext';
 import { useColors } from '@/hooks/ui/useColors';
 import { usePermissions } from '@/hooks/usePermissions';
+import { getEngagementParticipants } from '@/services/session/participants';
 import { getTrainingSessionsWithStats, SessionWithDetails } from '@/services/sessionService';
 import { getSessionVerdict, SessionVerdict } from '@/services/standards';
 import { getTrainingById } from '@/services/trainingService';
@@ -227,10 +228,67 @@ export default function TrainingReportScreen() {
         setError('Training not found');
       } else {
         setTraining(trainingData as TrainingWithDrills);
-        setSessions(sessionsData);
+
+        // Expand squad/group engagement sessions to include all participants
+        // For squad mode, there's ONE session shared by multiple participants
+        // We need to create "virtual" session entries for each participant
+        const expandedSessions: SessionWithDetails[] = [];
+
+        for (const session of sessionsData) {
+          const engagementMode = session.engagement?.engagement_mode;
+
+          if ((engagementMode === 'squad' || engagementMode === 'group') && session.engagement?.id) {
+            // Fetch all participants for this engagement
+            try {
+              const participants = await getEngagementParticipants(session.engagement.id);
+
+              if (participants.length > 0) {
+                // Create a session entry for each participant
+                for (const participant of participants) {
+                  // Only include joined participants
+                  if (participant.state !== 'joined') continue;
+
+                  // Create a virtual session for this participant
+                  const participantSession: SessionWithDetails = {
+                    ...session,
+                    // Override user info with participant info
+                    user_id: participant.user_id,
+                    user_full_name: participant.user_full_name || 'Unknown',
+                    // Override stats with participant's contribution
+                    stats: participant.shots_fired != null
+                      ? {
+                          shots_fired: participant.shots_fired || 0,
+                          hits_total: participant.hits || 0,
+                          accuracy_pct:
+                            participant.shots_fired && participant.shots_fired > 0
+                              ? Math.round(((participant.hits || 0) / participant.shots_fired) * 100)
+                              : 0,
+                          target_count: 0,
+                          best_dispersion_cm: null,
+                          avg_distance_m: session.drill_config?.distance_m || null,
+                        }
+                      : undefined,
+                  };
+                  expandedSessions.push(participantSession);
+                }
+              } else {
+                // No participants found, add original session
+                expandedSessions.push(session);
+              }
+            } catch (e) {
+              console.warn('[TrainingReport] Failed to fetch engagement participants:', e);
+              expandedSessions.push(session);
+            }
+          } else {
+            // Solo session or no engagement - add as-is
+            expandedSessions.push(session);
+          }
+        }
+
+        setSessions(expandedSessions);
         setError(null);
 
-        // Fetch verdicts for all sessions
+        // Fetch verdicts for all original sessions (not expanded)
         const verdictPromises = sessionsData.map((s: SessionWithDetails) =>
           getSessionVerdict(s.id)
             .then((v) => [s.id, v] as const)

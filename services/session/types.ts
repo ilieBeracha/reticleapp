@@ -9,10 +9,10 @@ export type { DrillGoal };
 
 /**
  * Execution Policy - Commander's intent for how strictly a drill must be followed.
- * 
+ *
  * This is NOT about whether execution happens.
  * Training decides how strict execution is.
- * 
+ *
  * @example
  * - locked: Military qualification - execute EXACTLY as defined
  * - guided: Training drill - defaults provided, adjustments allowed
@@ -48,7 +48,7 @@ export type EngagementStatus = 'pending' | 'active' | 'completed' | 'cancelled';
 
 /**
  * Engagement record - the atomic execution unit.
- * 
+ *
  * CANONICAL SCHEMA:
  * - One shooter, one result
  * - Optional participants (async consent only)
@@ -71,14 +71,22 @@ export interface Engagement {
   /** When the engagement was started by the commander */
   started_at: string | null;
   created_at: string;
+  /** Participants (populated when fetched with session) */
+  engagement_participants?: EngagementParticipant[];
 }
 
 /** State of a participant in a squad engagement */
-export type ParticipantState = 'pending' | 'joined' | 'left';
+export type ParticipantState = 'pending' | 'joined' | 'declined' | 'left';
+
+/** 
+ * Engagement role: shooter (fires weapon) or spotter (observer/assistant).
+ * Different from ParticipantRole which is for broader session context.
+ */
+export type EngagementRole = 'shooter' | 'spotter';
 
 /**
  * A participant in a squad engagement.
- * 
+ *
  * Squad mode tracks GROUP totals - all participants share one session.
  * Each participant can record their contribution (shots/hits).
  * Results are aggregated for the group, NOT counted in individual insights.
@@ -89,6 +97,8 @@ export interface EngagementParticipant {
   engagement_id: string;
   user_id: string;
   state: ParticipantState;
+  /** Engagement role: shooter (fires weapon) or spotter (observer) */
+  role: EngagementRole;
   joined_at: string | null;
   created_at: string;
   /** Participant's contribution to group totals */
@@ -105,17 +115,14 @@ export interface EngagementParticipant {
 
 /**
  * Enforce engagement mode based on drill goal.
- * 
+ *
  * CANONICAL RULE: Grouping is ALWAYS solo.
- * 
+ *
  * @param drillGoal - The drill goal (grouping or engagement)
  * @param requested - The requested engagement mode (optional)
  * @returns The enforced engagement mode
  */
-export function enforceEngagementMode(
-  drillGoal: DrillGoal,
-  requested?: EngagementMode
-): EngagementMode {
+export function enforceEngagementMode(drillGoal: DrillGoal, requested?: EngagementMode): EngagementMode {
   // Grouping is ALWAYS solo - this is non-negotiable
   if (drillGoal === 'grouping') {
     return 'solo';
@@ -192,44 +199,44 @@ export interface DrillConfig {
 
 /**
  * BaseSessionConfig - The unified structure ALL session creation flows must use.
- * 
+ *
  * SIMPLIFIED (v2):
  * - drill_id: Reference to ANY saved drill (team OR personal preset)
  * - drill_config: Inline config for Quick Start / Custom (no saved reference)
- * 
+ *
  * Entry points:
  * - Quick Start (one tap, uses defaults)
  * - Custom (inline config)
  * - My Presets (saved personal drills)
  * - Team Training (drill from training)
- * 
+ *
  * All funnel through sessionService.createSession(config: BaseSessionConfig)
  */
 export interface BaseSessionConfig {
   // Context
-  team_id: string | null;           // null = personal solo session
-  training_id: string | null;       // null = ad-hoc session
-  
+  team_id: string | null; // null = personal solo session
+  training_id: string | null; // null = ad-hoc session
+
   // Weapon (required for session - user_weapons.id)
-  weapon_id: string | null;         // Reference to user's weapon profile
-  
+  weapon_id: string | null; // Reference to user's weapon profile
+
   // Config source (ONE of these, or neither for blank session)
-  drill_id: string | null;          // Reference to saved drill/preset
+  drill_id: string | null; // Reference to saved drill/preset
   drill_template_id?: string | null; // @deprecated - use drill_id
   drill_config: DrillConfig | null; // Inline custom drill
-  
+
   // Session mode
   session_mode: 'solo' | 'group';
-  
+
   // Watch control
-  watch_controlled: boolean;        // user's choice per session
-  
+  watch_controlled: boolean; // user's choice per session
+
   // Optional metadata
   notes?: string;
-  
+
   // Weather conditions at session start (from OpenWeatherMap or manual)
   weather?: SessionWeatherData | null;
-  
+
   // Start as pending (for watch selection flow)
   // When true, session is created as 'pending' and user must call activateSession()
   start_as_pending?: boolean;
@@ -458,5 +465,3 @@ export interface SessionStats {
     avgBreathRate?: number;
   };
 }
-
-

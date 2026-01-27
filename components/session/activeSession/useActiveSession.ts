@@ -31,7 +31,7 @@ import { isGroupingDrill } from '@/utils/drillGoal';
 import { isInfiniteShots } from '@/utils/drillShots';
 
 import { useParticipantsRealtime, useSessionRealtime } from '@/hooks/realtime';
-import { getSessionParticipants } from '@/services/session/participants';
+import { completeEngagement, getSessionParticipants } from '@/services/session/participants';
 import type { EngagementParticipant } from '@/services/session/types';
 import { deriveDetectionConfig } from '@/utils/detectionSensitivity';
 import { SHOT_MARKING_ENABLED, TIMER_INTERVAL_MS, VIBRATE_ON_SHOT } from './activeSession.constants';
@@ -756,9 +756,53 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
     setShowCompletionModal(false);
   }, []);
 
-  const handleEndSession = useCallback(() => {
+  const handleEndSession = useCallback(async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
+    // For squad/group engagements, skip the drill requirement dialog
+    // Completion is tracked by participant results, not target scans
+    const engagementMode = session?.engagement?.engagement_mode;
+    const isSquadOrGroup = engagementMode === 'squad' || engagementMode === 'group';
+
+    // Common end session logic
+    const doEndSession = async () => {
+      setEnding(true);
+      try {
+        await endSession(sessionId!);
+
+        // Complete engagement for squad/group sessions
+        const engagementId = session?.engagement?.id;
+        if (engagementId) {
+          console.log('[ActiveSession] Completing engagement:', engagementId);
+          await completeEngagement(engagementId);
+        }
+
+        if (garminStatus === 'CONNECTED') {
+          sendToGarmin('SESSION_END', {
+            sessionId,
+            duration: elapsedTime,
+            targetsCount: targets.length,
+            accuracy,
+          });
+        }
+
+        await refreshSessionList(session?.team_id, loadTeamSessions, loadPersonalSessions);
+        navigateAfterSessionEnd(session?.training_id, sessionId!, lastSessionData);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } catch (error: any) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        Alert.alert('Error', error.message || 'Failed to end session');
+        setEnding(false);
+      }
+    };
+
+    // Squad/group sessions: SquadSessionView already shows confirmation, just end
+    if (isSquadOrGroup) {
+      await doEndSession();
+      return;
+    }
+
+    // Solo/team sessions: show drill requirement dialog
     const meetsRequirements =
       !!drillProgress && drillProgress.isComplete && drillProgress.meetsAccuracy && drillProgress.meetsTime;
     const { title, message } = buildEndSessionMessage(
@@ -787,29 +831,7 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
       {
         text: confirmText,
         style: 'destructive',
-        onPress: async () => {
-          setEnding(true);
-          try {
-            await endSession(sessionId!);
-
-            if (garminStatus === 'CONNECTED') {
-              sendToGarmin('SESSION_END', {
-                sessionId,
-                duration: elapsedTime,
-                targetsCount: targets.length,
-                accuracy,
-              });
-            }
-
-            await refreshSessionList(session?.team_id, loadTeamSessions, loadPersonalSessions);
-            navigateAfterSessionEnd(session?.training_id, sessionId!, lastSessionData);
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-          } catch (error: any) {
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-            Alert.alert('Error', error.message || 'Failed to end session');
-            setEnding(false);
-          }
-        },
+        onPress: doEndSession,
       },
     ]);
   }, [
@@ -818,6 +840,8 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
     elapsedTime,
     session?.team_id,
     session?.training_id,
+    session?.engagement?.id,
+    session?.engagement?.engagement_mode,
     loadPersonalSessions,
     loadTeamSessions,
     hasDrill,

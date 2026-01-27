@@ -2495,7 +2495,6 @@ CREATE OR REPLACE FUNCTION "public"."update_engagement_participants_updated_at"(
     AS $$
 BEGIN
   NEW.updated_at = NOW();
-  -- Auto-set joined_at when state changes to 'joined'
   IF NEW.state = 'joined' AND (OLD.state IS NULL OR OLD.state != 'joined') THEN
     NEW.joined_at = NOW();
   END IF;
@@ -2994,7 +2993,13 @@ CREATE TABLE IF NOT EXISTS "public"."engagement_participants" (
     "joined_at" timestamp with time zone,
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "engagement_id" "uuid" NOT NULL,
-    CONSTRAINT "engagement_participants_state_check" CHECK (("state" = ANY (ARRAY['pending'::"text", 'joined'::"text", 'left'::"text"])))
+    "updated_at" timestamp with time zone DEFAULT "now"(),
+    "session_id" "uuid",
+    "shots_fired" integer,
+    "hits" integer,
+    "role" "text" DEFAULT 'shooter'::"text",
+    CONSTRAINT "engagement_participants_role_check" CHECK (("role" = ANY (ARRAY['shooter'::"text", 'spotter'::"text"]))),
+    CONSTRAINT "engagement_participants_state_check" CHECK (("state" = ANY (ARRAY['pending'::"text", 'joined'::"text", 'declined'::"text", 'left'::"text"])))
 );
 
 
@@ -3005,7 +3010,7 @@ COMMENT ON TABLE "public"."engagement_participants" IS 'Participants in squad en
 
 
 
-COMMENT ON COLUMN "public"."engagement_participants"."state" IS 'pending = invited, joined = acknowledged/participated, left = declined';
+COMMENT ON COLUMN "public"."engagement_participants"."state" IS 'Participant state: pending (invited, awaiting response), joined (accepted), declined (rejected invite), left (removed/left after joining)';
 
 
 
@@ -3014,6 +3019,10 @@ COMMENT ON COLUMN "public"."engagement_participants"."joined_at" IS 'Timestamp w
 
 
 COMMENT ON COLUMN "public"."engagement_participants"."engagement_id" IS 'Reference to the engagement (execution unit) - ONLY reference, never session_id';
+
+
+
+COMMENT ON COLUMN "public"."engagement_participants"."role" IS 'Participant role: shooter (fires weapon, records results) or spotter (observer, assists shooter)';
 
 
 
@@ -3026,9 +3035,11 @@ CREATE TABLE IF NOT EXISTS "public"."engagements" (
     "shooter_id" "uuid",
     "training_id" "uuid",
     "drill_goal" "text",
+    "started_at" timestamp with time zone,
+    "updated_at" timestamp with time zone DEFAULT "now"(),
     CONSTRAINT "engagements_drill_goal_check" CHECK (("drill_goal" = ANY (ARRAY['grouping'::"text", 'engagement'::"text"]))),
     CONSTRAINT "engagements_engagement_mode_check" CHECK (("engagement_mode" = ANY (ARRAY['solo'::"text", 'squad'::"text"]))),
-    CONSTRAINT "engagements_status_check" CHECK (("status" = ANY (ARRAY['completed'::"text", 'aborted'::"text"])))
+    CONSTRAINT "engagements_status_check" CHECK (("status" = ANY (ARRAY['pending'::"text", 'active'::"text", 'completed'::"text", 'cancelled'::"text"])))
 );
 
 
@@ -3047,7 +3058,7 @@ COMMENT ON COLUMN "public"."engagements"."engagement_mode" IS 'solo = individual
 
 
 
-COMMENT ON COLUMN "public"."engagements"."status" IS 'completed = finished successfully, aborted = cancelled/incomplete';
+COMMENT ON COLUMN "public"."engagements"."status" IS 'Engagement status: pending (lobby/waiting), active (in progress), completed (finished normally), cancelled (aborted by commander)';
 
 
 
@@ -3999,6 +4010,10 @@ CREATE INDEX "engagement_participants_engagement_id_idx" ON "public"."engagement
 
 
 
+CREATE INDEX "engagement_participants_role_idx" ON "public"."engagement_participants" USING "btree" ("role");
+
+
+
 CREATE INDEX "engagement_participants_state_idx" ON "public"."engagement_participants" USING "btree" ("state");
 
 
@@ -4403,6 +4418,11 @@ ALTER TABLE ONLY "public"."drill_templates"
 
 ALTER TABLE ONLY "public"."engagement_participants"
     ADD CONSTRAINT "engagement_participants_engagement_id_fkey" FOREIGN KEY ("engagement_id") REFERENCES "public"."engagements"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."engagement_participants"
+    ADD CONSTRAINT "engagement_participants_session_id_fkey" FOREIGN KEY ("session_id") REFERENCES "public"."sessions"("id");
 
 
 
@@ -5163,6 +5183,19 @@ CREATE POLICY "Users can read own weapons" ON "public"."user_weapons" FOR SELECT
 
 
 
+CREATE POLICY "Users can update engagements" ON "public"."engagements" FOR UPDATE USING (((EXISTS ( SELECT 1
+   FROM "public"."sessions" "s"
+  WHERE (("s"."id" = "engagements"."session_id") AND ("s"."user_id" = "auth"."uid"())))) OR (EXISTS ( SELECT 1
+   FROM (("public"."sessions" "s"
+     JOIN "public"."trainings" "t" ON (("t"."id" = "s"."training_id")))
+     JOIN "public"."team_members" "tm" ON (("tm"."team_id" = "t"."team_id")))
+  WHERE (("s"."id" = "engagements"."session_id") AND ("tm"."user_id" = "auth"."uid"()) AND ("tm"."role" = ANY (ARRAY['owner'::"text", 'commander'::"text", 'squad_commander'::"text"]))))) OR (EXISTS ( SELECT 1
+   FROM ("public"."sessions" "s"
+     JOIN "public"."team_members" "tm" ON (("tm"."team_id" = "s"."team_id")))
+  WHERE (("s"."id" = "engagements"."session_id") AND ("tm"."user_id" = "auth"."uid"()) AND ("tm"."role" = ANY (ARRAY['owner'::"text", 'commander'::"text", 'squad_commander'::"text"])))))));
+
+
+
 CREATE POLICY "Users can update own insights" ON "public"."session_insights" FOR UPDATE USING (("user_id" = "auth"."uid"()));
 
 
@@ -5220,12 +5253,6 @@ CREATE POLICY "Users can update tactical results from own sessions" ON "public".
    FROM ("public"."session_targets" "st"
      JOIN "public"."sessions" "s" ON (("s"."id" = "st"."session_id")))
   WHERE (("st"."id" = "tactical_target_results"."session_target_id") AND ("s"."user_id" = "auth"."uid"())))));
-
-
-
-CREATE POLICY "Users can update their own engagements" ON "public"."engagements" FOR UPDATE USING ((EXISTS ( SELECT 1
-   FROM "public"."sessions" "s"
-  WHERE (("s"."id" = "engagements"."session_id") AND ("s"."user_id" = "auth"."uid"())))));
 
 
 
@@ -5404,6 +5431,36 @@ ALTER TABLE "public"."session_stats" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."session_targets" ENABLE ROW LEVEL SECURITY;
 
 
+CREATE POLICY "session_targets_insert_policy" ON "public"."session_targets" FOR INSERT WITH CHECK (((EXISTS ( SELECT 1
+   FROM "public"."sessions" "s"
+  WHERE (("s"."id" = "session_targets"."session_id") AND ("s"."user_id" = "auth"."uid"())))) OR (EXISTS ( SELECT 1
+   FROM ("public"."engagements" "e"
+     JOIN "public"."engagement_participants" "ep" ON (("ep"."engagement_id" = "e"."id")))
+  WHERE (("e"."session_id" = "session_targets"."session_id") AND ("ep"."user_id" = "auth"."uid"()) AND ("ep"."state" = 'joined'::"text"))))));
+
+
+
+CREATE POLICY "session_targets_select_policy" ON "public"."session_targets" FOR SELECT USING (((EXISTS ( SELECT 1
+   FROM "public"."sessions" "s"
+  WHERE (("s"."id" = "session_targets"."session_id") AND ("s"."user_id" = "auth"."uid"())))) OR (EXISTS ( SELECT 1
+   FROM ("public"."sessions" "s"
+     JOIN "public"."team_members" "tm" ON (("tm"."team_id" = "s"."team_id")))
+  WHERE (("s"."id" = "session_targets"."session_id") AND ("tm"."user_id" = "auth"."uid"())))) OR (EXISTS ( SELECT 1
+   FROM ("public"."engagements" "e"
+     JOIN "public"."engagement_participants" "ep" ON (("ep"."engagement_id" = "e"."id")))
+  WHERE (("e"."session_id" = "session_targets"."session_id") AND ("ep"."user_id" = "auth"."uid"()))))));
+
+
+
+CREATE POLICY "session_targets_update_policy" ON "public"."session_targets" FOR UPDATE USING (((EXISTS ( SELECT 1
+   FROM "public"."sessions" "s"
+  WHERE (("s"."id" = "session_targets"."session_id") AND ("s"."user_id" = "auth"."uid"())))) OR (EXISTS ( SELECT 1
+   FROM ("public"."engagements" "e"
+     JOIN "public"."engagement_participants" "ep" ON (("ep"."engagement_id" = "e"."id")))
+  WHERE (("e"."session_id" = "session_targets"."session_id") AND ("ep"."user_id" = "auth"."uid"()) AND ("ep"."state" = 'joined'::"text"))))));
+
+
+
 ALTER TABLE "public"."session_timelines" ENABLE ROW LEVEL SECURITY;
 
 
@@ -5411,6 +5468,40 @@ ALTER TABLE "public"."sessions" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."tactical_target_results" ENABLE ROW LEVEL SECURITY;
+
+
+CREATE POLICY "tactical_target_results_insert_policy" ON "public"."tactical_target_results" FOR INSERT WITH CHECK (((EXISTS ( SELECT 1
+   FROM ("public"."session_targets" "st"
+     JOIN "public"."sessions" "s" ON (("s"."id" = "st"."session_id")))
+  WHERE (("st"."id" = "tactical_target_results"."session_target_id") AND ("s"."user_id" = "auth"."uid"())))) OR (EXISTS ( SELECT 1
+   FROM (("public"."session_targets" "st"
+     JOIN "public"."engagements" "e" ON (("e"."session_id" = "st"."session_id")))
+     JOIN "public"."engagement_participants" "ep" ON (("ep"."engagement_id" = "e"."id")))
+  WHERE (("st"."id" = "tactical_target_results"."session_target_id") AND ("ep"."user_id" = "auth"."uid"()) AND ("ep"."state" = 'joined'::"text"))))));
+
+
+
+CREATE POLICY "tactical_target_results_select_policy" ON "public"."tactical_target_results" FOR SELECT USING ((EXISTS ( SELECT 1
+   FROM ("public"."session_targets" "st"
+     JOIN "public"."sessions" "s" ON (("s"."id" = "st"."session_id")))
+  WHERE (("st"."id" = "tactical_target_results"."session_target_id") AND (("s"."user_id" = "auth"."uid"()) OR (EXISTS ( SELECT 1
+           FROM "public"."team_members" "tm"
+          WHERE (("tm"."team_id" = "s"."team_id") AND ("tm"."user_id" = "auth"."uid"())))) OR (EXISTS ( SELECT 1
+           FROM ("public"."engagements" "e"
+             JOIN "public"."engagement_participants" "ep" ON (("ep"."engagement_id" = "e"."id")))
+          WHERE (("e"."session_id" = "s"."id") AND ("ep"."user_id" = "auth"."uid"())))))))));
+
+
+
+CREATE POLICY "tactical_target_results_update_policy" ON "public"."tactical_target_results" FOR UPDATE USING (((EXISTS ( SELECT 1
+   FROM ("public"."session_targets" "st"
+     JOIN "public"."sessions" "s" ON (("s"."id" = "st"."session_id")))
+  WHERE (("st"."id" = "tactical_target_results"."session_target_id") AND ("s"."user_id" = "auth"."uid"())))) OR (EXISTS ( SELECT 1
+   FROM (("public"."session_targets" "st"
+     JOIN "public"."engagements" "e" ON (("e"."session_id" = "st"."session_id")))
+     JOIN "public"."engagement_participants" "ep" ON (("ep"."engagement_id" = "e"."id")))
+  WHERE (("st"."id" = "tactical_target_results"."session_target_id") AND ("ep"."user_id" = "auth"."uid"()) AND ("ep"."state" = 'joined'::"text"))))));
+
 
 
 ALTER TABLE "public"."team_drill_presets" ENABLE ROW LEVEL SECURITY;

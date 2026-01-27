@@ -43,7 +43,21 @@ export const SESSION_SELECT_WITH_WEAPON = `
   trainings:training_id(title),
   training_drills:drill_id(id, name, drill_goal, target_type, distance_m, rounds_per_shooter, position),
   drill_templates:drill_template_id(id, name, drill_goal, target_type, distance_m, rounds_per_shooter, position),
-  user_weapons:weapon_id(name, caliber, category)
+  user_weapons:weapon_id(name, caliber, category),
+  engagement:engagements(
+    id,
+    drill_goal,
+    engagement_mode,
+    status,
+    engagement_participants(
+      id,
+      user_id,
+      state,
+      role,
+      shots_fired,
+      hits
+    )
+  )
 `;
 
 /**
@@ -72,7 +86,21 @@ export const SESSION_SELECT_MINIMAL = `
   teams:team_id(name),
   trainings:training_id(title),
   training_drills:drill_id(id, name, drill_goal, target_type, distance_m, rounds_per_shooter, position),
-  drill_templates:drill_template_id(id, name, drill_goal, target_type, distance_m, rounds_per_shooter, position)
+  drill_templates:drill_template_id(id, name, drill_goal, target_type, distance_m, rounds_per_shooter, position),
+  engagement:engagements(
+    id,
+    drill_goal,
+    engagement_mode,
+    status,
+    engagement_participants(
+      id,
+      user_id,
+      state,
+      role,
+      shots_fired,
+      hits
+    )
+  )
 `;
 
 /**
@@ -153,7 +181,22 @@ export const SESSION_SELECT_WITH_FULL_DRILL = `
     safety_notes
   ),
   user_weapons:weapon_id(name, caliber, category),
-  engagement:engagements(id, engagement_mode, status, started_at, created_at)
+  engagement:engagements(
+    id,
+    drill_goal,
+    engagement_mode,
+    status,
+    started_at,
+    created_at,
+    engagement_participants(
+      id,
+      user_id,
+      state,
+      role,
+      shots_fired,
+      hits
+    )
+  )
 `;
 
 /**

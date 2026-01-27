@@ -7,6 +7,7 @@
 import { useSessionTimeline } from '@/components/session';
 import { WeatherStrip } from '@/components/session/WeatherDisplay';
 import { isEngagementPaper, isGroupingPaper, isPaperTarget } from '@/constants';
+import { useAuth } from '@/contexts/AuthContext';
 import { useColors } from '@/hooks/ui/useColors';
 import { getSessionInsights, triggerInsightGeneration, type SessionInsight } from '@/services/insights';
 import type { ShotDetail } from '@/services/session/timelineService';
@@ -61,6 +62,7 @@ export default function SessionDetailScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { sessionId } = useLocalSearchParams<{ sessionId: string }>();
+  const { user } = useAuth();
 
   const [session, setSession] = useState<SessionWithDetails | null>(null);
   const [stats, setStats] = useState<SessionStats | null>(null);
@@ -366,6 +368,10 @@ export default function SessionDetailScreen() {
   // Determine if this is a grouping or engagement session
   const isGroupingDrill = isGroupingSession(session);
 
+  // Check if this is a squad/group engagement (hide certain config fields for these)
+  const engagementMode = session.engagement?.engagement_mode;
+  const isSquadOrGroup = engagementMode === 'squad' || engagementMode === 'group';
+
   return (
     <ScrollView
       style={styles.scrollView}
@@ -439,7 +445,8 @@ export default function SessionDetailScreen() {
               </View>
             )}
 
-            {session.drill_config?.position && (
+            {/* Hide position for squad/group - often just defaults */}
+            {!isSquadOrGroup && session.drill_config?.position && (
               <View style={styles.contextItem}>
                 <View style={[styles.contextIconBg, { backgroundColor: `${colors.blue}15` }]}>
                   <Focus size={14} color={colors.blue} />
@@ -454,9 +461,9 @@ export default function SessionDetailScreen() {
             )}
           </View>
 
-          {/* Row 2: Distance & Drill Goal */}
+          {/* Row 2: Distance & Drill Goal - hide distance for squad/group (often defaults) */}
           <View style={styles.contextRow}>
-            {session.drill_config?.distance_m && (
+            {!isSquadOrGroup && session.drill_config?.distance_m && (
               <View style={styles.contextItem}>
                 <View style={[styles.contextIconBg, { backgroundColor: `${colors.indigo}15` }]}>
                   <Ruler size={14} color={colors.indigo} />
@@ -532,22 +539,24 @@ export default function SessionDetailScreen() {
             )}
           </View>
 
-          {/* Bullets per shooter (if set) */}
-          {session.drill_config?.rounds_per_shooter && session.drill_config.rounds_per_shooter > 0 && (
-            <View style={styles.contextRow}>
-              <View style={styles.contextItem}>
-                <View style={[styles.contextIconBg, { backgroundColor: `${colors.textMuted}15` }]}>
-                  <Target size={14} color={colors.textMuted} />
-                </View>
-                <View style={styles.contextItemContent}>
-                  <Text style={[styles.contextLabel, { color: colors.textMuted }]}>Bullets</Text>
-                  <Text style={[styles.contextValue, { color: colors.text }]}>
-                    {session.drill_config.rounds_per_shooter} per shooter
-                  </Text>
+          {/* Bullets per shooter - hide for squad/group engagements (often just defaults) */}
+          {!isSquadOrGroup &&
+            session.drill_config?.rounds_per_shooter &&
+            session.drill_config.rounds_per_shooter > 0 && (
+              <View style={styles.contextRow}>
+                <View style={styles.contextItem}>
+                  <View style={[styles.contextIconBg, { backgroundColor: `${colors.textMuted}15` }]}>
+                    <Target size={14} color={colors.textMuted} />
+                  </View>
+                  <View style={styles.contextItemContent}>
+                    <Text style={[styles.contextLabel, { color: colors.textMuted }]}>Bullets</Text>
+                    <Text style={[styles.contextValue, { color: colors.text }]}>
+                      {session.drill_config.rounds_per_shooter} per shooter
+                    </Text>
+                  </View>
                 </View>
               </View>
-            </View>
-          )}
+            )}
 
           {/* Input Method Preference (if set) */}
           {session.drill_config?.input_method && (
@@ -712,12 +721,64 @@ export default function SessionDetailScreen() {
             </Text>
           )}
         </Animated.View>
-      ) : stats?.targetCount === 0 ? (
+      ) : stats?.targetCount === 0 && !isSquadOrGroup ? (
+        // Only show "no targets" for solo sessions - squad/group track differently
         <View style={[styles.emptyStats, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <Target size={32} color={colors.textMuted} />
           <Text style={[styles.emptyStatsText, { color: colors.textMuted }]}>No targets recorded</Text>
         </View>
       ) : null}
+
+      {/* Participants Section - Squad/Group engagements only */}
+      {session.engagement?.engagement_participants && session.engagement.engagement_participants.length > 0 && (
+        <Animated.View entering={FadeInDown.delay(100).duration(300)} style={styles.participantsSection}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Participants</Text>
+          <View style={[styles.participantsList, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            {session.engagement.engagement_participants
+              .filter((p) => p.state === 'joined')
+              .map((participant, idx, arr) => {
+                const isSelf = participant.user_id === user?.id;
+                const shots = participant.shots_fired ?? 0;
+                const displayName = isSelf ? 'You' : participant.user_full_name || `Shooter ${idx + 1}`;
+                const initial = isSelf ? 'Y' : (participant.user_full_name?.charAt(0) || `${idx + 1}`).toUpperCase();
+                return (
+                  <View
+                    key={participant.id}
+                    style={[
+                      styles.participantRow,
+                      idx < arr.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.border },
+                    ]}
+                  >
+                    <View style={styles.participantInfo}>
+                      <View style={[styles.participantAvatar, { backgroundColor: isSelf ? colors.primary + '20' : colors.secondary }]}>
+                        <Text style={[styles.participantInitial, { color: isSelf ? colors.primary : colors.textMuted }]}>
+                          {initial}
+                        </Text>
+                      </View>
+                      <View>
+                        <Text style={[styles.participantName, { color: colors.text }]}>
+                          {displayName}
+                        </Text>
+                        <Text style={[styles.participantRole, { color: colors.textMuted }]}>
+                          {participant.role === 'spotter' ? 'Spotter' : 'Shooter'}
+                        </Text>
+                      </View>
+                    </View>
+                    <View style={styles.participantStats}>
+                      {shots > 0 ? (
+                        <Text style={[styles.participantShotCount, { color: colors.text }]}>
+                          {shots} shots
+                        </Text>
+                      ) : (
+                        <Text style={[styles.participantShotCount, { color: colors.textMuted }]}>—</Text>
+                      )}
+                    </View>
+                  </View>
+                );
+              })}
+          </View>
+        </Animated.View>
+      )}
 
       {/* Watch Data / Biometrics Section */}
       {watchData && (watchData.heartRate || watchData.steadiness || watchData.splits) && (
@@ -1847,6 +1908,54 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     marginTop: 8,
     fontStyle: 'italic',
+  },
+
+  // Participants Section (Squad/Group)
+  participantsSection: {
+    marginBottom: 24,
+    gap: 12,
+  },
+  participantsList: {
+    borderRadius: 14,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  participantRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 12,
+  },
+  participantInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  participantAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  participantInitial: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  participantName: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  participantRole: {
+    fontSize: 11,
+    marginTop: 1,
+  },
+  participantStats: {
+    alignItems: 'flex-end',
+  },
+  participantShotCount: {
+    fontSize: 13,
+    fontWeight: '600',
   },
 
   // Biometrics Section

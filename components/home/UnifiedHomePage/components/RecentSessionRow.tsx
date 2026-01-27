@@ -18,6 +18,7 @@ export function RecentSessionRow({ session, colors, onPress }: RecentSessionRowP
   const isTeam = session.origin === 'team';
   const hasWatchData = session.sourceSession?.watch_controlled ?? false;
   const isGrouping = isGroupingGoal(session.drillGoal);
+  const isSquadOrGroup = session.isSquadEngagement || session.isGroupEngagement;
   const scale = useSharedValue(1);
 
   const animStyle = useAnimatedStyle(() => ({
@@ -42,8 +43,10 @@ export function RecentSessionRow({ session, colors, onPress }: RecentSessionRowP
   const hits = session.stats?.hits || 0;
   const accuracy = session.stats?.accuracy;
   const bestDispersion = session.stats?.bestDispersion;
+  const participantCount = session.stats?.participantCount;
 
-  const iconColor = isTeam ? colors.blue : isGrouping ? colors.orange : colors.indigo;
+  // Icon color: squad/group = blue, grouping = orange, engagement = indigo
+  const iconColor = isSquadOrGroup ? colors.blue : isGrouping ? colors.orange : colors.indigo;
 
   return (
     <AnimatedTouchable
@@ -53,9 +56,9 @@ export function RecentSessionRow({ session, colors, onPress }: RecentSessionRowP
       onPressOut={handlePressOut}
       activeOpacity={1}
     >
-      {/* Icon - different for grouping vs engagement */}
+      {/* Icon - different for squad/group, grouping, and solo engagement */}
       <View style={[s.icon, { backgroundColor: `${iconColor}12` }]}>
-        {isTeam ? (
+        {isSquadOrGroup ? (
           <Users size={15} color={iconColor} />
         ) : isGrouping ? (
           <Target size={15} color={iconColor} />
@@ -73,9 +76,23 @@ export function RecentSessionRow({ session, colors, onPress }: RecentSessionRowP
           {hasWatchData && <Heart size={12} color="#EF4444" fill="#EF4444" style={{ opacity: 0.8 }} />}
         </View>
 
-        {/* Stats row - different for grouping vs engagement */}
+        {/* Stats row - different for squad/group, grouping, and solo engagement */}
         <View style={s.statsRow}>
-          {isGrouping ? (
+          {isSquadOrGroup ? (
+            // SQUAD/GROUP: Show participant count + total shots (NO accuracy)
+            <>
+              {participantCount !== undefined && participantCount > 0 && (
+                <Text style={[s.stat, { color: colors.blue }]}>{participantCount} shooters</Text>
+              )}
+              {shots > 0 && (
+                <>
+                  <View style={[s.dot, { backgroundColor: colors.textMuted }]} />
+                  <Text style={[s.stat, { color: colors.textMuted }]}>{shots} shots</Text>
+                </>
+              )}
+            </>
+          ) : isGrouping ? (
+            // GROUPING: Show shots + best dispersion (NO accuracy)
             <>
               {shots > 0 && <Text style={[s.stat, { color: colors.textMuted }]}>{shots} shots</Text>}
               {bestDispersion !== undefined && bestDispersion > 0 && (
@@ -86,6 +103,7 @@ export function RecentSessionRow({ session, colors, onPress }: RecentSessionRowP
               )}
             </>
           ) : (
+            // SOLO ENGAGEMENT: Show hits + accuracy
             <>
               {shots > 0 && (
                 <Text style={[s.stat, { color: colors.textMuted }]}>

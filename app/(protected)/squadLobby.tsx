@@ -18,16 +18,21 @@ import { useColors } from '@/hooks/ui/useColors';
 import { supabase } from '@/lib/supabase';
 import { notifySquadEngagementInvites, notifySquadEngagementStarting } from '@/services/pushService';
 import {
+  abortEngagement,
+  acceptInvite,
   addParticipant,
+  declineInvite,
   getEngagement,
   getEngagementParticipants,
   getParticipantCounts,
   startEngagement,
+  updateParticipantRole,
 } from '@/services/session/participants';
-import type { Engagement, EngagementParticipant } from '@/services/session/types';
+import { updateSession } from '@/services/session/mutations';
+import type { Engagement, EngagementParticipant, EngagementRole } from '@/services/session/types';
 import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from 'expo-router';
-import { Check, ChevronLeft, LogOut, Play, UserPlus, Users, X } from 'lucide-react-native';
+import { Check, ChevronDown, ChevronLeft, Clock, LogOut, Play, UserPlus, Users, X } from 'lucide-react-native';
 import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -81,6 +86,12 @@ export default function SquadLobbyScreen() {
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [invitedUserIds, setInvitedUserIds] = useState<string[]>([]);
   const [sendingInvites, setSendingInvites] = useState(false);
+
+  // Accept/decline state
+  const [responding, setResponding] = useState(false);
+
+  // Participant weapons: userId -> weapon name
+  const [participantWeapons, setParticipantWeapons] = useState<Record<string, string>>({});
 
   // Load engagement, session, and participants
   const loadData = useCallback(async () => {
@@ -144,37 +155,188 @@ export default function SquadLobbyScreen() {
     onParticipantRemoved: loadData,
   });
 
+  // Fetch participant weapons (favorite or most recently used)
+  useEffect(() => {
+    if (participants.length === 0) return;
+
+    const fetchParticipantWeapons = async () => {
+      const userIds = participants.map((p) => p.user_id);
+      if (userIds.length === 0) return;
+
+      try {
+        // Fetch favorite or most recently used weapon for each participant
+        const { data, error } = await supabase
+          .from('user_weapons')
+          .select('user_id, name, caliber, is_favorite, last_used_at')
+          .in('user_id', userIds)
+          .order('is_favorite', { ascending: false })
+          .order('last_used_at', { ascending: false, nullsFirst: false });
+
+        if (error) {
+          console.error('[SquadLobby] Failed to fetch weapons:', error);
+          return;
+        }
+
+        // Build map: userId -> weapon display string (first match for each user)
+        const weaponMap: Record<string, string> = {};
+        for (const weapon of data || []) {
+          if (!weaponMap[weapon.user_id]) {
+            weaponMap[weapon.user_id] = weapon.name + (weapon.caliber ? ` (${weapon.caliber})` : '');
+          }
+        }
+        setParticipantWeapons(weaponMap);
+      } catch (error) {
+        console.error('[SquadLobby] Error fetching participant weapons:', error);
+      }
+    };
+
+    fetchParticipantWeapons();
+  }, [participants]);
+
   const counts = getParticipantCounts(participants);
   const isCommander = !!(currentUserId && session?.user_id === currentUserId);
 
+  // Calculate role-based counts
+  const joinedShooters = participants.filter((p) => p.state === 'joined' && p.role === 'shooter').length;
+  const joinedSpotters = participants.filter((p) => p.state === 'joined' && p.role === 'spotter').length;
+  const pendingCount = participants.filter((p) => p.state === 'pending').length;
+  const canStart = joinedShooters >= 2; // Minimum 2 shooters to start
+
+  // Handle role change (commander only) - optimistic update for instant UI
+  const handleRoleChange = async (userId: string, newRole: EngagementRole) => {
+    if (!engagement) return;
+
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+    // Optimistic update - update local state immediately
+    const previousParticipants = participants;
+    setParticipants((prev) =>
+      prev.map((p) => (p.user_id === userId ? { ...p, role: newRole } : p))
+    );
+
+    try {
+      await updateParticipantRole(engagement.id, userId, newRole);
+      // No need to reload - optimistic update already applied
+    } catch (error: any) {
+      console.error('[SquadLobby] Failed to update role:', error);
+      // Revert on error
+      setParticipants(previousParticipants);
+      Alert.alert('Error', error.message || 'Failed to update role');
+    }
+  };
+
+  // Handle accept invite (participant)
+  const handleAcceptInvite = async () => {
+    if (!engagement || !currentUserId) return;
+
+    setResponding(true);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+    try {
+      await acceptInvite(engagement.id, currentUserId);
+      loadData();
+    } catch (error: any) {
+      console.error('[SquadLobby] Failed to accept invite:', error);
+      Alert.alert('Error', error.message || 'Failed to accept invite');
+    } finally {
+      setResponding(false);
+    }
+  };
+
+  // Handle decline invite (participant)
+  const handleDeclineInvite = async () => {
+    if (!engagement || !currentUserId) return;
+
+    Alert.alert('Decline Invitation?', 'You will be removed from this squad engagement.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Decline',
+        style: 'destructive',
+        onPress: async () => {
+          setResponding(true);
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+
+          try {
+            await declineInvite(engagement.id, currentUserId);
+            // Navigate back after declining
+            if (params.trainingId) {
+              router.replace({
+                pathname: '/(protected)/trainingDetail',
+                params: { id: params.trainingId },
+              });
+            } else {
+              router.replace('/(protected)/(tabs)');
+            }
+          } catch (error: any) {
+            console.error('[SquadLobby] Failed to decline invite:', error);
+            Alert.alert('Error', error.message || 'Failed to decline invite');
+            setResponding(false);
+          }
+        },
+      },
+    ]);
+  };
+
   // Realtime: Listen for commander starting the session (for participants)
+  // Uses BOTH broadcast (fast) and postgres_changes (reliable fallback)
   useEffect(() => {
     if (!engagement?.id || !session?.id || isCommander) return;
 
-    const channelName = `squad-start-${engagement.id}`;
-    const channel = supabase.channel(channelName);
+    let hasNavigated = false;
+    const navigateToSession = () => {
+      if (hasNavigated) return;
+      hasNavigated = true;
+      console.log('[SquadLobby] Session started, navigating...');
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      router.replace({
+        pathname: '/(protected)/activeSession',
+        params: {
+          sessionId: session.id,
+          engagementId: engagement.id,
+          engagementMode: params.engagementMode || 'squad',
+          returnTo: params.trainingId ? 'trainingDetail' : undefined,
+          returnId: params.trainingId,
+        },
+      });
+    };
 
-    channel
+    // Primary: Broadcast channel (fast)
+    const broadcastChannel = supabase
+      .channel(`squad-start-${engagement.id}`)
       .on('broadcast', { event: 'session_started' }, () => {
-        console.log('[SquadLobby] Commander started session, navigating...');
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        router.replace({
-          pathname: '/(protected)/activeSession',
-          params: {
-            sessionId: session.id, // All participants share one session
-            engagementId: engagement.id,
-            engagementMode: params.engagementMode || 'squad',
-            returnTo: params.trainingId ? 'trainingDetail' : undefined,
-            returnId: params.trainingId,
-          },
-        });
+        console.log('[SquadLobby] Received broadcast: session_started');
+        navigateToSession();
       })
+      .subscribe((status) => {
+        console.log('[SquadLobby] Broadcast subscription:', status);
+      });
+
+    // Fallback: Postgres changes (reliable but slower)
+    const dbChannel = supabase
+      .channel(`squad-db-${engagement.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'engagements',
+          filter: `id=eq.${engagement.id}`,
+        },
+        (payload) => {
+          // Check if engagement was started (started_at was set)
+          if (payload.new?.started_at && !payload.old?.started_at) {
+            console.log('[SquadLobby] Detected engagement start via DB change');
+            navigateToSession();
+          }
+        }
+      )
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(broadcastChannel);
+      supabase.removeChannel(dbChannel);
     };
-  }, [engagement?.id, session?.id, isCommander, params.trainingId]);
+  }, [engagement?.id, session?.id, isCommander, params.trainingId, params.engagementMode, router]);
 
   // Find current user's participation
   const myParticipation = participants.find((p) => p.user_id === currentUserId);
@@ -189,19 +351,34 @@ export default function SquadLobbyScreen() {
 
     try {
       // Mark engagement as started (closes invitations)
+      // This also triggers postgres_changes for the fallback listener
       await startEngagement(engagement.id);
 
       // Broadcast to all participants in the lobby that we're starting
       const channelName = `squad-start-${engagement.id}`;
       const channel = supabase.channel(channelName);
-      await channel.subscribe();
-      await channel.send({
-        type: 'broadcast',
-        event: 'session_started',
-        payload: { engagementId: engagement.id },
+
+      // Wait for subscription to be fully ready
+      await new Promise<void>((resolve) => {
+        channel.subscribe((status) => {
+          if (status === 'SUBSCRIBED') {
+            resolve();
+          }
+        });
       });
-      // Small delay to ensure broadcast is sent before we leave
-      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      // Send broadcast multiple times for reliability
+      for (let i = 0; i < 3; i++) {
+        await channel.send({
+          type: 'broadcast',
+          event: 'session_started',
+          payload: { engagementId: engagement.id },
+        });
+        if (i < 2) await new Promise((r) => setTimeout(r, 50));
+      }
+
+      // Small delay to ensure broadcast is delivered before cleanup
+      await new Promise((resolve) => setTimeout(resolve, 150));
       supabase.removeChannel(channel);
 
       // Also send push notifications for participants not in the lobby
@@ -255,8 +432,26 @@ export default function SquadLobbyScreen() {
         text: 'Cancel Engagement',
         style: 'destructive',
         onPress: async () => {
-          // TODO: Cancel session and notify participants
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+
+          try {
+            // Cancel engagement in database
+            if (engagement?.id) {
+              await abortEngagement(engagement.id);
+            }
+
+            // Cancel the associated session
+            if (session?.id) {
+              await updateSession(session.id, { status: 'cancelled' });
+            }
+
+            console.log('[SquadLobby] Engagement cancelled:', engagement?.id);
+          } catch (error) {
+            console.error('[SquadLobby] Failed to cancel engagement:', error);
+            // Continue with navigation even if cancel fails
+          }
+
+          // Navigate back
           if (params.trainingId) {
             router.replace({
               pathname: '/(protected)/trainingDetail',
@@ -323,7 +518,12 @@ export default function SquadLobbyScreen() {
 
   if (loading) {
     return (
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <View
+        style={[
+          styles.container,
+          { backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center', paddingTop: insets.top },
+        ]}
+      >
         <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
@@ -375,10 +575,18 @@ export default function SquadLobbyScreen() {
         {/* Status Section */}
         <View style={styles.statusSection}>
           <Text style={[styles.statusTitle, { color: colors.text }]}>
-            {counts.total === 0 ? 'No participants yet' : `${counts.total} Participant${counts.total !== 1 ? 's' : ''}`}
+            {counts.total === 0
+              ? 'No participants yet'
+              : `${joinedShooters} Shooter${joinedShooters !== 1 ? 's' : ''} / ${joinedSpotters} Spotter${joinedSpotters !== 1 ? 's' : ''}`}
           </Text>
-          <Text style={[styles.statusSubtitle, { color: colors.textMuted }]}>
-            {counts.total === 0 ? 'Add participants before starting' : 'Start when ready'}
+          <Text style={[styles.statusSubtitle, { color: pendingCount > 0 ? colors.orange : colors.textMuted }]}>
+            {counts.total === 0
+              ? 'Add participants before starting'
+              : pendingCount > 0
+                ? `${pendingCount} pending response${pendingCount !== 1 ? 's' : ''}`
+                : canStart
+                  ? 'Ready to start'
+                  : `Need ${2 - joinedShooters} more shooter${2 - joinedShooters !== 1 ? 's' : ''}`}
           </Text>
         </View>
 
@@ -387,53 +595,80 @@ export default function SquadLobbyScreen() {
           <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>PARTICIPANTS</Text>
 
           <View style={[styles.participantsList, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            {participants.map((participant, index) => (
-              <View
-                key={participant.id}
-                style={[
-                  styles.participantRow,
-                  index < participants.length - 1 && {
-                    borderBottomWidth: 1,
-                    borderBottomColor: colors.border,
-                  },
-                ]}
-              >
-                <View style={styles.participantInfo}>
-                  <Text style={[styles.participantName, { color: colors.text }]}>
-                    {participant.user_full_name || 'Unknown'}
-                  </Text>
-                  <View style={styles.participantStatus}>
-                    {participant.state === 'joined' && (
-                      <>
-                        <Check size={12} color={colors.green} />
-                        <Text style={[styles.statusText, { color: colors.green }]}>In Squad</Text>
-                      </>
-                    )}
-                    {participant.state === 'left' && (
-                      <>
-                        <LogOut size={12} color={colors.textMuted} />
-                        <Text style={[styles.statusText, { color: colors.textMuted }]}>Removed</Text>
-                      </>
-                    )}
-                  </View>
-                </View>
+            {participants.map((participant, index) => {
+              const statusColor =
+                participant.state === 'joined'
+                  ? colors.green
+                  : participant.state === 'pending'
+                    ? colors.orange
+                    : participant.state === 'declined'
+                      ? colors.red || '#EF4444'
+                      : colors.textMuted;
+              const statusLabel =
+                participant.state === 'joined'
+                  ? 'Joined'
+                  : participant.state === 'pending'
+                    ? 'Pending'
+                    : participant.state === 'declined'
+                      ? 'Declined'
+                      : 'Left';
 
-                {/* Status indicator */}
+              return (
                 <View
+                  key={participant.id}
                   style={[
-                    styles.statusDot,
-                    {
-                      backgroundColor:
-                        participant.state === 'joined'
-                          ? colors.green
-                          : participant.state === 'left'
-                            ? colors.textMuted
-                            : colors.orange,
+                    styles.participantRow,
+                    index < participants.length - 1 && {
+                      borderBottomWidth: 1,
+                      borderBottomColor: colors.border,
                     },
                   ]}
-                />
-              </View>
-            ))}
+                >
+                  <View style={styles.participantInfo}>
+                    <Text style={[styles.participantName, { color: colors.text }]}>
+                      {participant.user_full_name || 'Unknown'}
+                    </Text>
+                    <View style={styles.participantMeta}>
+                      <View style={styles.participantStatus}>
+                        {participant.state === 'joined' && <Check size={12} color={statusColor} />}
+                        {participant.state === 'pending' && <Clock size={12} color={statusColor} />}
+                        {participant.state === 'declined' && <X size={12} color={statusColor} />}
+                        {participant.state === 'left' && <LogOut size={12} color={statusColor} />}
+                        <Text style={[styles.statusText, { color: statusColor }]}>{statusLabel}</Text>
+                      </View>
+                      {/* Only show weapon for shooters */}
+                      {participant.role === 'shooter' && participantWeapons[participant.user_id] && (
+                        <>
+                          <Text style={[styles.metaSeparator, { color: colors.textMuted }]}>·</Text>
+                          <Text style={[styles.participantWeapon, { color: colors.textMuted }]} numberOfLines={1}>
+                            {participantWeapons[participant.user_id]}
+                          </Text>
+                        </>
+                      )}
+                    </View>
+                  </View>
+
+                  {/* Role toggle (commander only, for active participants) */}
+                  {isCommander && (participant.state === 'joined' || participant.state === 'pending') ? (
+                    <TouchableOpacity
+                      style={[styles.roleToggle, { borderColor: colors.border }]}
+                      onPress={() =>
+                        handleRoleChange(participant.user_id, participant.role === 'shooter' ? 'spotter' : 'shooter')
+                      }
+                      activeOpacity={0.7}
+                    >
+                      <Text style={[styles.roleText, { color: colors.text }]}>
+                        {participant.role === 'shooter' ? 'Shooter' : 'Spotter'}
+                      </Text>
+                      <ChevronDown size={14} color={colors.textMuted} />
+                    </TouchableOpacity>
+                  ) : (
+                    /* Status dot for non-commander view */
+                    <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
+                  )}
+                </View>
+              );
+            })}
 
             {participants.length === 0 && (
               <View style={styles.emptyState}>
@@ -447,13 +682,17 @@ export default function SquadLobbyScreen() {
         <Text style={[styles.hintText, { color: colors.textMuted }]}>
           {isCommander
             ? counts.total === 0
-              ? 'Invite participants using the + button, or start alone'
-              : 'You can leave and return to this lobby anytime'
-            : "You'll be notified when the commander starts the session"}
+              ? 'Invite participants using the + button'
+              : !canStart
+                ? 'At least 2 shooters must accept before you can start'
+                : 'You can leave and return to this lobby anytime'
+            : myParticipation?.state === 'pending'
+              ? 'Accept the invite to join the squad'
+              : "You'll be notified when the commander starts the session"}
         </Text>
       </ScrollView>
 
-      {/* Bottom Action - Commander only can start */}
+      {/* Bottom Action - Commander or Participant */}
       <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 16, backgroundColor: colors.background }]}>
         <View style={[styles.bottomBarInner, { borderTopColor: colors.border }]}>
           {isCommander ? (
@@ -469,23 +708,60 @@ export default function SquadLobbyScreen() {
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[styles.startButton, { backgroundColor: colors.green }]}
+                style={[styles.startButton, { backgroundColor: canStart ? colors.green : colors.secondary }]}
                 onPress={handleStartEngagement}
-                disabled={starting}
+                disabled={starting || !canStart}
                 activeOpacity={0.85}
               >
                 {starting ? (
                   <ActivityIndicator size="small" color="#fff" />
                 ) : (
                   <>
-                    <Play size={20} color="#fff" fill="#fff" />
-                    <Text style={styles.startButtonText}>Start{counts.total > 0 ? ` (${counts.total})` : ''}</Text>
+                    <Play
+                      size={20}
+                      color={canStart ? '#fff' : colors.textMuted}
+                      fill={canStart ? '#fff' : colors.textMuted}
+                    />
+                    <Text style={[styles.startButtonText, { color: canStart ? '#fff' : colors.textMuted }]}>
+                      {canStart
+                        ? `Start (${joinedShooters + joinedSpotters})`
+                        : `Need ${2 - joinedShooters} more shooter${2 - joinedShooters !== 1 ? 's' : ''}`}
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+          ) : myParticipation?.state === 'pending' ? (
+            // Participant with pending invite: Accept/Decline buttons
+            <View style={styles.participantBottomActions}>
+              <TouchableOpacity
+                style={[styles.bottomDeclineBtn, { borderColor: colors.border }]}
+                onPress={handleDeclineInvite}
+                disabled={responding}
+                activeOpacity={0.7}
+              >
+                <X size={18} color={colors.red || colors.textMuted} />
+                <Text style={[styles.bottomDeclineText, { color: colors.red || colors.textMuted }]}>Decline</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.bottomAcceptBtn, { backgroundColor: colors.green }]}
+                onPress={handleAcceptInvite}
+                disabled={responding}
+                activeOpacity={0.85}
+              >
+                {responding ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <>
+                    <Check size={18} color="#fff" />
+                    <Text style={styles.bottomAcceptText}>Accept Invite</Text>
                   </>
                 )}
               </TouchableOpacity>
             </View>
           ) : (
-            // Participant waiting for commander to start
+            // Participant who accepted, waiting for commander to start
             <View
               style={[
                 styles.waitingBar,
@@ -541,7 +817,10 @@ export default function SquadLobbyScreen() {
                   teamId={session.team_id}
                   invitedUserIds={invitedUserIds}
                   onInvitedChange={setInvitedUserIds}
-                  excludeUserIds={participants.map((p) => p.user_id)}
+                  // Only exclude active participants (joined/pending) - allow re-inviting left/declined
+                  excludeUserIds={participants
+                    .filter((p) => p.state === 'joined' || p.state === 'pending')
+                    .map((p) => p.user_id)}
                 />
               ) : (
                 <View style={styles.inviteModalEmpty}>
@@ -707,10 +986,36 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '500',
   },
+  participantMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'nowrap',
+    gap: 4,
+  },
+  metaSeparator: {
+    fontSize: 12,
+  },
+  participantWeapon: {
+    fontSize: 12,
+    flex: 1,
+  },
   statusDot: {
     width: 10,
     height: 10,
     borderRadius: 5,
+  },
+  roleToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 4,
+  },
+  roleText: {
+    fontSize: 13,
+    fontWeight: '500',
   },
   emptyState: {
     padding: 24,
