@@ -19,6 +19,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useModals } from '@/contexts/ModalContext';
 import { useColors } from '@/hooks/ui/useColors';
 import { usePermissions } from '@/hooks/usePermissions';
+import { useTrainingRealtime } from '@/hooks/realtime';
 import { getTrainingSessionsWithStats, SessionWithDetails } from '@/services/sessionService';
 import { finishTraining, startTraining } from '@/services/trainingService';
 import { useTeamStore } from '@/store/teamStore';
@@ -738,6 +739,52 @@ export default function TrainingDetailScreen() {
   useEffect(() => {
     if (training?.id) loadCompletedSessions();
   }, [training?.id, loadCompletedSessions]);
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Realtime Subscription - Training Status Changes
+  // ─────────────────────────────────────────────────────────────────────────────
+  const handleTrainingRealtimeUpdate = useCallback(
+    (updatedTraining: { id: string; status: 'planned' | 'ongoing' | 'finished' | 'cancelled' }) => {
+      // Safety: Validate the payload before processing
+      const validStatuses = ['planned', 'ongoing', 'finished', 'cancelled'];
+      if (!updatedTraining?.id || !updatedTraining?.status || !validStatuses.includes(updatedTraining.status)) {
+        console.warn('[TrainingDetail] Invalid realtime payload, ignoring:', updatedTraining);
+        return;
+      }
+
+      // Safety: Only process if the training ID matches
+      if (updatedTraining.id !== training?.id) {
+        console.warn('[TrainingDetail] Received update for different training, ignoring');
+        return;
+      }
+
+      console.log('[TrainingDetail] Realtime update received:', updatedTraining.status);
+      
+      // Update local training state with new status
+      setTraining((prev: any) => {
+        if (!prev) return prev;
+        // Only update if status actually changed
+        if (prev.status === updatedTraining.status) return prev;
+        return { ...prev, status: updatedTraining.status };
+      });
+
+      // If training was ended/cancelled by commander, give haptic feedback
+      if (updatedTraining.status === 'finished' || updatedTraining.status === 'cancelled') {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
+    },
+    [setTraining, training?.id]
+  );
+
+  // Subscribe to training and session changes
+  // This is READ-ONLY - it only listens for database changes, never triggers writes
+  useTrainingRealtime({
+    trainingId: training?.id,
+    onTrainingUpdate: handleTrainingRealtimeUpdate,
+    onSessionUpdate: loadCompletedSessions,
+    onSessionCreate: loadCompletedSessions,
+    enabled: !!training?.id && training.status !== 'finished' && training.status !== 'cancelled',
+  });
 
   // ─────────────────────────────────────────────────────────────────────────────
   // Navigation Handlers

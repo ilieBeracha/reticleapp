@@ -162,7 +162,11 @@ function LeaderboardItem({
   const rankColor = rankConfig[rank as keyof typeof rankConfig]?.color || colors.textMuted;
   const rankBg = rankConfig[rank as keyof typeof rankConfig]?.bg || colors.secondary;
 
-  const completionRate = Math.min(100, Math.round((participant.drillsCompleted / totalDrills) * 100));
+  // Use drillResults.length as fallback if totalDrills is 0 (for sessions without training drills)
+  const effectiveTotalDrills = totalDrills > 0 ? totalDrills : participant.drillResults.length;
+  const completionRate = effectiveTotalDrills > 0 
+    ? Math.min(100, Math.round((participant.drillsCompleted / effectiveTotalDrills) * 100))
+    : 100; // If no drills defined, consider it complete
   const hasGrouping = participant.drillResults.some((r) => r.drillGoal === 'grouping');
   const hasEngagement = participant.drillResults.some((r) => r.drillGoal === 'engagement');
 
@@ -316,10 +320,12 @@ function LeaderboardItem({
 function TeamSummaryStats({
   participants,
   totalDrills,
+  sessions,
   colors,
 }: {
   participants: ParticipantData[];
   totalDrills: number;
+  sessions: SessionWithDetails[];
   colors: ReturnType<typeof useColors>;
 }) {
   const stats = useMemo(() => {
@@ -333,25 +339,84 @@ function TeamSummaryStats({
     const totalHits = participants.reduce((sum, p) => sum + p.totalHits, 0);
     const teamAccuracy = totalShots > 0 ? Math.round((totalHits / totalShots) * 100) : null;
 
-    const fullCompletion = participants.filter((p) => p.drillsCompleted === totalDrills).length;
-    const completionRate = Math.round((fullCompletion / participants.length) * 100);
+    // Use participant's drill results as fallback when totalDrills is 0
+    const fullCompletion = totalDrills > 0
+      ? participants.filter((p) => p.drillsCompleted === totalDrills).length
+      : participants.filter((p) => p.drillResults.length > 0 && p.drillResults.every((r) => r.completed)).length;
+    const completionRate = participants.length > 0 ? Math.round((fullCompletion / participants.length) * 100) : 0;
 
     const dispersions = participants.filter((p) => p.bestDispersion !== null).map((p) => p.bestDispersion!);
     const bestTeamDispersion = dispersions.length > 0 ? Math.min(...dispersions) : null;
 
-    return { avgAccuracy, teamAccuracy, totalShots, totalHits, fullCompletion, completionRate, bestTeamDispersion };
-  }, [participants, totalDrills]);
+    // Count sessions by type
+    let soloCount = 0;
+    let teamCount = 0;
+    let squadCount = 0;
+    let groupingCount = 0;
+    let allSessionShots = 0;
+
+    sessions.forEach((s) => {
+      const engagementMode = s.engagement?.engagement_mode;
+      const drillGoal = s.drill_config?.drill_goal || s.engagement?.drill_goal;
+      
+      allSessionShots += s.stats?.shots_fired || 0;
+      
+      if (drillGoal === 'grouping') {
+        groupingCount++;
+      } else if (engagementMode === 'squad' || engagementMode === 'group') {
+        squadCount++;
+      } else if (engagementMode === 'team') {
+        teamCount++;
+      } else {
+        soloCount++;
+      }
+    });
+
+    return { 
+      avgAccuracy, teamAccuracy, totalShots, totalHits, fullCompletion, completionRate, bestTeamDispersion,
+      soloCount, teamCount, squadCount, groupingCount, allSessionShots
+    };
+  }, [participants, totalDrills, sessions]);
+
+  // Determine if we need to show the accuracy note
+  const hasSquadSessions = stats.squadCount > 0;
+  const hasAccuracySessions = stats.soloCount > 0 || stats.teamCount > 0;
 
   return (
     <View style={[styles.summaryStats, { backgroundColor: colors.card }]}>
       <Text style={[styles.summaryTitle, { color: colors.text }]}>Team Performance</Text>
+      
+      {/* Session Type Breakdown */}
+      <View style={[styles.typeBreakdown, { borderBottomColor: colors.border }]}>
+        {stats.soloCount > 0 && (
+          <View style={[styles.typeBadge, { backgroundColor: colors.primary + '15' }]}>
+            <Text style={[styles.typeBadgeText, { color: colors.primary }]}>{stats.soloCount} Solo</Text>
+          </View>
+        )}
+        {stats.teamCount > 0 && (
+          <View style={[styles.typeBadge, { backgroundColor: colors.blue + '15' }]}>
+            <Text style={[styles.typeBadgeText, { color: colors.blue }]}>{stats.teamCount} Team</Text>
+          </View>
+        )}
+        {stats.squadCount > 0 && (
+          <View style={[styles.typeBadge, { backgroundColor: colors.orange + '15' }]}>
+            <Text style={[styles.typeBadgeText, { color: colors.orange }]}>{stats.squadCount} Squad</Text>
+          </View>
+        )}
+        {stats.groupingCount > 0 && (
+          <View style={[styles.typeBadge, { backgroundColor: colors.green + '15' }]}>
+            <Text style={[styles.typeBadgeText, { color: colors.green }]}>{stats.groupingCount} Grouping</Text>
+          </View>
+        )}
+      </View>
+
       <View style={styles.statsGrid}>
         <View style={styles.statBox}>
           <Users size={16} color={colors.primary} />
           <Text style={[styles.statBoxValue, { color: colors.text }]}>{participants.length}</Text>
           <Text style={[styles.statBoxLabel, { color: colors.textMuted }]}>Participants</Text>
         </View>
-        {stats.teamAccuracy !== null && (
+        {stats.teamAccuracy !== null && hasAccuracySessions && (
           <View style={styles.statBox}>
             <Target size={16} color={stats.teamAccuracy >= 70 ? colors.green : colors.orange} />
             <Text style={[styles.statBoxValue, { color: stats.teamAccuracy >= 70 ? colors.green : colors.orange }]}>
@@ -374,10 +439,17 @@ function TeamSummaryStats({
         )}
         <View style={styles.statBox}>
           <Zap size={16} color={colors.text} />
-          <Text style={[styles.statBoxValue, { color: colors.text }]}>{stats.totalShots}</Text>
+          <Text style={[styles.statBoxValue, { color: colors.text }]}>{stats.allSessionShots}</Text>
           <Text style={[styles.statBoxLabel, { color: colors.textMuted }]}>Total Shots</Text>
         </View>
       </View>
+
+      {/* Note about accuracy calculation */}
+      {hasSquadSessions && hasAccuracySessions && (
+        <Text style={[styles.accuracyNote, { color: colors.textMuted }]}>
+          * Accuracy calculated from solo/team engagements only
+        </Text>
+      )}
     </View>
   );
 }
@@ -390,34 +462,37 @@ export function ParticipantInsights({ teamSessions, drills }: ParticipantInsight
   const colors = useColors();
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
 
-  // Process participant data - GROUP BY TRAINING DRILL (only drills in this training)
+  // Process participant data - GROUP BY TRAINING DRILL or session if no drill match
   const participants = useMemo<ParticipantData[]>(() => {
-    if (!teamSessions.length || !drills.length) return [];
+    if (!teamSessions.length) return [];
 
     // Create a set of valid drill IDs from the training
     const trainingDrillIds = new Set(drills.map((d) => d.id));
 
     const userMap = new Map<string, ParticipantData>();
 
-    // First pass: group sessions by user and drill (only for training drills)
+    // First pass: group sessions by user and drill (prioritize training drills, but include all)
     const userDrillMap = new Map<string, Map<string, SessionWithDetails[]>>();
 
     teamSessions.forEach((session) => {
       const userId = session.user_id;
       const drillId = session.drill_id;
 
-      // Only include sessions for drills that are part of this training
-      if (!drillId || !trainingDrillIds.has(drillId)) return;
+      // Use drill_id if it matches a training drill, otherwise use a synthetic key
+      // This ensures we still show participants even if drill_id doesn't match
+      const effectiveDrillId = drillId && trainingDrillIds.has(drillId) 
+        ? drillId 
+        : `session_${session.id}`;
 
       if (!userDrillMap.has(userId)) {
         userDrillMap.set(userId, new Map());
       }
 
       const userDrills = userDrillMap.get(userId)!;
-      if (!userDrills.has(drillId)) {
-        userDrills.set(drillId, []);
+      if (!userDrills.has(effectiveDrillId)) {
+        userDrills.set(effectiveDrillId, []);
       }
-      userDrills.get(drillId)!.push(session);
+      userDrills.get(effectiveDrillId)!.push(session);
     });
 
     // Second pass: aggregate per user-drill combination
@@ -445,14 +520,30 @@ export function ParticipantInsights({ teamSessions, drills }: ParticipantInsight
       const completedDrillIds = new Set<string>();
 
       // Process each drill (aggregating all sessions for that drill)
-      drillSessions.forEach((sessions, drillId) => {
-        // Get drill info from training drills
-        const drill = drills.find((d) => d.id === drillId);
-        if (!drill) return; // Skip if drill not in training
-
-        const drillName = drill.name;
-        const drillGoal = (drill.drill_goal || 'engagement') as 'grouping' | 'engagement';
+      drillSessions.forEach((sessions, effectiveDrillId) => {
+        // Get drill info from training drills, or use session data as fallback
+        const drill = drills.find((d) => d.id === effectiveDrillId);
+        const firstSession = sessions[0];
+        
+        // For sessions without matching drill, use session/drill_config data
+        const drillName = drill?.name 
+          || firstSession?.drill_name 
+          || firstSession?.drill_config?.name 
+          || 'Session';
+        const drillGoal = (
+          drill?.drill_goal 
+          || firstSession?.drill_config?.drill_goal 
+          || firstSession?.engagement?.drill_goal
+          || 'engagement'
+        ) as 'grouping' | 'engagement';
         const isGrouping = drillGoal === 'grouping';
+        
+        // Check if this is a squad/group engagement (no hit tracking)
+        const engagementMode = firstSession?.engagement?.engagement_mode;
+        const isSquadOrGroup = engagementMode === 'squad' || engagementMode === 'group';
+        
+        // Use the actual drill ID if available, otherwise use effectiveDrillId
+        const drillId = drill?.id || effectiveDrillId;
 
         // Aggregate stats from all sessions for this drill
         let totalDrillShots = 0;
@@ -485,8 +576,9 @@ export function ParticipantInsights({ teamSessions, drills }: ParticipantInsight
           }
         });
 
-        // Add to participant totals (engagement only for accuracy)
-        if (!isGrouping) {
+        // Add to participant totals (only for sessions that track hits - not grouping, not squad/group)
+        // Squad/group engagements don't track individual hits, so exclude them from accuracy
+        if (!isGrouping && !isSquadOrGroup) {
           participant.totalShots += totalDrillShots;
           participant.totalHits += totalDrillHits;
         }
@@ -505,14 +597,16 @@ export function ParticipantInsights({ teamSessions, drills }: ParticipantInsight
         }
 
         // Add ONE drill result (aggregated)
+        // Accuracy is only meaningful for solo/team engagements (not grouping, not squad/group)
+        const hasValidAccuracy = !isGrouping && !isSquadOrGroup && totalDrillShots > 0;
         participant.drillResults.push({
           drillId,
           drillName,
           drillGoal,
-          accuracy: !isGrouping && totalDrillShots > 0 ? Math.round((totalDrillHits / totalDrillShots) * 100) : null,
+          accuracy: hasValidAccuracy ? Math.round((totalDrillHits / totalDrillShots) * 100) : null,
           dispersion: isGrouping ? bestDrillDispersion : null,
           shots: totalDrillShots,
-          hits: totalDrillHits,
+          hits: isSquadOrGroup ? 0 : totalDrillHits, // Squad/group doesn't track hits
           completed: hasCompleted,
           duration: totalDuration > 0 ? totalDuration : null,
         });
@@ -635,7 +729,7 @@ export function ParticipantInsights({ teamSessions, drills }: ParticipantInsight
   return (
     <View style={styles.container}>
       {/* Team Summary */}
-      <TeamSummaryStats participants={participants} totalDrills={drills.length} colors={colors} />
+      <TeamSummaryStats participants={participants} totalDrills={drills.length} sessions={teamSessions} colors={colors} />
 
       {/* Insights */}
       {insights.length > 0 && (
@@ -703,7 +797,29 @@ const styles = StyleSheet.create({
   summaryTitle: {
     fontSize: 15,
     fontWeight: '600',
-    marginBottom: 14,
+    marginBottom: 10,
+  },
+  typeBreakdown: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    paddingBottom: 12,
+    marginBottom: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  typeBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  typeBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  accuracyNote: {
+    fontSize: 10,
+    marginTop: 10,
+    fontStyle: 'italic',
   },
   statsGrid: {
     flexDirection: 'row',

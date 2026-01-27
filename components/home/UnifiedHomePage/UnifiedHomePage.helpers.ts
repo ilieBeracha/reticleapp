@@ -90,18 +90,34 @@ export function getStartPracticeSubtitle(lastSessionDaysAgo: number | null): str
 
 /**
  * Calculate weekly stats from completed sessions
+ * 
+ * Note: Accuracy only calculated from engagement sessions (solo/team) that track hits.
+ * Squad/group sessions don't track individual hits, so they're excluded from accuracy calculation.
+ * Total shots still includes ALL sessions.
  */
 export function calculateWeeklyStats(completedSessions: SessionWithDetails[]): WeeklyStats {
   let shots = 0;
+  let accuracyShots = 0; // Shots from sessions that track hits (for accuracy calc)
   let hits = 0;
   let totalTimeMs = 0;
   let minDispersion = 1000;
   let hasDispersion = false;
 
   completedSessions.forEach((s) => {
+    // Check if this is a squad/group engagement (no hit tracking)
+    const engagementMode = s.engagement?.engagement_mode;
+    const isSquadOrGroup = engagementMode === 'squad' || engagementMode === 'group';
+
     if (s.stats) {
+      // Total shots includes ALL sessions
       shots += s.stats.shots_fired || 0;
-      hits += s.stats.hits_total || 0;
+      
+      // Only count hits and accuracy shots from non-squad/group sessions
+      if (!isSquadOrGroup) {
+        accuracyShots += s.stats.shots_fired || 0;
+        hits += s.stats.hits_total || 0;
+      }
+      
       if (s.stats.best_dispersion_cm && s.stats.best_dispersion_cm > 0) {
         hasDispersion = true;
         minDispersion = Math.min(minDispersion, s.stats.best_dispersion_cm);
@@ -114,7 +130,8 @@ export function calculateWeeklyStats(completedSessions: SessionWithDetails[]): W
     }
   });
 
-  const accuracy = shots > 0 ? Math.round((hits / shots) * 100) : 0;
+  // Accuracy based only on sessions that track hits (not squad/group)
+  const accuracy = accuracyShots > 0 ? Math.round((hits / accuracyShots) * 100) : 0;
   const bestGroup = hasDispersion ? `${minDispersion.toFixed(1)}cm` : '—';
   const totalTimeMinutes = Math.round(totalTimeMs / 60000);
 

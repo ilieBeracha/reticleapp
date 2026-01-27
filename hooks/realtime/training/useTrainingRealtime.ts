@@ -1,17 +1,21 @@
 /**
  * useTrainingRealtime
  *
- * Subscribe to session and target changes within a training.
+ * Subscribe to training, session, and target changes within a training.
  *
  * Use Cases:
  * - Commander viewing team progress during training
  * - Live drill completion updates
  * - Real-time target/score additions
+ * - Training status changes (ended, cancelled) for all team members
  *
  * @example
  * ```tsx
  * const { isConnected } = useTrainingRealtime({
  *   trainingId: training.id,
+ *   onTrainingUpdate: (training) => {
+ *     if (training.status === 'finished') handleTrainingEnded();
+ *   },
  *   onSessionUpdate: (session) => refetchTeamProgress(),
  *   onNewTarget: (target) => refetchDrillProgress(),
  * });
@@ -21,17 +25,27 @@
 import { useCallback, useMemo } from 'react';
 import { useRealtimeChannel } from '../core';
 import type { ChangePayload } from '../table';
-import type { SessionRecord, SessionTargetRecord } from '../records';
+import type { SessionRecord, SessionTargetRecord, TrainingRecord } from '../records';
 import type { UseTrainingRealtimeOptions, UseTrainingRealtimeReturn } from './training.types';
 
 export function useTrainingRealtime(options: UseTrainingRealtimeOptions): UseTrainingRealtimeReturn {
-  const { trainingId, onSessionChange, onSessionCreate, onSessionUpdate, onNewTarget, enabled = true } = options;
+  const { trainingId, onTrainingUpdate, onSessionChange, onSessionCreate, onSessionUpdate, onNewTarget, enabled = true } = options;
 
   const isEnabled = enabled && !!trainingId;
 
   // ═══════════════════════════════════════════════════════════════════════════
   // HANDLERS
   // ═══════════════════════════════════════════════════════════════════════════
+
+  const handleTrainingData = useCallback(
+    (payload: ChangePayload<TrainingRecord>) => {
+      if (payload.eventType === 'UPDATE' && payload.new) {
+        console.log(`[TrainingRealtime] Training updated: status=${payload.new.status}`);
+        onTrainingUpdate?.(payload.new);
+      }
+    },
+    [onTrainingUpdate]
+  );
 
   const handleSessionData = useCallback(
     (payload: ChangePayload<SessionRecord>) => {
@@ -66,19 +80,28 @@ export function useTrainingRealtime(options: UseTrainingRealtimeOptions): UseTra
     if (!isEnabled) return [];
 
     return [
+      // Subscribe to training status changes (ended, cancelled, etc.)
+      {
+        table: 'trainings',
+        event: 'UPDATE' as const,
+        filter: `id=eq.${trainingId}`,
+        onData: handleTrainingData as any,
+      },
+      // Subscribe to session changes within this training
       {
         table: 'sessions',
         event: '*' as const,
         filter: `training_id=eq.${trainingId}`,
-        onData: handleSessionData as (payload: ChangePayload<SessionRecord>) => void,
+        onData: handleSessionData as any,
       },
+      // Subscribe to new targets
       {
         table: 'session_targets',
         event: 'INSERT' as const,
-        onData: handleTargetData as (payload: ChangePayload<SessionTargetRecord>) => void,
+        onData: handleTargetData as any,
       },
     ];
-  }, [isEnabled, trainingId, handleSessionData, handleTargetData]);
+  }, [isEnabled, trainingId, handleTrainingData, handleSessionData, handleTargetData]);
 
   // ═══════════════════════════════════════════════════════════════════════════
   // CHANNEL

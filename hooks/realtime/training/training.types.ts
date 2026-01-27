@@ -5,11 +5,14 @@
  */
 
 import type { ChangePayload } from '../table';
-import type { SessionRecord, SessionTargetRecord } from '../records';
+import type { SessionRecord, SessionTargetRecord, TrainingRecord } from '../records';
 
 export interface UseTrainingRealtimeOptions {
   /** Training ID to subscribe to */
   trainingId: string | undefined | null;
+
+  /** Called when the training itself is updated (status change, ended, etc.) */
+  onTrainingUpdate?: (training: TrainingRecord) => void;
 
   /** Called when any session in this training changes */
   onSessionChange?: (payload: ChangePayload<SessionRecord>) => void;

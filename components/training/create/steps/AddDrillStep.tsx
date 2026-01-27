@@ -79,7 +79,7 @@ function SessionCard({ session, index, total, onRemove, onMove, colors }: Sessio
   const isGrouping = session.drill_goal === 'grouping';
   const isSquad = session.engagement_mode === 'squad';
   const purposeColor = isGrouping ? colors.blue : colors.orange;
-  const purposeLabel = isGrouping ? 'Grouping' : (isSquad ? 'Squad Engagement' : 'Engagement');
+  const purposeLabel = isGrouping ? 'Grouping' : isSquad ? 'Squad Engagement' : 'Engagement';
 
   // Execution policy display
   const policy = session.execution_policy || 'locked';
@@ -109,7 +109,12 @@ function SessionCard({ session, index, total, onRemove, onMove, colors }: Sessio
               <Text style={[styles.policyBadgeText, { color: policyConfig.color }]}>{policyConfig.label}</Text>
             </View>
             {!isGrouping && (
-              <View style={[styles.policyBadge, { backgroundColor: isSquad ? `${colors.orange}15` : `${colors.primary}15`, marginLeft: 4 }]}>
+              <View
+                style={[
+                  styles.policyBadge,
+                  { backgroundColor: isSquad ? `${colors.orange}15` : `${colors.primary}15`, marginLeft: 4 },
+                ]}
+              >
                 <ModeIcon size={10} color={isSquad ? colors.orange : colors.primary} />
                 <Text style={[styles.policyBadgeText, { color: isSquad ? colors.orange : colors.primary }]}>
                   {isSquad ? 'Squad' : 'Solo'}
@@ -280,17 +285,20 @@ function AddSessionSheet({ visible, onClose, onAdd }: AddSessionSheetProps) {
 
     // Validation for LOCKED policy only - commander must specify config
     // Squad mode: only distance required (free-form session)
-    // Solo mode: full config required (distance, rounds, position)
+    // Grouping mode: only distance + position required (shot count comes from scan)
+    // Engagement mode: full config required (distance, rounds, position)
     if (executionPolicy === 'locked') {
       if (!hasDistance) {
         setValidationError('Distance is required for locked drills');
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
         return;
       }
-      // Solo locked mode requires full config
+      // Solo locked mode requires config based on drill goal
       if (effectiveEngagementMode !== 'squad') {
-        if (!hasRounds) {
-          setValidationError('Rounds are required for locked drills');
+        // Engagement drills need rounds specified upfront
+        // Grouping drills don't - shot count comes from scanned target
+        if (purpose !== 'grouping' && !hasRounds) {
+          setValidationError('Rounds are required for locked engagement drills');
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
           return;
         }
@@ -373,7 +381,7 @@ function AddSessionSheet({ visible, onClose, onAdd }: AddSessionSheetProps) {
               {
                 backgroundColor: colors.primary,
                 width: step === 1 ? (needsStep2 ? '50%' : '100%') : '100%',
-              }
+              },
             ]}
           />
         </View>
@@ -427,29 +435,35 @@ function AddSessionSheet({ visible, onClose, onAdd }: AddSessionSheetProps) {
               <View style={styles.policySection}>
                 <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>Mode</Text>
                 <Text style={[styles.policyHint, { color: colors.textMuted }]}>
-                  {purpose === 'grouping'
-                    ? 'Grouping drills are always individual'
-                    : 'Individual or team execution?'}
+                  {purpose === 'grouping' ? 'Grouping drills are always individual' : 'Individual or team execution?'}
                 </Text>
                 <View style={[styles.policyToggle, { backgroundColor: colors.card, borderColor: colors.border }]}>
                   <TouchableOpacity
                     style={[
                       styles.policyOption,
-                      effectiveEngagementMode === 'solo' && [styles.policyOptionActive, { backgroundColor: colors.primary }],
+                      effectiveEngagementMode === 'solo' && [
+                        styles.policyOptionActive,
+                        { backgroundColor: colors.primary },
+                      ],
                     ]}
                     onPress={() => handleEngagementModeSelect('solo')}
                     disabled={purpose === 'grouping'}
                     activeOpacity={0.7}
                   >
                     <User size={14} color={effectiveEngagementMode === 'solo' ? '#fff' : colors.textMuted} />
-                    <Text style={[styles.policyText, { color: effectiveEngagementMode === 'solo' ? '#fff' : colors.text }]}>
+                    <Text
+                      style={[styles.policyText, { color: effectiveEngagementMode === 'solo' ? '#fff' : colors.text }]}
+                    >
                       Solo
                     </Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={[
                       styles.policyOption,
-                      effectiveEngagementMode === 'squad' && [styles.policyOptionActive, { backgroundColor: colors.orange }],
+                      effectiveEngagementMode === 'squad' && [
+                        styles.policyOptionActive,
+                        { backgroundColor: colors.orange },
+                      ],
                       purpose === 'grouping' && { opacity: 0.4 },
                     ]}
                     onPress={() => handleEngagementModeSelect('squad')}
@@ -457,7 +471,9 @@ function AddSessionSheet({ visible, onClose, onAdd }: AddSessionSheetProps) {
                     activeOpacity={0.7}
                   >
                     <Users size={14} color={effectiveEngagementMode === 'squad' ? '#fff' : colors.textMuted} />
-                    <Text style={[styles.policyText, { color: effectiveEngagementMode === 'squad' ? '#fff' : colors.text }]}>
+                    <Text
+                      style={[styles.policyText, { color: effectiveEngagementMode === 'squad' ? '#fff' : colors.text }]}
+                    >
                       Squad
                     </Text>
                   </TouchableOpacity>
@@ -596,12 +612,15 @@ function AddSessionSheet({ visible, onClose, onAdd }: AddSessionSheetProps) {
               {/* Squad mode - distance only */}
               {effectiveEngagementMode === 'squad' && (
                 <>
-                  <View style={[styles.squadNotice, { backgroundColor: colors.primary + '10', borderColor: colors.primary }]}>
+                  <View
+                    style={[
+                      styles.squadNotice,
+                      { backgroundColor: colors.primary + '10', borderColor: colors.primary },
+                    ]}
+                  >
                     <Users size={20} color={colors.primary} />
                     <View style={styles.freeNoticeText}>
-                      <Text style={[styles.freeNoticeTitle, { color: colors.text }]}>
-                        Squad Session
-                      </Text>
+                      <Text style={[styles.freeNoticeTitle, { color: colors.text }]}>Squad Session</Text>
                       <Text style={[styles.freeNoticeDesc, { color: colors.textMuted }]}>
                         Team drill with shared results. Only distance is configured.
                       </Text>
@@ -628,15 +647,19 @@ function AddSessionSheet({ visible, onClose, onAdd }: AddSessionSheetProps) {
                               setCustomDistanceEditing(false);
                             }}
                           >
-                            <Text style={[styles.distanceText, { color: isActive ? '#fff' : colors.text }]}>
-                              {d}m
-                            </Text>
+                            <Text style={[styles.distanceText, { color: isActive ? '#fff' : colors.text }]}>{d}m</Text>
                           </TouchableOpacity>
                         );
                       })}
                       {/* Custom distance input */}
                       {customDistanceEditing ? (
-                        <View style={[styles.distanceOption, styles.distanceInputContainer, { borderColor: colors.primary }]}>
+                        <View
+                          style={[
+                            styles.distanceOption,
+                            styles.distanceInputContainer,
+                            { borderColor: colors.primary },
+                          ]}
+                        >
                           <TextInput
                             style={[styles.distanceInput, { color: colors.text }]}
                             value={customDistanceText}
@@ -667,10 +690,11 @@ function AddSessionSheet({ visible, onClose, onAdd }: AddSessionSheetProps) {
                         <TouchableOpacity
                           style={[
                             styles.distanceOption,
-                            context.distance > 0 && ![15, 25, 50, 100].includes(context.distance) && [
-                              styles.distanceOptionActive,
-                              { backgroundColor: colors.primary },
-                            ],
+                            context.distance > 0 &&
+                              ![15, 25, 50, 100].includes(context.distance) && [
+                                styles.distanceOptionActive,
+                                { backgroundColor: colors.primary },
+                              ],
                           ]}
                           onPress={() => {
                             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -697,9 +721,7 @@ function AddSessionSheet({ visible, onClose, onAdd }: AddSessionSheetProps) {
                       )}
                     </View>
                     {context.distance === 0 && (
-                      <Text style={[styles.policyDesc, { color: colors.red }]}>
-                        Select a distance
-                      </Text>
+                      <Text style={[styles.policyDesc, { color: colors.red }]}>Select a distance</Text>
                     )}
                   </View>
                 </>
@@ -707,12 +729,12 @@ function AddSessionSheet({ visible, onClose, onAdd }: AddSessionSheetProps) {
 
               {/* Free policy notice - only for solo free mode (shouldn't reach here but safety) */}
               {executionPolicy === 'free' && effectiveEngagementMode !== 'squad' && (
-                <View style={[styles.freeNotice, { backgroundColor: colors.orange + '10', borderColor: colors.orange }]}>
+                <View
+                  style={[styles.freeNotice, { backgroundColor: colors.orange + '10', borderColor: colors.orange }]}
+                >
                   <Unlock size={20} color={colors.orange} />
                   <View style={styles.freeNoticeText}>
-                    <Text style={[styles.freeNoticeTitle, { color: colors.text }]}>
-                      Full Freedom Mode
-                    </Text>
+                    <Text style={[styles.freeNoticeTitle, { color: colors.text }]}>Full Freedom Mode</Text>
                     <Text style={[styles.freeNoticeDesc, { color: colors.textMuted }]}>
                       Soldiers will choose their own distance, rounds, and position when executing this drill.
                     </Text>
@@ -725,11 +747,7 @@ function AddSessionSheet({ visible, onClose, onAdd }: AddSessionSheetProps) {
 
         {/* Footer */}
         <View style={[styles.sheetFooter, { backgroundColor: colors.background, paddingBottom: insets.bottom + 16 }]}>
-          {validationError && (
-            <Text style={[styles.validationError, { color: colors.red }]}>
-              {validationError}
-            </Text>
-          )}
+          {validationError && <Text style={[styles.validationError, { color: colors.red }]}>{validationError}</Text>}
           {step === 1 ? (
             <TouchableOpacity
               style={[styles.sheetSubmitBtn, { backgroundColor: colors.text }]}

@@ -7,15 +7,15 @@ import { router } from 'expo-router';
 import { ArrowLeft, Check, ChevronRight, Crosshair, Minus, Plus, Ruler, Target, Timer } from 'lucide-react-native';
 import React, { useCallback, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    ScrollView,
-    StyleSheet,
-    Switch,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { COLORS } from './types';
 
@@ -641,7 +641,7 @@ export function TacticalTargetFlow({
           {/* Total Shots in Group (Required) */}
           <View style={styles.groupingShotsSection}>
             <Text style={styles.groupingShotsLabel}>
-              Shots in Group <Text style={{ color: COLORS.danger }}>*</Text>
+              Total Shots <Text style={{ color: COLORS.danger }}>*</Text>
             </Text>
             <View style={styles.groupingShotsRow}>
               <TouchableOpacity

@@ -335,7 +335,8 @@ export default function StartEngagementScreen() {
   // Squad toggle only for engagement + team context + commander
   const showSquadToggle = drillGoal === 'engagement' && isTeamContext && canManageTraining;
 
-  const canStart = weapon !== null && distance > 0 && rounds > 0;
+  // Grouping sessions don't require rounds upfront - shot count comes from scanned target
+  const canStart = weapon !== null && distance > 0 && (drillGoal === 'grouping' || rounds > 0);
 
   // ═══════════════════════════════════════════════════════════════════════════
   // START ENGAGEMENT (main action)
@@ -672,11 +673,13 @@ export default function StartEngagementScreen() {
                     <Text style={[styles.overviewValue, { color: colors.text }]}>{distance}m</Text>
                   </View>
 
-                  {/* Rounds */}
-                  <View style={styles.overviewItem}>
-                    <Text style={[styles.overviewLabel, { color: colors.textMuted }]}>Rounds</Text>
-                    <Text style={[styles.overviewValue, { color: colors.text }]}>{rounds} rds</Text>
-                  </View>
+                  {/* Rounds - only for engagement, grouping gets count from scanned target */}
+                  {drillGoal !== 'grouping' && (
+                    <View style={styles.overviewItem}>
+                      <Text style={[styles.overviewLabel, { color: colors.textMuted }]}>Rounds</Text>
+                      <Text style={[styles.overviewValue, { color: colors.text }]}>{rounds} rds</Text>
+                    </View>
+                  )}
 
                   {/* Position */}
                   <View style={styles.overviewItem}>
@@ -887,32 +890,34 @@ export default function StartEngagementScreen() {
                 </View>
               </View>
 
-              {/* Rounds */}
-              <View style={styles.section}>
-                <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>ROUNDS</Text>
-                <View style={[styles.counterRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                  <TouchableOpacity
-                    style={[styles.counterBtn, { backgroundColor: colors.secondary }]}
-                    onPress={() => adjustRounds(-1)}
-                  >
-                    <Minus size={18} color={colors.text} />
-                  </TouchableOpacity>
-                  <TextInput
-                    style={[styles.counterInput, { color: colors.text }]}
-                    value={String(rounds)}
-                    onChangeText={(t) => setRounds(parseInt(t, 10) || 0)}
-                    keyboardType="number-pad"
-                    selectTextOnFocus
-                  />
-                  <Text style={[styles.counterUnit, { color: colors.textMuted }]}>rds</Text>
-                  <TouchableOpacity
-                    style={[styles.counterBtn, { backgroundColor: colors.secondary }]}
-                    onPress={() => adjustRounds(1)}
-                  >
-                    <Plus size={18} color={colors.text} />
-                  </TouchableOpacity>
+              {/* Rounds - only for engagement, grouping gets count from scanned target */}
+              {drillGoal !== 'grouping' && (
+                <View style={styles.section}>
+                  <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>ROUNDS</Text>
+                  <View style={[styles.counterRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                    <TouchableOpacity
+                      style={[styles.counterBtn, { backgroundColor: colors.secondary }]}
+                      onPress={() => adjustRounds(-1)}
+                    >
+                      <Minus size={18} color={colors.text} />
+                    </TouchableOpacity>
+                    <TextInput
+                      style={[styles.counterInput, { color: colors.text }]}
+                      value={String(rounds)}
+                      onChangeText={(t) => setRounds(parseInt(t, 10) || 0)}
+                      keyboardType="number-pad"
+                      selectTextOnFocus
+                    />
+                    <Text style={[styles.counterUnit, { color: colors.textMuted }]}>rds</Text>
+                    <TouchableOpacity
+                      style={[styles.counterBtn, { backgroundColor: colors.secondary }]}
+                      onPress={() => adjustRounds(1)}
+                    >
+                      <Plus size={18} color={colors.text} />
+                    </TouchableOpacity>
+                  </View>
                 </View>
-              </View>
+              )}
 
               {/* Position */}
               <View style={styles.section}>
