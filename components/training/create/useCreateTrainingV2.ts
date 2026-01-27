@@ -25,7 +25,7 @@ import {
   type DrillCategory,
   type DrillConfig,
   type TeamDrillPreset,
-  type TrainingDrillItem
+  type TrainingDrillItem,
 } from '@/services/drills';
 import { createTraining } from '@/services/trainingService';
 import { useTeamStore } from '@/store/teamStore';
@@ -357,6 +357,11 @@ export function useCreateTrainingV2({ teamIdParam }: UseCreateTrainingV2Params):
         title: title.trim(),
         scheduled_at: finalDate.toISOString(),
         drills_count: drills.length,
+        drills_details: drills.map((d) => ({
+          name: d.name,
+          drill_goal: d.drill_goal,
+          engagement_mode: d.engagement_mode,
+        })),
       });
 
       const created = await createTraining({

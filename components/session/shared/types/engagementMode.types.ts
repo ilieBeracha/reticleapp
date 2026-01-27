@@ -9,17 +9,21 @@
  *
  * CANONICAL RULES:
  * - Grouping drills are ALWAYS solo (non-negotiable)
- * - Engagement drills can be solo or squad
+ * - Engagement drills can be solo, squad, or group
  * - Squad mode is async-only (no live presence required)
+ * - Group mode is simple totals (participants enter shots/hits manually)
  * - Participants acknowledge/consent, shooter executes alone
  */
 
 import type { DrillGoal } from './drillGoal.types';
 
 /**
- * Engagement mode: solo (individual) or squad (async team participation)
+ * Engagement mode:
+ * - solo: individual execution
+ * - squad: async team with detailed target tracking
+ * - group: async team with simple shot/hit entry per person
  */
-export type EngagementMode = 'solo' | 'squad';
+export type EngagementMode = 'solo' | 'squad' | 'group';
 
 /**
  * Enforce engagement mode based on drill goal.
@@ -51,9 +55,25 @@ export function isSquadAllowed(drillGoal: DrillGoal | null | undefined): boolean
 }
 
 /**
+ * Check if group mode is allowed for a drill goal
+ */
+export function isGroupAllowed(drillGoal: DrillGoal | null | undefined): boolean {
+  // Group only allowed for engagement drills
+  return drillGoal === 'engagement';
+}
+
+/**
+ * Check if team modes (squad or group) are allowed for a drill goal
+ */
+export function isTeamModeAllowed(drillGoal: DrillGoal | null | undefined): boolean {
+  // Team modes (squad/group) only allowed for engagement drills
+  return drillGoal === 'engagement';
+}
+
+/**
  * Check if a session should show the engagement mode toggle
  */
 export function shouldShowEngagementModeToggle(drillGoal: DrillGoal | null | undefined): boolean {
   // Only show toggle for engagement drills (grouping is always solo)
-  return isSquadAllowed(drillGoal);
+  return isTeamModeAllowed(drillGoal);
 }

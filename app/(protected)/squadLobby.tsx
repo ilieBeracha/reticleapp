@@ -22,6 +22,7 @@ import {
   getEngagement,
   getEngagementParticipants,
   getParticipantCounts,
+  startEngagement,
 } from '@/services/session/participants';
 import type { Engagement, EngagementParticipant } from '@/services/session/types';
 import * as Haptics from 'expo-haptics';
@@ -61,6 +62,8 @@ export default function SquadLobbyScreen() {
     /** @deprecated Use engagementId. Kept for backwards compat. */
     sessionId?: string;
     trainingId?: string;
+    /** Engagement mode: squad or group */
+    engagementMode?: 'squad' | 'group';
   }>();
 
   // Use engagementId as primary, fall back to sessionId for backwards compat
@@ -70,7 +73,7 @@ export default function SquadLobbyScreen() {
   const [loading, setLoading] = useState(true);
   const [starting, setStarting] = useState(false);
   const [engagement, setEngagement] = useState<Engagement | null>(null);
-  const [session, setSession] = useState<SessionInfo | null>(null);
+  const [session, setSession] = useState<SessionInfo | null>(null); // Shared session
   const [participants, setParticipants] = useState<EngagementParticipant[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
@@ -144,6 +147,35 @@ export default function SquadLobbyScreen() {
   const counts = getParticipantCounts(participants);
   const isCommander = !!(currentUserId && session?.user_id === currentUserId);
 
+  // Realtime: Listen for commander starting the session (for participants)
+  useEffect(() => {
+    if (!engagement?.id || !session?.id || isCommander) return;
+
+    const channelName = `squad-start-${engagement.id}`;
+    const channel = supabase.channel(channelName);
+
+    channel
+      .on('broadcast', { event: 'session_started' }, () => {
+        console.log('[SquadLobby] Commander started session, navigating...');
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        router.replace({
+          pathname: '/(protected)/activeSession',
+          params: {
+            sessionId: session.id, // All participants share one session
+            engagementId: engagement.id,
+            engagementMode: params.engagementMode || 'squad',
+            returnTo: params.trainingId ? 'trainingDetail' : undefined,
+            returnId: params.trainingId,
+          },
+        });
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [engagement?.id, session?.id, isCommander, params.trainingId]);
+
   // Find current user's participation
   const myParticipation = participants.find((p) => p.user_id === currentUserId);
   const isParticipant = !!myParticipation;
@@ -156,7 +188,23 @@ export default function SquadLobbyScreen() {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
     try {
-      // Notify all joined participants that we're starting
+      // Mark engagement as started (closes invitations)
+      await startEngagement(engagement.id);
+
+      // Broadcast to all participants in the lobby that we're starting
+      const channelName = `squad-start-${engagement.id}`;
+      const channel = supabase.channel(channelName);
+      await channel.subscribe();
+      await channel.send({
+        type: 'broadcast',
+        event: 'session_started',
+        payload: { engagementId: engagement.id },
+      });
+      // Small delay to ensure broadcast is sent before we leave
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      supabase.removeChannel(channel);
+
+      // Also send push notifications for participants not in the lobby
       const joinedUserIds = participants.filter((p) => p.state === 'joined').map((p) => p.user_id);
 
       if (joinedUserIds.length > 0) {
@@ -173,6 +221,7 @@ export default function SquadLobbyScreen() {
         params: {
           sessionId: session.id,
           engagementId: engagement.id,
+          engagementMode: params.engagementMode || 'squad',
           returnTo: params.trainingId ? 'trainingDetail' : undefined,
           returnId: params.trainingId,
         },
@@ -291,7 +340,9 @@ export default function SquadLobbyScreen() {
         <TouchableOpacity style={styles.backButton} onPress={handleBack} activeOpacity={0.7}>
           <ChevronLeft size={24} color={colors.text} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>Squad Lobby</Text>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>
+          {isCommander ? (params.engagementMode === 'group' ? 'Group Lobby' : 'Squad Lobby') : 'Waiting Room'}
+        </Text>
         {isCommander && session?.team_id ? (
           <TouchableOpacity
             style={[styles.inviteHeaderBtn, { backgroundColor: colors.primary }]}
@@ -305,11 +356,7 @@ export default function SquadLobbyScreen() {
         )}
       </View>
 
-      <ScrollView
-        style={styles.content}
-        contentContainerStyle={styles.contentContainer}
-        showsVerticalScrollIndicator={false}
-      >
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Drill Info Card */}
         <View style={[styles.drillCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <View style={styles.drillIcon}>
@@ -397,13 +444,13 @@ export default function SquadLobbyScreen() {
         </View>
 
         {/* Hint */}
-        {isCommander && (
-          <Text style={[styles.hintText, { color: colors.textMuted }]}>
-            {counts.total === 0
+        <Text style={[styles.hintText, { color: colors.textMuted }]}>
+          {isCommander
+            ? counts.total === 0
               ? 'Invite participants using the + button, or start alone'
-              : 'You can leave and return to this lobby anytime'}
-          </Text>
-        )}
+              : 'You can leave and return to this lobby anytime'
+            : "You'll be notified when the commander starts the session"}
+        </Text>
       </ScrollView>
 
       {/* Bottom Action - Commander only can start */}
@@ -432,20 +479,21 @@ export default function SquadLobbyScreen() {
                 ) : (
                   <>
                     <Play size={20} color="#fff" fill="#fff" />
-                    <Text style={styles.startButtonText}>
-                      Start{counts.total > 0 ? ` (${counts.total})` : ''}
-                    </Text>
+                    <Text style={styles.startButtonText}>Start{counts.total > 0 ? ` (${counts.total})` : ''}</Text>
                   </>
                 )}
               </TouchableOpacity>
             </View>
           ) : (
-            // Non-commander shouldn't be here - redirect them
-            <View style={[styles.waitingBar, { backgroundColor: colors.card }]}>
-              <Users size={18} color={colors.textMuted} />
-              <Text style={[styles.waitingText, { color: colors.textMuted }]}>
-                Only commanders can manage this session
-              </Text>
+            // Participant waiting for commander to start
+            <View
+              style={[
+                styles.waitingBar,
+                { backgroundColor: colors.primary + '10', borderColor: colors.primary, borderWidth: 1 },
+              ]}
+            >
+              <ActivityIndicator size="small" color={colors.primary} />
+              <Text style={[styles.waitingText, { color: colors.text }]}>Waiting for commander to start...</Text>
             </View>
           )}
         </View>
@@ -551,7 +599,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingBottom: 12,
+    // paddingBottom: 12,
   },
   backButton: {
     width: 40,
@@ -572,8 +620,6 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-  },
-  contentContainer: {
     padding: 16,
     paddingBottom: 100,
   },

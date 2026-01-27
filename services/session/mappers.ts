@@ -96,6 +96,11 @@ export function mapSession(row: any): SessionWithDetails {
   // Determine drill name: prefer training_drills > drill_templates > custom
   const drillName = drills.name ?? drillTemplate.name ?? customConfig?.name ?? null;
 
+  // Map engagement if present (for squad/group sessions)
+  // Note: engagement is a one-to-many relation, so it comes as an array from Supabase
+  const engagementData = row.engagement;
+  const engagement = Array.isArray(engagementData) ? engagementData[0] : engagementData;
+
   return {
     id: row.id,
     user_id: row.user_id,
@@ -119,6 +124,7 @@ export function mapSession(row: any): SessionWithDetails {
     created_at: row.created_at,
     updated_at: row.updated_at ?? row.created_at,
     weather: row.weather as SessionWeatherData | null ?? null,
+    engagement: engagement ?? null,
   };
 }
 

@@ -40,11 +40,11 @@ export type ExecutionPolicy = 'locked' | 'guided' | 'free';
  * - Participants only acknowledge/consent, shooter executes alone
  */
 
-/** Engagement mode: solo (individual) or squad (async team participation) */
-export type EngagementMode = 'solo' | 'squad';
+/** Engagement mode: solo (individual), squad (detailed team tracking), or group (simple team totals) */
+export type EngagementMode = 'solo' | 'squad' | 'group';
 
-/** Engagement execution status: completed or aborted */
-export type EngagementStatus = 'completed' | 'aborted';
+/** Engagement execution status: pending (lobby), active (in progress), completed, or cancelled */
+export type EngagementStatus = 'pending' | 'active' | 'completed' | 'cancelled';
 
 /**
  * Engagement record - the atomic execution unit.
@@ -68,6 +68,8 @@ export interface Engagement {
   engagement_mode: EngagementMode;
   /** Final status */
   status: EngagementStatus;
+  /** When the engagement was started by the commander */
+  started_at: string | null;
   created_at: string;
 }
 
@@ -77,19 +79,21 @@ export type ParticipantState = 'pending' | 'joined' | 'left';
 /**
  * A participant in a squad engagement.
  * 
- * CANONICAL RULES:
- * - References engagement_id ONLY (never session_id)
- * - Participants acknowledge/consent asynchronously
- * - Shooter executes alone, result is attributed to participants
+ * Squad mode tracks GROUP totals - all participants share one session.
+ * Each participant can record their contribution (shots/hits).
+ * Results are aggregated for the group, NOT counted in individual insights.
  */
 export interface EngagementParticipant {
   id: string;
-  /** Reference to the engagement (execution unit) */
+  /** Reference to the engagement */
   engagement_id: string;
   user_id: string;
   state: ParticipantState;
   joined_at: string | null;
   created_at: string;
+  /** Participant's contribution to group totals */
+  shots_fired?: number | null;
+  hits?: number | null;
   /** Joined from user profile */
   user_full_name?: string | null;
   user_avatar_url?: string | null;

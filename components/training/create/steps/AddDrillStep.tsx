@@ -212,6 +212,10 @@ function AddSessionSheet({ visible, onClose, onAdd }: AddSessionSheetProps) {
   const handleEngagementModeSelect = useCallback((mode: 'solo' | 'squad') => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setEngagementMode(mode);
+    // Squad mode = always locked (commander controls)
+    if (mode === 'squad') {
+      setExecutionPolicy('locked');
+    }
   }, []);
 
   const handleUpdateContext = useCallback((partial: Partial<SessionContextState>) => {
@@ -234,21 +238,26 @@ function AddSessionSheet({ visible, onClose, onAdd }: AddSessionSheetProps) {
     const hasPosition = context.position && context.position !== 'any';
 
     // Validation for LOCKED policy only - commander must specify config
+    // Squad mode: only distance required (free-form session)
+    // Solo mode: full config required (distance, rounds, position)
     if (executionPolicy === 'locked') {
       if (!hasDistance) {
         setValidationError('Distance is required for locked drills');
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
         return;
       }
-      if (!hasRounds) {
-        setValidationError('Rounds are required for locked drills');
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-        return;
-      }
-      if (!hasPosition) {
-        setValidationError('Position is required for locked drills');
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-        return;
+      // Solo locked mode requires full config
+      if (effectiveEngagementMode !== 'squad') {
+        if (!hasRounds) {
+          setValidationError('Rounds are required for locked drills');
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+          return;
+        }
+        if (!hasPosition) {
+          setValidationError('Position is required for locked drills');
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+          return;
+        }
       }
     }
 
@@ -339,59 +348,61 @@ function AddSessionSheet({ visible, onClose, onAdd }: AddSessionSheetProps) {
             </View>
           </View>
 
-          {/* Execution Policy - How strict must soldiers follow this config? */}
-          <View style={styles.policySection}>
-            <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>Execution Policy</Text>
-            <Text style={[styles.policyHint, { color: colors.textMuted }]}>
-              How strictly must soldiers follow this configuration?
-            </Text>
-            <View style={[styles.policyToggle, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <TouchableOpacity
-                style={[
-                  styles.policyOption,
-                  executionPolicy === 'locked' && [styles.policyOptionActive, { backgroundColor: colors.blue }],
-                ]}
-                onPress={() => handlePolicySelect('locked')}
-                activeOpacity={0.7}
-              >
-                <Lock size={14} color={executionPolicy === 'locked' ? '#fff' : colors.textMuted} />
-                <Text style={[styles.policyText, { color: executionPolicy === 'locked' ? '#fff' : colors.text }]}>
-                  Locked
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.policyOption,
-                  executionPolicy === 'guided' && [styles.policyOptionActive, { backgroundColor: colors.green }],
-                ]}
-                onPress={() => handlePolicySelect('guided')}
-                activeOpacity={0.7}
-              >
-                <Sparkles size={14} color={executionPolicy === 'guided' ? '#fff' : colors.textMuted} />
-                <Text style={[styles.policyText, { color: executionPolicy === 'guided' ? '#fff' : colors.text }]}>
-                  Guided
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.policyOption,
-                  executionPolicy === 'free' && [styles.policyOptionActive, { backgroundColor: colors.orange }],
-                ]}
-                onPress={() => handlePolicySelect('free')}
-                activeOpacity={0.7}
-              >
-                <Unlock size={14} color={executionPolicy === 'free' ? '#fff' : colors.textMuted} />
-                <Text style={[styles.policyText, { color: executionPolicy === 'free' ? '#fff' : colors.text }]}>
-                  Free
-                </Text>
-              </TouchableOpacity>
+          {/* Execution Policy - Only show for solo mode (squad is always free) */}
+          {effectiveEngagementMode !== 'squad' && (
+            <View style={styles.policySection}>
+              <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>Execution Policy</Text>
+              <Text style={[styles.policyHint, { color: colors.textMuted }]}>
+                How strictly must soldiers follow this configuration?
+              </Text>
+              <View style={[styles.policyToggle, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <TouchableOpacity
+                  style={[
+                    styles.policyOption,
+                    executionPolicy === 'locked' && [styles.policyOptionActive, { backgroundColor: colors.blue }],
+                  ]}
+                  onPress={() => handlePolicySelect('locked')}
+                  activeOpacity={0.7}
+                >
+                  <Lock size={14} color={executionPolicy === 'locked' ? '#fff' : colors.textMuted} />
+                  <Text style={[styles.policyText, { color: executionPolicy === 'locked' ? '#fff' : colors.text }]}>
+                    Locked
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.policyOption,
+                    executionPolicy === 'guided' && [styles.policyOptionActive, { backgroundColor: colors.green }],
+                  ]}
+                  onPress={() => handlePolicySelect('guided')}
+                  activeOpacity={0.7}
+                >
+                  <Sparkles size={14} color={executionPolicy === 'guided' ? '#fff' : colors.textMuted} />
+                  <Text style={[styles.policyText, { color: executionPolicy === 'guided' ? '#fff' : colors.text }]}>
+                    Guided
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.policyOption,
+                    executionPolicy === 'free' && [styles.policyOptionActive, { backgroundColor: colors.orange }],
+                  ]}
+                  onPress={() => handlePolicySelect('free')}
+                  activeOpacity={0.7}
+                >
+                  <Unlock size={14} color={executionPolicy === 'free' ? '#fff' : colors.textMuted} />
+                  <Text style={[styles.policyText, { color: executionPolicy === 'free' ? '#fff' : colors.text }]}>
+                    Free
+                  </Text>
+                </TouchableOpacity>
+              </View>
+              <Text style={[styles.policyDesc, { color: colors.textMuted }]}>
+                {executionPolicy === 'locked' && 'Soldiers must execute exactly as defined'}
+                {executionPolicy === 'guided' && 'Defaults pre-filled, soldiers may adjust'}
+                {executionPolicy === 'free' && 'Drill is a label only, full freedom'}
+              </Text>
             </View>
-            <Text style={[styles.policyDesc, { color: colors.textMuted }]}>
-              {executionPolicy === 'locked' && 'Soldiers must execute exactly as defined'}
-              {executionPolicy === 'guided' && 'Defaults pre-filled, soldiers may adjust'}
-              {executionPolicy === 'free' && 'Drill is a label only, full freedom'}
-            </Text>
-          </View>
+          )}
 
           {/* Engagement Mode - Solo vs Squad (only for Engagement drills) */}
           <View style={styles.policySection}>
@@ -441,8 +452,8 @@ function AddSessionSheet({ visible, onClose, onAdd }: AddSessionSheetProps) {
             </Text>
           </View>
 
-          {/* Drill Configuration - Hidden when FREE (soldiers choose everything) */}
-          {executionPolicy !== 'free' && (
+          {/* Drill Configuration - Hidden when FREE or when SQUAD mode */}
+          {executionPolicy !== 'free' && effectiveEngagementMode !== 'squad' && (
             <>
               {executionPolicy === 'guided' && (
                 <View style={styles.optionalHeader}>
@@ -464,8 +475,54 @@ function AddSessionSheet({ visible, onClose, onAdd }: AddSessionSheetProps) {
             </>
           )}
 
-          {/* Free policy notice */}
-          {executionPolicy === 'free' && (
+          {/* Squad mode - minimal config with just distance */}
+          {effectiveEngagementMode === 'squad' && (
+            <View style={[styles.squadNotice, { backgroundColor: colors.primary + '10', borderColor: colors.primary }]}>
+              <Users size={20} color={colors.primary} />
+              <View style={styles.freeNoticeText}>
+                <Text style={[styles.freeNoticeTitle, { color: colors.text }]}>
+                  Squad Session
+                </Text>
+                <Text style={[styles.freeNoticeDesc, { color: colors.textMuted }]}>
+                  Team drill with shared results. Only distance is configured.
+                </Text>
+              </View>
+            </View>
+          )}
+
+          {/* Distance selector for squad mode (required) */}
+          {effectiveEngagementMode === 'squad' && (
+            <View style={styles.squadDistanceSection}>
+              <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>Distance</Text>
+              <View style={[styles.distanceRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                {[15, 25, 50, 100].map((d) => (
+                  <TouchableOpacity
+                    key={d}
+                    style={[
+                      styles.distanceOption,
+                      context.distance === d && [styles.distanceOptionActive, { backgroundColor: colors.primary }],
+                    ]}
+                    onPress={() => {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      handleUpdateContext({ distance: d });
+                    }}
+                  >
+                    <Text style={[styles.distanceText, { color: context.distance === d ? '#fff' : colors.text }]}>
+                      {d}m
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              {context.distance === 0 && (
+                <Text style={[styles.policyDesc, { color: colors.red }]}>
+                  Select a distance
+                </Text>
+              )}
+            </View>
+          )}
+
+          {/* Free policy notice - only for solo free mode */}
+          {executionPolicy === 'free' && effectiveEngagementMode !== 'squad' && (
             <View style={[styles.freeNotice, { backgroundColor: colors.orange + '10', borderColor: colors.orange }]}>
               <Unlock size={20} color={colors.orange} />
               <View style={styles.freeNoticeText}>
@@ -902,6 +959,46 @@ const styles = StyleSheet.create({
   freeNoticeDesc: {
     fontSize: 13,
     lineHeight: 18,
+  },
+
+  // Squad mode notice
+  squadNotice: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginTop: 8,
+  },
+
+  // Squad distance section
+  squadDistanceSection: {
+    marginTop: 16,
+  },
+  distanceRow: {
+    flexDirection: 'row',
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 4,
+    gap: 4,
+  },
+  distanceOption: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    borderRadius: 9,
+  },
+  distanceOptionActive: {
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  distanceText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
 });
 

@@ -63,4 +63,4 @@ export { useActiveSession } from './useActiveSession';
 // VIEWS
 // ═══════════════════════════════════════════════════════════════════════════
 
-export { SessionPrepView, SquadSessionView } from './views';
+export { SessionPrepView, SquadSessionView, SquadParticipantsCard, GroupSessionView } from './views';

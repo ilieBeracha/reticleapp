@@ -25,6 +25,8 @@ interface ActiveLobby {
   sessionId: string;
   drillName: string;
   participantCount: number;
+  hasStarted: boolean; // true if started_at is set
+  engagementMode: 'squad' | 'group';
 }
 
 interface SquadLobbyBannerProps {
@@ -41,27 +43,31 @@ export function SquadLobbyBanner({ trainingId, userId, onLobbyChanged }: SquadLo
   // Load active lobby for this commander in this training
   const loadActiveLobby = useCallback(async () => {
     try {
-      // Find squad engagements for this training where user is the shooter (commander)
-      // and engagement is in 'completed' status (our default, since we can't use 'pending')
-      // We identify "active lobby" by: squad mode + no session targets yet
+      // Find squad/group engagements for this training where user is the shooter (commander)
+      // We identify "active" by: team mode (squad or group) + session not completed
       const { data: engagements, error: engError } = await supabase
         .from('engagements')
-        .select(`
+        .select(
+          `
           id,
           session_id,
           engagement_mode,
           status,
           created_at,
+          started_at,
           sessions!inner (
             id,
             custom_drill_config,
             training_id,
-            user_id
+            user_id,
+            status
           )
-        `)
+        `
+        )
         .eq('sessions.training_id', trainingId)
         .eq('sessions.user_id', userId)
-        .eq('engagement_mode', 'squad')
+        .in('engagement_mode', ['squad', 'group'])
+        .neq('sessions.status', 'completed') // Don't show for completed sessions
         .order('created_at', { ascending: false })
         .limit(1);
 
@@ -71,17 +77,20 @@ export function SquadLobbyBanner({ trainingId, userId, onLobbyChanged }: SquadLo
         return;
       }
 
-      const engagement = engagements[0];
+      const engagement = engagements[0] as any;
       const session = engagement.sessions as any;
 
-      // Check if this engagement has any targets (results) - if so, it's already been executed
+      // Check if this engagement has any targets (results)
       const { count: targetCount } = await supabase
         .from('session_targets')
         .select('id', { count: 'exact', head: true })
         .eq('session_id', session.id);
 
-      // If there are targets, the engagement has been executed
-      if (targetCount && targetCount > 0) {
+      // If started but no targets yet, show "in progress" banner
+      // If not started and no targets, show "lobby" banner
+      // If has targets, the engagement is done - don't show banner
+      if (targetCount && targetCount > 0 && !engagement.started_at) {
+        // Session has results but wasn't formally started - probably completed
         setActiveLobby(null);
         return;
       }
@@ -92,11 +101,14 @@ export function SquadLobbyBanner({ trainingId, userId, onLobbyChanged }: SquadLo
 
       const drillConfig = session.custom_drill_config as any;
 
+      const isGroup = engagement.engagement_mode === 'group';
       setActiveLobby({
         engagementId: engagement.id,
         sessionId: session.id,
-        drillName: drillConfig?.name || 'Squad Engagement',
+        drillName: drillConfig?.name || (isGroup ? 'Group Engagement' : 'Squad Engagement'),
         participantCount: counts.total,
+        hasStarted: !!engagement.started_at,
+        engagementMode: engagement.engagement_mode as 'squad' | 'group',
       });
     } catch (error) {
       console.error('[SquadLobbyBanner] Failed to load:', error);
@@ -143,19 +155,36 @@ export function SquadLobbyBanner({ trainingId, userId, onLobbyChanged }: SquadLo
     };
   }, [trainingId, userId, loadActiveLobby]);
 
-  // Navigate to lobby
+  // Navigate to lobby or active session
   const handleGoToLobby = () => {
     if (!activeLobby) return;
 
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    router.push({
-      pathname: '/(protected)/squadLobby',
-      params: {
-        engagementId: activeLobby.engagementId,
-        sessionId: activeLobby.sessionId,
-        trainingId,
-      },
-    });
+
+    if (activeLobby.hasStarted) {
+      // Session in progress - go to active session
+      router.push({
+        pathname: '/(protected)/activeSession',
+        params: {
+          sessionId: activeLobby.sessionId,
+          engagementId: activeLobby.engagementId,
+          engagementMode: activeLobby.engagementMode,
+          returnTo: 'trainingDetail',
+          returnId: trainingId,
+        },
+      });
+    } else {
+      // Still in lobby - go to squad/group lobby
+      router.push({
+        pathname: '/(protected)/squadLobby',
+        params: {
+          engagementId: activeLobby.engagementId,
+          sessionId: activeLobby.sessionId,
+          trainingId,
+          engagementMode: activeLobby.engagementMode,
+        },
+      });
+    }
   };
 
   // Don't render if no active lobby
@@ -163,27 +192,34 @@ export function SquadLobbyBanner({ trainingId, userId, onLobbyChanged }: SquadLo
     return null;
   }
 
+  const isInProgress = activeLobby.hasStarted;
+  const isGroup = activeLobby.engagementMode === 'group';
+  const modeLabel = isGroup ? 'Group' : 'Squad';
+  const accentColor = isInProgress ? colors.green : colors.orange;
+
   return (
     <Animated.View entering={FadeInDown.duration(300)} exiting={FadeOutUp.duration(200)}>
       <TouchableOpacity
-        style={[styles.container, { backgroundColor: colors.orange + '15', borderColor: colors.orange }]}
+        style={[styles.container, { backgroundColor: accentColor + '15', borderColor: accentColor }]}
         onPress={handleGoToLobby}
         activeOpacity={0.7}
       >
-        <View style={[styles.iconContainer, { backgroundColor: colors.orange + '25' }]}>
-          <Users size={20} color={colors.orange} />
+        <View style={[styles.iconContainer, { backgroundColor: accentColor + '25' }]}>
+          <Users size={20} color={accentColor} />
         </View>
 
         <View style={styles.content}>
-          <Text style={[styles.title, { color: colors.text }]}>Squad Lobby Active</Text>
+          <Text style={[styles.title, { color: colors.text }]}>
+            {isInProgress ? `${modeLabel} Session In Progress` : `${modeLabel} Lobby Active`}
+          </Text>
           <Text style={[styles.subtitle, { color: colors.textMuted }]}>
             {activeLobby.drillName}
-            {activeLobby.participantCount > 0 && ` · ${activeLobby.participantCount} waiting`}
+            {!isInProgress && activeLobby.participantCount > 0 && ` · ${activeLobby.participantCount} waiting`}
           </Text>
         </View>
 
-        <View style={[styles.chevronContainer, { backgroundColor: colors.orange + '20' }]}>
-          <ChevronRight size={18} color={colors.orange} />
+        <View style={[styles.chevronContainer, { backgroundColor: accentColor + '20' }]}>
+          <ChevronRight size={18} color={accentColor} />
         </View>
       </TouchableOpacity>
     </Animated.View>

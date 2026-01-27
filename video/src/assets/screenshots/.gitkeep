@@ -1,0 +1,20 @@
+# Add your screenshots here
+
+Required screenshots (9 total):
+
+## Scene 1: Engagement Flow
+- engagement-1.png - Home screen with "Start Engagement" visible
+- engagement-2.png - Engagement config modal (distance, position, rounds)
+- engagement-3.png - Weapon picker with selection
+
+## Scene 2: Target Scanning
+- scanning-1.png - Camera view with target in frame
+- scanning-2.png - Detection preview with hits highlighted
+- scanning-3.png - Results card showing accuracy
+
+## Scene 3: Insights
+- insights-1.png - Insights dashboard overview
+- insights-2.png - Trend chart or performance graph
+- insights-3.png - AI recommendation card
+
+Recommended size: 1170x2532 (iPhone 15 Pro resolution)

@@ -152,7 +152,8 @@ export const SESSION_SELECT_WITH_FULL_DRILL = `
     instructions,
     safety_notes
   ),
-  user_weapons:weapon_id(name, caliber, category)
+  user_weapons:weapon_id(name, caliber, category),
+  engagement:engagements(id, engagement_mode, status, started_at, created_at)
 `;
 
 /**

@@ -71,6 +71,7 @@ export default ({ config }) => {
       ],
     },
     plugins: [
+      './plugins/strip-bitcode',
       './plugins/withGarminUrlHandler',
       'expo-build-properties',
       'expo-secure-store',

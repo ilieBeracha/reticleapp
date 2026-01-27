@@ -26,7 +26,7 @@ import { useOpenWeather } from '@/hooks/useOpenWeather';
 import { usePermissions } from '@/hooks/usePermissions';
 import { supabase } from '@/lib/supabase';
 import type { DrillPreset } from '@/services/presetService';
-import { createEngagement } from '@/services/session/participants';
+import { addParticipant, createEngagement } from '@/services/session/participants';
 import type { DrillGoal, EngagementMode } from '@/services/session/types';
 import { deleteSession, getMyActiveSession, getOrCreateSetupSession } from '@/services/sessionService';
 import { getUserWeapon, type UserWeapon } from '@/services/weaponService';
@@ -93,8 +93,8 @@ export default function StartEngagementScreen() {
     // 'guided' = defaults pre-filled, user may change
     // 'free' = no constraints, full freedom
     executionPolicy?: 'locked' | 'guided' | 'free';
-    // Engagement mode: solo or squad (from commander config)
-    engagementMode?: 'solo' | 'squad';
+    // Engagement mode: solo, squad, or group (from commander config)
+    engagementMode?: 'solo' | 'squad' | 'group';
     // Return destination
     returnTo?: string;
     returnId?: string;
@@ -127,6 +127,16 @@ export default function StartEngagementScreen() {
   // Grouping drills are ALWAYS solo (enforced)
   const initialEngagementMode = params.purpose === 'grouping' ? 'solo' : params.engagementMode || 'solo';
   const [engagementMode, setEngagementMode] = useState<EngagementMode>(initialEngagementMode);
+
+  // Debug: Log params on mount
+  useEffect(() => {
+    console.log('[StartEngagement] Params received:', {
+      purpose: params.purpose,
+      engagementMode: params.engagementMode,
+      teamId: params.teamId,
+      initialEngagementMode,
+    });
+  }, []);
   const [distance, setDistance] = useState(params.distance ? parseInt(params.distance, 10) : 25);
   const [rounds, setRounds] = useState(params.shots ? parseInt(params.shots, 10) : 5);
   const [position, setPosition] = useState<Position>((params.position as Position) || 'standing');
@@ -191,7 +201,7 @@ export default function StartEngagementScreen() {
   }, []);
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // CHECK FOR ACTIVE SESSION
+  // CHECK FOR ACTIVE SESSION OR EXISTING SQUAD ENGAGEMENT
   // ═══════════════════════════════════════════════════════════════════════════
 
   useFocusEffect(
@@ -200,6 +210,79 @@ export default function StartEngagementScreen() {
 
       async function check() {
         try {
+          const {
+            data: { user },
+          } = await supabase.auth.getUser();
+          if (!user) {
+            if (!cancelled) setCheckingSession(false);
+            return;
+          }
+
+          // Check for active squad/group engagement in this training first
+          if (trainingId) {
+            const { data: activeEngagements } = await supabase
+              .from('engagements')
+              .select(`
+                id,
+                session_id,
+                status,
+                engagement_mode,
+                started_at,
+                shooter_id
+              `)
+              .eq('training_id', trainingId)
+              .in('engagement_mode', ['squad', 'group'])
+              .not('status', 'in', '("completed","cancelled")')
+              .order('created_at', { ascending: false })
+              .limit(1);
+
+            if (activeEngagements && activeEngagements.length > 0) {
+              const engagement = activeEngagements[0];
+              const isCommander = engagement.shooter_id === user.id;
+
+              // Check if user is a participant
+              const { data: participation } = await supabase
+                .from('engagement_participants')
+                .select('id, state')
+                .eq('engagement_id', engagement.id)
+                .eq('user_id', user.id)
+                .maybeSingle();
+
+              const isParticipant = !!participation && participation.state === 'joined';
+              const hasStarted = !!engagement.started_at;
+
+              // If user is commander or participant, redirect to existing engagement
+              if (isCommander || isParticipant) {
+                if (hasStarted) {
+                  // Session in progress - go to active session
+                  router.replace({
+                    pathname: '/(protected)/activeSession',
+                    params: {
+                      sessionId: engagement.session_id,
+                      engagementId: engagement.id,
+                      engagementMode: engagement.engagement_mode,
+                      returnTo: params.returnTo || 'trainingDetail',
+                      returnId: trainingId,
+                    },
+                  });
+                } else {
+                  // Still in lobby - go to squad lobby
+                  router.replace({
+                    pathname: '/(protected)/squadLobby',
+                    params: {
+                      engagementId: engagement.id,
+                      sessionId: engagement.session_id,
+                      trainingId,
+                      engagementMode: engagement.engagement_mode,
+                    },
+                  });
+                }
+                return;
+              }
+            }
+          }
+
+          // Check for any other active session (solo)
           const active = await getMyActiveSession();
           if (active) {
             Alert.alert('Active Session', 'You have an active session. Continue or start fresh?', [
@@ -239,7 +322,7 @@ export default function StartEngagementScreen() {
       return () => {
         cancelled = true;
       };
-    }, [])
+    }, [trainingId, params.returnTo])
   );
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -271,6 +354,55 @@ export default function StartEngagementScreen() {
       } = await supabase.auth.getUser();
       if (userError || !user) throw new Error('Not authenticated');
 
+      // Safety check: Prevent creating duplicate squad/group engagement
+      const isTeamMode = effectiveEngagementMode === 'squad' || effectiveEngagementMode === 'group';
+      if (isTeamMode && trainingId) {
+        const { data: existingEngagements } = await supabase
+          .from('engagements')
+          .select('id, session_id, status, started_at, shooter_id')
+          .eq('training_id', trainingId)
+          .in('engagement_mode', ['squad', 'group'])
+          .not('status', 'in', '("completed","cancelled")')
+          .limit(1);
+
+        if (existingEngagements && existingEngagements.length > 0) {
+          const existing = existingEngagements[0];
+          Alert.alert(
+            'Active Squad Engagement',
+            'There\'s already an active squad/group engagement for this training. You\'ll be redirected to it.',
+            [
+              {
+                text: 'OK',
+                onPress: () => {
+                  if (existing.started_at) {
+                    router.replace({
+                      pathname: '/(protected)/activeSession',
+                      params: {
+                        sessionId: existing.session_id,
+                        engagementId: existing.id,
+                        engagementMode: effectiveEngagementMode,
+                      },
+                    });
+                  } else {
+                    router.replace({
+                      pathname: '/(protected)/squadLobby',
+                      params: {
+                        engagementId: existing.id,
+                        sessionId: existing.session_id,
+                        trainingId,
+                        engagementMode: effectiveEngagementMode,
+                      },
+                    });
+                  }
+                },
+              },
+            ]
+          );
+          setIsSubmitting(false);
+          return;
+        }
+      }
+
       // Step 1: Get or create Session (INVISIBLE to user)
       // Session is based on setup params: weapon, environment
       const sessionWeather = toSessionWeatherData(openWeather, 'openweathermap');
@@ -298,26 +430,46 @@ export default function StartEngagementScreen() {
       });
 
       // Step 2: Create Engagement (the actual execution unit)
+      // Squad/group engagements start as 'pending' (in lobby, waiting to start)
+      // Solo engagements start as 'completed' (immediate execution)
       const engagement = await createEngagement({
         sessionId: session.id,
         shooterId: user.id,
         drillGoal: drillGoal as DrillGoal,
         trainingId,
         requestedMode: effectiveEngagementMode,
+        status: isTeamMode ? 'pending' : 'completed',
       });
+
+      // Step 2b: For squad/group, add commander as first participant
+      // This ensures commander can also record their shots
+      if (effectiveEngagementMode === 'squad' || effectiveEngagementMode === 'group') {
+        await addParticipant(engagement.id, user.id);
+      }
 
       await loadSessions();
 
       // ═══════════════════════════════════════════════════════════════════════
-      // SQUAD ENGAGEMENT: Navigate to squad lobby (invites happen there)
+      // SQUAD/GROUP ENGAGEMENT: Navigate to lobby (invites happen there)
       // ═══════════════════════════════════════════════════════════════════════
-      if (effectiveEngagementMode === 'squad' && teamId) {
+      console.log('[StartEngagement] Navigation decision:', {
+        effectiveEngagementMode,
+        engagementMode,
+        drillGoal,
+        teamId,
+        isSquadOrGroup: effectiveEngagementMode === 'squad' || effectiveEngagementMode === 'group',
+        hasTeamId: !!teamId,
+      });
+
+      if ((effectiveEngagementMode === 'squad' || effectiveEngagementMode === 'group') && teamId) {
+        console.log('[StartEngagement] Going to squadLobby (mode:', effectiveEngagementMode, ')');
         router.replace({
           pathname: '/(protected)/squadLobby',
           params: {
             engagementId: engagement.id,
             sessionId: session.id,
             trainingId: trainingId || undefined,
+            engagementMode: effectiveEngagementMode,
           },
         });
         return;
@@ -326,6 +478,7 @@ export default function StartEngagementScreen() {
       // ═══════════════════════════════════════════════════════════════════════
       // SOLO ENGAGEMENT: Navigate directly to active session
       // ═══════════════════════════════════════════════════════════════════════
+      console.log('[StartEngagement] Going to activeSession (solo mode)');
       router.replace({
         pathname: '/(protected)/activeSession',
         params: {
@@ -832,7 +985,9 @@ export default function StartEngagementScreen() {
                   ? 'Run Grouping'
                   : effectiveEngagementMode === 'squad'
                     ? 'Start Squad Engagement'
-                    : 'Start Engagement'}
+                    : effectiveEngagementMode === 'group'
+                      ? 'Start Group Engagement'
+                      : 'Start Engagement'}
               </Text>
             </>
           )}

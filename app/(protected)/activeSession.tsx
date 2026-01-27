@@ -7,7 +7,7 @@
 
 import { TargetCard } from '@/components/session/TargetCard';
 import { WeatherStrip } from '@/components/session/WeatherDisplay';
-import { COLORS, formatTime, SessionPrepView, SquadSessionView, styles, useActiveSession } from '@/components/session/activeSession';
+import { COLORS, formatTime, GroupSessionView, SessionPrepView, SquadSessionView, styles, useActiveSession } from '@/components/session/activeSession';
 import { PAPER_TYPE } from '@/constants';
 import { isGroupingPaper, isPaperTarget } from '@/constants/drill';
 import { useColors } from '@/hooks/ui/useColors';
@@ -223,7 +223,13 @@ function CompactStats({ targets, colors }: { targets: any[]; colors: ReturnType<
 export default function ActiveSessionScreen() {
   const insets = useSafeAreaInsets();
   const colors = useColors();
-  const { sessionId } = useLocalSearchParams<{ sessionId: string }>();
+  const { sessionId, engagementMode: routeEngagementMode, viewOnly } = useLocalSearchParams<{
+    sessionId: string;
+    engagementMode?: 'solo' | 'squad' | 'group';
+    viewOnly?: string;
+  }>();
+
+  const isViewOnly = viewOnly === 'true';
 
   const {
     session,
@@ -379,14 +385,44 @@ export default function ActiveSessionScreen() {
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // SQUAD SESSION: Collaborative data entry mode
-  // Show for any squad engagement (even with 0 participants - commander can start alone)
+  // SQUAD/GROUP SESSION: Collaborative data entry mode
+  // Show for any squad or group engagement (even with 0 participants)
   // ═══════════════════════════════════════════════════════════════════════════
-  if (isSquadEngagement) {
+
+  // Determine actual mode from engagement data or route param
+  const actualEngagementMode = session?.engagement?.engagement_mode || routeEngagementMode;
+  const isGroupEngagement = actualEngagementMode === 'group';
+
+  if (isSquadEngagement || isGroupEngagement) {
     const isCommander = currentUserId === session.user_id;
+
+    // Group mode: simple shot/hit entry per participant
+    if (isGroupEngagement) {
+      return (
+        <GroupSessionView
+          sessionId={sessionId}
+          engagementId={session.engagement?.id || ''}
+          session={{
+            id: session.id,
+            user_id: session.user_id,
+            drill_name: session.drill_name,
+            drill_config: session.drill_config as any,
+            training_id: session.training_id,
+          }}
+          participants={participants}
+          isCommander={isCommander && !isViewOnly}
+          isViewOnly={isViewOnly}
+          onRefresh={loadData}
+          onEndSession={handleEndSession}
+        />
+      );
+    }
+
+    // Squad mode: full target tracking
     return (
       <SquadSessionView
         sessionId={sessionId}
+        engagementId={session.engagement?.id || ''}
         session={{
           id: session.id,
           user_id: session.user_id,
@@ -396,7 +432,8 @@ export default function ActiveSessionScreen() {
         }}
         participants={participants}
         targets={targets}
-        isCommander={isCommander}
+        isCommander={isCommander && !isViewOnly}
+        isViewOnly={isViewOnly}
         onRefresh={loadData}
         onEndSession={handleEndSession}
       />

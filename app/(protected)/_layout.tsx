@@ -243,30 +243,6 @@ export default function ProtectedLayout() {
       />
 
       <Stack.Screen
-        name="trainingLive"
-        options={{
-          headerShown: false,
-          presentation: 'card',
-          gestureEnabled: false,
-          contentStyle: { backgroundColor: '#0A0A0A' },
-        }}
-      />
-
-      <Stack.Screen
-        name="addTarget"
-        options={{
-          headerShown: false,
-          presentation: 'formSheet',
-          gestureEnabled: true,
-          sheetGrabberVisible: false,
-          contentStyle: { backgroundColor: colors.card },
-          sheetAllowedDetents: [0.85, 0.95],
-          sheetInitialDetentIndex: 0,
-          sheetLargestUndimmedDetentIndex: -1,
-        }}
-      />
-
-      <Stack.Screen
         name="scanTarget"
         options={{
           headerShown: false,
@@ -305,26 +281,6 @@ export default function ProtectedLayout() {
       />
 
       <Stack.Screen
-        name="scans"
-        options={{
-          headerShown: false,
-          presentation: 'card',
-          gestureEnabled: true,
-          contentStyle: { backgroundColor: colors.background },
-        }}
-      />
-
-      <Stack.Screen
-        name="drillLibrary"
-        options={{
-          headerShown: false,
-          presentation: 'card',
-          gestureEnabled: true,
-          contentStyle: { backgroundColor: colors.background },
-        }}
-      />
-
-      <Stack.Screen
         name="weaponDetail"
         options={{
           headerShown: false,
@@ -341,20 +297,6 @@ export default function ProtectedLayout() {
           presentation: 'card',
           gestureEnabled: false,
           contentStyle: { backgroundColor: colors.background },
-        }}
-      />
-
-      <Stack.Screen
-        name="analysis"
-        options={{
-          headerShown: false,
-          presentation: 'formSheet',
-          gestureEnabled: true,
-          sheetGrabberVisible: true,
-          contentStyle: { backgroundColor: colors.card },
-          sheetAllowedDetents: [0.75, 1],
-          sheetInitialDetentIndex: 0,
-          sheetLargestUndimmedDetentIndex: -1,
         }}
       />
 

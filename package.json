@@ -5,7 +5,7 @@
   "scripts": {
     "start:dev": "APP_VARIANT=development expo start",
     "ios:dev": "APP_VARIANT=development expo run:ios",
-    "postinstall": "patch-package",
+    "postinstall": "patch-package && scripts/strip-bitcode.sh",
     "start": "expo start",
     "android": "expo run:android",
     "ios": "expo run:ios",

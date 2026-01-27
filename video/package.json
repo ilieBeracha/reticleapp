@@ -1,0 +1,21 @@
+{
+  "name": "reticle-product-video",
+  "version": "1.0.0",
+  "description": "Reticle App Store Preview Video",
+  "scripts": {
+    "preview": "remotion studio",
+    "build": "remotion render ProductVideo out/reticle-preview.mp4",
+    "build:gif": "remotion render ProductVideo out/reticle-preview.gif"
+  },
+  "dependencies": {
+    "@remotion/cli": "^4.0.0",
+    "@remotion/player": "^4.0.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "remotion": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.0",
+    "typescript": "^5.0.0"
+  }
+}

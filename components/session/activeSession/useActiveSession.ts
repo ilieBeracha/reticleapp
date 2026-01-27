@@ -179,10 +179,10 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
       setTargets(targetsData);
       setStats(statsData);
 
-      // Load participants for squad engagement sessions
+      // Load participants for squad/group engagement sessions
       // Note: engagement_mode now lives on the engagement, not the session
-      // For now, we check if there's an engagement with squad mode
-      if (sessionData?.engagement?.engagement_mode === 'squad') {
+      const engagementMode = sessionData?.engagement?.engagement_mode;
+      if (engagementMode === 'squad' || engagementMode === 'group') {
         const participantsData = await getSessionParticipants(sessionId);
         setParticipants(participantsData);
       }
@@ -565,13 +565,15 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
     ),
   });
 
-  // Squad engagement participants realtime
+  // Squad/Group engagement participants realtime
   // Note: engagement_mode now lives on the engagement, not the session
   const isSquadEngagement = session?.engagement?.engagement_mode === 'squad';
+  const isGroupEngagement = session?.engagement?.engagement_mode === 'group';
+  const isTeamEngagement = isSquadEngagement || isGroupEngagement;
   useParticipantsRealtime({
     engagementId: session?.engagement?.id || null,
     sessionId, // deprecated fallback
-    enabled: !!sessionId && isSquadEngagement,
+    enabled: !!sessionId && isTeamEngagement,
     onParticipantAdded: useCallback(() => {
       console.log('[ActiveSession] Realtime: Participant added, refreshing...');
       loadData();

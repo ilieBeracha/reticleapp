@@ -118,8 +118,8 @@ export async function createEngagement(params: {
 
 /**
  * Update engagement status.
- * 
- * CANONICAL: Status can only be 'completed' or 'aborted'
+ *
+ * Status values: 'pending' (lobby), 'active' (in progress), 'completed', 'cancelled'
  */
 export async function updateEngagementStatus(
   engagementId: string,
@@ -137,10 +137,36 @@ export async function updateEngagementStatus(
 }
 
 /**
- * Mark an engagement as aborted.
+ * Mark an engagement as cancelled.
  */
 export async function abortEngagement(engagementId: string): Promise<Engagement> {
-  return updateEngagementStatus(engagementId, 'aborted');
+  return updateEngagementStatus(engagementId, 'cancelled');
+}
+
+/**
+ * Mark an engagement as completed.
+ */
+export async function completeEngagement(engagementId: string): Promise<Engagement> {
+  return updateEngagementStatus(engagementId, 'completed');
+}
+
+/**
+ * Mark an engagement as started (closes new invites).
+ * Sets started_at timestamp and status to 'active' - after this, new participants cannot join.
+ */
+export async function startEngagement(engagementId: string): Promise<Engagement> {
+  const { data, error } = await supabase
+    .from('engagements')
+    .update({
+      started_at: new Date().toISOString(),
+      status: 'active',
+    })
+    .eq('id', engagementId)
+    .select('*')
+    .single();
+
+  if (error) throw error;
+  return data;
 }
 
 // ============================================================================
@@ -154,10 +180,10 @@ export async function abortEngagement(engagementId: string): Promise<Engagement>
 export async function getEngagementParticipants(
   engagementId: string
 ): Promise<EngagementParticipant[]> {
-  // Get participants
+  // Get participants with their contribution (shots/hits)
   const { data: participants, error } = await supabase
     .from('engagement_participants')
-    .select('id, engagement_id, user_id, state, joined_at, created_at')
+    .select('id, engagement_id, user_id, state, joined_at, created_at, shots_fired, hits')
     .eq('engagement_id', engagementId)
     .order('created_at', { ascending: true });
 
@@ -183,6 +209,8 @@ export async function getEngagementParticipants(
       state: row.state,
       joined_at: row.joined_at,
       created_at: row.created_at,
+      shots_fired: row.shots_fired || null,
+      hits: row.hits || null,
       user_full_name: profile?.full_name || null,
       user_avatar_url: profile?.avatar_url || null,
     };
@@ -296,7 +324,6 @@ export async function addParticipant(
   engagementId: string,
   userId: string
 ): Promise<EngagementParticipant> {
-  // Participants are added directly as 'joined' (async consent model)
   const { data, error } = await supabase
     .from('engagement_participants')
     .insert({
@@ -305,7 +332,7 @@ export async function addParticipant(
       state: 'joined',
       joined_at: new Date().toISOString(),
     })
-    .select('id, engagement_id, user_id, state, joined_at, created_at')
+    .select('id, engagement_id, user_id, state, joined_at, created_at, shots_fired, hits')
     .single();
 
   if (error) throw error;
@@ -324,6 +351,8 @@ export async function addParticipant(
     state: data.state,
     joined_at: data.joined_at,
     created_at: data.created_at,
+    shots_fired: data.shots_fired || null,
+    hits: data.hits || null,
     user_full_name: profile?.full_name || null,
     user_avatar_url: profile?.avatar_url || null,
   };
@@ -343,7 +372,7 @@ export async function updateParticipantState(
     .update({ state })
     .eq('engagement_id', engagementId)
     .eq('user_id', userId)
-    .select('id, engagement_id, user_id, state, joined_at, created_at')
+    .select('id, engagement_id, user_id, state, joined_at, created_at, shots_fired, hits')
     .single();
 
   if (error) throw error;
@@ -362,6 +391,52 @@ export async function updateParticipantState(
     state: data.state,
     joined_at: data.joined_at,
     created_at: data.created_at,
+    shots_fired: data.shots_fired || null,
+    hits: data.hits || null,
+    user_full_name: profile?.full_name || null,
+    user_avatar_url: profile?.avatar_url || null,
+  };
+}
+
+/**
+ * Update a participant's contribution (shots/hits) in a squad engagement.
+ * This is for recording group results where each participant contributes.
+ */
+export async function updateParticipantResults(
+  engagementId: string,
+  userId: string,
+  shotsFired: number,
+  hits: number
+): Promise<EngagementParticipant> {
+  const { data, error } = await supabase
+    .from('engagement_participants')
+    .update({
+      shots_fired: shotsFired,
+      hits: hits,
+    })
+    .eq('engagement_id', engagementId)
+    .eq('user_id', userId)
+    .select('id, engagement_id, user_id, state, joined_at, created_at, shots_fired, hits')
+    .single();
+
+  if (error) throw error;
+
+  // Get profile for this user
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('full_name, avatar_url')
+    .eq('id', userId)
+    .single();
+
+  return {
+    id: data.id,
+    engagement_id: data.engagement_id,
+    user_id: data.user_id,
+    state: data.state,
+    joined_at: data.joined_at,
+    created_at: data.created_at,
+    shots_fired: data.shots_fired || null,
+    hits: data.hits || null,
     user_full_name: profile?.full_name || null,
     user_avatar_url: profile?.avatar_url || null,
   };
@@ -411,4 +486,36 @@ export function getParticipantCounts(
     counts[p.state]++;
   }
   return counts;
+}
+
+/**
+ * Calculate group totals from all participants' contributions.
+ * Used for group engagements where each participant enters shots/hits.
+ */
+export function calculateGroupTotals(participants: EngagementParticipant[]): {
+  totalShotsFired: number;
+  totalHits: number;
+  accuracy: number;
+  submittedCount: number;
+  totalCount: number;
+} {
+  let totalShotsFired = 0;
+  let totalHits = 0;
+  let submittedCount = 0;
+
+  for (const p of participants) {
+    if (p.shots_fired != null && p.shots_fired > 0) {
+      totalShotsFired += p.shots_fired;
+      totalHits += p.hits || 0;
+      submittedCount++;
+    }
+  }
+
+  return {
+    totalShotsFired,
+    totalHits,
+    accuracy: totalShotsFired > 0 ? Math.round((totalHits / totalShotsFired) * 100) : 0,
+    submittedCount,
+    totalCount: participants.length,
+  };
 }
