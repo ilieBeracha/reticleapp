@@ -36,7 +36,7 @@ function featureToSession(f: DashboardFeature): SessionWithDetails {
     drill_config: {
       id: '',
       name: '',
-      drill_goal: (f.drill_goal as any) ?? 'achievement',
+      drill_goal: (f.drill_goal as any) ?? 'engagement',
       target_type: (f.target_type as 'paper' | 'tactical') ?? 'paper',
       distance_m: f.distance_m ?? 0,
       rounds_per_shooter: f.shots,
