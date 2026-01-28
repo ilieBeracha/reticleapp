@@ -5,6 +5,7 @@
  */
 
 import { AlertTriangle, Award, ChevronRight, Clock, Sparkles, Target, TrendingUp, Zap } from 'lucide-react-native';
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import type { Colors, WeeklyStats } from '../UnifiedHomePage.types';
 
@@ -29,7 +30,8 @@ function generateInsight(
   stats: WeeklyStats,
   streak: number,
   lastSessionDaysAgo: number | null,
-  colors: Colors
+  colors: Colors,
+  t: ReturnType<typeof useTranslation>['t']
 ): Insight | null {
   // Priority: achievements > warnings > positive
 
@@ -38,8 +40,8 @@ function generateInsight(
     return {
       type: 'warning',
       icon: <Clock size={16} color={colors.orange} />,
-      text: `${lastSessionDaysAgo} days idle`,
-      highlight: 'Time to train!',
+      text: t('insights.daysIdle', { count: lastSessionDaysAgo }),
+      highlight: t('insights.timeToTrain'),
     };
   }
 
@@ -48,8 +50,8 @@ function generateInsight(
     return {
       type: 'achievement',
       icon: <Award size={16} color="#F59E0B" />,
-      text: 'Elite performance',
-      highlight: `${stats.accuracy}% accuracy`,
+      text: t('insights.elitePerformance'),
+      highlight: t('insights.accuracyHighlight', { accuracy: stats.accuracy }),
     };
   }
 
@@ -58,8 +60,8 @@ function generateInsight(
     return {
       type: 'achievement',
       icon: <Zap size={16} color="#8B5CF6" />,
-      text: 'Training machine',
-      highlight: `${stats.sessions} sessions`,
+      text: t('insights.trainingMachine'),
+      highlight: t('insights.sessionsHighlight', { count: stats.sessions }),
     };
   }
 
@@ -68,8 +70,8 @@ function generateInsight(
     return {
       type: 'achievement',
       icon: <Sparkles size={16} color="#F97316" />,
-      text: 'On fire',
-      highlight: `${streak} day streak`,
+      text: t('insights.onFire'),
+      highlight: t('insights.streakHighlight', { count: streak }),
     };
   }
 
@@ -78,8 +80,8 @@ function generateInsight(
     return {
       type: 'warning',
       icon: <AlertTriangle size={16} color={colors.orange} />,
-      text: 'Focus on fundamentals',
-      highlight: 'Slow is smooth',
+      text: t('insights.focusFundamentals'),
+      highlight: t('insights.slowIsSmooth'),
     };
   }
 
@@ -88,8 +90,8 @@ function generateInsight(
     return {
       type: 'positive',
       icon: <TrendingUp size={16} color={colors.green} />,
-      text: 'Good momentum',
-      highlight: `${stats.sessions} sessions this week`,
+      text: t('insights.goodMomentum'),
+      highlight: t('insights.sessionsThisWeek', { count: stats.sessions }),
     };
   }
 
@@ -98,8 +100,8 @@ function generateInsight(
     return {
       type: 'positive',
       icon: <Target size={16} color={colors.primary} />,
-      text: 'Keep building',
-      highlight: 'Consistency is key',
+      text: t('insights.keepBuilding'),
+      highlight: t('insights.consistencyIsKey'),
     };
   }
 
@@ -107,7 +109,8 @@ function generateInsight(
 }
 
 export function InsightsCard({ stats, streak, lastSessionDaysAgo, colors, onPress }: InsightsCardProps) {
-  const insight = generateInsight(stats, streak, lastSessionDaysAgo, colors);
+  const { t } = useTranslation();
+  const insight = generateInsight(stats, streak, lastSessionDaysAgo, colors, t);
 
   if (!insight) return null;
 

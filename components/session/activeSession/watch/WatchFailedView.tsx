@@ -6,6 +6,7 @@
  */
 
 import { useColors } from '@/hooks/ui/useColors';
+import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import { Watch, X } from 'lucide-react-native';
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -32,6 +33,7 @@ export function WatchFailedView({
   isTeamTraining,
 }: WatchFailedViewProps) {
   const colors = useColors();
+  const { t } = useTranslation();
 
   return (
     <View style={[sharedStyles.container, { backgroundColor: colors.background }]}>
@@ -56,8 +58,8 @@ export function WatchFailedView({
           <Watch size={56} color={colors.textMuted} strokeWidth={1.5} />
         </View>
 
-        <Text style={[styles.title, { color: colors.text }]}>Watch Not Responding</Text>
-        <Text style={[styles.subtitle, { color: colors.textMuted }]}>No worries — you can continue on your phone</Text>
+        <Text style={[styles.title, { color: colors.text }]}>{t('session.watchNotResponding')}</Text>
+        <Text style={[styles.subtitle, { color: colors.textMuted }]}>{t('session.noWorriesContinueOnPhone')}</Text>
 
         <View style={[styles.actions, { marginTop: 32 }]}>
           <TouchableOpacity
@@ -65,7 +67,7 @@ export function WatchFailedView({
             onPress={onContinueWithoutWatch}
           >
             <Ionicons name="phone-portrait-outline" size={18} color={colors.background} />
-            <Text style={[styles.primaryBtnText, { color: colors.background }]}>Use Phone</Text>
+            <Text style={[styles.primaryBtnText, { color: colors.background }]}>{t('session.usePhone')}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -76,7 +78,7 @@ export function WatchFailedView({
             {watchStarting ? (
               <ActivityIndicator size="small" color={colors.textMuted} />
             ) : (
-              <Text style={[styles.subtleBtnText, { color: colors.textMuted }]}>Try Watch Again</Text>
+              <Text style={[styles.subtleBtnText, { color: colors.textMuted }]}>{t('session.tryWatchAgain')}</Text>
             )}
           </TouchableOpacity>
         </View>

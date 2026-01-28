@@ -14,6 +14,7 @@
 import { SessionContextStep } from '@/components/session/creation';
 import type { SessionContextState, SessionPurpose } from '@/components/session/creation/sessionCreation.types';
 import { useColors } from '@/hooks/ui/useColors';
+import { useTranslation } from 'react-i18next';
 import { type TrainingDrillItem } from '@/services/drills';
 import type { ExecutionPolicy } from '@/services/session/types';
 import { Ionicons } from '@expo/vector-icons';
@@ -76,17 +77,18 @@ interface SessionCardProps {
 }
 
 function SessionCard({ session, index, total, onRemove, onMove, colors }: SessionCardProps) {
+  const { t } = useTranslation();
   const isGrouping = session.drill_goal === 'grouping';
   const isSquad = session.engagement_mode === 'squad';
   const purposeColor = isGrouping ? colors.blue : colors.orange;
-  const purposeLabel = isGrouping ? 'Grouping' : isSquad ? 'Squad Engagement' : 'Engagement';
+  const purposeLabel = isGrouping ? t('session.grouping') : isSquad ? t('training.squadEngagement') : t('session.engagement');
 
   // Execution policy display
   const policy = session.execution_policy || 'locked';
   const policyConfig = {
-    locked: { icon: Lock, color: colors.blue, label: 'Locked' },
-    guided: { icon: Sparkles, color: colors.green, label: 'Guided' },
-    free: { icon: Unlock, color: colors.orange, label: 'Free' },
+    locked: { icon: Lock, color: colors.blue, label: t('training.locked') },
+    guided: { icon: Sparkles, color: colors.green, label: t('training.guided') },
+    free: { icon: Unlock, color: colors.orange, label: t('training.free') },
   }[policy];
   const PolicyIcon = policyConfig.icon;
 
@@ -102,7 +104,7 @@ function SessionCard({ session, index, total, onRemove, onMove, colors }: Sessio
         <View style={styles.sessionInfo}>
           <View style={styles.sessionNameRow}>
             <Text style={[styles.sessionName, { color: colors.text }]} numberOfLines={1}>
-              {session.name || `Drill ${index + 1}`}
+              {session.name || t('training.drillNumber', { number: index + 1 })}
             </Text>
             <View style={[styles.policyBadge, { backgroundColor: `${policyConfig.color}15` }]}>
               <PolicyIcon size={10} color={policyConfig.color} />
@@ -117,7 +119,7 @@ function SessionCard({ session, index, total, onRemove, onMove, colors }: Sessio
               >
                 <ModeIcon size={10} color={isSquad ? colors.orange : colors.primary} />
                 <Text style={[styles.policyBadgeText, { color: isSquad ? colors.orange : colors.primary }]}>
-                  {isSquad ? 'Squad' : 'Solo'}
+                  {isSquad ? t('training.squadType') : t('training.solo')}
                 </Text>
               </View>
             )}
@@ -125,9 +127,9 @@ function SessionCard({ session, index, total, onRemove, onMove, colors }: Sessio
           <Text style={[styles.sessionMeta, { color: colors.textMuted }]}>
             {purposeLabel}
             {session.config.distance_m != null ? ` · ${session.config.distance_m}m` : ''}
-            {session.config.rounds != null ? ` · ${session.config.rounds} shots` : ''}
-            {session.config.position && ` · ${session.config.position}`}
-            {session.config.distance_m == null && session.config.rounds == null && ' · Soldier chooses'}
+            {session.config.rounds != null ? ` · ${t('training.shotsCount', { count: session.config.rounds })}` : ''}
+            {session.config.position && ` · ${t(`session.positionOptions.${session.config.position}`)}`}
+            {session.config.distance_m == null && session.config.rounds == null && ` · ${t('training.soldierChooses')}`}
           </Text>
         </View>
         <View style={styles.sessionActions}>
@@ -189,6 +191,7 @@ interface AddSessionSheetProps {
 }
 
 function AddSessionSheet({ visible, onClose, onAdd }: AddSessionSheetProps) {
+  const { t } = useTranslation();
   const colors = useColors();
   const insets = useSafeAreaInsets();
 
@@ -289,7 +292,7 @@ function AddSessionSheet({ visible, onClose, onAdd }: AddSessionSheetProps) {
     // Engagement mode: full config required (distance, rounds, position)
     if (executionPolicy === 'locked') {
       if (!hasDistance) {
-        setValidationError('Distance is required for locked drills');
+        setValidationError(t('training.distanceRequiredForLocked'));
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
         return;
       }
@@ -298,12 +301,12 @@ function AddSessionSheet({ visible, onClose, onAdd }: AddSessionSheetProps) {
         // Engagement drills need rounds specified upfront
         // Grouping drills don't - shot count comes from scanned target
         if (purpose !== 'grouping' && !hasRounds) {
-          setValidationError('Rounds are required for locked engagement drills');
+          setValidationError(t('training.roundsRequiredForLocked'));
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
           return;
         }
         if (!hasPosition) {
-          setValidationError('Position is required for locked drills');
+          setValidationError(t('training.positionRequiredForLocked'));
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
           return;
         }
@@ -314,9 +317,9 @@ function AddSessionSheet({ visible, onClose, onAdd }: AddSessionSheetProps) {
     setValidationError(null);
 
     // Build name based on what's configured
-    const nameParts = [purpose === 'grouping' ? 'Grouping' : 'Engagement'];
+    const nameParts = [purpose === 'grouping' ? t('session.grouping') : t('session.engagement')];
     if (hasDistance) nameParts.push(`${context.distance}m`);
-    if (effectiveEngagementMode === 'squad') nameParts.push('(Squad)');
+    if (effectiveEngagementMode === 'squad') nameParts.push(`(${t('training.squadType')})`);
 
     const newSession: TrainingDrillItem = {
       id: `session-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
@@ -351,7 +354,7 @@ function AddSessionSheet({ visible, onClose, onAdd }: AddSessionSheetProps) {
   }, [purpose, context, executionPolicy, effectiveEngagementMode, onAdd, onClose]);
 
   // Get step title
-  const stepTitle = step === 1 ? 'Drill Type' : 'Configuration';
+  const stepTitle = step === 1 ? t('training.drillType') : t('training.configuration');
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={handleClose}>
@@ -367,7 +370,7 @@ function AddSessionSheet({ visible, onClose, onAdd }: AddSessionSheetProps) {
           <View style={styles.sheetHeaderCenter}>
             <Text style={[styles.sheetTitle, { color: colors.text }]}>{stepTitle}</Text>
             <Text style={[styles.sheetStep, { color: colors.textMuted }]}>
-              Step {step} of {needsStep2 ? 2 : 1}
+              {t('training.stepOf', { step, total: needsStep2 ? 2 : 1 })}
             </Text>
           </View>
           <View style={{ width: 40 }} />
@@ -400,7 +403,7 @@ function AddSessionSheet({ visible, onClose, onAdd }: AddSessionSheetProps) {
             <>
               {/* Purpose Toggle */}
               <View style={styles.purposeRow}>
-                <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>Goal</Text>
+                <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>{t('training.goal')}</Text>
                 <View style={[styles.purposeToggle, { backgroundColor: colors.card, borderColor: colors.border }]}>
                   <TouchableOpacity
                     style={[
@@ -412,7 +415,7 @@ function AddSessionSheet({ visible, onClose, onAdd }: AddSessionSheetProps) {
                   >
                     <Crosshair size={16} color={purpose === 'grouping' ? '#fff' : colors.textMuted} />
                     <Text style={[styles.purposeText, { color: purpose === 'grouping' ? '#fff' : colors.text }]}>
-                      Grouping
+                      {t('session.grouping')}
                     </Text>
                   </TouchableOpacity>
                   <TouchableOpacity
@@ -425,7 +428,7 @@ function AddSessionSheet({ visible, onClose, onAdd }: AddSessionSheetProps) {
                   >
                     <Target size={16} color={purpose === 'engagement' ? '#fff' : colors.textMuted} />
                     <Text style={[styles.purposeText, { color: purpose === 'engagement' ? '#fff' : colors.text }]}>
-                      Engagement
+                      {t('session.engagement')}
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -433,9 +436,9 @@ function AddSessionSheet({ visible, onClose, onAdd }: AddSessionSheetProps) {
 
               {/* Engagement Mode - Solo vs Squad */}
               <View style={styles.policySection}>
-                <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>Mode</Text>
+                <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>{t('training.mode')}</Text>
                 <Text style={[styles.policyHint, { color: colors.textMuted }]}>
-                  {purpose === 'grouping' ? 'Grouping drills are always individual' : 'Individual or team execution?'}
+                  {purpose === 'grouping' ? t('training.groupingAlwaysIndividual') : t('training.individualOrTeam')}
                 </Text>
                 <View style={[styles.policyToggle, { backgroundColor: colors.card, borderColor: colors.border }]}>
                   <TouchableOpacity
@@ -454,7 +457,7 @@ function AddSessionSheet({ visible, onClose, onAdd }: AddSessionSheetProps) {
                     <Text
                       style={[styles.policyText, { color: effectiveEngagementMode === 'solo' ? '#fff' : colors.text }]}
                     >
-                      Solo
+                      {t('training.solo')}
                     </Text>
                   </TouchableOpacity>
                   <TouchableOpacity
@@ -474,7 +477,7 @@ function AddSessionSheet({ visible, onClose, onAdd }: AddSessionSheetProps) {
                     <Text
                       style={[styles.policyText, { color: effectiveEngagementMode === 'squad' ? '#fff' : colors.text }]}
                     >
-                      Squad
+                      {t('training.squadType')}
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -483,9 +486,9 @@ function AddSessionSheet({ visible, onClose, onAdd }: AddSessionSheetProps) {
               {/* Execution Policy - Only show for solo mode */}
               {effectiveEngagementMode !== 'squad' && (
                 <View style={styles.policySection}>
-                  <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>Flexibility</Text>
+                  <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>{t('training.flexibility')}</Text>
                   <Text style={[styles.policyHint, { color: colors.textMuted }]}>
-                    How strictly must soldiers follow the configuration?
+                    {t('training.howStrictlyMustFollow')}
                   </Text>
                   <View style={[styles.policyToggle, { backgroundColor: colors.card, borderColor: colors.border }]}>
                     <TouchableOpacity
@@ -498,7 +501,7 @@ function AddSessionSheet({ visible, onClose, onAdd }: AddSessionSheetProps) {
                     >
                       <Lock size={14} color={executionPolicy === 'locked' ? '#fff' : colors.textMuted} />
                       <Text style={[styles.policyText, { color: executionPolicy === 'locked' ? '#fff' : colors.text }]}>
-                        Locked
+                        {t('training.locked')}
                       </Text>
                     </TouchableOpacity>
                     <TouchableOpacity
@@ -511,7 +514,7 @@ function AddSessionSheet({ visible, onClose, onAdd }: AddSessionSheetProps) {
                     >
                       <Sparkles size={14} color={executionPolicy === 'guided' ? '#fff' : colors.textMuted} />
                       <Text style={[styles.policyText, { color: executionPolicy === 'guided' ? '#fff' : colors.text }]}>
-                        Guided
+                        {t('training.guided')}
                       </Text>
                     </TouchableOpacity>
                     <TouchableOpacity
@@ -524,14 +527,14 @@ function AddSessionSheet({ visible, onClose, onAdd }: AddSessionSheetProps) {
                     >
                       <Unlock size={14} color={executionPolicy === 'free' ? '#fff' : colors.textMuted} />
                       <Text style={[styles.policyText, { color: executionPolicy === 'free' ? '#fff' : colors.text }]}>
-                        Free
+                        {t('training.free')}
                       </Text>
                     </TouchableOpacity>
                   </View>
                   <Text style={[styles.policyDesc, { color: colors.textMuted }]}>
-                    {executionPolicy === 'locked' && 'Soldiers must execute exactly as defined'}
-                    {executionPolicy === 'guided' && 'Defaults pre-filled, soldiers may adjust'}
-                    {executionPolicy === 'free' && 'Soldiers choose everything freely'}
+                    {executionPolicy === 'locked' && t('training.lockedDescription')}
+                    {executionPolicy === 'guided' && t('training.guidedDescription')}
+                    {executionPolicy === 'free' && t('training.freeDescription')}
                   </Text>
                 </View>
               )}
@@ -546,7 +549,7 @@ function AddSessionSheet({ visible, onClose, onAdd }: AddSessionSheetProps) {
               {/* Summary of Step 1 choices */}
               <View style={[styles.summaryCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
                 <View style={styles.summaryRow}>
-                  <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>Goal</Text>
+                  <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>{t('training.goal')}</Text>
                   <View style={styles.summaryValue}>
                     {purpose === 'grouping' ? (
                       <Crosshair size={14} color={colors.primary} />
@@ -554,12 +557,12 @@ function AddSessionSheet({ visible, onClose, onAdd }: AddSessionSheetProps) {
                       <Target size={14} color={colors.orange} />
                     )}
                     <Text style={[styles.summaryText, { color: colors.text }]}>
-                      {purpose === 'grouping' ? 'Grouping' : 'Engagement'}
+                      {purpose === 'grouping' ? t('session.grouping') : t('session.engagement')}
                     </Text>
                   </View>
                 </View>
                 <View style={styles.summaryRow}>
-                  <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>Mode</Text>
+                  <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>{t('training.mode')}</Text>
                   <View style={styles.summaryValue}>
                     {effectiveEngagementMode === 'solo' ? (
                       <User size={14} color={colors.primary} />
@@ -567,19 +570,19 @@ function AddSessionSheet({ visible, onClose, onAdd }: AddSessionSheetProps) {
                       <Users size={14} color={colors.orange} />
                     )}
                     <Text style={[styles.summaryText, { color: colors.text }]}>
-                      {effectiveEngagementMode === 'solo' ? 'Solo' : 'Squad'}
+                      {effectiveEngagementMode === 'solo' ? t('training.solo') : t('training.squadType')}
                     </Text>
                   </View>
                 </View>
                 {effectiveEngagementMode !== 'squad' && (
                   <View style={styles.summaryRow}>
-                    <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>Flexibility</Text>
+                    <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>{t('training.flexibility')}</Text>
                     <View style={styles.summaryValue}>
                       {executionPolicy === 'locked' && <Lock size={14} color={colors.blue} />}
                       {executionPolicy === 'guided' && <Sparkles size={14} color={colors.green} />}
                       {executionPolicy === 'free' && <Unlock size={14} color={colors.orange} />}
                       <Text style={[styles.summaryText, { color: colors.text }]}>
-                        {executionPolicy === 'locked' ? 'Locked' : executionPolicy === 'guided' ? 'Guided' : 'Free'}
+                        {executionPolicy === 'locked' ? t('training.locked') : executionPolicy === 'guided' ? t('training.guided') : t('training.free')}
                       </Text>
                     </View>
                   </View>
@@ -592,10 +595,10 @@ function AddSessionSheet({ visible, onClose, onAdd }: AddSessionSheetProps) {
                   {executionPolicy === 'guided' && (
                     <View style={styles.optionalHeader}>
                       <Text style={[styles.optionalLabel, { color: colors.textMuted }]}>
-                        SUGGESTED DEFAULTS (OPTIONAL)
+                        {t('training.suggestedDefaultsOptional')}
                       </Text>
                       <Text style={[styles.optionalHint, { color: colors.textMuted }]}>
-                        Soldiers can adjust these values when executing
+                        {t('training.soldiersCanAdjust')}
                       </Text>
                     </View>
                   )}
@@ -620,15 +623,15 @@ function AddSessionSheet({ visible, onClose, onAdd }: AddSessionSheetProps) {
                   >
                     <Users size={20} color={colors.primary} />
                     <View style={styles.freeNoticeText}>
-                      <Text style={[styles.freeNoticeTitle, { color: colors.text }]}>Squad Session</Text>
+                      <Text style={[styles.freeNoticeTitle, { color: colors.text }]}>{t('training.squadSession')}</Text>
                       <Text style={[styles.freeNoticeDesc, { color: colors.textMuted }]}>
-                        Team drill with shared results. Only distance is configured.
+                        {t('training.squadSessionDescription')}
                       </Text>
                     </View>
                   </View>
 
                   <View style={styles.squadDistanceSection}>
-                    <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>Distance</Text>
+                    <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>{t('session.distance')}</Text>
                     <View style={[styles.distanceRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
                       {[15, 25, 50, 100].map((d) => {
                         const isActive = context.distance === d && !customDistanceEditing;
@@ -715,13 +718,13 @@ function AddSessionSheet({ visible, onClose, onAdd }: AddSessionSheetProps) {
                           >
                             {context.distance > 0 && ![15, 25, 50, 100].includes(context.distance)
                               ? `${context.distance}m`
-                              : 'Other'}
+                              : t('common.other')}
                           </Text>
                         </TouchableOpacity>
                       )}
                     </View>
                     {context.distance === 0 && (
-                      <Text style={[styles.policyDesc, { color: colors.red }]}>Select a distance</Text>
+                      <Text style={[styles.policyDesc, { color: colors.red }]}>{t('training.selectDistanceRequired')}</Text>
                     )}
                   </View>
                 </>
@@ -734,9 +737,9 @@ function AddSessionSheet({ visible, onClose, onAdd }: AddSessionSheetProps) {
                 >
                   <Unlock size={20} color={colors.orange} />
                   <View style={styles.freeNoticeText}>
-                    <Text style={[styles.freeNoticeTitle, { color: colors.text }]}>Full Freedom Mode</Text>
+                    <Text style={[styles.freeNoticeTitle, { color: colors.text }]}>{t('training.fullFreedomMode')}</Text>
                     <Text style={[styles.freeNoticeDesc, { color: colors.textMuted }]}>
-                      Soldiers will choose their own distance, rounds, and position when executing this drill.
+                      {t('training.fullFreedomDescription')}
                     </Text>
                   </View>
                 </View>
@@ -755,7 +758,7 @@ function AddSessionSheet({ visible, onClose, onAdd }: AddSessionSheetProps) {
               activeOpacity={0.85}
             >
               <Text style={[styles.sheetSubmitText, { color: colors.background }]}>
-                {needsStep2 ? 'Continue' : 'Add Drill'}
+                {needsStep2 ? t('common.continue') : t('training.addDrill')}
               </Text>
               {needsStep2 ? (
                 <Ionicons name="arrow-forward" size={18} color={colors.background} />
@@ -770,7 +773,7 @@ function AddSessionSheet({ visible, onClose, onAdd }: AddSessionSheetProps) {
               activeOpacity={0.85}
             >
               <Plus size={18} color={colors.background} />
-              <Text style={[styles.sheetSubmitText, { color: colors.background }]}>Add Drill</Text>
+              <Text style={[styles.sheetSubmitText, { color: colors.background }]}>{t('training.addDrill')}</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -784,6 +787,7 @@ function AddSessionSheet({ visible, onClose, onAdd }: AddSessionSheetProps) {
 // ============================================================================
 
 export function AddDrillStep({ drills, onAddDrill, onRemoveDrill, onMoveDrill }: AddDrillStepProps) {
+  const { t } = useTranslation();
   const colors = useColors();
   const [showSheet, setShowSheet] = useState(false);
 
@@ -808,9 +812,9 @@ export function AddDrillStep({ drills, onAddDrill, onRemoveDrill, onMoveDrill }:
           <Target size={20} color={colors.text} />
         </View>
         <View style={styles.headerText}>
-          <Text style={[styles.headerTitle, { color: colors.text }]}>What will you train?</Text>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>{t('training.whatWillYouTrain')}</Text>
           <Text style={[styles.headerHint, { color: colors.textMuted }]}>
-            Add drills · Everyone runs them in parallel
+            {t('training.addDrillsEveryoneRuns')}
           </Text>
         </View>
       </View>
@@ -850,7 +854,7 @@ export function AddDrillStep({ drills, onAddDrill, onRemoveDrill, onMoveDrill }:
       >
         <Plus size={18} color={drills.length === 0 ? '#fff' : colors.primary} />
         <Text style={[styles.addBtnText, { color: drills.length === 0 ? '#fff' : colors.primary }]}>
-          {drills.length === 0 ? 'Add First Drill' : 'Add Another Drill'}
+          {drills.length === 0 ? t('training.addFirstDrill') : t('training.addAnotherDrill')}
         </Text>
       </TouchableOpacity>
 
@@ -858,7 +862,7 @@ export function AddDrillStep({ drills, onAddDrill, onRemoveDrill, onMoveDrill }:
       {drills.length === 0 && (
         <View style={styles.emptyHint}>
           <Circle size={16} color={colors.textMuted} />
-          <Text style={[styles.emptyHintText, { color: colors.textMuted }]}>Add at least one drill to continue</Text>
+          <Text style={[styles.emptyHintText, { color: colors.textMuted }]}>{t('training.addAtLeastOneDrill')}</Text>
         </View>
       )}
 

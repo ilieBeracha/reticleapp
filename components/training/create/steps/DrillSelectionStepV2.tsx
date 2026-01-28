@@ -21,6 +21,7 @@ import type {
   TrainingDrillItem,
 } from '@/services/drills';
 import { buildTrainingDrillItem, validateDrillConfig } from '@/services/drills';
+import { useTranslation } from 'react-i18next';
 import * as Haptics from 'expo-haptics';
 import { Check, Focus, Plus, Save, Star, Target, Trophy, X, Zap } from 'lucide-react-native';
 import { useEffect, useMemo, useState } from 'react';
@@ -59,18 +60,18 @@ interface DrillSelectionStepV2Props {
 // CONSTANTS
 // ============================================================================
 
-const CATEGORY_CONFIG: Record<DrillCategory, { label: string; icon: any; color: string }> = {
-  zeroing: { label: 'Zeroing', icon: Focus, color: '#3B82F6' },
-  grouping: { label: 'Grouping', icon: Target, color: '#22C55E' },
-  speed: { label: 'Speed', icon: Zap, color: '#F59E0B' },
-  qualification: { label: 'Qualification', icon: Trophy, color: '#8B5CF6' },
-};
+const getCategoryConfig = (t: (key: string) => string): Record<DrillCategory, { label: string; icon: any; color: string }> => ({
+  zeroing: { label: t('training.categoryZeroing'), icon: Focus, color: '#3B82F6' },
+  grouping: { label: t('session.grouping'), icon: Target, color: '#22C55E' },
+  speed: { label: t('training.categorySpeed'), icon: Zap, color: '#F59E0B' },
+  qualification: { label: t('training.categoryQualification'), icon: Trophy, color: '#8B5CF6' },
+});
 
-const POSITIONS: { value: ShootingPosition; label: string }[] = [
-  { value: 'prone', label: 'Prone' },
-  { value: 'kneeling', label: 'Kneeling' },
-  { value: 'sitting', label: 'Sitting' },
-  { value: 'standing', label: 'Standing' },
+const getPositions = (t: (key: string) => string): { value: ShootingPosition; label: string }[] => [
+  { value: 'prone', label: t('session.positionOptions.prone') },
+  { value: 'kneeling', label: t('session.positionOptions.kneeling') },
+  { value: 'sitting', label: t('session.sitting') },
+  { value: 'standing', label: t('session.positionOptions.standing') },
 ];
 
 // ============================================================================
@@ -90,6 +91,8 @@ function DrillCard({
   onPress: () => void;
   colors: ReturnType<typeof useColors>;
 }) {
+  const { t } = useTranslation();
+  const CATEGORY_CONFIG = getCategoryConfig(t);
   const categoryConfig = drill.category ? CATEGORY_CONFIG[drill.category] : null;
   const goalColor = drill.drill_goal === 'grouping' ? '#22C55E' : '#F59E0B';
 
@@ -115,8 +118,8 @@ function DrillCard({
         </Text>
         <View style={styles.drillMetaRow}>
           <Text style={[styles.drillMeta, { color: isAdded ? colors.background + '99' : colors.textMuted }]}>
-            {drill.default_shots} shots
-            {drill.supports_time && ' · timed'}
+            {t('training.shotsCount', { count: drill.default_shots })}
+            {drill.supports_time && ` · ${t('training.timed')}`}
           </Text>
           {preset && (
             <View style={[styles.presetBadge, { backgroundColor: colors.primary + '20' }]}>
@@ -151,6 +154,7 @@ function ProgramItem({
   onAdjust: () => void;
   colors: ReturnType<typeof useColors>;
 }) {
+  const { t } = useTranslation();
   const goalColor = drill.drill_goal === 'grouping' ? '#22C55E' : '#F59E0B';
 
   return (
@@ -178,11 +182,11 @@ function ProgramItem({
             <View style={[styles.programGoalBadge, { backgroundColor: goalColor + '20' }]}>
               <View style={[styles.programGoalDot, { backgroundColor: goalColor }]} />
               <Text style={[styles.programGoalText, { color: goalColor }]}>
-                {drill.drill_goal === 'grouping' ? 'Grouping' : 'Engagement'}
+                {drill.drill_goal === 'grouping' ? t('session.grouping') : t('session.engagement')}
               </Text>
             </View>
             <Text style={[styles.programParams, { color: colors.textMuted }]}>
-              {drill.config.distance_m}m · {drill.config.rounds} rds
+              {drill.config.distance_m}m · {t('training.roundsCount', { count: drill.config.rounds })}
             </Text>
           </View>
         </View>
@@ -252,6 +256,8 @@ function ConfigureModal({
   canSavePreset?: boolean;
   colors: ReturnType<typeof useColors>;
 }) {
+  const { t } = useTranslation();
+  const POSITIONS = getPositions(t);
   const [distance, setDistance] = useState(100);
   const [customDistance, setCustomDistance] = useState('');
   const [showCustomInput, setShowCustomInput] = useState(false);
@@ -329,12 +335,12 @@ function ConfigureModal({
           <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
             {/* Distance */}
             <View style={styles.configSection}>
-              <Text style={[styles.configLabel, { color: colors.text }]}>Distance</Text>
+              <Text style={[styles.configLabel, { color: colors.text }]}>{t('session.distance')}</Text>
 
               {/* Restricted distances info */}
               {hasRestrictedDistances && (
                 <Text style={[styles.configHint, { color: colors.textMuted }]}>
-                  This drill requires specific distances
+                  {t('training.drillRequiresSpecificDistances')}
                 </Text>
               )}
 
@@ -388,7 +394,7 @@ function ConfigureModal({
                         { color: showCustomInput || !isDistanceInList ? colors.background : colors.text },
                       ]}
                     >
-                      Other
+                      {t('common.other')}
                     </Text>
                   </TouchableOpacity>
                 )}
@@ -399,7 +405,7 @@ function ConfigureModal({
                 <View style={[styles.customInputContainer, { borderColor: colors.border }]}>
                   <TextInput
                     style={[styles.customInput, { color: colors.text }]}
-                    placeholder="Enter distance"
+                    placeholder={t('training.enterDistance')}
                     placeholderTextColor={colors.textMuted}
                     keyboardType="number-pad"
                     value={customDistance}
@@ -412,7 +418,7 @@ function ConfigureModal({
                     }}
                     autoFocus
                   />
-                  <Text style={[styles.customInputSuffix, { color: colors.textMuted }]}>meters</Text>
+                  <Text style={[styles.customInputSuffix, { color: colors.textMuted }]}>{t('training.meters')}</Text>
                 </View>
               )}
             </View>
@@ -420,7 +426,7 @@ function ConfigureModal({
             {/* Rounds */}
             {!drill.fixed_shots && (
               <View style={styles.configSection}>
-                <Text style={[styles.configLabel, { color: colors.text }]}>Rounds</Text>
+                <Text style={[styles.configLabel, { color: colors.text }]}>{t('training.rounds')}</Text>
                 <View style={styles.configOptions}>
                   {[3, 5, 10, 20].map((r) => (
                     <TouchableOpacity
@@ -449,27 +455,27 @@ function ConfigureModal({
             {/* Time Limit */}
             {drill.supports_time && (
               <View style={styles.configSection}>
-                <Text style={[styles.configLabel, { color: colors.text }]}>Time Limit</Text>
+                <Text style={[styles.configLabel, { color: colors.text }]}>{t('session.timeLimit')}</Text>
                 <View style={styles.configOptions}>
-                  {[null, 30, 60, 120].map((t) => (
+                  {[null, 30, 60, 120].map((timeVal) => (
                     <TouchableOpacity
-                      key={t ?? 'none'}
+                      key={timeVal ?? 'none'}
                       style={[
                         styles.configChip,
                         {
-                          backgroundColor: timeLimit === t ? colors.text : colors.secondary,
-                          borderColor: timeLimit === t ? colors.text : colors.border,
+                          backgroundColor: timeLimit === timeVal ? colors.text : colors.secondary,
+                          borderColor: timeLimit === timeVal ? colors.text : colors.border,
                         },
                       ]}
                       onPress={() => {
                         Haptics.selectionAsync();
-                        setTimeLimit(t);
+                        setTimeLimit(timeVal);
                       }}
                     >
                       <Text
-                        style={[styles.configChipText, { color: timeLimit === t ? colors.background : colors.text }]}
+                        style={[styles.configChipText, { color: timeLimit === timeVal ? colors.background : colors.text }]}
                       >
-                        {t ? `${t}s` : 'None'}
+                        {timeVal ? `${timeVal}s` : t('common.none')}
                       </Text>
                     </TouchableOpacity>
                   ))}
@@ -480,7 +486,7 @@ function ConfigureModal({
             {/* Position */}
             {drill.supports_position && (
               <View style={styles.configSection}>
-                <Text style={[styles.configLabel, { color: colors.text }]}>Position</Text>
+                <Text style={[styles.configLabel, { color: colors.text }]}>{t('session.position')}</Text>
                 <View style={styles.configOptions}>
                   {POSITIONS.map((p) => (
                     <TouchableOpacity
@@ -515,7 +521,7 @@ function ConfigureModal({
             {drill.fixed_shots && (
               <View style={[styles.infoBox, { backgroundColor: colors.primary + '15' }]}>
                 <Text style={[styles.infoText, { color: colors.primary }]}>
-                  This drill uses exactly {drill.default_shots} shots
+                  {t('training.drillUsesExactlyShots', { count: drill.default_shots })}
                 </Text>
               </View>
             )}
@@ -543,7 +549,7 @@ function ConfigureModal({
                 }}
               >
                 <Save size={16} color={colors.textMuted} />
-                <Text style={[styles.savePresetText, { color: colors.textMuted }]}>Save Preset</Text>
+                <Text style={[styles.savePresetText, { color: colors.textMuted }]}>{t('training.savePreset')}</Text>
               </TouchableOpacity>
             )}
             <TouchableOpacity
@@ -552,7 +558,7 @@ function ConfigureModal({
               disabled={!validation.valid}
             >
               <Text style={[styles.addBtnText, { color: validation.valid ? colors.background : colors.textMuted }]}>
-                Add to Training
+                {t('training.addToTraining')}
               </Text>
             </TouchableOpacity>
           </View>
@@ -577,7 +583,9 @@ export function DrillSelectionStepV2({
   onSavePreset,
   canCreatePresets,
 }: DrillSelectionStepV2Props) {
+  const { t } = useTranslation();
   const colors = useColors();
+  const CATEGORY_CONFIG = getCategoryConfig(t);
 
   // Modal state
   const [selectedDrill, setSelectedDrill] = useState<CanonicalDrill | null>(null);
@@ -637,9 +645,9 @@ export function DrillSelectionStepV2({
       {drills.length > 0 && (
         <Animated.View entering={FadeIn.duration(200)} style={styles.section}>
           <View style={styles.programHeader}>
-            <Text style={[styles.programTitle, { color: colors.text }]}>PROGRAM</Text>
+            <Text style={[styles.programTitle, { color: colors.text }]}>{t('training.program').toUpperCase()}</Text>
             <Text style={[styles.programStats, { color: colors.textMuted }]}>
-              {drills.length} {drills.length === 1 ? 'drill' : 'drills'} · {totalRounds} rounds
+              {t('training.drillsRounds', { drills: drills.length, rounds: totalRounds })}
             </Text>
           </View>
           <View style={styles.programList}>
@@ -660,7 +668,7 @@ export function DrillSelectionStepV2({
       {/* Team Presets (if any) */}
       {teamPresets.length > 0 && (
         <View style={styles.section}>
-          <SectionHeader icon={Star} title="Team Presets" color="#F59E0B" count={teamPresets.length} colors={colors} />
+          <SectionHeader icon={Star} title={t('training.teamPresets')} color="#F59E0B" count={teamPresets.length} colors={colors} />
           <View style={styles.drillGrid}>
             {teamPresets.slice(0, 4).map((preset) => {
               const drill = preset.drill;

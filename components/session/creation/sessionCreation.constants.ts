@@ -7,6 +7,8 @@
 import type { DrillGoal } from '@/types/workspace';
 import type { Position, PurposeOption, SessionPurpose } from './sessionCreation.types';
 
+// Position labels are translated in SessionContextStep component
+
 // ============================================================================
 // PURPOSE OPTIONS - "What am I going to do now?"
 // ============================================================================

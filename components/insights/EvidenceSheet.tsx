@@ -12,6 +12,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { format } from 'date-fns';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import {
   Activity,
   Calendar,
@@ -54,6 +55,7 @@ interface SessionCardProps {
 }
 
 function SessionCard({ session, onPress, colors }: SessionCardProps) {
+  const { t } = useTranslation();
   const formattedDate = format(new Date(session.started_at), 'MMM d, yyyy');
   const formattedTime = format(new Date(session.started_at), 'h:mm a');
 
@@ -70,7 +72,7 @@ function SessionCard({ session, onPress, colors }: SessionCardProps) {
       <View style={styles.sessionHeader}>
         <View style={styles.sessionInfo}>
           <Text style={[styles.sessionName, { color: colors.text }]}>
-            {session.drill_name || session.drill_config?.name || 'Session'}
+            {session.drill_name || session.drill_config?.name || t('session.title')}
           </Text>
           <View style={styles.sessionMeta}>
             <Calendar size={12} color={colors.textMuted} />
@@ -90,7 +92,7 @@ function SessionCard({ session, onPress, colors }: SessionCardProps) {
             <Text style={[styles.statValue, { color: colors.text }]}>
               {session.stats.shots_fired}
             </Text>
-            <Text style={[styles.statLabel, { color: colors.textMuted }]}>shots</Text>
+            <Text style={[styles.statLabel, { color: colors.textMuted }]}>{t('session.shots')}</Text>
           </View>
 
           {session.stats.accuracy_pct > 0 && (
@@ -99,7 +101,7 @@ function SessionCard({ session, onPress, colors }: SessionCardProps) {
               <Text style={[styles.statValue, { color: colors.text }]}>
                 {session.stats.accuracy_pct}%
               </Text>
-              <Text style={[styles.statLabel, { color: colors.textMuted }]}>accuracy</Text>
+              <Text style={[styles.statLabel, { color: colors.textMuted }]}>{t('session.accuracy')}</Text>
             </View>
           )}
 
@@ -109,7 +111,7 @@ function SessionCard({ session, onPress, colors }: SessionCardProps) {
               <Text style={[styles.statValue, { color: colors.text }]}>
                 {Math.round(session.stats.best_dispersion_cm * 10) / 10}cm
               </Text>
-              <Text style={[styles.statLabel, { color: colors.textMuted }]}>group</Text>
+              <Text style={[styles.statLabel, { color: colors.textMuted }]}>{t('session.grouping')}</Text>
             </View>
           )}
 
@@ -119,7 +121,7 @@ function SessionCard({ session, onPress, colors }: SessionCardProps) {
               <Text style={[styles.statValue, { color: colors.text }]}>
                 {Math.round(session.stats.avg_distance_m)}m
               </Text>
-              <Text style={[styles.statLabel, { color: colors.textMuted }]}>distance</Text>
+              <Text style={[styles.statLabel, { color: colors.textMuted }]}>{t('session.distance')}</Text>
             </View>
           )}
         </View>
@@ -160,11 +162,12 @@ function SessionCard({ session, onPress, colors }: SessionCardProps) {
 // ============================================================================
 
 function LoadingState({ colors }: { colors: ReturnType<typeof useColors> }) {
+  const { t } = useTranslation();
   return (
     <View style={styles.loadingContainer}>
       <ActivityIndicator size="large" color={colors.primary} />
       <Text style={[styles.loadingText, { color: colors.textMuted }]}>
-        Loading sessions...
+        {t('insights.evidence.loadingSessions')}
       </Text>
     </View>
   );
@@ -175,12 +178,13 @@ function LoadingState({ colors }: { colors: ReturnType<typeof useColors> }) {
 // ============================================================================
 
 function EmptyState({ colors }: { colors: ReturnType<typeof useColors> }) {
+  const { t } = useTranslation();
   return (
     <View style={styles.emptyContainer}>
       <Ionicons name="document-text-outline" size={48} color={colors.textMuted} />
-      <Text style={[styles.emptyTitle, { color: colors.text }]}>No sessions found</Text>
+      <Text style={[styles.emptyTitle, { color: colors.text }]}>{t('insights.evidence.noSessionsFound')}</Text>
       <Text style={[styles.emptyText, { color: colors.textMuted }]}>
-        The sessions backing this insight are no longer available
+        {t('insights.evidence.sessionsNoLongerAvailable')}
       </Text>
     </View>
   );
@@ -191,6 +195,7 @@ function EmptyState({ colors }: { colors: ReturnType<typeof useColors> }) {
 // ============================================================================
 
 export function EvidenceSheet({ visible, context, onClose }: EvidenceSheetProps) {
+  const { t } = useTranslation();
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -231,9 +236,9 @@ export function EvidenceSheet({ visible, context, onClose }: EvidenceSheetProps)
       } catch (e: any) {
         console.error('Failed to load evidence sessions:', e);
         if (e?.message === 'AUTH_ERROR') {
-          setError('Session expired. Please close and reopen the app.');
+          setError(t('insights.evidence.sessionExpired'));
         } else {
-          setError('Failed to load sessions');
+          setError(t('insights.evidence.failedToLoad'));
         }
       } finally {
         setLoading(false);
@@ -269,7 +274,7 @@ export function EvidenceSheet({ visible, context, onClose }: EvidenceSheetProps)
         {/* Header */}
         <View style={[styles.header, { borderBottomColor: colors.border }]}>
           <View style={styles.headerContent}>
-            <Text style={[styles.headerTitle, { color: colors.text }]}>Evidence</Text>
+            <Text style={[styles.headerTitle, { color: colors.text }]}>{t('insights.evidence.title')}</Text>
             <Text style={[styles.headerSubtitle, { color: colors.textMuted }]}>
               {context.title}
             </Text>
@@ -295,7 +300,7 @@ export function EvidenceSheet({ visible, context, onClose }: EvidenceSheetProps)
           <View style={[styles.infoBanner, { backgroundColor: colors.card }]}>
             <Ionicons name="information-circle" size={18} color={colors.primary} />
             <Text style={[styles.infoText, { color: colors.textMuted }]}>
-              These sessions contributed to the insight "{context.title}"
+              {t('insights.evidence.contributingSessions', { title: context.title })}
             </Text>
           </View>
 
@@ -304,7 +309,7 @@ export function EvidenceSheet({ visible, context, onClose }: EvidenceSheetProps)
           ) : error ? (
             <View style={styles.emptyContainer}>
               <Ionicons name="alert-circle-outline" size={48} color={colors.destructive || '#EF4444'} />
-              <Text style={[styles.emptyTitle, { color: colors.text }]}>Unable to load</Text>
+              <Text style={[styles.emptyTitle, { color: colors.text }]}>{t('insights.evidence.unableToLoad')}</Text>
               <Text style={[styles.emptyText, { color: colors.textMuted }]}>
                 {error}
               </Text>
@@ -314,7 +319,7 @@ export function EvidenceSheet({ visible, context, onClose }: EvidenceSheetProps)
           ) : (
             <View style={styles.sessionsList}>
               <Text style={[styles.sessionsCount, { color: colors.textMuted }]}>
-                {sessions.length} session{sessions.length !== 1 ? 's' : ''}
+                {t('insights.evidence.sessionsCount', { count: sessions.length })}
               </Text>
               {sessions.map((session) => (
                 <SessionCard
@@ -326,7 +331,7 @@ export function EvidenceSheet({ visible, context, onClose }: EvidenceSheetProps)
               ))}
               {context.sessionIds.length > 10 && (
                 <Text style={[styles.moreText, { color: colors.textMuted }]}>
-                  +{context.sessionIds.length - 10} more sessions
+                  {t('insights.evidence.moreSessions', { count: context.sessionIds.length - 10 })}
                 </Text>
               )}
             </View>

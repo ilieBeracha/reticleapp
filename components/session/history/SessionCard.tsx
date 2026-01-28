@@ -1,6 +1,7 @@
 import { useColors } from '@/hooks/ui/useColors';
 import type { SessionWithDetails } from '@/services/session/types';
 import { isGroupingSession } from '@/utils/drillGoal';
+import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
@@ -20,6 +21,7 @@ interface SessionCardProps {
 
 export function SessionCard({ session, onPress, compact = false }: SessionCardProps) {
   const colors = useColors();
+  const { t } = useTranslation();
   
   // Determine if this is a grouping session
   const isGrouping = isGroupingSession(session);
@@ -34,7 +36,7 @@ export function SessionCard({ session, onPress, compact = false }: SessionCardPr
   const shots = session.stats?.shots_fired || 0;
   const hits = session.stats?.hits_total || 0;
   const distance = session.drill_config?.distance_m;
-  const drillName = session.drill_config?.name || session.drill_name || 'Quick Practice';
+  const drillName = session.drill_config?.name || session.drill_name || t('session.quickPractice');
   const weaponName = session.weapon_name;
   const statusColor = STATUS_COLORS[session.status] || colors.textMuted;
   const bestDispersion = session.stats?.best_dispersion_cm;
@@ -124,19 +126,19 @@ export function SessionCard({ session, onPress, compact = false }: SessionCardPr
             {/* Participants */}
             <View style={styles.stat}>
               <Text style={[styles.statValue, { color: colors.primary }]}>{participantCount}</Text>
-              <Text style={[styles.statLabel, { color: colors.textMuted }]}>shooters</Text>
+              <Text style={[styles.statLabel, { color: colors.textMuted }]}>{t('session.shooters', { count: participantCount })}</Text>
             </View>
 
             {/* Shots */}
             <View style={styles.stat}>
               <Text style={[styles.statValue, { color: colors.text }]}>{shots}</Text>
-              <Text style={[styles.statLabel, { color: colors.textMuted }]}>shots</Text>
+              <Text style={[styles.statLabel, { color: colors.textMuted }]}>{t('session.shots')}</Text>
             </View>
 
             {/* Hits */}
             <View style={styles.stat}>
               <Text style={[styles.statValue, { color: colors.text }]}>{hits}</Text>
-              <Text style={[styles.statLabel, { color: colors.textMuted }]}>hits</Text>
+              <Text style={[styles.statLabel, { color: colors.textMuted }]}>{t('session.hits')}</Text>
             </View>
 
             {/* Distance */}
@@ -144,7 +146,7 @@ export function SessionCard({ session, onPress, compact = false }: SessionCardPr
               <Text style={[styles.statValue, { color: distance ? colors.text : colors.textMuted }]}>
                 {distance ? `${distance}m` : '—'}
               </Text>
-              <Text style={[styles.statLabel, { color: colors.textMuted }]}>dist</Text>
+              <Text style={[styles.statLabel, { color: colors.textMuted }]}>{t('session.dist')}</Text>
             </View>
           </>
         ) : isGrouping ? (
@@ -153,7 +155,7 @@ export function SessionCard({ session, onPress, compact = false }: SessionCardPr
             {/* Shots */}
             <View style={styles.stat}>
               <Text style={[styles.statValue, { color: colors.text }]}>{shots}</Text>
-              <Text style={[styles.statLabel, { color: colors.textMuted }]}>shots</Text>
+              <Text style={[styles.statLabel, { color: colors.textMuted }]}>{t('session.shots')}</Text>
             </View>
 
             {/* Group Size */}
@@ -161,7 +163,7 @@ export function SessionCard({ session, onPress, compact = false }: SessionCardPr
               <Text style={[styles.statValue, { color: bestDispersion != null ? colors.orange : colors.textMuted }]}>
                 {bestDispersion != null ? `${bestDispersion.toFixed(1)}cm` : '—'}
               </Text>
-              <Text style={[styles.statLabel, { color: colors.textMuted }]}>group</Text>
+              <Text style={[styles.statLabel, { color: colors.textMuted }]}>{t('session.group')}</Text>
             </View>
 
             {/* Distance */}
@@ -169,7 +171,7 @@ export function SessionCard({ session, onPress, compact = false }: SessionCardPr
               <Text style={[styles.statValue, { color: distance ? colors.text : colors.textMuted }]}>
                 {distance ? `${distance}m` : '—'}
               </Text>
-              <Text style={[styles.statLabel, { color: colors.textMuted }]}>dist</Text>
+              <Text style={[styles.statLabel, { color: colors.textMuted }]}>{t('session.dist')}</Text>
             </View>
 
             {/* Duration */}
@@ -177,7 +179,7 @@ export function SessionCard({ session, onPress, compact = false }: SessionCardPr
               <Text style={[styles.statValue, { color: durationMins ? colors.text : colors.textMuted }]}>
                 {formatDuration(durationMins)}
               </Text>
-              <Text style={[styles.statLabel, { color: colors.textMuted }]}>time</Text>
+              <Text style={[styles.statLabel, { color: colors.textMuted }]}>{t('session.time')}</Text>
             </View>
           </>
         ) : (
@@ -186,7 +188,7 @@ export function SessionCard({ session, onPress, compact = false }: SessionCardPr
             {/* Shots */}
             <View style={styles.stat}>
               <Text style={[styles.statValue, { color: colors.text }]}>{shots}</Text>
-              <Text style={[styles.statLabel, { color: colors.textMuted }]}>shots</Text>
+              <Text style={[styles.statLabel, { color: colors.textMuted }]}>{t('session.shots')}</Text>
             </View>
 
             {/* Hits */}
@@ -194,7 +196,7 @@ export function SessionCard({ session, onPress, compact = false }: SessionCardPr
               <Text style={[styles.statValue, { color: colors.text }]}>
                 {hits}/{shots}
               </Text>
-              <Text style={[styles.statLabel, { color: colors.textMuted }]}>hits</Text>
+              <Text style={[styles.statLabel, { color: colors.textMuted }]}>{t('session.hits')}</Text>
             </View>
 
             {/* Accuracy */}
@@ -202,7 +204,7 @@ export function SessionCard({ session, onPress, compact = false }: SessionCardPr
               <Text style={[styles.statValue, { color: accuracy !== null ? colors.text : colors.textMuted }]}>
                 {accuracy !== null ? `${accuracy}%` : '—'}
               </Text>
-              <Text style={[styles.statLabel, { color: colors.textMuted }]}>acc</Text>
+              <Text style={[styles.statLabel, { color: colors.textMuted }]}>{t('session.acc')}</Text>
             </View>
 
             {/* Distance */}
@@ -210,7 +212,7 @@ export function SessionCard({ session, onPress, compact = false }: SessionCardPr
               <Text style={[styles.statValue, { color: distance ? colors.text : colors.textMuted }]}>
                 {distance ? `${distance}m` : '—'}
               </Text>
-              <Text style={[styles.statLabel, { color: colors.textMuted }]}>dist</Text>
+              <Text style={[styles.statLabel, { color: colors.textMuted }]}>{t('session.dist')}</Text>
             </View>
 
             {/* Duration */}
@@ -218,7 +220,7 @@ export function SessionCard({ session, onPress, compact = false }: SessionCardPr
               <Text style={[styles.statValue, { color: durationMins ? colors.text : colors.textMuted }]}>
                 {formatDuration(durationMins)}
               </Text>
-              <Text style={[styles.statLabel, { color: colors.textMuted }]}>time</Text>
+              <Text style={[styles.statLabel, { color: colors.textMuted }]}>{t('session.time')}</Text>
             </View>
           </>
         )}

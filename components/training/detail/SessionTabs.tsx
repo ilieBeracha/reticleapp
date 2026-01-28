@@ -5,6 +5,7 @@
  */
 
 import { useColors } from '@/hooks/ui/useColors';
+import { useTranslation } from 'react-i18next';
 import type { DrillGoal } from '@/types/workspace';
 import * as Haptics from 'expo-haptics';
 import { Crosshair, Target } from 'lucide-react-native';
@@ -27,6 +28,7 @@ export interface SessionTabsProps {
 // ============================================================================
 
 export function SessionTabs({ activeTab, onTabChange, groupingCount, engagementCount }: SessionTabsProps) {
+  const { t } = useTranslation();
   const colors = useColors();
 
   const handleTabPress = useCallback(
@@ -48,7 +50,7 @@ export function SessionTabs({ activeTab, onTabChange, groupingCount, engagementC
         activeOpacity={0.7}
       >
         <Crosshair size={16} color={activeTab === 'grouping' ? '#fff' : colors.textMuted} />
-        <Text style={[styles.tabText, { color: activeTab === 'grouping' ? '#fff' : colors.text }]}>Grouping</Text>
+        <Text style={[styles.tabText, { color: activeTab === 'grouping' ? '#fff' : colors.text }]}>{t('session.grouping')}</Text>
         {groupingCount > 0 && (
           <View
             style={[
@@ -72,7 +74,7 @@ export function SessionTabs({ activeTab, onTabChange, groupingCount, engagementC
         activeOpacity={0.7}
       >
         <Target size={16} color={activeTab === 'engagement' ? '#fff' : colors.textMuted} />
-        <Text style={[styles.tabText, { color: activeTab === 'engagement' ? '#fff' : colors.text }]}>Engagement</Text>
+        <Text style={[styles.tabText, { color: activeTab === 'engagement' ? '#fff' : colors.text }]}>{t('session.engagement')}</Text>
         {engagementCount > 0 && (
           <View
             style={[

@@ -5,7 +5,7 @@
 
 import type { TeamMemberWithProfile, TrainingWithDetails } from '@/types/workspace';
 import { addDays, isSameDay, startOfWeek } from 'date-fns';
-import { DEFAULT_WEEKLY_GOAL, ROLE_CONFIG, STATUS_CONFIG } from './trainings.constants';
+import { DEFAULT_WEEKLY_GOAL, ROLE_CONFIG, STATUS_CONFIG, getRoleConfig as getRoleConfigTranslated, getStatusConfig as getStatusConfigTranslated } from './trainings.constants';
 import type { GroupedTrainings, MemberStats, QuickStats, RoleConfig, StatusConfig, TeamStats } from './trainings.types';
 
 // ============================================================================
@@ -15,10 +15,11 @@ import type { GroupedTrainings, MemberStats, QuickStats, RoleConfig, StatusConfi
 /**
  * Gets role configuration for display
  */
-export function getRoleConfig(role: string | null | undefined): RoleConfig {
-  if (!role) return ROLE_CONFIG.soldier;
+export function getRoleConfig(role: string | null | undefined, t?: (key: string) => string): RoleConfig {
+  if (!role) return t ? getRoleConfigTranslated(t).soldier : ROLE_CONFIG.soldier;
   const normalized = role === 'commander' ? 'team_commander' : role;
-  return ROLE_CONFIG[normalized] || ROLE_CONFIG.soldier;
+  const config = t ? getRoleConfigTranslated(t) : ROLE_CONFIG;
+  return config[normalized] || config.soldier;
 }
 
 // ============================================================================
@@ -28,8 +29,9 @@ export function getRoleConfig(role: string | null | undefined): RoleConfig {
 /**
  * Gets status configuration for display
  */
-export function getStatusConfig(status: string | null | undefined): StatusConfig {
-  return STATUS_CONFIG[status || 'planned'] || STATUS_CONFIG.planned;
+export function getStatusConfig(status: string | null | undefined, t?: (key: string) => string): StatusConfig {
+  const config = t ? getStatusConfigTranslated(t) : STATUS_CONFIG;
+  return config[status || 'planned'] || config.planned;
 }
 
 // ============================================================================

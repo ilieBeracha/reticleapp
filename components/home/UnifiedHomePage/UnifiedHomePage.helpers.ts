@@ -8,84 +8,86 @@
 import type { SessionWithDetails } from '@/services/session/types';
 import type { CoachMessageContext, WeeklyStats } from './UnifiedHomePage.types';
 
+type TFunction = (key: string, options?: any) => string;
+
 /**
  * Get contextual coach message based on user state
  */
-export function getCoachMessage(context: CoachMessageContext): string {
+export function getCoachMessage(context: CoachMessageContext, t: TFunction): string {
   const { sessions, shots, accuracy, hasActiveSession, hasUpcoming, streak } = context;
 
   if (hasActiveSession) {
-    return "You have a session in progress. Let's finish what you started.";
+    return t('home.coachMessage.activeSession');
   }
   if (sessions === 0) {
-    return 'Ready to get some rounds downrange? Start your first session today.';
+    return t('home.coachMessage.firstSession');
   }
   if (streak >= 5) {
-    return `${streak} day streak! You're building serious discipline.`;
+    return t('home.coachMessage.streak', { count: streak });
   }
   if (accuracy >= 90) {
-    return 'Outstanding accuracy this week. Keep pushing your limits.';
+    return t('home.coachMessage.outstandingAccuracy');
   }
   if (accuracy >= 75) {
-    return 'Solid performance. Consistency is building.';
+    return t('home.coachMessage.solidPerformance');
   }
   if (hasUpcoming) {
-    return 'You have training scheduled. Stay sharp.';
+    return t('home.coachMessage.trainingScheduled');
   }
   if (sessions < 3) {
-    return 'Build momentum with regular practice. Every session counts.';
+    return t('home.coachMessage.buildMomentum');
   }
-  return 'Keep the rhythm going. Your skills sharpen with each session.';
+  return t('home.coachMessage.keepRhythm');
 }
 
 /**
  * Format a date as relative time (e.g., "5m ago", "2d ago")
  */
-export function formatTimeAgo(date: Date): string {
+export function formatTimeAgo(date: Date, t: TFunction): string {
   const now = new Date();
   const diffMs = now.getTime() - date.getTime();
   const diffMins = Math.floor(diffMs / 60000);
   const diffHours = Math.floor(diffMs / 3600000);
   const diffDays = Math.floor(diffMs / 86400000);
 
-  if (diffMins < 60) return `${diffMins}m ago`;
-  if (diffHours < 24) return `${diffHours}h ago`;
-  if (diffDays === 1) return 'Yesterday';
-  if (diffDays < 7) return `${diffDays}d ago`;
+  if (diffMins < 60) return t('time.minutesAgo', { count: diffMins });
+  if (diffHours < 24) return t('time.hoursAgo', { count: diffHours });
+  if (diffDays === 1) return t('time.yesterday');
+  if (diffDays < 7) return t('time.daysAgo', { count: diffDays });
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
 /**
  * Format minutes as readable time (e.g., "1h 30m", "45m")
  */
-export function formatDuration(minutes: number): string {
+export function formatDuration(minutes: number, t: TFunction): string {
   if (minutes >= 60) {
     const h = Math.floor(minutes / 60);
     const m = minutes % 60;
-    return m > 0 ? `${h}h ${m}m` : `${h}h`;
+    return m > 0 ? `${h}${t('units.h')} ${m}${t('units.min')}` : `${h}${t('units.h')}`;
   }
-  return `${minutes}m`;
+  return `${minutes}${t('units.min')}`;
 }
 
 /**
  * Get greeting based on time of day
  */
-export function getGreeting(): string {
+export function getGreeting(t: TFunction): string {
   const hour = new Date().getHours();
-  if (hour < 12) return 'Good morning';
-  if (hour < 17) return 'Good afternoon';
-  return 'Good evening';
+  if (hour < 12) return t('home.greeting.morning');
+  if (hour < 17) return t('home.greeting.afternoon');
+  return t('home.greeting.evening');
 }
 
 /**
  * Get contextual subtitle for start practice card
  */
-export function getStartPracticeSubtitle(lastSessionDaysAgo: number | null): string {
-  if (lastSessionDaysAgo === null) return 'Begin your training journey';
-  if (lastSessionDaysAgo === 0) return 'Great momentum today!';
-  if (lastSessionDaysAgo === 1) return 'Pick up where you left off';
-  if (lastSessionDaysAgo <= 3) return `${lastSessionDaysAgo} days since last session`;
-  return 'Time to get back on the range';
+export function getStartPracticeSubtitle(lastSessionDaysAgo: number | null, t: TFunction): string {
+  if (lastSessionDaysAgo === null) return t('home.startPractice.beginJourney');
+  if (lastSessionDaysAgo === 0) return t('home.startPractice.greatMomentum');
+  if (lastSessionDaysAgo === 1) return t('home.startPractice.pickUp');
+  if (lastSessionDaysAgo <= 3) return t('home.startPractice.daysSince', { count: lastSessionDaysAgo });
+  return t('home.startPractice.backOnRange');
 }
 
 /**

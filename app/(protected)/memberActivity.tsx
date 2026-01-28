@@ -3,6 +3,7 @@ import { useAppContext } from '@/hooks/useAppContext';
 import { supabase } from '@/lib/supabase';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 
@@ -31,6 +32,7 @@ interface MemberStats {
  */
 export default function MemberActivityScreen() {
   const colors = useColors();
+  const { t } = useTranslation();
   const { activeTeamId } = useAppContext();
   const { memberId, memberName } = useLocalSearchParams<{ memberId: string; memberName: string }>();
 
@@ -116,13 +118,13 @@ export default function MemberActivityScreen() {
   }, [loadActivity]);
 
   const formatDuration = (startedAt: string, endedAt: string | null) => {
-    if (!endedAt) return 'In progress';
+    if (!endedAt) return t('session.inProgress');
     const duration = new Date(endedAt).getTime() - new Date(startedAt).getTime();
     const minutes = Math.floor(duration / (1000 * 60));
-    if (minutes < 60) return `${minutes}m`;
+    if (minutes < 60) return `${minutes}${t('units.min')}`;
     const hours = Math.floor(minutes / 60);
     const remainingMins = minutes % 60;
-    return `${hours}h ${remainingMins}m`;
+    return `${hours}${t('units.h')} ${remainingMins}${t('units.min')}`;
   };
 
   const formatDate = (dateStr: string) => {
@@ -130,9 +132,9 @@ export default function MemberActivityScreen() {
     const now = new Date();
     const diffDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
 
-    if (diffDays === 0) return 'Today';
-    if (diffDays === 1) return 'Yesterday';
-    if (diffDays < 7) return `${diffDays} days ago`;
+    if (diffDays === 0) return t('time.today');
+    if (diffDays === 1) return t('time.yesterday');
+    if (diffDays < 7) return t('time.daysAgo', { count: diffDays });
 
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   };
@@ -162,8 +164,8 @@ export default function MemberActivityScreen() {
     >
       {/* Header */}
       <View style={styles.header}>
-        <Text style={[styles.title, { color: colors.text }]}>{memberName || 'Member'}</Text>
-        <Text style={[styles.subtitle, { color: colors.textMuted }]}>Activity History</Text>
+        <Text style={[styles.title, { color: colors.text }]}>{memberName || t('members.member')}</Text>
+        <Text style={[styles.subtitle, { color: colors.textMuted }]}>{t('members.activityHistory')}</Text>
       </View>
 
       {/* Stats Grid */}
@@ -172,26 +174,26 @@ export default function MemberActivityScreen() {
           <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Ionicons name="fitness-outline" size={24} color={colors.primary} />
             <Text style={[styles.statValue, { color: colors.text }]}>{stats.totalSessions}</Text>
-            <Text style={[styles.statLabel, { color: colors.textMuted }]}>Sessions</Text>
+            <Text style={[styles.statLabel, { color: colors.textMuted }]}>{t('session.sessions')}</Text>
           </View>
           <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Ionicons name="checkmark-circle-outline" size={24} color="#22c55e" />
             <Text style={[styles.statValue, { color: colors.text }]}>{stats.completedSessions}</Text>
-            <Text style={[styles.statLabel, { color: colors.textMuted }]}>Completed</Text>
+            <Text style={[styles.statLabel, { color: colors.textMuted }]}>{t('members.sessionsCompleted')}</Text>
           </View>
           <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Ionicons name="time-outline" size={24} color="#f59e0b" />
             <Text style={[styles.statValue, { color: colors.text }]}>
               {stats.totalTimeMinutes < 60
-                ? `${stats.totalTimeMinutes}m`
-                : `${Math.floor(stats.totalTimeMinutes / 60)}h`}
+                ? `${stats.totalTimeMinutes}${t('units.min')}`
+                : `${Math.floor(stats.totalTimeMinutes / 60)}${t('units.h')}`}
             </Text>
-            <Text style={[styles.statLabel, { color: colors.textMuted }]}>Total Time</Text>
+            <Text style={[styles.statLabel, { color: colors.textMuted }]}>{t('members.totalTime')}</Text>
           </View>
           <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Ionicons name="flash-outline" size={24} color="#8b5cf6" />
             <Text style={[styles.statValue, { color: colors.text }]}>{stats.activeSessions}</Text>
-            <Text style={[styles.statLabel, { color: colors.textMuted }]}>Active</Text>
+            <Text style={[styles.statLabel, { color: colors.textMuted }]}>{t('common.active')}</Text>
           </View>
         </View>
       )}
@@ -201,22 +203,20 @@ export default function MemberActivityScreen() {
         <View style={[styles.lastActiveCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <Ionicons name="calendar-outline" size={18} color={colors.textMuted} />
           <Text style={[styles.lastActiveText, { color: colors.textMuted }]}>
-            Last active: {formatDate(stats.lastActive)} at {formatTime(stats.lastActive)}
+            {t('members.lastActive')} {formatDate(stats.lastActive)} {t('members.at')} {formatTime(stats.lastActive)}
           </Text>
         </View>
       )}
 
       {/* Sessions List */}
       <View style={styles.sessionsSection}>
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>Recent Sessions</Text>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('session.sessionHistory')}</Text>
 
         {sessions.length === 0 ? (
           <View style={[styles.emptyState, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Ionicons name="document-text-outline" size={40} color={colors.textMuted} />
-            <Text style={[styles.emptyTitle, { color: colors.text }]}>No sessions yet</Text>
-            <Text style={[styles.emptySubtitle, { color: colors.textMuted }]}>
-              This member hasn't participated in any training sessions
-            </Text>
+            <Text style={[styles.emptyTitle, { color: colors.text }]}>{t('members.noSessionsYet')}</Text>
+            <Text style={[styles.emptySubtitle, { color: colors.textMuted }]}>{t('members.noSessionsMessage')}</Text>
           </View>
         ) : (
           <View style={styles.sessionsList}>
@@ -273,7 +273,7 @@ export default function MemberActivityScreen() {
                       color={colors.text}
                     />
                     <Text style={[styles.tagText, { color: colors.text }]}>
-                      {session.session_mode === 'group' ? 'Group' : 'Solo'}
+                      {session.session_mode === 'group' ? t('session.group') : t('session.solo')}
                     </Text>
                   </View>
                 </View>

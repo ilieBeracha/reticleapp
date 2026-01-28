@@ -8,6 +8,7 @@
  */
 
 import { useColors } from '@/hooks/ui/useColors';
+import { useTranslation } from 'react-i18next';
 import * as Haptics from 'expo-haptics';
 import { Calendar, Check, ChevronDown, Clock, Users } from 'lucide-react-native';
 import { useState } from 'react';
@@ -54,6 +55,7 @@ export function TrainingDetailsStep({
   onOpenTimePicker,
   onToggleManualStart,
 }: TrainingDetailsStepProps) {
+  const { t } = useTranslation();
   const colors = useColors();
   const selectedTeam = teams.find((t) => t.id === selectedTeamId);
   const [showSchedule, setShowSchedule] = useState(!manualStart);
@@ -63,8 +65,8 @@ export function TrainingDetailsStep({
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
-    if (date.toDateString() === today.toDateString()) return 'Today';
-    if (date.toDateString() === tomorrow.toDateString()) return 'Tomorrow';
+    if (date.toDateString() === today.toDateString()) return t('common.today');
+    if (date.toDateString() === tomorrow.toDateString()) return t('common.tomorrow');
 
     return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
   };
@@ -90,7 +92,7 @@ export function TrainingDetailsStep({
     <View style={styles.container}>
       {/* Training Name - Primary focus */}
       <View style={styles.nameSection}>
-        <Text style={[styles.label, { color: colors.textMuted }]}>Training Name</Text>
+        <Text style={[styles.label, { color: colors.textMuted }]}>{t('training.trainingName')}</Text>
         <TextInput
           style={[
             styles.nameInput,
@@ -100,7 +102,7 @@ export function TrainingDetailsStep({
               color: colors.text,
             },
           ]}
-          placeholder="e.g. Morning Accuracy"
+          placeholder={t('training.trainingNamePlaceholder')}
           placeholderTextColor={colors.textMuted}
           value={title}
           onChangeText={onTitleChange}
@@ -112,7 +114,7 @@ export function TrainingDetailsStep({
       {/* Team Selection (only if multiple teams) */}
       {showTeamSelector ? (
         <View style={styles.section}>
-          <Text style={[styles.label, { color: colors.textMuted }]}>Team</Text>
+          <Text style={[styles.label, { color: colors.textMuted }]}>{t('navigation.team')}</Text>
           <View style={styles.teamGrid}>
             {teams.map((team) => {
               const isSelected = selectedTeamId === team.id;
@@ -157,7 +159,7 @@ export function TrainingDetailsStep({
           <View style={styles.scheduleHeaderLeft}>
             <Calendar size={16} color={colors.textMuted} strokeWidth={1.5} />
             <Text style={[styles.scheduleHeaderText, { color: colors.text }]}>
-              {showSchedule ? `${formatDate(scheduledDate)} at ${formatTime(scheduledDate)}` : 'Start when ready'}
+              {showSchedule ? t('training.scheduledAt', { date: formatDate(scheduledDate), time: formatTime(scheduledDate) }) : t('training.startWhenReady')}
             </Text>
           </View>
           <ChevronDown

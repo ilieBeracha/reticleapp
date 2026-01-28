@@ -9,6 +9,7 @@
  */
 
 import { useColors } from '@/hooks/ui/useColors';
+import { useTranslation } from 'react-i18next';
 import { supabase } from '@/lib/supabase';
 import { calculateGroupTotals, updateParticipantResults } from '@/services/session/participants';
 import type { EngagementParticipant } from '@/services/session/types';
@@ -81,6 +82,7 @@ export function SquadSessionView({
   onRefresh,
   onEndSession,
 }: SquadSessionViewProps) {
+  const { t } = useTranslation();
   const colors = useColors();
   const insets = useSafeAreaInsets();
 
@@ -157,7 +159,7 @@ export function SquadSessionView({
 
     // Validate hits <= total shots
     if (totalHitsCount > groupTotals.totalShotsFired) {
-      Alert.alert('Invalid Entry', 'Total hits cannot exceed total shots fired.');
+      Alert.alert(t('session.invalidEntry'), t('session.hitsCannotExceedShots'));
       return;
     }
 
@@ -180,7 +182,7 @@ export function SquadSessionView({
     } catch (error) {
       console.error('[SquadSessionView] Failed to save hits:', error);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      Alert.alert('Error', 'Failed to save hits. Please try again.');
+      Alert.alert(t('common.error'), t('session.failedSaveHits'));
     } finally {
       setSaving(false);
     }
@@ -198,10 +200,10 @@ export function SquadSessionView({
   };
 
   const handleEndSessionPress = () => {
-    Alert.alert('End Squad Session?', 'This will complete the session for all participants. Results will be saved.', [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('session.endSquadSession'), t('session.endSquadSessionMessage'), [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'End Session',
+        text: t('session.endSession'),
         style: 'destructive',
         onPress: onEndSession,
       },
@@ -232,12 +234,12 @@ export function SquadSessionView({
         </TouchableOpacity>
         <View style={styles.headerCenter}>
           <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>
-            {session.drill_name || 'Squad Session'}
+            {session.drill_name || t('session.squadSession')}
           </Text>
           <View style={styles.headerMeta}>
             <Users size={12} color={colors.textMuted} />
             <Text style={[styles.headerMetaText, { color: colors.textMuted }]}>
-              {groupTotals.submittedCount}/{groupTotals.totalCount} reported
+              {t('session.reportedCount', { reported: groupTotals.submittedCount, total: groupTotals.totalCount })}
             </Text>
           </View>
         </View>
@@ -248,7 +250,7 @@ export function SquadSessionView({
       {isViewOnly && (
         <View style={[styles.viewOnlyBanner, { backgroundColor: colors.orange + '15', borderColor: colors.orange }]}>
           <Users size={16} color={colors.orange} />
-          <Text style={[styles.viewOnlyText, { color: colors.orange }]}>Viewing progress • Join to participate</Text>
+          <Text style={[styles.viewOnlyText, { color: colors.orange }]}>{t('session.viewingProgress')}</Text>
         </View>
       )}
 
@@ -267,17 +269,17 @@ export function SquadSessionView({
           <View style={styles.summaryRow}>
             <View style={styles.summaryItem}>
               <Text style={[styles.summaryValue, { color: colors.text }]}>{groupTotals.totalShotsFired}</Text>
-              <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>shots</Text>
+              <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>{t('session.shots')}</Text>
             </View>
             <View style={[styles.summaryDivider, { backgroundColor: colors.border }]} />
             <View style={styles.summaryItem}>
               <Text style={[styles.summaryValue, { color: colors.text }]}>{groupTotals.totalHits}</Text>
-              <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>hits</Text>
+              <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>{t('session.hits')}</Text>
             </View>
             <View style={[styles.summaryDivider, { backgroundColor: colors.border }]} />
             <View style={styles.summaryItem}>
               <Text style={[styles.summaryValue, { color: colors.green }]}>{groupTotals.accuracy}%</Text>
-              <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>accuracy</Text>
+              <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>{t('session.accuracy')}</Text>
             </View>
           </View>
         </View>
@@ -290,7 +292,7 @@ export function SquadSessionView({
           onPress={() => setShowParticipants(!showParticipants)}
           activeOpacity={0.7}
         >
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>Participants</Text>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('session.participants')}</Text>
           <View style={styles.sectionHeaderRight}>
             <Text style={[styles.sectionCount, { color: colors.textMuted }]}>{participants.length}</Text>
             {showParticipants ? (
@@ -336,21 +338,21 @@ export function SquadSessionView({
                   <View style={styles.participantInfo}>
                     <View style={styles.nameRow}>
                       <Text style={[styles.participantName, { color: colors.text }]} numberOfLines={1}>
-                        {p.user_full_name || 'Unknown'}
+                        {p.user_full_name || t('common.unknown')}
                       </Text>
                       {isMe && (
                         <View style={[styles.badge, { backgroundColor: colors.primary + '20' }]}>
-                          <Text style={[styles.badgeText, { color: colors.primary }]}>You</Text>
+                          <Text style={[styles.badgeText, { color: colors.primary }]}>{t('common.you')}</Text>
                         </View>
                       )}
                       {isOwner && <Crown size={12} color={colors.orange} />}
                     </View>
                     <Text style={[styles.participantMeta, { color: colors.textMuted }]}>
                       {!isShooter 
-                        ? 'Spotter' 
+                        ? t('session.spotter')
                         : hasData 
-                          ? `${p.shots_fired} shots` 
-                          : 'Not reported yet'}
+                          ? t('session.shotsCount', { count: p.shots_fired ?? 0 })
+                          : t('session.notReportedYet')}
                     </Text>
                   </View>
 
@@ -370,7 +372,7 @@ export function SquadSessionView({
         {!isViewOnly && hasSubmitted && (
           <View style={[styles.myResultsCard, { backgroundColor: colors.card }]}>
             <View style={styles.myResultsHeader}>
-              <Text style={[styles.myResultsTitle, { color: colors.text }]}>Your Shots</Text>
+              <Text style={[styles.myResultsTitle, { color: colors.text }]}>{t('session.yourShots')}</Text>
               <View style={[styles.checkBadge, { backgroundColor: colors.green + '15' }]}>
                 <Check size={12} color={colors.green} />
               </View>
@@ -378,14 +380,14 @@ export function SquadSessionView({
             <View style={styles.myResultsStats}>
               <View style={styles.myResultsStat}>
                 <Text style={[styles.myResultsValue, { color: colors.text }]}>{myParticipant?.shots_fired || 0}</Text>
-                <Text style={[styles.myResultsLabel, { color: colors.textMuted }]}>shots fired</Text>
+                <Text style={[styles.myResultsLabel, { color: colors.textMuted }]}>{t('session.shotsFired')}</Text>
               </View>
             </View>
             <TouchableOpacity
               style={[styles.updateBtn, { backgroundColor: colors.secondary }]}
               onPress={handleOpenResultsSheet}
             >
-              <Text style={[styles.updateBtnText, { color: colors.text }]}>Update Shots</Text>
+              <Text style={[styles.updateBtnText, { color: colors.text }]}>{t('session.updateShots')}</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -401,8 +403,8 @@ export function SquadSessionView({
           >
             <Target size={24} color="#fff" />
             <View style={styles.addResultsText}>
-              <Text style={styles.addResultsTitle}>Enter Your Shots</Text>
-              <Text style={styles.addResultsSubtitle}>Record how many shots you fired</Text>
+              <Text style={styles.addResultsTitle}>{t('session.enterYourShots')}</Text>
+              <Text style={styles.addResultsSubtitle}>{t('session.recordShotsFired')}</Text>
             </View>
             <Plus size={20} color="#fff" />
           </TouchableOpacity>
@@ -423,10 +425,10 @@ export function SquadSessionView({
             <Target size={24} color={hasAnyHits ? colors.green : '#fff'} />
             <View style={styles.addResultsText}>
               <Text style={[styles.addResultsTitle, { color: hasAnyHits ? colors.text : '#fff' }]}>
-                {hasAnyHits ? `Total Hits: ${groupTotals.totalHits}` : 'Add Total Hits'}
+                {hasAnyHits ? t('session.totalHits', { hits: groupTotals.totalHits }) : t('session.addTotalHits')}
               </Text>
               <Text style={[styles.addResultsSubtitle, { color: hasAnyHits ? colors.textMuted : 'rgba(255,255,255,0.8)' }]}>
-                {hasAnyHits ? `${groupTotals.accuracy}% accuracy · Tap to update` : 'Enter combined hits for all shooters'}
+                {hasAnyHits ? t('session.accuracyTapToUpdate', { accuracy: groupTotals.accuracy }) : t('session.enterCombinedHits')}
               </Text>
             </View>
             {!hasAnyHits && <Plus size={20} color="#fff" />}
@@ -437,10 +439,10 @@ export function SquadSessionView({
         {isCommander && !allShotsSubmitted && shooters.length > 0 && (
           <View style={[styles.waitingCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Text style={[styles.waitingText, { color: colors.textMuted }]}>
-              Waiting for all shooters to report shots before adding total hits
+              {t('session.waitingForShooters')}
             </Text>
             <Text style={[styles.waitingSubtext, { color: colors.textMuted }]}>
-              {shooters.filter((p) => (p.shots_fired || 0) > 0).length}/{shooters.length} shooters reported
+              {t('session.shootersReported', { reported: shooters.filter((p) => (p.shots_fired || 0) > 0).length, total: shooters.length })}
             </Text>
           </View>
         )}
@@ -456,7 +458,7 @@ export function SquadSessionView({
             onPress={handleEndSessionPress}
           >
             <X size={18} color="#fff" />
-            <Text style={styles.endBtnText}>End Squad Session</Text>
+            <Text style={styles.endBtnText}>{t('session.endSquadSession')}</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -479,11 +481,11 @@ export function SquadSessionView({
               {/* Handle */}
               <View style={[styles.sheetHandle, { backgroundColor: colors.border }]} />
 
-              <Text style={[styles.sheetTitle, { color: colors.text }]}>Enter Your Shots</Text>
+              <Text style={[styles.sheetTitle, { color: colors.text }]}>{t('session.enterYourShots')}</Text>
 
               {/* Shots Counter */}
               <View style={styles.counterSection}>
-                <Text style={[styles.counterLabel, { color: colors.textMuted }]}>SHOTS FIRED</Text>
+                <Text style={[styles.counterLabel, { color: colors.textMuted }]}>{t('session.shotsFired')}</Text>
                 <View style={styles.counterRow}>
                   <TouchableOpacity
                     style={[styles.counterBtn, { backgroundColor: colors.secondary }]}
@@ -559,14 +561,18 @@ export function SquadSessionView({
               {/* Handle */}
               <View style={[styles.sheetHandle, { backgroundColor: colors.border }]} />
 
-              <Text style={[styles.sheetTitle, { color: colors.text }]}>Total Hits</Text>
+              <Text style={[styles.sheetTitle, { color: colors.text }]}>{t('session.totalHitsTitle')}</Text>
               <Text style={[styles.sheetSubtitle, { color: colors.textMuted }]}>
-                Combined hits for all {shooters.length} shooter{shooters.length !== 1 ? 's' : ''} ({groupTotals.totalShotsFired} total shots)
+                {t('session.combinedHitsDescription', {
+                  count: shooters.length,
+                  shooters: shooters.length,
+                  shots: groupTotals.totalShotsFired,
+                })}
               </Text>
 
               {/* Hits Counter */}
               <View style={styles.counterSection}>
-                <Text style={[styles.counterLabel, { color: colors.textMuted }]}>TOTAL HITS</Text>
+                <Text style={[styles.counterLabel, { color: colors.textMuted }]}>{t('session.totalHits')}</Text>
                 <View style={styles.counterRow}>
                   <TouchableOpacity
                     style={[styles.counterBtn, { backgroundColor: colors.secondary }]}
@@ -604,7 +610,7 @@ export function SquadSessionView({
                 {/* Accuracy preview */}
                 {groupTotals.totalShotsFired > 0 && (
                   <Text style={[styles.accuracyPreview, { color: colors.textMuted }]}>
-                    {Math.round((totalHitsCount / groupTotals.totalShotsFired) * 100)}% accuracy
+                    {t('session.accuracyPreview', { accuracy: Math.round((totalHitsCount / groupTotals.totalShotsFired) * 100) })}
                   </Text>
                 )}
               </View>
@@ -620,7 +626,7 @@ export function SquadSessionView({
                 ) : (
                   <>
                     <Check size={18} color="#fff" />
-                    <Text style={[styles.saveBtnText, { color: '#fff' }]}>Save Total Hits</Text>
+                    <Text style={[styles.saveBtnText, { color: '#fff' }]}>{t('session.saveTotalHits')}</Text>
                   </>
                 )}
               </TouchableOpacity>

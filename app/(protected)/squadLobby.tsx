@@ -17,6 +17,7 @@ import { useParticipantsRealtime } from '@/hooks/realtime';
 import { useColors } from '@/hooks/ui/useColors';
 import { supabase } from '@/lib/supabase';
 import { notifySquadEngagementInvites, notifySquadEngagementStarting } from '@/services/pushService';
+import { updateSession } from '@/services/session/mutations';
 import {
   abortEngagement,
   acceptInvite,
@@ -28,7 +29,6 @@ import {
   startEngagement,
   updateParticipantRole,
 } from '@/services/session/participants';
-import { updateSession } from '@/services/session/mutations';
 import type { Engagement, EngagementParticipant, EngagementRole } from '@/services/session/types';
 import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -210,9 +210,7 @@ export default function SquadLobbyScreen() {
 
     // Optimistic update - update local state immediately
     const previousParticipants = participants;
-    setParticipants((prev) =>
-      prev.map((p) => (p.user_id === userId ? { ...p, role: newRole } : p))
-    );
+    setParticipants((prev) => prev.map((p) => (p.user_id === userId ? { ...p, role: newRole } : p)));
 
     try {
       await updateParticipantRole(engagement.id, userId, newRole);
@@ -521,7 +519,12 @@ export default function SquadLobbyScreen() {
       <View
         style={[
           styles.container,
-          { backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center', paddingTop: insets.top },
+          {
+            backgroundColor: colors.background,
+            justifyContent: 'center',
+            alignItems: 'center',
+            paddingTop: insets.top,
+          },
         ]}
       >
         <ActivityIndicator size="large" color={colors.primary} />

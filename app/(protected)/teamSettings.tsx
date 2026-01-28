@@ -11,6 +11,7 @@ import { useTeamStore } from '@/store/teamStore';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { useState } from 'react';
 import {
   ActivityIndicator,
@@ -24,6 +25,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useRTL } from '@/hooks/ui/useRTL';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TYPES
@@ -47,84 +49,86 @@ type SettingSection = {
 // SETTINGS CONFIG
 // ─────────────────────────────────────────────────────────────────────────────
 
-const SETTINGS_SECTIONS: SettingSection[] = [
-  {
-    title: 'General',
-    items: [
-      { id: 'edit_team', icon: 'pencil', label: 'Edit Team Info', description: 'Name, description, and logo' },
-      {
-        id: 'notifications',
-        icon: 'notifications-outline',
-        label: 'Notifications',
-        description: 'Training alerts & reminders',
-      },
-    ],
-  },
-  {
-    title: 'Members',
-    items: [
-      { id: 'members', icon: 'people-outline', label: 'Manage Members', description: 'View and manage team roster' },
-      {
-        id: 'roles',
-        icon: 'shield-outline',
-        label: 'Roles & Permissions',
-        description: 'Configure member access levels',
-      },
-      { id: 'squads', icon: 'git-branch-outline', label: 'Squads', description: 'Organize into sub-groups' },
-    ],
-  },
-  {
-    title: 'Equipment',
-    items: [
-      {
-        id: 'weapons',
-        icon: 'shield-checkmark-outline',
-        label: 'Team Armory',
-        description: 'Weapons, assignments & requests',
-      },
-    ],
-  },
-  {
-    title: 'Training',
-    items: [
-      {
-        id: 'standards',
-        icon: 'checkmark-circle-outline',
-        label: 'Performance Standards',
-        description: 'Set expectations & condition modifiers',
-        iconColor: '#22C55E',
-      },
-      {
-        id: 'drill_defaults',
-        icon: 'fitness-outline',
-        label: 'Drill Defaults',
-        description: 'Default drill configurations',
-      },
-      { id: 'scoring', icon: 'analytics-outline', label: 'Scoring Rules', description: 'Customize scoring criteria' },
-      { id: 'targets', icon: 'disc-outline', label: 'Target Types', description: 'Manage available targets' },
-    ],
-  },
-  {
-    title: 'Data & Privacy',
-    items: [
-      { id: 'export', icon: 'download-outline', label: 'Export Data', description: 'Download training records' },
-      { id: 'archive', icon: 'archive-outline', label: 'Archive Team', description: 'Hide team from active list' },
-    ],
-  },
-  {
-    title: 'Danger Zone',
-    items: [
-      { id: 'leave', icon: 'exit-outline', label: 'Leave Team', danger: true },
-      {
-        id: 'delete',
-        icon: 'trash-outline',
-        label: 'Delete Team',
-        description: 'Permanently remove team',
-        danger: true,
-      },
-    ],
-  },
-];
+function getSettingsSections(t: (key: string) => string): SettingSection[] {
+  return [
+    {
+      title: t('teams.general'),
+      items: [
+        { id: 'edit_team', icon: 'pencil', label: t('teams.editTeamInfo'), description: t('teams.editTeamInfoDesc') },
+        {
+          id: 'notifications',
+          icon: 'notifications-outline',
+          label: t('teams.notifications'),
+          description: t('teams.notificationsDesc'),
+        },
+      ],
+    },
+    {
+      title: t('teams.members'),
+      items: [
+        { id: 'members', icon: 'people-outline', label: t('teams.manageMembers'), description: t('teams.manageMembersDesc') },
+        {
+          id: 'roles',
+          icon: 'shield-outline',
+          label: t('teams.rolesPermissions'),
+          description: t('teams.rolesPermissionsDesc'),
+        },
+        { id: 'squads', icon: 'git-branch-outline', label: t('teams.squads'), description: t('teams.squadsDesc') },
+      ],
+    },
+    {
+      title: t('teams.equipment'),
+      items: [
+        {
+          id: 'weapons',
+          icon: 'shield-checkmark-outline',
+          label: t('teams.teamArmory'),
+          description: t('teams.teamArmoryDesc'),
+        },
+      ],
+    },
+    {
+      title: t('teams.training'),
+      items: [
+        {
+          id: 'standards',
+          icon: 'checkmark-circle-outline',
+          label: t('teams.performanceStandards'),
+          description: t('teams.performanceStandardsDesc'),
+          iconColor: '#22C55E',
+        },
+        {
+          id: 'drill_defaults',
+          icon: 'fitness-outline',
+          label: t('teams.drillDefaults'),
+          description: t('teams.drillDefaultsDesc'),
+        },
+        { id: 'scoring', icon: 'analytics-outline', label: t('teams.scoringRules'), description: t('teams.scoringRulesDesc') },
+        { id: 'targets', icon: 'disc-outline', label: t('teams.targetTypes'), description: t('teams.targetTypesDesc') },
+      ],
+    },
+    {
+      title: t('teams.dataPrivacy'),
+      items: [
+        { id: 'export', icon: 'download-outline', label: t('teams.exportData'), description: t('teams.exportDataDesc') },
+        { id: 'archive', icon: 'archive-outline', label: t('teams.archiveTeam'), description: t('teams.archiveTeamDesc') },
+      ],
+    },
+    {
+      title: t('teams.dangerZone'),
+      items: [
+        { id: 'leave', icon: 'exit-outline', label: t('teams.leaveTeam'), danger: true },
+        {
+          id: 'delete',
+          icon: 'trash-outline',
+          label: t('teams.deleteTeam'),
+          description: t('teams.deleteTeamDesc'),
+          danger: true,
+        },
+      ],
+    },
+  ];
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SETTING ROW
@@ -134,10 +138,14 @@ function SettingRow({
   item,
   colors,
   onPress,
+  isRTL,
+  chevronIcon,
 }: {
   item: SettingItem;
   colors: ReturnType<typeof useColors>;
   onPress: () => void;
+  isRTL: boolean;
+  chevronIcon: string;
 }) {
   const iconBgColor = item.danger ? '#EF444415' : item.iconColor ? item.iconColor + '15' : colors.primary + '15';
   const iconColor = item.danger ? '#EF4444' : item.iconColor || colors.primary;
@@ -145,7 +153,11 @@ function SettingRow({
 
   return (
     <TouchableOpacity
-      style={[styles.settingRow, { backgroundColor: colors.background, borderColor: colors.border }]}
+      style={[
+        styles.settingRow,
+        { backgroundColor: colors.background, borderColor: colors.border },
+        isRTL && styles.settingRowRTL,
+      ]}
       onPress={onPress}
       activeOpacity={0.7}
     >
@@ -153,14 +165,27 @@ function SettingRow({
         <Ionicons name={item.icon as any} size={18} color={iconColor} />
       </View>
       <View style={styles.settingInfo}>
-        <Text style={[styles.settingLabel, { color: textColor }]}>{item.label}</Text>
+        <Text 
+          style={[
+            styles.settingLabel, 
+            { color: textColor, textAlign: isRTL ? 'right' : 'left' }
+          ]}
+        >
+          {item.label}
+        </Text>
         {item.description && (
-          <Text style={[styles.settingDescription, { color: colors.textMuted }]} numberOfLines={1}>
+          <Text 
+            style={[
+              styles.settingDescription, 
+              { color: colors.textMuted, textAlign: isRTL ? 'right' : 'left' }
+            ]} 
+            numberOfLines={1}
+          >
             {item.description}
           </Text>
         )}
       </View>
-      <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+      <Ionicons name={chevronIcon as any} size={16} color={colors.textMuted} />
     </TouchableOpacity>
   );
 }
@@ -170,11 +195,13 @@ function SettingRow({
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function TeamSettingsSheet() {
+  const { t } = useTranslation();
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { teamId } = useLocalSearchParams<{ teamId: string }>();
   const { teams, loadTeams, setActiveTeam } = useTeamStore();
   const { user } = useAuth();
+  const { isRTL, styles: rtlStyles, chevron } = useRTL();
 
   const team = teams.find((t) => t.id === teamId);
   const isOwner = team?.my_role === 'owner';
@@ -191,7 +218,7 @@ export default function TeamSettingsSheet() {
 
   const showComingSoon = (feature: string) => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-    Alert.alert('Coming Soon', `${feature} will be available in a future update.`, [{ text: 'OK' }]);
+    Alert.alert(t('teams.comingSoonTitle'), `${feature}${t('teams.comingSoonMessage')}`, [{ text: t('common.ok') }]);
   };
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -201,16 +228,16 @@ export default function TeamSettingsSheet() {
     if (!teamId || !user) return;
 
     if (isOwner) {
-      Alert.alert('Cannot Leave', 'As the owner, you must transfer ownership or delete the team instead.', [
-        { text: 'OK' },
+      Alert.alert(t('teams.cannotLeaveTitle'), t('teams.cannotLeaveMessage'), [
+        { text: t('common.ok') },
       ]);
       return;
     }
 
-    Alert.alert('Leave Team', `Are you sure you want to leave ${team?.name}? You'll need a new invite to rejoin.`, [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('teams.leaveTeamTitle'), t('teams.leaveTeamConfirm', { teamName: team?.name }), [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'Leave',
+        text: t('teams.leave'),
         style: 'destructive',
         onPress: async () => {
           try {
@@ -228,10 +255,10 @@ export default function TeamSettingsSheet() {
 
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             router.back();
-            Alert.alert('Left Team', `You have left ${team?.name}.`);
+            Alert.alert(t('teams.leftTeamTitle'), t('teams.leftTeamMessage', { teamName: team?.name }));
           } catch (error) {
             console.error('Failed to leave team:', error);
-            Alert.alert('Error', 'Failed to leave team. Please try again.');
+            Alert.alert(t('common.error'), t('teams.failedLeaveTeam'));
           }
         },
       },
@@ -245,12 +272,12 @@ export default function TeamSettingsSheet() {
     if (!teamId || !isOwner) return;
 
     Alert.alert(
-      'Delete Team',
-      `Are you sure you want to permanently delete "${team?.name}"?\n\nThis will remove all members, trainings, and data. This action cannot be undone.`,
+      t('teams.deleteTeamTitle'),
+      t('teams.deleteTeamConfirm', { teamName: team?.name }),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Delete Forever',
+          text: t('teams.deleteForever'),
           style: 'destructive',
           onPress: async () => {
             try {
@@ -268,10 +295,10 @@ export default function TeamSettingsSheet() {
 
               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
               router.back();
-              Alert.alert('Team Deleted', `${team?.name} has been permanently deleted.`);
+              Alert.alert(t('teams.teamDeletedTitle'), t('teams.teamDeletedMessage', { teamName: team?.name }));
             } catch (error) {
               console.error('Failed to delete team:', error);
-              Alert.alert('Error', 'Failed to delete team. Please try again.');
+              Alert.alert(t('common.error'), t('teams.failedDeleteTeam'));
             }
           },
         },
@@ -303,7 +330,7 @@ export default function TeamSettingsSheet() {
       setEditModalVisible(false);
     } catch (error) {
       console.error('Failed to update team:', error);
-      Alert.alert('Error', 'Failed to update team. Please try again.');
+      Alert.alert(t('common.error'), t('teams.failedUpdateTeam'));
     } finally {
       setSaving(false);
     }
@@ -337,32 +364,32 @@ export default function TeamSettingsSheet() {
         break;
       case 'standards':
         if (!canManage) {
-          Alert.alert('Permission Denied', 'Only commanders can manage performance standards.');
+          Alert.alert(t('common.permissionDenied'), t('teams.permissionDeniedStandards'));
           return;
         }
         setStandardsModalVisible(true);
         break;
       case 'drill_defaults':
-        showComingSoon('Drill Defaults');
+        showComingSoon(t('teams.drillDefaults'));
         break;
       case 'scoring':
-        showComingSoon('Scoring Rules');
+        showComingSoon(t('teams.scoringRules'));
         break;
       case 'targets':
-        showComingSoon('Target Types');
+        showComingSoon(t('teams.targetTypes'));
         break;
       case 'export':
-        showComingSoon('Export Data');
+        showComingSoon(t('teams.exportData'));
         break;
       case 'archive':
-        showComingSoon('Archive Team');
+        showComingSoon(t('teams.archiveTeam'));
         break;
       case 'leave':
         handleLeaveTeam();
         break;
       case 'delete':
         if (!isOwner) {
-          Alert.alert('Permission Denied', 'Only the team owner can delete the team.');
+          Alert.alert(t('common.permissionDenied'), t('teams.permissionDeniedDelete'));
           return;
         }
         handleDeleteTeam();
@@ -373,8 +400,9 @@ export default function TeamSettingsSheet() {
   };
 
   // Filter sections based on role
-  const visibleSections = SETTINGS_SECTIONS.map((section) => {
-    if (section.title === 'Danger Zone') {
+  const settingsSections = getSettingsSections(t);
+  const visibleSections = settingsSections.map((section) => {
+    if (section.title === t('teams.dangerZone')) {
       // Only show leave for non-owners, show both for owners
       const filteredItems = section.items.filter((item) => {
         if (item.id === 'delete') return isOwner;
@@ -383,11 +411,11 @@ export default function TeamSettingsSheet() {
       return { ...section, items: filteredItems };
     }
     // Only show Equipment section for commanders
-    if (section.title === 'Equipment') {
+    if (section.title === t('teams.equipment')) {
       return canManage ? section : { ...section, items: [] };
     }
     // Only show Training section for commanders
-    if (section.title === 'Training') {
+    if (section.title === t('teams.training')) {
       return canManage ? section : { ...section, items: [] };
     }
     return section;
@@ -404,12 +432,12 @@ export default function TeamSettingsSheet() {
         <View style={[styles.headerIcon, { backgroundColor: colors.secondary }]}>
           <Ionicons name="settings" size={28} color={colors.text} />
         </View>
-        <Text style={[styles.title, { color: colors.text }]}>Team Settings</Text>
+        <Text style={[styles.title, { color: colors.text }]}>{t('teams.teamSettings')}</Text>
         <Text style={[styles.subtitle, { color: colors.textMuted }]}>{team?.name}</Text>
         {!canManage && (
           <View style={[styles.viewOnlyBadge, { backgroundColor: colors.yellow + '20' }]}>
             <Ionicons name="eye-outline" size={12} color={colors.yellow} />
-            <Text style={[styles.viewOnlyText, { color: colors.yellow }]}>View Only</Text>
+            <Text style={[styles.viewOnlyText, { color: colors.yellow }]}>{t('common.viewOnly')}</Text>
           </View>
         )}
       </View>
@@ -418,10 +446,22 @@ export default function TeamSettingsSheet() {
       <View style={styles.settingsList}>
         {visibleSections.map((section, sectionIndex) => (
           <View key={section.title} style={[styles.section, sectionIndex > 0 && styles.sectionSpacing]}>
-            <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>{section.title.toUpperCase()}</Text>
+            <Text 
+              style={[
+                styles.sectionTitle, 
+                { 
+                  color: colors.textMuted,
+                  textAlign: isRTL ? 'right' : 'left',
+                  marginLeft: isRTL ? 0 : 4,
+                  marginRight: isRTL ? 4 : 0,
+                }
+              ]}
+            >
+              {section.title.toUpperCase()}
+            </Text>
             <View style={styles.sectionItems}>
               {section.items.map((item) => (
-                <SettingRow key={item.id} item={item} colors={colors} onPress={() => handleSettingPress(item)} />
+                <SettingRow key={item.id} item={item} colors={colors} isRTL={isRTL} chevronIcon={chevron.forward} onPress={() => handleSettingPress(item)} />
               ))}
             </View>
           </View>
@@ -430,7 +470,7 @@ export default function TeamSettingsSheet() {
 
       {/* Version Info */}
       <View style={styles.footer}>
-        <Text style={[styles.footerText, { color: colors.textMuted }]}>Team ID: {teamId?.slice(0, 8)}...</Text>
+        <Text style={[styles.footerText, { color: colors.textMuted }]}>{t('teams.teamId')}{teamId?.slice(0, 8)}...</Text>
       </View>
 
       {/* Edit Team Modal */}
@@ -444,15 +484,15 @@ export default function TeamSettingsSheet() {
           {/* Modal Header */}
           <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
             <TouchableOpacity onPress={() => setEditModalVisible(false)} disabled={saving}>
-              <Text style={[styles.modalCancel, { color: colors.textMuted }]}>Cancel</Text>
+              <Text style={[styles.modalCancel, { color: colors.textMuted }]}>{t('common.cancel')}</Text>
             </TouchableOpacity>
-            <Text style={[styles.modalTitle, { color: colors.text }]}>Edit Team</Text>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>{t('teams.editTeam')}</Text>
             <TouchableOpacity onPress={handleSaveEdit} disabled={saving || !editName.trim()}>
               {saving ? (
                 <ActivityIndicator size="small" color={colors.primary} />
               ) : (
                 <Text style={[styles.modalSave, { color: editName.trim() ? colors.primary : colors.textMuted }]}>
-                  Save
+                  {t('common.save')}
                 </Text>
               )}
             </TouchableOpacity>
@@ -461,7 +501,7 @@ export default function TeamSettingsSheet() {
           {/* Modal Content */}
           <View style={styles.modalContent}>
             <View style={styles.inputGroup}>
-              <Text style={[styles.inputLabel, { color: colors.textMuted }]}>TEAM NAME</Text>
+              <Text style={[styles.inputLabel, { color: colors.textMuted }]}>{t('teams.teamNameLabel')}</Text>
               <TextInput
                 style={[
                   styles.textInput,
@@ -469,7 +509,7 @@ export default function TeamSettingsSheet() {
                 ]}
                 value={editName}
                 onChangeText={setEditName}
-                placeholder="Enter team name"
+                placeholder={t('teams.teamNamePlaceholder')}
                 placeholderTextColor={colors.textMuted}
                 autoFocus
                 editable={!saving}
@@ -477,7 +517,7 @@ export default function TeamSettingsSheet() {
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={[styles.inputLabel, { color: colors.textMuted }]}>DESCRIPTION</Text>
+              <Text style={[styles.inputLabel, { color: colors.textMuted }]}>{t('teams.descriptionLabel')}</Text>
               <TextInput
                 style={[
                   styles.textInput,
@@ -486,7 +526,7 @@ export default function TeamSettingsSheet() {
                 ]}
                 value={editDescription}
                 onChangeText={setEditDescription}
-                placeholder="Optional team description"
+                placeholder={t('teams.descriptionPlaceholder')}
                 placeholderTextColor={colors.textMuted}
                 multiline
                 numberOfLines={4}
@@ -509,9 +549,9 @@ export default function TeamSettingsSheet() {
           {/* Modal Header */}
           <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
             <TouchableOpacity onPress={() => setStandardsModalVisible(false)}>
-              <Text style={[styles.modalCancel, { color: colors.textMuted }]}>Close</Text>
+              <Text style={[styles.modalCancel, { color: colors.textMuted }]}>{t('common.close')}</Text>
             </TouchableOpacity>
-            <Text style={[styles.modalTitle, { color: colors.text }]}>Performance Standards</Text>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>{t('teams.performanceStandards')}</Text>
             <View style={{ width: 50 }} />
           </View>
 
@@ -560,7 +600,7 @@ const styles = StyleSheet.create({
   // Section
   section: {},
   sectionSpacing: { marginTop: 24 },
-  sectionTitle: { fontSize: 11, fontWeight: '600', letterSpacing: 0.5, marginBottom: 10, marginLeft: 4 },
+  sectionTitle: { fontSize: 11, fontWeight: '600', letterSpacing: 0.5, marginBottom: 10 },
   sectionItems: { gap: 8 },
 
   // Setting Row
@@ -571,6 +611,9 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     gap: 12,
+  },
+  settingRowRTL: {
+    flexDirection: 'row-reverse',
   },
   settingIcon: {
     width: 36,

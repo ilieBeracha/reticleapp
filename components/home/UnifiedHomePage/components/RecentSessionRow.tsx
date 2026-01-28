@@ -7,6 +7,7 @@
 
 import { isGroupingGoal } from '@/utils/drillGoal';
 import { ChevronRight, Crosshair, Heart, Target, Users } from 'lucide-react-native';
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { formatTimeAgo } from '../UnifiedHomePage.helpers';
@@ -15,6 +16,7 @@ import type { RecentSessionRowProps } from '../UnifiedHomePage.types';
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
 export function RecentSessionRow({ session, colors, onPress }: RecentSessionRowProps) {
+  const { t } = useTranslation();
   const isTeam = session.origin === 'team';
   const hasWatchData = session.sourceSession?.watch_controlled ?? false;
   const isGrouping = isGroupingGoal(session.drillGoal);
@@ -34,9 +36,9 @@ export function RecentSessionRow({ session, colors, onPress }: RecentSessionRowP
   };
 
   const timeAgo = session.endedAt
-    ? formatTimeAgo(session.endedAt)
+    ? formatTimeAgo(session.endedAt, t)
     : session.startedAt
-      ? formatTimeAgo(session.startedAt)
+      ? formatTimeAgo(session.startedAt, t)
       : '';
 
   const shots = session.stats?.shots || 0;
@@ -71,7 +73,7 @@ export function RecentSessionRow({ session, colors, onPress }: RecentSessionRowP
       <View style={s.content}>
         <View style={s.titleRow}>
           <Text style={[s.title, { color: colors.text }]} numberOfLines={1}>
-            {session.drillName || (isTeam ? 'Team Session' : 'Practice')}
+            {session.drillName || (isTeam ? t('home.teamSession') : t('home.practice'))}
           </Text>
           {hasWatchData && <Heart size={12} color="#EF4444" fill="#EF4444" style={{ opacity: 0.8 }} />}
         </View>
@@ -82,23 +84,25 @@ export function RecentSessionRow({ session, colors, onPress }: RecentSessionRowP
             // SQUAD/GROUP: Show participant count + total shots (NO accuracy)
             <>
               {participantCount !== undefined && participantCount > 0 && (
-                <Text style={[s.stat, { color: colors.blue }]}>{participantCount} shooters</Text>
+                <Text style={[s.stat, { color: colors.blue }]}>
+                  {t('home.shooters', { count: participantCount })}
+                </Text>
               )}
               {shots > 0 && (
                 <>
                   <View style={[s.dot, { backgroundColor: colors.textMuted }]} />
-                  <Text style={[s.stat, { color: colors.textMuted }]}>{shots} shots</Text>
+                  <Text style={[s.stat, { color: colors.textMuted }]}>{t('session.shotsCount', { count: shots })}</Text>
                 </>
               )}
             </>
           ) : isGrouping ? (
             // GROUPING: Show shots + best dispersion (NO accuracy)
             <>
-              {shots > 0 && <Text style={[s.stat, { color: colors.textMuted }]}>{shots} shots</Text>}
+              {shots > 0 && <Text style={[s.stat, { color: colors.textMuted }]}>{t('session.shotsCount', { count: shots })}</Text>}
               {bestDispersion !== undefined && bestDispersion > 0 && (
                 <>
                   <View style={[s.dot, { backgroundColor: colors.textMuted }]} />
-                  <Text style={[s.stat, { color: colors.orange }]}>{bestDispersion.toFixed(1)}cm</Text>
+                  <Text style={[s.stat, { color: colors.orange }]}>{t('session.dispersionCm', { value: bestDispersion.toFixed(1) })}</Text>
                 </>
               )}
             </>
@@ -107,7 +111,7 @@ export function RecentSessionRow({ session, colors, onPress }: RecentSessionRowP
             <>
               {shots > 0 && (
                 <Text style={[s.stat, { color: colors.textMuted }]}>
-                  {hits}/{shots} hits
+                  {t('session.hitsOfShots', { hits, shots })}
                 </Text>
               )}
               {accuracy !== undefined && accuracy > 0 && (

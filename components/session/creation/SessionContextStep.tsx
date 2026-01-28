@@ -10,6 +10,7 @@ import type { DrillType } from '@/constants/categoryDrills';
 import { type CategoryDrill, getDrillById } from '@/constants/categoryDrills';
 import { getCategoryConfig, getCategoryDistances } from '@/constants/weaponCategories';
 import { useColors } from '@/hooks/ui/useColors';
+import { useTranslation } from 'react-i18next';
 import type { DrillGoal, DrillPreset } from '@/services/presetService';
 import type { WeaponCategory } from '@/types/workspace';
 import * as Haptics from 'expo-haptics';
@@ -55,6 +56,7 @@ function PillPicker({
   customSuffix?: string;
   placeholder?: string;
 }) {
+  const { t } = useTranslation();
   const colors = useColors();
   const inputRef = useRef<TextInput>(null);
   // 0 = no selection (treat as unset)
@@ -132,7 +134,7 @@ function PillPicker({
             }}
           >
             <Text style={[styles.pillText, { color: isCustom ? colors.background : hasValue ? colors.text : colors.textMuted }]}>
-              {isCustom ? `${selected}${customSuffix}` : hasValue ? String(selected) : placeholder}
+              {isCustom ? `${selected}${customSuffix}` : hasValue ? String(selected) : (placeholder || t('common.custom'))}
             </Text>
           </TouchableOpacity>
         ))}
@@ -155,6 +157,7 @@ function TimePillPicker({
   onSelect: (v: number) => void;
   allowCustom?: boolean;
 }) {
+  const { t } = useTranslation();
   const colors = useColors();
   const inputRef = useRef<TextInput>(null);
   const isCustom = !options.includes(selected);
@@ -221,7 +224,7 @@ function TimePillPicker({
             }}
           >
             <Text style={[styles.pillText, { color: isCustom ? colors.background : colors.text }]}>
-              {isCustom ? formatTime(selected) : 'Other'}
+              {isCustom ? formatTime(selected) : t('common.other')}
             </Text>
           </TouchableOpacity>
         ))}
@@ -242,6 +245,7 @@ export function SessionContextStep({
   selectedDrillId,
   onDrillChange,
 }: SessionContextStepProps) {
+  const { t } = useTranslation();
   const colors = useColors();
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [showDrillPicker, setShowDrillPicker] = useState(false);
@@ -274,12 +278,16 @@ export function SessionContextStep({
   const shotsPresets = SHOTS_PRESETS[purpose] || SHOTS_PRESETS.engagement;
 
   const positionOptions = useMemo(() => {
+    const allOptions = POSITION_OPTIONS.map((opt) => ({
+      ...opt,
+      label: t(`session.positionOptions.${opt.value}`),
+    }));
     if (categoryConfig) {
       const positions = categoryConfig.drillDefaults.positions;
-      return POSITION_OPTIONS.filter((p) => p.value === 'any' || positions.includes(p.value));
+      return allOptions.filter((p) => p.value === 'any' || positions.includes(p.value));
     }
-    return POSITION_OPTIONS;
-  }, [categoryConfig]);
+    return allOptions;
+  }, [categoryConfig, t]);
 
   const handleDrillSelect = useCallback(
     (drill: CategoryDrill) => {
@@ -299,7 +307,7 @@ export function SessionContextStep({
     [onUpdateContext, onDrillChange]
   );
 
-  const formatTime = (s: number | null) => (s === null ? 'None' : s < 60 ? `${s}s` : `${Math.floor(s / 60)}m`);
+  const formatTime = (s: number | null) => (s === null ? t('common.none') : s < 60 ? `${s}s` : `${Math.floor(s / 60)}m`);
 
   // Map purpose to drill goal for preset
   const purposeToDrillGoal = (p: SessionPurpose): DrillGoal => {
@@ -329,8 +337,8 @@ export function SessionContextStep({
   const handlePresetCreated = useCallback((preset: DrillPreset) => {
     setShowPresetForm(false);
     setIsEditingDrill(false);
-    Alert.alert('Saved', `"${preset.name}" saved to your presets`);
-  }, []);
+    Alert.alert(t('common.saved'), t('session.presetSaved', { name: preset.name }));
+  }, [t]);
 
   const handleEditDrill = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -361,14 +369,16 @@ export function SessionContextStep({
         }}
         activeOpacity={0.6}
       >
-        <Text style={[styles.drillLabel, { color: colors.textMuted }]}>{selectedDrill ? 'Drill' : 'Use a drill?'}</Text>
+        <Text style={[styles.drillLabel, { color: colors.textMuted }]}>
+          {selectedDrill ? t('session.drill') : t('session.useDrill')}
+        </Text>
         {selectedDrill ? (
           <View style={styles.drillSelected}>
             <Text style={[styles.drillName, { color: colors.text }]}>
               {selectedDrill.name}
-              {isDrillModified && <Text style={{ color: colors.textMuted }}> (edited)</Text>}
+              {isDrillModified && <Text style={{ color: colors.textMuted }}> {t('session.edited')}</Text>}
             </Text>
-            <Text style={[styles.drillChange, { color: colors.textMuted }]}>Change</Text>
+            <Text style={[styles.drillChange, { color: colors.textMuted }]}>{t('common.change')}</Text>
           </View>
         ) : (
           <ChevronRight size={16} color={colors.textMuted} />
@@ -386,7 +396,7 @@ export function SessionContextStep({
                 onPress={handleEditDrill}
               >
                 <Edit3 size={14} color={colors.text} />
-                <Text style={[styles.drillActionText, { color: colors.text }]}>Edit</Text>
+                <Text style={[styles.drillActionText, { color: colors.text }]}>{t('common.edit')}</Text>
               </TouchableOpacity>
             ) : (
               <>
@@ -396,7 +406,7 @@ export function SessionContextStep({
                     onPress={handleResetDrill}
                   >
                     <X size={14} color={colors.textMuted} />
-                    <Text style={[styles.drillActionText, { color: colors.textMuted }]}>Reset</Text>
+                    <Text style={[styles.drillActionText, { color: colors.textMuted }]}>{t('common.reset')}</Text>
                   </TouchableOpacity>
                 )}
               </>
@@ -406,7 +416,7 @@ export function SessionContextStep({
               onPress={handleSaveAsPreset}
             >
               <Bookmark size={14} color={colors.text} />
-              <Text style={[styles.drillActionText, { color: colors.text }]}>Save as Preset</Text>
+              <Text style={[styles.drillActionText, { color: colors.text }]}>{t('session.saveAsPreset')}</Text>
             </TouchableOpacity>
           </View>
 
@@ -414,7 +424,7 @@ export function SessionContextStep({
           {isEditingDrill && (
             <>
               <View style={styles.paramRow}>
-                <Text style={[styles.paramLabel, { color: colors.textMuted }]}>Distance</Text>
+                <Text style={[styles.paramLabel, { color: colors.textMuted }]}>{t('session.distance')}</Text>
                 <PillPicker
                   options={distancePresets.slice(0, 4)}
                   selected={context.distance}
@@ -427,7 +437,7 @@ export function SessionContextStep({
               {/* Only show bullets for engagement - grouping gets count from scan */}
               {purpose !== 'grouping' && (
                 <View style={styles.paramRow}>
-                  <Text style={[styles.paramLabel, { color: colors.textMuted }]}>Bullets</Text>
+                  <Text style={[styles.paramLabel, { color: colors.textMuted }]}>{t('session.bullets')}</Text>
                   <PillPicker
                     options={shotsPresets.slice(0, 4)}
                     selected={context.shotsPlanned}
@@ -438,7 +448,7 @@ export function SessionContextStep({
               )}
 
               <View style={styles.paramRow}>
-                <Text style={[styles.paramLabel, { color: colors.textMuted }]}>Time limit</Text>
+                <Text style={[styles.paramLabel, { color: colors.textMuted }]}>{t('session.timeLimit')}</Text>
                 <TimePillPicker
                   options={TIME_PRESETS}
                   selected={context.timeLimit ?? 60}
@@ -452,7 +462,7 @@ export function SessionContextStep({
           {!isEditingDrill && (
             <View style={styles.drillSummary}>
               <Text style={[styles.drillSummaryText, { color: colors.textMuted }]}>
-                {context.distance}m{purpose !== 'grouping' ? ` • ${context.shotsPlanned} bullets` : ''}
+                {context.distance}m{purpose !== 'grouping' ? ` • ${context.shotsPlanned} ${t('session.bullets').toLowerCase()}` : ''}
                 {context.timeLimit ? ` • ${formatTime(context.timeLimit)}` : ''}
               </Text>
             </View>
@@ -464,7 +474,7 @@ export function SessionContextStep({
       {!selectedDrill && (
         <>
           <View style={styles.paramRow}>
-            <Text style={[styles.paramLabel, { color: colors.textMuted }]}>Distance</Text>
+            <Text style={[styles.paramLabel, { color: colors.textMuted }]}>{t('session.distance')}</Text>
             <PillPicker
               options={distancePresets.slice(0, 4)}
               selected={context.distance}
@@ -477,7 +487,7 @@ export function SessionContextStep({
           {/* Only show bullets for engagement - grouping gets count from scan */}
           {purpose !== 'grouping' && (
             <View style={styles.paramRow}>
-              <Text style={[styles.paramLabel, { color: colors.textMuted }]}>Bullets</Text>
+              <Text style={[styles.paramLabel, { color: colors.textMuted }]}>{t('session.bullets')}</Text>
               <PillPicker
                 options={shotsPresets.slice(0, 4)}
                 selected={context.shotsPlanned}
@@ -489,7 +499,7 @@ export function SessionContextStep({
 
           {/* Position - always visible */}
           <View style={styles.paramRow}>
-            <Text style={[styles.paramLabel, { color: colors.textMuted }]}>Position</Text>
+            <Text style={[styles.paramLabel, { color: colors.textMuted }]}>{t('session.position')}</Text>
             <View style={styles.pills}>
               {positionOptions.map((opt) => {
                 const active = context.position === opt.value;
@@ -514,7 +524,7 @@ export function SessionContextStep({
           {/* Advanced toggle */}
           <TouchableOpacity style={styles.advancedToggle} onPress={() => setShowAdvanced(!showAdvanced)}>
             <Text style={[styles.advancedText, { color: colors.textMuted }]}>
-              {showAdvanced ? 'Less options' : 'More options'}
+              {showAdvanced ? t('session.lessOptions') : t('session.moreOptions')}
             </Text>
             {showAdvanced ? (
               <ChevronUp size={14} color={colors.textMuted} />
@@ -528,8 +538,8 @@ export function SessionContextStep({
               {/* Time Limit Toggle */}
               <View style={styles.toggleRow}>
                 <View style={styles.toggleLabel}>
-                  <Text style={[styles.paramLabel, { color: colors.text, marginBottom: 0 }]}>Time limit</Text>
-                  <Text style={[styles.toggleHint, { color: colors.textMuted }]}>Set a countdown timer</Text>
+                  <Text style={[styles.paramLabel, { color: colors.text, marginBottom: 0 }]}>{t('session.timeLimit')}</Text>
+                  <Text style={[styles.toggleHint, { color: colors.textMuted }]}>{t('session.setCountdownTimer')}</Text>
                 </View>
                 <Switch
                   value={context.timeLimit !== null}
@@ -556,9 +566,9 @@ export function SessionContextStep({
               {/* Stress Drill Toggle */}
               <View style={styles.toggleRow}>
                 <View style={styles.toggleLabel}>
-                  <Text style={[styles.paramLabel, { color: colors.text, marginBottom: 0 }]}>Stress drill</Text>
+                  <Text style={[styles.paramLabel, { color: colors.text, marginBottom: 0 }]}>{t('session.stressDrill')}</Text>
                   <Text style={[styles.toggleHint, { color: colors.textMuted }]}>
-                    Physical activity before shooting
+                    {t('session.stressDrillDescription')}
                   </Text>
                 </View>
                 <Switch
@@ -578,7 +588,7 @@ export function SessionContextStep({
                     styles.notesInput,
                     { backgroundColor: colors.card, borderColor: colors.border, color: colors.text },
                   ]}
-                  placeholder="Session notes..."
+                  placeholder={t('session.sessionNotes')}
                   placeholderTextColor={colors.textMuted}
                   value={context.notes}
                   onChangeText={(notes) => onUpdateContext({ notes })}
@@ -599,7 +609,7 @@ export function SessionContextStep({
       >
         <View style={{ flex: 1, backgroundColor: colors.background }}>
           <View style={styles.modalHeader}>
-            <Text style={[styles.modalTitle, { color: colors.text }]}>Select Drill</Text>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>{t('session.selectDrill')}</Text>
             <TouchableOpacity onPress={() => setShowDrillPicker(false)}>
               <X size={22} color={colors.text} />
             </TouchableOpacity>

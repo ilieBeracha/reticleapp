@@ -2,6 +2,7 @@
 import { supabase } from '@/lib/supabase';
 import { useTeamStore } from '@/store/teamStore';
 import { Session, User } from '@supabase/supabase-js';
+import * as Linking from 'expo-linking';
 import { router } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
@@ -248,16 +249,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // - forceAccountPicker: show account chooser (prompt: 'select_account')
     const googleQueryParams = forceAccountPicker ? { prompt: 'select_account' } : undefined;
 
+    // Use Linking.createURL to get correct scheme based on APP_VARIANT
+    // dev/preview: retic://  |  production: reticle://
+    const redirectUrl = Linking.createURL('auth/callback');
+
     const { data } = await supabase.auth.signInWithOAuth({
       provider,
       options: {
-        redirectTo: 'retic://auth/callback',
+        redirectTo: redirectUrl,
         skipBrowserRedirect: true,
         queryParams: provider === 'google' ? googleQueryParams : undefined,
       },
     });
 
-    const result = await WebBrowser.openAuthSessionAsync(data.url ?? '', 'retic://auth/callback');
+    const result = await WebBrowser.openAuthSessionAsync(data.url ?? '', redirectUrl);
 
     if (result.type === 'success' && result.url) {
       const access_token = result.url.split('access_token=')[1].split('&')[0];

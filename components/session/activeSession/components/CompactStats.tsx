@@ -7,6 +7,7 @@
 
 import { isGroupingPaper, isPaperTarget } from '@/constants/drill';
 import { useColors } from '@/hooks/ui/useColors';
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, View } from 'react-native';
 
 interface CompactStatsProps {
@@ -15,6 +16,7 @@ interface CompactStatsProps {
 
 export function CompactStats({ targets }: CompactStatsProps) {
   const colors = useColors();
+  const { t } = useTranslation();
 
   let manualShots = 0;
   let manualHits = 0;
@@ -58,7 +60,7 @@ export function CompactStats({ targets }: CompactStatsProps) {
     <View style={[styles.container, { backgroundColor: colors.card }]}>
       <View style={styles.item}>
         <Text style={[styles.value, { color: colors.text }]}>{totalTargets}</Text>
-        <Text style={[styles.label, { color: colors.textMuted }]}>targets</Text>
+        <Text style={[styles.label, { color: colors.textMuted }]}>{t('session.targetsLabel', { count: totalTargets })}</Text>
       </View>
 
       <View style={[styles.divider, { backgroundColor: colors.border }]} />
@@ -74,50 +76,50 @@ export function CompactStats({ targets }: CompactStatsProps) {
             >
               {manualAccuracy}%
             </Text>
-            <Text style={[styles.label, { color: colors.textMuted }]}>accuracy</Text>
+            <Text style={[styles.label, { color: colors.textMuted }]}>{t('session.accuracy')}</Text>
           </View>
           <View style={[styles.divider, { backgroundColor: colors.border }]} />
           <View style={styles.item}>
             <Text style={[styles.value, { color: colors.text }]}>
               {manualHits}/{manualShots}
             </Text>
-            <Text style={[styles.label, { color: colors.textMuted }]}>hits</Text>
+            <Text style={[styles.label, { color: colors.textMuted }]}>{t('session.hits')}</Text>
           </View>
         </>
       ) : hasScan ? (
         <>
           <View style={styles.item}>
             <Text style={[styles.value, { color: '#A78BFA' }]}>{scannedHoles}</Text>
-            <Text style={[styles.label, { color: colors.textMuted }]}>holes</Text>
+            <Text style={[styles.label, { color: colors.textMuted }]}>{t('session.holes')}</Text>
           </View>
           <View style={[styles.divider, { backgroundColor: colors.border }]} />
           <View style={styles.item}>
-            <Text style={[styles.value, { color: colors.textMuted, fontSize: 11 }]}>no acc</Text>
-            <Text style={[styles.label, { color: colors.textMuted }]}>scanned</Text>
+            <Text style={[styles.value, { color: colors.textMuted, fontSize: 11 }]}>{t('session.noAcc')}</Text>
+            <Text style={[styles.label, { color: colors.textMuted }]}>{t('session.scannedLabel')}</Text>
           </View>
         </>
       ) : hasGrouping && bestDispersion != null ? (
         <>
           <View style={styles.item}>
             <Text style={[styles.value, { color: '#22C55E' }]}>{bestDispersion.toFixed(1)}cm</Text>
-            <Text style={[styles.label, { color: colors.textMuted }]}>best</Text>
+            <Text style={[styles.label, { color: colors.textMuted }]}>{t('session.best')}</Text>
           </View>
           <View style={[styles.divider, { backgroundColor: colors.border }]} />
           <View style={styles.item}>
             <Text style={[styles.value, { color: colors.text }]}>{groupingCount}</Text>
-            <Text style={[styles.label, { color: colors.textMuted }]}>groups</Text>
+            <Text style={[styles.label, { color: colors.textMuted }]}>{t('session.groups', { count: groupingCount })}</Text>
           </View>
         </>
       ) : (
         <>
           <View style={styles.item}>
             <Text style={[styles.value, { color: colors.textMuted }]}>-</Text>
-            <Text style={[styles.label, { color: colors.textMuted }]}>awaiting</Text>
+            <Text style={[styles.label, { color: colors.textMuted }]}>{t('session.awaiting')}</Text>
           </View>
           <View style={[styles.divider, { backgroundColor: colors.border }]} />
           <View style={styles.item}>
             <Text style={[styles.value, { color: colors.textMuted }]}>-</Text>
-            <Text style={[styles.label, { color: colors.textMuted }]}>data</Text>
+            <Text style={[styles.label, { color: colors.textMuted }]}>{t('session.data')}</Text>
           </View>
         </>
       )}

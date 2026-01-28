@@ -7,6 +7,7 @@
  */
 
 import { useColors } from '@/hooks/ui/useColors';
+import { useTranslation } from 'react-i18next';
 import * as Haptics from 'expo-haptics';
 import { Check, Smartphone, Watch } from 'lucide-react-native';
 import { useCallback } from 'react';
@@ -39,6 +40,7 @@ export function CaptureModePickerInline({
   showSensitivity = true,
 }: CaptureModePickerInlineProps) {
   const colors = useColors();
+  const { t } = useTranslation();
 
   const handleModeSelect = useCallback(
     (mode: CaptureMode) => {
@@ -76,8 +78,8 @@ export function CaptureModePickerInline({
             <Smartphone size={20} color={colors.primary} />
           </View>
           <View style={styles.modeContent}>
-            <Text style={[styles.modeTitle, { color: colors.text }]}>Phone</Text>
-            <Text style={[styles.modeDesc, { color: colors.textMuted }]}>Manual logging</Text>
+            <Text style={[styles.modeTitle, { color: colors.text }]}>{t('session.phone')}</Text>
+            <Text style={[styles.modeDesc, { color: colors.textMuted }]}>{t('session.manualLogging')}</Text>
           </View>
           {selectedMode === 'phone' && (
             <View style={[styles.checkIcon, { backgroundColor: colors.primary }]}>
@@ -102,8 +104,8 @@ export function CaptureModePickerInline({
             <Watch size={20} color={colors.orange} />
           </View>
           <View style={styles.modeContent}>
-            <Text style={[styles.modeTitle, { color: colors.text }]}>Watch</Text>
-            <Text style={[styles.modeDesc, { color: colors.textMuted }]}>Auto detection</Text>
+            <Text style={[styles.modeTitle, { color: colors.text }]}>{t('session.watch')}</Text>
+            <Text style={[styles.modeDesc, { color: colors.textMuted }]}>{t('session.autoDetection')}</Text>
           </View>
           {selectedMode === 'watch' && (
             <View style={[styles.checkIcon, { backgroundColor: colors.orange }]}>
@@ -116,12 +118,12 @@ export function CaptureModePickerInline({
       {/* Sensitivity Settings - Only show when watch is selected */}
       {showSensitivity && selectedMode === 'watch' && onSensitivityChange && (
         <View style={[styles.sensitivityContainer, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Text style={[styles.sensitivityTitle, { color: colors.textMuted }]}>Detection Sensitivity</Text>
+          <Text style={[styles.sensitivityTitle, { color: colors.textMuted }]}>{t('session.detectionSensitivity')}</Text>
           <View style={styles.sensitivityOptions}>
             {[
-              { value: 2.5, label: 'Light' },
-              { value: 3.5, label: 'Standard' },
-              { value: 5.5, label: 'Heavy' },
+              { value: 2.5, label: t('session.light') },
+              { value: 3.5, label: t('session.standard') },
+              { value: 5.5, label: t('session.heavy') },
             ].map((opt) => {
               const isSelected = sensitivity === opt.value;
               return (

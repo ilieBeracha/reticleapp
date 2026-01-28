@@ -5,6 +5,7 @@
  */
 
 import { useColors } from '@/hooks/ui/useColors';
+import { useTranslation } from 'react-i18next';
 import { useMemo } from 'react';
 import { Dimensions, StyleSheet, Text, View } from 'react-native';
 import Svg, { Defs, LinearGradient, Rect, Stop, Text as SvgText } from 'react-native-svg';
@@ -31,8 +32,10 @@ interface ActivityChartProps {
 
 const screenWidth = Dimensions.get('window').width;
 
-export function ActivityChart({ data, height = 140, title = 'This Week' }: ActivityChartProps) {
+export function ActivityChart({ data, height = 140, title }: ActivityChartProps) {
+  const { t } = useTranslation();
   const colors = useColors();
+  const chartTitle = title || t('home.thisWeek');
   // Parent ScrollView paddingHorizontal: 14, container padding: 14
   // Total: 14 + 14 = 28px each side = 56px total
   const width = screenWidth - 56;
@@ -61,7 +64,7 @@ export function ActivityChart({ data, height = 140, title = 'This Week' }: Activ
     return (
       <View style={[styles.container, { backgroundColor: colors.card }]}>
         <Text style={[styles.noData, { color: colors.textMuted }]}>
-          No activity data
+          {t('insights.charts.noActivityData')}
         </Text>
       </View>
     );
@@ -71,13 +74,13 @@ export function ActivityChart({ data, height = 140, title = 'This Week' }: Activ
     <View style={[styles.container, { backgroundColor: colors.card }]}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
+        <Text style={[styles.title, { color: colors.text }]}>{chartTitle}</Text>
         <View style={styles.totals}>
           <Text style={[styles.totalValue, { color: colors.text }]}>{totalSessions}</Text>
-          <Text style={[styles.totalLabel, { color: colors.textMuted }]}>sessions</Text>
+          <Text style={[styles.totalLabel, { color: colors.textMuted }]}>{t('session.sessions')}</Text>
           <View style={[styles.totalDot, { backgroundColor: colors.border }]} />
           <Text style={[styles.totalValue, { color: colors.text }]}>{totalRounds}</Text>
-          <Text style={[styles.totalLabel, { color: colors.textMuted }]}>rounds</Text>
+          <Text style={[styles.totalLabel, { color: colors.textMuted }]}>{t('weapons.rounds')}</Text>
         </View>
       </View>
 

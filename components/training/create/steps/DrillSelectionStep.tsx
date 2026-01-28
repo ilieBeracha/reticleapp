@@ -11,6 +11,7 @@
 
 import { STANDARD_DRILL_TEMPLATES, type StandardDrillTemplate } from '@/constants/standardDrills';
 import { useColors } from '@/hooks/ui/useColors';
+import { useTranslation } from 'react-i18next';
 import type { Drill, TrainingDrill } from '@/types/workspace';
 import * as Haptics from 'expo-haptics';
 import { Check, ChevronRight, History, Plus, Shield, Sparkles, Target } from 'lucide-react-native';
@@ -64,6 +65,7 @@ function DrillCard({
   onPress: () => void;
   colors: ReturnType<typeof useColors>;
 }) {
+  const { t } = useTranslation();
   const goalColor = drillGoal === 'grouping' ? '#22C55E' : '#F59E0B';
 
   return (
@@ -87,7 +89,7 @@ function DrillCard({
           {name}
         </Text>
         <Text style={[styles.drillMeta, { color: isAdded ? colors.background + '99' : colors.textMuted }]}>
-          {distance}m · {rounds} rds{timeLimit ? ` · ${timeLimit}s` : ''}
+          {distance}m · {t('training.roundsCount', { count: rounds })}{timeLimit ? ` · ${timeLimit}s` : ''}
         </Text>
       </View>
       {isAdded ? (
@@ -116,6 +118,7 @@ function ProgramItem({
   onAdjust: () => void;
   colors: ReturnType<typeof useColors>;
 }) {
+  const { t } = useTranslation();
   const goalColor = drill.drill_goal === 'grouping' ? '#22C55E' : '#F59E0B';
 
   return (
@@ -143,11 +146,11 @@ function ProgramItem({
             <View style={[styles.programGoalBadge, { backgroundColor: goalColor + '20' }]}>
               <View style={[styles.programGoalDot, { backgroundColor: goalColor }]} />
               <Text style={[styles.programGoalText, { color: goalColor }]}>
-                {drill.drill_goal === 'grouping' ? 'Grouping' : 'Engagement'}
+                {drill.drill_goal === 'grouping' ? t('session.grouping') : t('session.engagement')}
               </Text>
             </View>
             <Text style={[styles.programParams, { color: colors.textMuted }]}>
-              {drill.distance_m}m · {drill.rounds_per_shooter} rds
+              {drill.distance_m}m · {t('training.roundsCount', { count: drill.rounds_per_shooter })}
             </Text>
           </View>
         </View>
@@ -285,9 +288,9 @@ export function DrillSelectionStep({
       {drills.length > 0 && (
         <Animated.View entering={FadeIn.duration(200)} style={styles.section}>
           <View style={styles.programHeader}>
-            <Text style={[styles.programTitle, { color: colors.text }]}>PROGRAM</Text>
+            <Text style={[styles.programTitle, { color: colors.text }]}>{t('training.program')}</Text>
             <Text style={[styles.programStats, { color: colors.textMuted }]}>
-              {drills.length} {drills.length === 1 ? 'drill' : 'drills'} · {totalRounds} rounds
+              {t('training.drillsRounds', { drills: drills.length, rounds: totalRounds })}
             </Text>
           </View>
           <View style={styles.programList}>
@@ -310,8 +313,8 @@ export function DrillSelectionStep({
         <View style={styles.section}>
           <SectionHeader
             icon={History}
-            title="From Last Training"
-            subtitle={`${lastTrainingDrills.length} drills`}
+            title={t('training.fromLastTraining')}
+            subtitle={t('training.drillsCount', { count: lastTrainingDrills.length })}
             colors={colors}
           />
           <View style={styles.drillGrid}>
@@ -338,7 +341,7 @@ export function DrillSelectionStep({
       {/* Team Drills */}
       {teamDrills.length > 0 && (
         <View style={styles.section}>
-          <SectionHeader icon={Shield} title="Team Drills" colors={colors} />
+          <SectionHeader icon={Shield} title={t('training.teamDrills')} colors={colors} />
           <View style={styles.drillGrid}>
             {teamDrills.slice(0, 6).map((drill) => {
               const itemId = `team-${drill.id}`;
@@ -363,7 +366,7 @@ export function DrillSelectionStep({
               onPress={onBuildCustom}
               activeOpacity={0.7}
             >
-              <Text style={[styles.viewAllText, { color: colors.text }]}>View all {teamDrills.length} team drills</Text>
+              <Text style={[styles.viewAllText, { color: colors.text }]}>{t('training.viewAllTeamDrills', { count: teamDrills.length })}</Text>
               <ChevronRight size={16} color={colors.textMuted} />
             </TouchableOpacity>
           )}
@@ -372,7 +375,7 @@ export function DrillSelectionStep({
 
       {/* Standard Templates */}
       <View style={styles.section}>
-        <SectionHeader icon={Sparkles} title="Quick Templates" colors={colors} />
+        <SectionHeader icon={Sparkles} title={t('training.quickTemplates')} colors={colors} />
         <View style={styles.drillGrid}>
           {STANDARD_DRILL_TEMPLATES.slice(0, 8).map((template) => (
             <DrillCard
@@ -403,9 +406,9 @@ export function DrillSelectionStep({
           <Target size={20} color={colors.text} />
         </View>
         <View style={styles.customContent}>
-          <Text style={[styles.customTitle, { color: colors.text }]}>Build Custom Drill</Text>
+          <Text style={[styles.customTitle, { color: colors.text }]}>{t('training.buildCustomDrill')}</Text>
           <Text style={[styles.customSubtitle, { color: colors.textMuted }]}>
-            Create from scratch or browse full library
+            {t('training.createFromScratchOrBrowse')}
           </Text>
         </View>
         <ChevronRight size={20} color={colors.textMuted} />

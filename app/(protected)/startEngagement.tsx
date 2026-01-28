@@ -222,14 +222,16 @@ export default function StartEngagementScreen() {
           if (trainingId) {
             const { data: activeEngagements } = await supabase
               .from('engagements')
-              .select(`
+              .select(
+                `
                 id,
                 session_id,
                 status,
                 engagement_mode,
                 started_at,
                 shooter_id
-              `)
+              `
+              )
               .eq('training_id', trainingId)
               .in('engagement_mode', ['squad', 'group'])
               .not('status', 'in', '("completed","cancelled")')
@@ -370,7 +372,7 @@ export default function StartEngagementScreen() {
           const existing = existingEngagements[0];
           Alert.alert(
             'Active Squad Engagement',
-            'There\'s already an active squad/group engagement for this training. You\'ll be redirected to it.',
+            "There's already an active squad/group engagement for this training. You'll be redirected to it.",
             [
               {
                 text: 'OK',

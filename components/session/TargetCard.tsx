@@ -1,6 +1,7 @@
 import { SessionTargetWithResults } from '@/services/sessionService';
 import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 // ============================================================================
@@ -16,6 +17,7 @@ interface TargetCardProps {
 // COMPONENT
 // ============================================================================
 export const TargetCard = React.memo(function TargetCard({ target, index, onPress }: TargetCardProps) {
+  const { t } = useTranslation();
   const isPaper = target.target_type === 'paper';
 
   // Determine target purpose: grouping (consistency) vs achievement (accuracy)
@@ -51,7 +53,7 @@ export const TargetCard = React.memo(function TargetCard({ target, index, onPres
   const hasResult = (isPaper && target.paper_result) || (!isPaper && target.tactical_result);
 
   // Meta info
-  const laneInfo = target.lane_number ? `Lane ${target.lane_number}` : null;
+  const laneInfo = target.lane_number ? t('session.lane', { number: target.lane_number }) : null;
   const notesSnippet = target.notes ? target.notes.slice(0, 30) : null;
 
   return (
@@ -83,8 +85,8 @@ export const TargetCard = React.memo(function TargetCard({ target, index, onPres
             isGroupingTarget ? (
               // Grouping: show dispersion (primary) and shot count
               <Text style={styles.title}>
-                {dispersionCm != null ? `${dispersionCm.toFixed(1)}cm` : `${shots} shots`}
-                {dispersionCm != null && <Text style={styles.titleMuted}> • {shots} shots</Text>}
+                {dispersionCm != null ? `${dispersionCm.toFixed(1)}cm` : t('session.shotsCount', { count: shots })}
+                {dispersionCm != null && <Text style={styles.titleMuted}> • {t('session.shotsCount', { count: shots })}</Text>}
               </Text>
             ) : isScanned ? (
               // SCANNED: Show holes detected (not "hits" - we're counting holes on paper)
@@ -95,7 +97,7 @@ export const TargetCard = React.memo(function TargetCard({ target, index, onPres
                 </Text>
               ) : (
                 // No declared shots → just holes detected
-                <Text style={styles.title}>{hits} holes</Text>
+                <Text style={styles.title}>{t('session.holesCount', { count: hits })}</Text>
               )
             ) : (
               // MANUAL: User entered shots + hits → show accuracy
@@ -104,7 +106,7 @@ export const TargetCard = React.memo(function TargetCard({ target, index, onPres
               </Text>
             )
           ) : (
-            <Text style={styles.title}>No result</Text>
+            <Text style={styles.title}>{t('session.noResult')}</Text>
           )}
           {/* Entry method indicator */}
           <View style={[styles.entryTag, isScanned ? styles.entryTagScan : styles.entryTagManual]}>
@@ -125,14 +127,14 @@ export const TargetCard = React.memo(function TargetCard({ target, index, onPres
                   : styles.typeTagTactical,
             ]}
           >
-            {isGroupingTarget ? 'Grouping' : isPaper ? 'Engagement' : 'Tactical'}
+            {isGroupingTarget ? t('session.grouping') : isPaper ? t('session.engagement') : t('session.tactical')}
           </Text>
           {/* Entry method for achievement/tactical */}
           {!isGroupingTarget && isPaper && (
             <>
               <View style={styles.dot} />
               <Text style={[styles.metaText, isScanned ? styles.metaTextScan : styles.metaTextManual]}>
-                {isScanned ? 'Scanned' : 'Manual'}
+                {isScanned ? t('session.scannedLabel') : t('session.manualLabel')}
               </Text>
             </>
           )}

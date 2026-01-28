@@ -14,6 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -32,18 +33,17 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 // ROLE CONFIG
 // ─────────────────────────────────────────────────────────────────────────────
 
-const ROLE_LABELS: Record<string, string> = {
-  owner: 'Owner',
-  commander: 'Commander',
-  team_commander: 'Commander',
-  squad_commander: 'Squad Lead',
-  soldier: 'Soldier',
-};
-
-function getRoleLabel(role: string | null | undefined): string {
-  if (!role) return 'Soldier';
+function getRoleLabel(role: string | null | undefined, t: (key: string) => string): string {
+  if (!role) return t('teams.roles.soldier');
   const normalized = role === 'commander' ? 'team_commander' : role;
-  return ROLE_LABELS[normalized] || 'Soldier';
+  const roleMap: Record<string, string> = {
+    owner: t('teams.roles.owner'),
+    commander: t('teams.roles.commander'),
+    team_commander: t('teams.roles.commander'),
+    squad_commander: t('teams.roles.squadCommander'),
+    soldier: t('teams.roles.soldier'),
+  };
+  return roleMap[normalized] || t('teams.roles.soldier');
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -67,9 +67,10 @@ function MemberRow({
   isMySquadMember?: boolean;
   showDivider?: boolean;
 }) {
+  const { t } = useTranslation();
   const memberSquadId = member.role?.squad_id || member.details?.squad_id;
   const isSoldier = (member.role?.role || 'soldier') === 'soldier';
-  const roleLabel = getRoleLabel(member.role?.role);
+  const roleLabel = getRoleLabel(member.role?.role, t);
 
   return (
     <TouchableOpacity
@@ -88,7 +89,7 @@ function MemberRow({
 
       <View style={styles.memberInfo}>
         <Text style={[styles.memberName, { color: colors.text }]} numberOfLines={1}>
-          {member.profile.full_name || member.profile.email?.split('@')[0] || 'Unknown'}
+          {member.profile.full_name || member.profile.email?.split('@')[0] || t('common.unknown')}
         </Text>
         <Text style={[styles.memberMeta, { color: colors.textMuted }]}>
           {roleLabel}
@@ -120,6 +121,7 @@ function MemberRow({
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function TeamMembersSheet() {
+  const { t } = useTranslation();
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { teamId } = useLocalSearchParams<{ teamId: string }>();
@@ -201,9 +203,9 @@ export default function TeamMembersSheet() {
 
   const handleOpenSquadAssign = (member: TeamMemberWithProfile) => {
     if (teamSquads.length === 0) {
-      Alert.alert('No Squads', 'Create squads first in Team Settings.', [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Go to Squads', onPress: () => router.push(`/(protected)/teamSquads?teamId=${teamId}` as any) },
+      Alert.alert(t('teams.noSquads'), t('teams.createSquadsFirst'), [
+        { text: t('common.cancel'), style: 'cancel' },
+        { text: t('teams.goToSquads'), onPress: () => router.push(`/(protected)/teamSquads?teamId=${teamId}` as any) },
       ]);
       return;
     }
@@ -223,7 +225,7 @@ export default function TeamMembersSheet() {
       setSquadModalVisible(false);
       setSelectedMember(null);
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to assign squad');
+      Alert.alert(t('common.error'), error.message || t('teams.failedAssignSquad'));
     } finally {
       setAssigning(false);
     }
@@ -244,8 +246,8 @@ export default function TeamMembersSheet() {
 
     return roleOrder
       .filter((role) => grouped[role]?.length > 0)
-      .map((role) => ({ role, label: getRoleLabel(role), members: grouped[role] || [] }));
-  }, [members]);
+      .map((role) => ({ role, label: getRoleLabel(role, t), members: grouped[role] || [] }));
+  }, [members, t]);
 
   const currentMemberSquad = selectedMember?.role?.squad_id || selectedMember?.details?.squad_id;
 
@@ -258,10 +260,10 @@ export default function TeamMembersSheet() {
     >
       {/* Header */}
       <View style={styles.header}>
-        <Text style={[styles.title, { color: colors.text }]}>Members</Text>
+        <Text style={[styles.title, { color: colors.text }]}>{t('teams.members')}</Text>
         {team && (
           <Text style={[styles.subtitle, { color: colors.textMuted }]}>
-            {team.name} · {members.length} total
+            {team.name} · {t('teams.totalMembers', { count: members.length })}
           </Text>
         )}
       </View>
@@ -270,7 +272,7 @@ export default function TeamMembersSheet() {
       {isSquadCommander && !canManageTeam && mySquadId && !loading && (
         <View style={[styles.note, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
           <Text style={[styles.noteText, { color: colors.textMuted }]}>
-            Managing <Text style={{ color: colors.text, fontWeight: '600' }}>{mySquadId}</Text> squad
+            {t('teams.managingSquad', { squad: mySquadId })}
           </Text>
         </View>
       )}
@@ -284,7 +286,7 @@ export default function TeamMembersSheet() {
         >
           <Ionicons name="add" size={18} color={colors.text} />
           <Text style={[styles.inviteText, { color: colors.text }]}>
-            {isSquadCommander && !canManageTeam ? `Add to ${mySquadId}` : 'Add member'}
+            {isSquadCommander && !canManageTeam ? t('teams.addToSquad', { squad: mySquadId }) : t('teams.addMember')}
           </Text>
         </TouchableOpacity>
       )}
@@ -337,7 +339,7 @@ export default function TeamMembersSheet() {
       {/* Empty */}
       {!loading && members.length === 0 && (
         <View style={styles.empty}>
-          <Text style={[styles.emptyText, { color: colors.textMuted }]}>No members yet</Text>
+          <Text style={[styles.emptyText, { color: colors.textMuted }]}>{t('teams.noMembersYet')}</Text>
         </View>
       )}
 
@@ -363,9 +365,9 @@ export default function TeamMembersSheet() {
               }}
               disabled={assigning}
             >
-              <Text style={[styles.modalCancel, { color: colors.textMuted }]}>Cancel</Text>
+              <Text style={[styles.modalCancel, { color: colors.textMuted }]}>{t('common.cancel')}</Text>
             </TouchableOpacity>
-            <Text style={[styles.modalTitle, { color: colors.text }]}>Assign Squad</Text>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>{t('teams.assignSquad')}</Text>
             <View style={{ width: 50 }} />
           </View>
 
@@ -380,17 +382,19 @@ export default function TeamMembersSheet() {
                 />
                 <View style={styles.selectedMemberInfo}>
                   <Text style={[styles.selectedMemberName, { color: colors.text }]}>
-                    {selectedMember.profile.full_name || 'Unknown'}
+                    {selectedMember.profile.full_name || t('common.unknown')}
                   </Text>
                   <Text style={[styles.selectedMemberSquad, { color: colors.textMuted }]}>
-                    {currentMemberSquad ? `Currently: ${currentMemberSquad}` : 'No squad assigned'}
+                    {currentMemberSquad ? t('teams.currentlySquad', { squad: currentMemberSquad }) : t('teams.noSquadAssigned')}
                   </Text>
                 </View>
               </View>
 
               {/* Squad Commander Note */}
               {isSquadCommander && !canManage && mySquadId && (
-                <Text style={[styles.modalNote, { color: colors.textMuted }]}>Limited to your squad: {mySquadId}</Text>
+                <Text style={[styles.modalNote, { color: colors.textMuted }]}>
+                  {t('teams.limitedToSquad', { squad: mySquadId })}
+                </Text>
               )}
 
               {/* Squad Options */}
@@ -430,7 +434,7 @@ export default function TeamMembersSheet() {
                   activeOpacity={0.5}
                 >
                   <Ionicons name="close-outline" size={16} color="#EF4444" />
-                  <Text style={styles.removeText}>Remove from squad</Text>
+                  <Text style={styles.removeText}>{t('teams.removeFromSquad')}</Text>
                 </TouchableOpacity>
               )}
             </ScrollView>

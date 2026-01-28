@@ -8,6 +8,7 @@
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { BarChart3, BookOpen, Trophy, Users } from 'lucide-react-native';
+import { useTranslation } from 'react-i18next';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeInRight, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import type { Colors } from '../UnifiedHomePage.types';
@@ -65,31 +66,32 @@ function QuickActionButton({ action, colors, index }: { action: QuickAction; col
 }
 
 export function QuickActionsRow({ colors }: QuickActionsRowProps) {
+  const { t } = useTranslation();
   const actions: QuickAction[] = [
     {
       id: 'weapon',
-      label: 'Weapons',
+      label: t('weapons.weapons'),
       icon: <BookOpen size={16} color={colors.indigo} />,
       color: colors.indigo,
       route: '/(protected)/weaponLibrary',
     },
     {
       id: 'stats',
-      label: 'Stats',
+      label: t('stats.title'),
       icon: <BarChart3 size={16} color={colors.green} />,
       color: colors.green,
       route: '/(protected)/stats',
     },
     {
       id: 'team',
-      label: 'Team',
+      label: t('teams.team'),
       icon: <Users size={16} color={colors.blue} />,
       color: colors.blue,
       route: '/(protected)/(tabs)/team',
     },
     {
       id: 'achievements',
-      label: 'Badges',
+      label: t('achievements.badges'),
       icon: <Trophy size={16} color={colors.orange} />,
       color: colors.orange,
       route: '/(protected)/achievements',

@@ -9,6 +9,7 @@ import type { UserWeapon, WeaponStats } from '@/services/weaponService';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { ChevronRight, Crosshair, Minus, TrendingDown, TrendingUp } from 'lucide-react-native';
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import type { Colors } from '../UnifiedHomePage.types';
@@ -31,11 +32,12 @@ function getTrend(stats: WeaponStats): Trend {
 }
 
 function TrendBadge({ trend, colors }: { trend: Trend; colors: Colors }) {
+  const { t } = useTranslation();
   const config = {
-    improving: { label: 'Improving', color: colors.green, Icon: TrendingUp },
-    stable: { label: 'Stable', color: colors.textMuted, Icon: Minus },
-    declining: { label: 'Needs Work', color: colors.orange, Icon: TrendingDown },
-    new: { label: 'New', color: colors.blue, Icon: Minus },
+    improving: { label: t('insights.improving'), color: colors.green, Icon: TrendingUp },
+    stable: { label: t('weapons.stable'), color: colors.textMuted, Icon: Minus },
+    declining: { label: t('weapons.needsWork'), color: colors.orange, Icon: TrendingDown },
+    new: { label: t('common.new'), color: colors.blue, Icon: Minus },
   }[trend];
 
   return (
@@ -56,6 +58,7 @@ function Metric({ label, value, colors }: { label: string; value: string; colors
 }
 
 export function WeaponPerformanceCard({ weapon, stats, colors }: WeaponPerformanceCardProps) {
+  const { t } = useTranslation();
   const trend = getTrend(stats);
 
   const handlePress = () => {
@@ -74,10 +77,10 @@ export function WeaponPerformanceCard({ weapon, stats, colors }: WeaponPerforman
   let recency = '';
   if (stats.last_used_at) {
     const daysAgo = Math.floor((Date.now() - new Date(stats.last_used_at).getTime()) / 86400000);
-    if (daysAgo === 0) recency = 'Used today';
-    else if (daysAgo === 1) recency = 'Yesterday';
-    else if (daysAgo < 7) recency = `${daysAgo}d ago`;
-    else recency = `${Math.floor(daysAgo / 7)}w ago`;
+    if (daysAgo === 0) recency = t('weapons.usedToday');
+    else if (daysAgo === 1) recency = t('time.yesterday');
+    else if (daysAgo < 7) recency = t('time.daysAgo', { count: daysAgo });
+    else recency = t('time.weeksAgo', { count: Math.floor(daysAgo / 7) });
   }
 
   return (
@@ -97,7 +100,7 @@ export function WeaponPerformanceCard({ weapon, stats, colors }: WeaponPerforman
               {weapon.name}
             </Text>
             <Text style={[s.weaponMeta, { color: colors.textMuted }]} numberOfLines={1}>
-              {weapon.caliber || weapon.category || 'Primary weapon'}
+              {weapon.caliber || weapon.category || t('weapons.primaryWeapon')}
               {recency ? ` · ${recency}` : ''}
             </Text>
           </View>
@@ -106,18 +109,18 @@ export function WeaponPerformanceCard({ weapon, stats, colors }: WeaponPerforman
 
         {/* Metrics row */}
         <View style={[s.metricsRow, { borderTopColor: colors.border }]}>
-          <Metric label="Sessions" value={String(stats.total_sessions)} colors={colors} />
+          <Metric label={t('session.sessions')} value={String(stats.total_sessions)} colors={colors} />
           <View style={[s.divider, { backgroundColor: colors.border }]} />
-          <Metric label="Accuracy" value={accuracy} colors={colors} />
+          <Metric label={t('session.accuracy')} value={accuracy} colors={colors} />
           <View style={[s.divider, { backgroundColor: colors.border }]} />
-          <Metric label="Best Group" value={bestGroup} colors={colors} />
+          <Metric label={t('session.bestGroup')} value={bestGroup} colors={colors} />
           <View style={[s.divider, { backgroundColor: colors.border }]} />
-          <Metric label="Rounds" value={rounds} colors={colors} />
+          <Metric label={t('weapons.rounds')} value={rounds} colors={colors} />
         </View>
 
         {/* Footer link */}
         <View style={s.footer}>
-          <Text style={[s.footerText, { color: colors.primary }]}>View details</Text>
+          <Text style={[s.footerText, { color: colors.primary }]}>{t('common.viewDetails')}</Text>
           <ChevronRight size={13} color={colors.primary} />
         </View>
       </TouchableOpacity>

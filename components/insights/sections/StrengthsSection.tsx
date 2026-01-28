@@ -18,6 +18,7 @@ import { useColors } from '@/hooks/ui/useColors';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { ChevronRight, Shield, TrendingUp } from 'lucide-react-native';
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { AIExplanationBlock, WhyButton } from '../AIExplanationBlock';
@@ -59,10 +60,11 @@ interface ConfidenceBadgeProps {
 }
 
 function ConfidenceBadge({ confidence, colors }: ConfidenceBadgeProps) {
+  const { t } = useTranslation();
   const config = {
-    high: { label: 'High confidence', color: colors.green },
-    medium: { label: 'Medium confidence', color: colors.textMuted },
-    low: { label: 'Low data', color: colors.textMuted },
+    high: { label: t('insights.confidence.high'), color: colors.green },
+    medium: { label: t('insights.confidence.medium'), color: colors.textMuted },
+    low: { label: t('insights.confidence.low'), color: colors.textMuted },
   }[confidence];
 
   return (
@@ -86,6 +88,7 @@ interface StrengthCardItemProps {
 }
 
 function StrengthCardItem({ strength, onPress, colors }: StrengthCardItemProps) {
+  const { t } = useTranslation();
   const iconName = CATEGORY_ICONS[strength.category] || 'checkmark-circle';
   const { getExplanation, isLoading, getError, requestExplanation } = useAIExplanations();
   
@@ -187,7 +190,7 @@ function StrengthCardItem({ strength, onPress, colors }: StrengthCardItemProps) 
         <View style={styles.cardFooter}>
           <ConfidenceBadge confidence={strength.metric.confidence} colors={colors} />
           <Text style={[styles.dataPointsText, { color: colors.textMuted }]}>
-            {strength.metric.dataPoints.toLocaleString()} shots
+            {t('insights.shots', { count: strength.metric.dataPoints })}
           </Text>
         </View>
 
@@ -211,16 +214,17 @@ function StrengthCardItem({ strength, onPress, colors }: StrengthCardItemProps) 
 // ============================================================================
 
 function EmptyState({ colors }: { colors: ReturnType<typeof useColors> }) {
+  const { t } = useTranslation();
   return (
     <View style={[styles.emptyState, { backgroundColor: colors.card }]}>
       <View style={[styles.emptyIconContainer, { backgroundColor: `${colors.green}10` }]}>
         <Shield size={24} color={colors.green} />
       </View>
       <Text style={[styles.emptyTitle, { color: colors.text }]}>
-        Building your strengths
+        {t('insights.strengths.building')}
       </Text>
       <Text style={[styles.emptyText, { color: colors.textMuted }]}>
-        Keep training to identify what you do best
+        {t('insights.strengths.keepTraining')}
       </Text>
     </View>
   );
@@ -236,6 +240,7 @@ export function StrengthsSection({
   maxVisible = 5,
   hideHeader = false,
 }: StrengthsSectionProps) {
+  const { t } = useTranslation();
   const colors = useColors();
   const visibleStrengths = strengths.slice(0, maxVisible);
 
@@ -248,11 +253,11 @@ export function StrengthsSection({
               <Shield size={14} color={colors.green} />
             </View>
             <Text style={[styles.sectionTitle, { color: colors.text }]}>
-              Strengths
+              {t('insights.detailedBreakdown.strengths')}
             </Text>
           </View>
           <Text style={[styles.sectionSubtitle, { color: colors.textMuted }]}>
-            What you can trust
+            {t('insights.strengths.whatYouCanTrust')}
           </Text>
         </View>
       )}
@@ -269,7 +274,7 @@ export function StrengthsSection({
           ))}
           {strengths.length > maxVisible && (
             <Text style={[styles.moreText, { color: colors.textMuted }]}>
-              +{strengths.length - maxVisible} more strengths
+              {t('insights.strengths.more', { count: strengths.length - maxVisible })}
             </Text>
           )}
         </View>

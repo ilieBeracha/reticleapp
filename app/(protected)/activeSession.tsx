@@ -22,6 +22,7 @@ import { supabase } from '@/lib/supabase';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -42,6 +43,7 @@ import {
 export default function ActiveSessionScreen() {
   const insets = useSafeAreaInsets();
   const colors = useColors();
+  const { t } = useTranslation();
   const {
     sessionId,
     engagementMode: routeEngagementMode,
@@ -120,7 +122,7 @@ export default function ActiveSessionScreen() {
           />
         </View>
         <Text style={[styles.statusTitle, { color: colors.text }]}>
-          {isCompleted ? 'Session Completed' : 'Session not found'}
+          {isCompleted ? t('session.sessionComplete') : t('session.sessionNotFound')}
         </Text>
 
         <View style={localStyles.exitButtonsWrap}>
@@ -135,13 +137,13 @@ export default function ActiveSessionScreen() {
                   })
                 }
               >
-                <Text style={[localStyles.exitPrimaryText, { color: colors.background }]}>Return to Training</Text>
+                <Text style={[localStyles.exitPrimaryText, { color: colors.background }]}>{t('session.returnToTraining')}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={localStyles.exitSecondaryBtn}
                 onPress={() => router.replace('/(protected)/(tabs)')}
               >
-                <Text style={[localStyles.exitSecondaryText, { color: colors.textMuted }]}>Exit to Home</Text>
+                <Text style={[localStyles.exitSecondaryText, { color: colors.textMuted }]}>{t('session.exitToHome')}</Text>
               </TouchableOpacity>
             </>
           ) : (
@@ -149,7 +151,7 @@ export default function ActiveSessionScreen() {
               style={[styles.statusButton, { backgroundColor: colors.secondary }]}
               onPress={() => router.replace('/(protected)/(tabs)')}
             >
-              <Text style={[styles.statusButtonText, { color: colors.text }]}>Go Home</Text>
+              <Text style={[styles.statusButtonText, { color: colors.text }]}>{t('session.goHome')}</Text>
             </TouchableOpacity>
           )}
         </View>

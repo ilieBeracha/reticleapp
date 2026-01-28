@@ -6,6 +6,7 @@
  */
 
 import { useColors } from '@/hooks/ui/useColors';
+import { useTranslation } from 'react-i18next';
 import { Watch, X } from 'lucide-react-native';
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { EdgeInsets } from 'react-native-safe-area-context';
@@ -20,6 +21,7 @@ interface WatchStartingViewProps {
 
 export function WatchStartingView({ insets, drillName, onClose, isTeamTraining }: WatchStartingViewProps) {
   const colors = useColors();
+  const { t } = useTranslation();
 
   return (
     <View style={[sharedStyles.container, { backgroundColor: colors.background }]}>
@@ -43,8 +45,8 @@ export function WatchStartingView({ insets, drillName, onClose, isTeamTraining }
         <View style={[styles.iconLarge, { backgroundColor: colors.secondary }]}>
           <Watch size={56} color={colors.textMuted} strokeWidth={1.5} />
         </View>
-        <Text style={[styles.title, { color: colors.text }]}>Connecting to Watch</Text>
-        <Text style={[styles.subtitle, { color: colors.textMuted }]}>Just a moment...</Text>
+        <Text style={[styles.title, { color: colors.text }]}>{t('session.connectingToWatch')}</Text>
+        <Text style={[styles.subtitle, { color: colors.textMuted }]}>{t('session.justAMoment')}</Text>
         <ActivityIndicator size="small" color={colors.textMuted} style={{ marginTop: 24 }} />
       </View>
     </View>

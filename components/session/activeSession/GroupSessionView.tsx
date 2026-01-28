@@ -9,6 +9,7 @@
  */
 
 import { useColors } from '@/hooks/ui/useColors';
+import { useTranslation } from 'react-i18next';
 import { supabase } from '@/lib/supabase';
 import {
   calculateGroupTotals,
@@ -64,6 +65,7 @@ export function GroupSessionView({
   onRefresh: _onRefresh,
   onEndSession,
 }: GroupSessionViewProps) {
+  const { t } = useTranslation();
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
@@ -136,7 +138,7 @@ export function GroupSessionView({
     if (!currentUserId || !engagementId || hasSubmitted) return;
 
     if (shotsFired === 0) {
-      Alert.alert('Enter Shots', 'Please enter how many shots you fired.');
+      Alert.alert(t('session.enterShots'), t('session.enterShotsMessage'));
       return;
     }
 
@@ -149,7 +151,7 @@ export function GroupSessionView({
       setParticipants(updated);
     } catch (error) {
       console.error('[GroupSessionView] Save error:', error);
-      Alert.alert('Error', 'Failed to save your entry. Please try again.');
+      Alert.alert(t('common.error'), t('session.failedSaveEntry'));
     } finally {
       setSaving(false);
     }
@@ -170,12 +172,12 @@ export function GroupSessionView({
   // Handle end session
   const handleEndSessionPress = () => {
     Alert.alert(
-      'End Group Session?',
-      'This will complete the session for all participants.',
+      t('session.endGroupSession'),
+      t('session.endGroupSessionMessage'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'End Session',
+          text: t('session.endSession'),
           style: 'destructive',
           onPress: onEndSession,
         },
@@ -224,12 +226,12 @@ export function GroupSessionView({
         </TouchableOpacity>
         <View style={styles.headerCenter}>
           <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>
-            {session.drill_name || 'Group Session'}
+            {session.drill_name || t('session.groupSession')}
           </Text>
           <View style={styles.headerSubtitle}>
             <Users size={12} color={colors.textMuted} />
             <Text style={[styles.headerSubtitleText, { color: colors.textMuted }]}>
-              {totals.submittedCount}/{totals.totalCount} submitted
+              {t('session.submittedCount', { submitted: totals.submittedCount, total: totals.totalCount })}
             </Text>
           </View>
         </View>
@@ -246,7 +248,7 @@ export function GroupSessionView({
           <View style={[styles.viewOnlyBanner, { backgroundColor: colors.orange + '15', borderColor: colors.orange }]}>
             <Users size={16} color={colors.orange} />
             <Text style={[styles.viewOnlyText, { color: colors.orange }]}>
-              Viewing progress • Join to participate
+              {t('session.viewingProgress')}
             </Text>
           </View>
         )}
@@ -254,25 +256,25 @@ export function GroupSessionView({
         {/* Group Totals Card */}
         <Animated.View entering={FadeIn.duration(300)}>
           <View style={[styles.totalsCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Text style={[styles.totalsTitle, { color: colors.textMuted }]}>GROUP TOTALS</Text>
+            <Text style={[styles.totalsTitle, { color: colors.textMuted }]}>{t('session.groupTotals')}</Text>
             <View style={styles.totalsRow}>
               <View style={styles.totalsItem}>
                 <Text style={[styles.totalsValue, { color: colors.text }]}>{totals.totalShotsFired}</Text>
-                <Text style={[styles.totalsLabel, { color: colors.textMuted }]}>shots</Text>
+                <Text style={[styles.totalsLabel, { color: colors.textMuted }]}>{t('session.shots')}</Text>
               </View>
               <View style={[styles.totalsDivider, { backgroundColor: colors.border }]} />
               <View style={styles.totalsItem}>
                 <Text style={[styles.totalsValue, { color: colors.text }]}>
                   {totals.submittedCount}/{totals.totalCount}
                 </Text>
-                <Text style={[styles.totalsLabel, { color: colors.textMuted }]}>submitted</Text>
+                <Text style={[styles.totalsLabel, { color: colors.textMuted }]}>{t('session.submitted')}</Text>
               </View>
               {totals.totalHits > 0 && (
                 <>
                   <View style={[styles.totalsDivider, { backgroundColor: colors.border }]} />
                   <View style={styles.totalsItem}>
                     <Text style={[styles.totalsValue, { color: colors.green }]}>{totals.totalHits}</Text>
-                    <Text style={[styles.totalsLabel, { color: colors.textMuted }]}>hits</Text>
+                    <Text style={[styles.totalsLabel, { color: colors.textMuted }]}>{t('session.hits')}</Text>
                   </View>
                 </>
               )}
@@ -284,11 +286,11 @@ export function GroupSessionView({
         {!isViewOnly && (
           <View style={[styles.entryCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <View style={styles.entryHeader}>
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>Your Entry</Text>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('session.yourEntry')}</Text>
               {hasSubmitted && (
                 <View style={[styles.submittedBadge, { backgroundColor: colors.green + '15' }]}>
                   <Check size={12} color={colors.green} />
-                  <Text style={[styles.submittedText, { color: colors.green }]}>Submitted</Text>
+                  <Text style={[styles.submittedText, { color: colors.green }]}>{t('session.submitted')}</Text>
                 </View>
               )}
             </View>
@@ -297,12 +299,12 @@ export function GroupSessionView({
               // Show submitted data (read-only)
               <View style={styles.submittedInfo}>
                 <View style={styles.submittedRow}>
-                  <Text style={[styles.submittedLabel, { color: colors.textMuted }]}>Shots Fired</Text>
+                  <Text style={[styles.submittedLabel, { color: colors.textMuted }]}>{t('session.shotsFired')}</Text>
                   <Text style={[styles.submittedValue, { color: colors.text }]}>{myParticipant?.shots_fired}</Text>
                 </View>
                 {myParticipant?.hits != null && myParticipant.hits > 0 && (
                   <View style={styles.submittedRow}>
-                    <Text style={[styles.submittedLabel, { color: colors.textMuted }]}>Hits</Text>
+                    <Text style={[styles.submittedLabel, { color: colors.textMuted }]}>{t('session.hits')}</Text>
                     <Text style={[styles.submittedValue, { color: colors.green }]}>{myParticipant.hits}</Text>
                   </View>
                 )}
@@ -312,7 +314,7 @@ export function GroupSessionView({
               <>
                 {/* Shots Fired - Required */}
                 <View style={styles.stepperSection}>
-                  <Text style={[styles.stepperLabel, { color: colors.text }]}>SHOTS FIRED</Text>
+                  <Text style={[styles.stepperLabel, { color: colors.text }]}>{t('session.shotsFired')}</Text>
                   <View style={styles.stepperRow}>
                     <TouchableOpacity
                       style={[styles.stepperBtn, { backgroundColor: colors.secondary }]}
@@ -336,7 +338,7 @@ export function GroupSessionView({
                 {/* Hits - Optional */}
                 <View style={styles.optionalSection}>
                   <View style={styles.optionalHeader}>
-                    <Text style={[styles.optionalLabel, { color: colors.textMuted }]}>HITS (optional)</Text>
+                    <Text style={[styles.optionalLabel, { color: colors.textMuted }]}>{t('session.hitsOptional')}</Text>
                   </View>
                   <View style={styles.hitsRow}>
                     <TouchableOpacity
@@ -374,7 +376,7 @@ export function GroupSessionView({
                     <>
                       <Send size={18} color={shotsFired > 0 ? '#fff' : colors.textMuted} />
                       <Text style={[styles.submitBtnText, { color: shotsFired > 0 ? '#fff' : colors.textMuted }]}>
-                        Submit Entry
+                        {t('session.submitEntry')}
                       </Text>
                     </>
                   )}
@@ -385,7 +387,7 @@ export function GroupSessionView({
         )}
 
         {/* Team Results Section */}
-        <Text style={[styles.teamResultsTitle, { color: colors.textMuted }]}>TEAM</Text>
+        <Text style={[styles.teamResultsTitle, { color: colors.textMuted }]}>{t('session.team')}</Text>
         {participants.map((p) => {
           const isMe = p.user_id === currentUserId;
           const pHasSubmitted = p.shots_fired != null && p.shots_fired > 0;
@@ -412,18 +414,18 @@ export function GroupSessionView({
                   <View style={styles.participantInfo}>
                     <View style={styles.nameRow}>
                       <Text style={[styles.participantName, { color: colors.text }]} numberOfLines={1}>
-                        {p.user_full_name || 'Unknown'}
+                        {p.user_full_name || t('common.unknown')}
                       </Text>
                       {isMe && (
                         <View style={[styles.badge, { backgroundColor: colors.primary + '20' }]}>
-                          <Text style={[styles.badgeText, { color: colors.primary }]}>You</Text>
+                          <Text style={[styles.badgeText, { color: colors.primary }]}>{t('common.you')}</Text>
                         </View>
                       )}
                     </View>
                     <Text style={[styles.participantStatus, { color: colors.textMuted }]}>
                       {pHasSubmitted
-                        ? `${p.shots_fired} shots${p.hits ? ` · ${p.hits} hits` : ''}`
-                        : 'Waiting...'}
+                        ? t('session.participantResults', { shots: p.shots_fired, hits: p.hits || 0 })
+                        : t('session.waiting')}
                     </Text>
                   </View>
 
@@ -448,7 +450,7 @@ export function GroupSessionView({
             onPress={handleEndSessionPress}
           >
             <X size={18} color="#fff" />
-            <Text style={styles.endSessionText}>End Group Session</Text>
+            <Text style={styles.endSessionText}>{t('session.endGroupSession')}</Text>
           </TouchableOpacity>
         </View>
       )}

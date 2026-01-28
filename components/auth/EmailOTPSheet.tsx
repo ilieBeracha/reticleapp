@@ -5,6 +5,7 @@ import { useColors } from "@/hooks/ui/useColors";
 import { signInWithOtp, verifyOtp } from "@/services/authService";
 import { Ionicons } from "@expo/vector-icons";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   ActivityIndicator,
   Alert,
@@ -23,6 +24,7 @@ interface EmailOTPSheetProps {
 
 export function EmailOTPSheet({ visible, onClose }: EmailOTPSheetProps) {
   const colors = useColors();
+  const { t } = useTranslation();
   const [email, setEmail] = useState("");
   const [otp, setOtp] = useState("");
   const [step, setStep] = useState<"email" | "otp">("email");
@@ -30,7 +32,7 @@ export function EmailOTPSheet({ visible, onClose }: EmailOTPSheetProps) {
 
   const handleSendOTP = async () => {
     if (!email.trim()) {
-      Alert.alert("Error", "Please enter your email");
+      Alert.alert(t("common.error"), t("auth.enterEmail"));
       return;
     }
 
@@ -39,13 +41,13 @@ export function EmailOTPSheet({ visible, onClose }: EmailOTPSheetProps) {
       await signInWithOtp(email);
 
       Alert.alert(
-        "Check Your Email",
-        `We sent a 6-digit code to ${email}`,
-        [{ text: "OK" }]
+        t("auth.checkYourEmail"),
+        t("auth.codeSentTo", { email }),
+        [{ text: t("common.ok") }]
       );
       setStep("otp");
     } catch (error: any) {
-      Alert.alert("Error", error.message || "Failed to send code");
+      Alert.alert(t("common.error"), error.message || t("auth.sendCodeFailed"));
     } finally {
       setLoading(false);
     }
@@ -53,7 +55,7 @@ export function EmailOTPSheet({ visible, onClose }: EmailOTPSheetProps) {
 
   const handleVerifyOTP = async () => {
     if (!otp.trim() || otp.length !== 6) {
-      Alert.alert("Error", "Please enter the 6-digit code");
+      Alert.alert(t("common.error"), t("auth.enterCode"));
       return;
     }
 
@@ -64,7 +66,7 @@ export function EmailOTPSheet({ visible, onClose }: EmailOTPSheetProps) {
       // Success - auth context will handle navigation
       onClose();
     } catch (error: any) {
-      Alert.alert("Error", error.message || "Invalid code");
+      Alert.alert(t("common.error"), error.message || t("auth.invalidCode"));
     } finally {
       setLoading(false);
     }
@@ -101,7 +103,7 @@ export function EmailOTPSheet({ visible, onClose }: EmailOTPSheetProps) {
             <Ionicons name="arrow-back" size={24} color={colors.text} />
           </TouchableOpacity>
           <Text style={[styles.title, { color: colors.text }]}>
-            {step === "email" ? "Sign In" : "Enter Code"}
+            {step === "email" ? t("auth.signIn") : t("auth.enterCode")}
           </Text>
           <TouchableOpacity
             onPress={handleClose}
@@ -119,13 +121,13 @@ export function EmailOTPSheet({ visible, onClose }: EmailOTPSheetProps) {
             </View>
 
             <Text style={[styles.subtitle, { color: colors.textMuted }]}>
-              Enter your email to receive a one-time code
+              {t("auth.enterEmailForCode")}
             </Text>
 
             <View style={styles.form}>
               <View style={styles.field}>
                 <Text style={[styles.label, { color: colors.text }]}>
-                  Email Address
+                  {t("auth.email")}
                 </Text> 
                   <InputField
                   value={email}
@@ -156,7 +158,7 @@ export function EmailOTPSheet({ visible, onClose }: EmailOTPSheetProps) {
               ) : (
                 <>
                   <Ionicons name="mail-outline" size={20} color="#fff" />
-                  <Text style={styles.buttonText}>Send Code</Text>
+                  <Text style={styles.buttonText}>{t("auth.sendCode")}</Text>
                 </>
               )}
             </TouchableOpacity>
@@ -169,7 +171,7 @@ export function EmailOTPSheet({ visible, onClose }: EmailOTPSheetProps) {
             </View>
 
             <Text style={[styles.subtitle, { color: colors.textMuted }]}>
-              Enter the 6-digit code sent to
+              {t("auth.enterCodeSentTo")}
             </Text>
             <Text style={[styles.emailDisplay, { color: colors.text }]}>
               {email}
@@ -178,7 +180,7 @@ export function EmailOTPSheet({ visible, onClose }: EmailOTPSheetProps) {
             <View style={styles.form}>
               <View style={styles.field}>
                 <Text style={[styles.label, { color: colors.text }]}>
-                  Verification Code
+                  {t("auth.verificationCode")}
                 </Text>
                   <InputField
                     value={otp}
@@ -208,7 +210,7 @@ export function EmailOTPSheet({ visible, onClose }: EmailOTPSheetProps) {
               ) : (
                 <>
                   <Ionicons name="checkmark-circle" size={20} color="#fff" />
-                  <Text style={styles.buttonText}>Verify & Sign In</Text>
+                  <Text style={styles.buttonText}>{t("auth.verifyAndSignIn")}</Text>
                 </>
               )}
             </TouchableOpacity>
@@ -219,7 +221,7 @@ export function EmailOTPSheet({ visible, onClose }: EmailOTPSheetProps) {
               disabled={loading}
             >
               <Text style={[styles.resendText, { color: colors.tint }]}>
-                Resend Code
+                {t("auth.resendCode")}
               </Text>
             </TouchableOpacity>
           </>

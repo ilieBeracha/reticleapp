@@ -8,6 +8,7 @@
 import { useColors } from '@/hooks/ui/useColors';
 import type { SessionDrillConfig } from '@/services/session/types';
 import { formatMaxShots } from '@/utils/drillShots';
+import { useTranslation } from 'react-i18next';
 import { Camera, Check, Clock, Focus, Lock, MapPin, Target, Trophy, Zap } from 'lucide-react-native';
 import { StyleSheet, Text, View } from 'react-native';
 import { COLORS } from '../activeSession.constants';
@@ -34,6 +35,7 @@ export function DrillBanner({
   isLocked = false,
 }: DrillBannerProps) {
   const colors = useColors();
+  const { t } = useTranslation();
 
   return (
     <View style={styles.container}>
@@ -67,14 +69,14 @@ export function DrillBanner({
                   <>
                     <Zap size={12} color={colors.textMuted} />
                     <Text style={[styles.reqText, { color: colors.text }]}>
-                      {drillProgress?.bulletsPerRound ?? drill.rounds_per_shooter} shots/round
+                      {t('session.shotsPerRound', { shots: drillProgress?.bulletsPerRound ?? drill.rounds_per_shooter })}
                     </Text>
                   </>
                 ) : (
                   <>
                     <Camera size={12} color={colors.textMuted} />
                     <Text style={[styles.reqText, { color: colors.text }]}>
-                      Scan (max {formatMaxShots(drill.rounds_per_shooter)})
+                      {t('session.scanMax', { max: formatMaxShots(drill.rounds_per_shooter) })}
                     </Text>
                   </>
                 )}
@@ -115,7 +117,7 @@ export function DrillBanner({
             />
           </View>
           <Text style={[styles.progressText, { color: colors.textMuted }]}>
-            {targets.length}/{drillProgress?.requiredTargets ?? 1} entries
+            {t('session.entries', { current: targets.length, required: drillProgress?.requiredTargets ?? 1 })}
           </Text>
         </View>
       </View>

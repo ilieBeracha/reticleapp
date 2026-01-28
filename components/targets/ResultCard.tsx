@@ -7,6 +7,7 @@ import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Cloud, Droplets, Thermometer, Wind } from 'lucide-react-native';
 import React, { useCallback, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
   Animated,
@@ -67,6 +68,7 @@ export const ResultCard = React.memo(function ResultCard({
   weather,
 }: ResultCardProps) {
   const colors = useColors();
+  const { t } = useTranslation();
   const [editMode, setEditMode] = useState<EditMode>('add');
   const [editingEnabled, setEditingEnabled] = useState(false);
   const [editorModalVisible, setEditorModalVisible] = useState(false);
@@ -236,10 +238,10 @@ export const ResultCard = React.memo(function ResultCard({
       {/* Header */}
       <View style={styles.header}>
         <Text style={[styles.title, { color: colors.text }]}>
-          {targetType === 'grouping' ? 'Grouping Analysis' : 'Achievement Results'}
+          {targetType === 'grouping' ? t('target.groupingAnalysis') : t('target.achievementResults')}
         </Text>
         <Text style={[styles.subtitle, { color: colors.textMuted }]}>
-          {targetType === 'grouping' ? 'Measuring shot consistency' : 'AI detected bullet holes'}
+          {targetType === 'grouping' ? t('target.measuringShotConsistency') : t('target.aiDetectedBulletHoles')}
         </Text>
 
         {/* Weather Conditions */}
@@ -292,7 +294,7 @@ export const ResultCard = React.memo(function ResultCard({
           <Ionicons name="pencil" size={16} color={editingEnabled ? '#000' : colors.textMuted} />
         </View>
         <Text style={[styles.editToggleText, { color: colors.text }]}>
-          {editingEnabled ? 'Editing...' : 'Edit Detections'}
+          {editingEnabled ? t('target.editing') : t('target.editDetections')}
         </Text>
         <Ionicons name="expand-outline" size={18} color={colors.textMuted} />
       </TouchableOpacity>
@@ -305,9 +307,9 @@ export const ResultCard = React.memo(function ResultCard({
               <Ionicons name="analytics" size={20} color="#fff" />
             </View>
             <View style={styles.groupSizeHeaderText}>
-              <Text style={[styles.groupSizeTitle, { color: colors.text }]}>Group Size</Text>
+              <Text style={[styles.groupSizeTitle, { color: colors.text }]}>{t('target.groupSize')}</Text>
               <Text style={[styles.groupSizeHint, { color: colors.textMuted }]}>
-                Furthest distance between any 2 bullets (circled above)
+                {t('target.furthestDistanceHint')}
               </Text>
             </View>
           </View>
@@ -324,22 +326,22 @@ export const ResultCard = React.memo(function ResultCard({
             {groupSizeData.maxDistanceCm <= 5 ? (
               <>
                 <View style={[styles.qualityDot, { backgroundColor: COLORS.primary }]} />
-                <Text style={[styles.qualityText, { color: COLORS.primary }]}>Excellent</Text>
+                <Text style={[styles.qualityText, { color: COLORS.primary }]}>{t('target.groupQuality.excellent')}</Text>
               </>
             ) : groupSizeData.maxDistanceCm <= 10 ? (
               <>
                 <View style={[styles.qualityDot, { backgroundColor: '#22C55E' }]} />
-                <Text style={[styles.qualityText, { color: '#22C55E' }]}>Good</Text>
+                <Text style={[styles.qualityText, { color: '#22C55E' }]}>{t('target.groupQuality.good')}</Text>
               </>
             ) : groupSizeData.maxDistanceCm <= 20 ? (
               <>
                 <View style={[styles.qualityDot, { backgroundColor: COLORS.warning }]} />
-                <Text style={[styles.qualityText, { color: COLORS.warning }]}>Fair</Text>
+                <Text style={[styles.qualityText, { color: COLORS.warning }]}>{t('target.groupQuality.fair')}</Text>
               </>
             ) : (
               <>
                 <View style={[styles.qualityDot, { backgroundColor: COLORS.danger }]} />
-                <Text style={[styles.qualityText, { color: COLORS.danger }]}>Wide spread</Text>
+                <Text style={[styles.qualityText, { color: COLORS.danger }]}>{t('target.groupQuality.wideSpread')}</Text>
               </>
             )}
           </View>
@@ -347,7 +349,7 @@ export const ResultCard = React.memo(function ResultCard({
           {/* Min pair info if available */}
           {groupSizeData.minDistanceCm != null && (
             <View style={[styles.groupSizeExtra, { borderTopColor: colors.border }]}>
-              <Text style={[styles.groupSizeExtraLabel, { color: colors.textMuted }]}>Tightest pair:</Text>
+              <Text style={[styles.groupSizeExtraLabel, { color: colors.textMuted }]}>{t('target.tightestPair')}</Text>
               <Text style={[styles.groupSizeExtraValue, { color: colors.text }]}>
                 {groupSizeData.minDistanceCm.toFixed(1)} cm
               </Text>
@@ -374,7 +376,7 @@ export const ResultCard = React.memo(function ResultCard({
           >
             {/* Modal Header */}
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Edit Detections</Text>
+              <Text style={styles.modalTitle}>{t('target.editDetections')}</Text>
               <TouchableOpacity onPress={handleCloseEditor} style={styles.modalClose}>
                 <Ionicons name="close" size={24} color="#fff" />
               </TouchableOpacity>
@@ -393,14 +395,14 @@ export const ResultCard = React.memo(function ResultCard({
             {/* Stats in Modal */}
             <View style={styles.modalStats}>
               <Text style={styles.modalStatsText}>
-                {stats.total} hits • {stats.manual} added manually
+                {t('target.modalStats', { total: stats.total, manual: stats.manual })}
               </Text>
             </View>
 
             {/* Done Button */}
             <TouchableOpacity style={styles.modalDone} onPress={handleCloseEditor} activeOpacity={0.8}>
               <Ionicons name="checkmark-circle" size={20} color="#000" />
-              <Text style={styles.modalDoneText}>Done Editing</Text>
+              <Text style={styles.modalDoneText}>{t('target.doneEditing')}</Text>
             </TouchableOpacity>
           </Animated.View>
         </Animated.View>
@@ -411,8 +413,8 @@ export const ResultCard = React.memo(function ResultCard({
         <View style={styles.mainStat}>
           <Text style={[styles.mainStatValue, { color: colors.primary }]}>{stats.total}</Text>
           <Text style={[styles.mainStatLabel, { color: colors.textMuted }]}>
-            {targetType === 'grouping' ? 'Total Shots' : 'Total Hits'}
-            {hasChanges ? ' (edited)' : ''}
+            {targetType === 'grouping' ? t('target.totalShots') : t('target.totalHits')}
+            {hasChanges ? ` ${t('session.edited')}` : ''}
           </Text>
         </View>
 
@@ -425,20 +427,22 @@ export const ResultCard = React.memo(function ResultCard({
               <View style={styles.breakdownRow}>
                 <View style={[styles.statDot, { backgroundColor: colors.primary }]} />
                 <Text style={[styles.breakdownText, { color: colors.textMuted }]}>
-                  {stats.high - stats.manual} AI detected
+                  {t('target.aiDetectedCount', { count: stats.high - stats.manual })}
                 </Text>
               </View>
               {stats.manual > 0 && (
                 <View style={styles.breakdownRow}>
                   <View style={[styles.statDot, { backgroundColor: COLORS.info }]} />
-                  <Text style={[styles.breakdownText, { color: colors.textMuted }]}>{stats.manual} Added</Text>
+                  <Text style={[styles.breakdownText, { color: colors.textMuted }]}>
+                    {t('target.addedCount', { count: stats.manual })}
+                  </Text>
                 </View>
               )}
               {groupSizeData?.maxDistanceCm != null && (
                 <View style={styles.breakdownRow}>
                   <View style={[styles.statDot, { backgroundColor: COLORS.warning }]} />
                   <Text style={[styles.breakdownText, { color: colors.textMuted }]}>
-                    {groupSizeData.maxDistanceCm.toFixed(1)}cm spread
+                    {t('target.spreadCm', { value: groupSizeData.maxDistanceCm.toFixed(1) })}
                   </Text>
                 </View>
               )}
@@ -448,24 +452,32 @@ export const ResultCard = React.memo(function ResultCard({
             <>
               <View style={styles.breakdownRow}>
                 <View style={[styles.statDot, { backgroundColor: colors.primary }]} />
-                <Text style={[styles.breakdownText, { color: colors.textMuted }]}>{stats.high - stats.manual} AI</Text>
+                <Text style={[styles.breakdownText, { color: colors.textMuted }]}>
+                  {t('target.breakdownCount', { count: stats.high - stats.manual, label: t('target.breakdown.ai') })}
+                </Text>
               </View>
               {stats.manual > 0 && (
                 <View style={styles.breakdownRow}>
                   <View style={[styles.statDot, { backgroundColor: COLORS.info }]} />
-                  <Text style={[styles.breakdownText, { color: colors.textMuted }]}>{stats.manual} Manual</Text>
+                  <Text style={[styles.breakdownText, { color: colors.textMuted }]}>
+                    {t('target.breakdownCount', { count: stats.manual, label: t('target.breakdown.manual') })}
+                  </Text>
                 </View>
               )}
               {stats.medium > 0 && (
                 <View style={styles.breakdownRow}>
                   <View style={[styles.statDot, { backgroundColor: COLORS.warning }]} />
-                  <Text style={styles.breakdownText}>{stats.medium} Med</Text>
+                  <Text style={styles.breakdownText}>
+                    {t('target.breakdownCount', { count: stats.medium, label: t('target.breakdown.medium') })}
+                  </Text>
                 </View>
               )}
               {stats.low > 0 && (
                 <View style={styles.breakdownRow}>
                   <View style={[styles.statDot, { backgroundColor: COLORS.danger }]} />
-                  <Text style={[styles.breakdownText, { color: colors.textMuted }]}>{stats.low} Low</Text>
+                  <Text style={[styles.breakdownText, { color: colors.textMuted }]}>
+                    {t('target.breakdownCount', { count: stats.low, label: t('target.breakdown.low') })}
+                  </Text>
                 </View>
               )}
             </>
@@ -479,10 +491,12 @@ export const ResultCard = React.memo(function ResultCard({
           <Ionicons name="pencil" size={14} color={COLORS.info} />
           <Text style={[styles.changeText, { color: colors.text }]}>
             {result.detections.length > editedDetections.length
-              ? `Removed ${result.detections.length - editedDetections.length + stats.manual} false detection${result.detections.length - editedDetections.length + stats.manual !== 1 ? 's' : ''}`
+              ? t('target.removedFalseDetections', {
+                  count: result.detections.length - editedDetections.length + stats.manual,
+                })
               : stats.manual > 0
-                ? `Added ${stats.manual} missed bullet${stats.manual !== 1 ? 's' : ''}`
-                : 'Detections modified'}
+                ? t('target.addedMissedBullets', { count: stats.manual })
+                : t('target.detectionsModified')}
           </Text>
         </View>
       )}
@@ -491,7 +505,7 @@ export const ResultCard = React.memo(function ResultCard({
       <View style={styles.infoRow}>
         <Ionicons name="time-outline" size={14} color={colors.textMuted} />
         <Text style={[styles.infoText, { color: colors.textMuted }]}>
-          AI processed in {result.processing_time_s.toFixed(2)}s
+          {t('target.aiProcessedIn', { seconds: result.processing_time_s.toFixed(2) })}
         </Text>
       </View>
 
@@ -500,11 +514,10 @@ export const ResultCard = React.memo(function ResultCard({
         <View style={[styles.actualShotsCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <View style={styles.actualShotsHeader}>
             <Ionicons name="analytics-outline" size={18} color={colors.primary} />
-            <Text style={[styles.actualShotsTitle, { color: colors.text }]}>How many shots did you fire?</Text>
+            <Text style={[styles.actualShotsTitle, { color: colors.text }]}>{t('target.howManyShotsFired')}</Text>
           </View>
           <Text style={[styles.actualShotsHint, { color: colors.textMuted }]}>
-            Optional: AI detected {stats.total} hole{stats.total !== 1 ? 's' : ''}, but some shots may have missed
-            entirely. Enter your actual shot count for accurate accuracy %.
+            {t('target.actualShotsHint', { holes: stats.total })}
           </Text>
           <View style={styles.actualShotsInputRow}>
             <TextInput
@@ -516,18 +529,18 @@ export const ResultCard = React.memo(function ResultCard({
                   borderColor: actualShotsDeclared && actualShotsDeclared < stats.total ? COLORS.danger : colors.border,
                 },
               ]}
-              placeholder={`e.g. ${Math.max(stats.total, 10)}`}
+              placeholder={t('target.exampleShotsPlaceholder', { example: Math.max(stats.total, 10) })}
               placeholderTextColor={colors.textMuted}
               keyboardType="number-pad"
               value={actualShotsInput}
               onChangeText={setActualShotsInput}
               maxLength={3}
             />
-            <Text style={[styles.actualShotsLabel, { color: colors.textMuted }]}>shots fired</Text>
+            <Text style={[styles.actualShotsLabel, { color: colors.textMuted }]}>{t('target.shotsFiredLabel')}</Text>
           </View>
           {actualShotsDeclared && actualShotsDeclared >= stats.total && (
             <View style={styles.accuracyPreview}>
-              <Text style={[styles.accuracyPreviewLabel, { color: colors.textMuted }]}>Accuracy:</Text>
+              <Text style={[styles.accuracyPreviewLabel, { color: colors.textMuted }]}>{t('target.accuracyLabel')}</Text>
               <Text
                 style={[
                   styles.accuracyPreviewValue,
@@ -550,7 +563,7 @@ export const ResultCard = React.memo(function ResultCard({
           )}
           {actualShotsDeclared && actualShotsDeclared < stats.total && (
             <Text style={[styles.actualShotsError, { color: COLORS.danger }]}>
-              Shots fired must be ≥ detected holes ({stats.total})
+              {t('target.shotsFiredMustBeAtLeastDetectedHoles', { holes: stats.total })}
             </Text>
           )}
         </View>
@@ -572,11 +585,11 @@ export const ResultCard = React.memo(function ResultCard({
               <Text style={styles.doneButtonText}>
                 {targetType === 'grouping'
                   ? stats.total === 0
-                    ? 'Save (No Shots)'
-                    : `Save ${stats.total} Shot${stats.total !== 1 ? 's' : ''}`
+                    ? t('target.saveNoShots')
+                    : t('target.saveShotsCount', { count: stats.total })
                   : stats.total === 0
-                    ? 'Save (No Hits)'
-                    : `Save ${stats.total} Hit${stats.total !== 1 ? 's' : ''}`}
+                    ? t('target.saveNoHits')
+                    : t('target.saveHitsCount', { count: stats.total })}
               </Text>
             </>
           )}
@@ -590,7 +603,7 @@ export const ResultCard = React.memo(function ResultCard({
         disabled={saving}
       >
         <Ionicons name="camera-outline" size={18} color={colors.textMuted} />
-        <Text style={[styles.retakeButtonText, { color: colors.textMuted }]}>Retake Photo</Text>
+        <Text style={[styles.retakeButtonText, { color: colors.textMuted }]}>{t('target.retake')}</Text>
       </TouchableOpacity>
     </ScrollView>
   );

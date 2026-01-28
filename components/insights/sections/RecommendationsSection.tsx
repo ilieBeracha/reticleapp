@@ -14,6 +14,7 @@ import {
   Lightbulb,
   Sparkles,
 } from 'lucide-react-native';
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import type { Recommendation, RecommendationPriority } from '../insights.types';
@@ -143,6 +144,7 @@ interface QuickActionProps {
 }
 
 function QuickAction({ recommendation, onAddToTrainingPlan, colors }: QuickActionProps) {
+  const { t } = useTranslation();
   if (recommendation.priority !== 'high' || !onAddToTrainingPlan) return null;
 
   return (
@@ -156,7 +158,7 @@ function QuickAction({ recommendation, onAddToTrainingPlan, colors }: QuickActio
     >
       <Sparkles size={13} color={colors.primary} />
       <Text style={[styles.quickActionText, { color: colors.text }]} numberOfLines={1}>
-        Add to training plan
+        {t('insights.recommendations.addToTrainingPlan')}
       </Text>
       <ArrowRight size={13} color={colors.textMuted} />
     </TouchableOpacity>
@@ -174,6 +176,7 @@ export function RecommendationsSection({
   onShowEvidence,
   maxVisible = 3,
 }: RecommendationsSectionProps) {
+  const { t } = useTranslation();
   const colors = useColors();
   const visibleRecommendations = recommendations.slice(0, maxVisible);
   const highPriorityRec = visibleRecommendations.find((r) => r.priority === 'high');
@@ -183,7 +186,7 @@ export function RecommendationsSection({
       <View style={[styles.emptyState, { backgroundColor: colors.card }]}>
         <Lightbulb size={20} color={colors.textMuted} />
         <Text style={[styles.emptyText, { color: colors.textMuted }]}>
-          Keep training to unlock recommendations
+          {t('insights.recommendations.keepTraining')}
         </Text>
       </View>
     );
@@ -194,7 +197,7 @@ export function RecommendationsSection({
       {/* Header */}
       <View style={styles.header}>
         <Crosshair size={16} color={colors.primary} />
-        <Text style={[styles.headerTitle, { color: colors.text }]}>Next Steps</Text>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>{t('insights.recommendations.nextSteps')}</Text>
         <Text style={[styles.headerCount, { color: colors.textMuted }]}>
           {recommendations.length}
         </Text>
@@ -226,7 +229,7 @@ export function RecommendationsSection({
       {/* More indicator */}
       {recommendations.length > maxVisible && (
         <Text style={[styles.moreText, { color: colors.textMuted }]}>
-          +{recommendations.length - maxVisible} more
+          {t('insights.recommendations.more', { count: recommendations.length - maxVisible })}
         </Text>
       )}
     </View>

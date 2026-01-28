@@ -26,6 +26,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { ChevronRight, Clock, HelpCircle, History, TrendingUp } from 'lucide-react-native';
+import { useTranslation } from 'react-i18next';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -84,22 +85,23 @@ interface EmptyStateProps {
 }
 
 function EmptyState({ colors, onStartSession }: EmptyStateProps) {
+  const { t } = useTranslation();
   return (
     <View style={[styles.emptyContainer, { backgroundColor: colors.card }]}>
       <View style={[styles.emptyIconContainer, { backgroundColor: `${colors.primary}10` }]}>
         <Ionicons name="analytics" size={32} color={colors.primary} />
       </View>
       <Text style={[styles.emptyTitle, { color: colors.text }]}>
-        Start Building Your Insights
+        {t('insights.startBuilding')}
       </Text>
       <Text style={[styles.emptyText, { color: colors.textMuted }]}>
-        Complete your first sessions to unlock personalized performance analysis
+        {t('insights.completeFirstSessions')}
       </Text>
       <TouchableOpacity
         style={[styles.emptyButton, { backgroundColor: colors.primary }]}
         onPress={onStartSession}
       >
-        <Text style={styles.emptyButtonText}>Start Training</Text>
+        <Text style={styles.emptyButtonText}>{t('insights.startTraining')}</Text>
       </TouchableOpacity>
     </View>
   );
@@ -116,6 +118,7 @@ interface NotEnoughDataProps {
 }
 
 function NotEnoughDataState({ colors, currentSessions, minRequired }: NotEnoughDataProps) {
+  const { t } = useTranslation();
   const progress = Math.min(currentSessions / minRequired, 1);
 
   return (
@@ -124,10 +127,10 @@ function NotEnoughDataState({ colors, currentSessions, minRequired }: NotEnoughD
         <Ionicons name="hourglass" size={24} color={colors.primary} />
       </View>
       <Text style={[styles.notEnoughTitle, { color: colors.text }]}>
-        Building Your Profile
+        {t('insights.buildingProfile')}
       </Text>
       <Text style={[styles.notEnoughText, { color: colors.textMuted }]}>
-        {minRequired - currentSessions} more session{minRequired - currentSessions !== 1 ? 's' : ''} needed for full insights
+        {t('insights.moreSessionsNeeded', { count: minRequired - currentSessions })}
       </Text>
       {/* Progress bar */}
       <View style={[styles.progressBarContainer, { backgroundColor: colors.background }]}>
@@ -139,7 +142,7 @@ function NotEnoughDataState({ colors, currentSessions, minRequired }: NotEnoughD
         />
       </View>
       <Text style={[styles.progressText, { color: colors.textMuted }]}>
-        {currentSessions} of {minRequired} sessions
+        {t('insights.sessionsProgress', { current: currentSessions, total: minRequired })}
       </Text>
     </View>
   );
@@ -196,6 +199,7 @@ function SectionHeaderWithTooltip({ title, tooltip, icon, colors }: SectionHeade
 // ============================================================================
 
 export function InsightsDashboard() {
+  const { t } = useTranslation();
   const colors = useColors();
   const router = useRouter();
   const { user } = useAuth();
@@ -275,15 +279,15 @@ export function InsightsDashboard() {
 
   // Compute insights
   const insights: ComputedInsights = useMemo(() => {
-    return computeInsights(sessions, filters);
-  }, [sessions, filters]);
+    return computeInsights(sessions, filters, undefined, t);
+  }, [sessions, filters, t]);
 
   // Compute context profiles (engagement ↔ grouping connection)
   const contextProfiles: ComputedContextProfiles = useMemo(() => {
     // Apply same filters as insights
     const completedSessions = sessions.filter((s) => s.status === 'completed');
-    return computeContextProfiles(completedSessions);
-  }, [sessions]);
+    return computeContextProfiles(completedSessions, undefined, t);
+  }, [sessions, t]);
 
   // Compute overview status (for Training Overview card)
   const overviewStatus: OverviewStatus = useMemo(() => {
@@ -441,24 +445,24 @@ export function InsightsDashboard() {
       setEvidenceContext({
         insightType: 'trend',
         insightId: 'accuracy-trend',
-        title: 'Accuracy Trend',
+        title: t('insights.trendsData.accuracyTrend'),
         sessionIds: overviewStatus.accuracy.evidenceIds,
       });
       setShowEvidence(true);
     }
-  }, [overviewStatus.accuracy]);
+  }, [overviewStatus.accuracy, t]);
 
   const openEvidenceForOverviewGrouping = useCallback(() => {
     if (overviewStatus.grouping?.evidenceIds.length) {
       setEvidenceContext({
         insightType: 'trend',
         insightId: 'grouping-trend',
-        title: 'Grouping Trend',
+        title: t('insights.trendsData.groupingTrend'),
         sessionIds: overviewStatus.grouping.evidenceIds,
       });
       setShowEvidence(true);
     }
-  }, [overviewStatus.grouping]);
+  }, [overviewStatus.grouping, t]);
 
   // Open evidence for focus item
   const openEvidenceForFocus = useCallback(() => {
@@ -525,10 +529,10 @@ export function InsightsDashboard() {
         >
           {/* Header */}
           <View style={styles.headerSection}>
-            <Text style={[styles.pageTitle, { color: colors.text }]}>Insights</Text>
+            <Text style={[styles.pageTitle, { color: colors.text }]}>{t('insights.title')}</Text>
             {hasData && (
               <Text style={[styles.headerSubtitle, { color: colors.textMuted }]}>
-                {quickStats.totalSessions} sessions · {quickStats.totalRounds} rounds
+                {t('insights.headerSubtitle', { sessions: quickStats.totalSessions, rounds: quickStats.totalRounds })}
               </Text>
             )}
           </View>
@@ -556,8 +560,8 @@ export function InsightsDashboard() {
               {performanceChartData.length >= 3 && (
                 <View style={styles.chartsSection}>
                   <SectionHeaderWithTooltip
-                    title="Trends"
-                    tooltip="Your accuracy and grouping performance over time. Shows your last 15 sessions to reveal patterns and improvement."
+                    title={t('insights.trends')}
+                    tooltip={t('insights.trendsTooltip')}
                     icon={<TrendingUp size={13} color={colors.textMuted} />}
                     colors={colors}
                   />
@@ -569,7 +573,7 @@ export function InsightsDashboard() {
                   <ActivityChart
                     data={weeklyActivityData}
                     height={120}
-                    title="This Week"
+                    title={t('home.thisWeek')}
                   />
                 </View>
               )}
@@ -594,7 +598,7 @@ export function InsightsDashboard() {
                     activeOpacity={0.7}
                   >
                     <History size={14} color={colors.textMuted} />
-                    <Text style={[styles.linkText, { color: colors.text }]}>Session History</Text>
+                    <Text style={[styles.linkText, { color: colors.text }]}>{t('session.history')}</Text>
                     <ChevronRight size={14} color={colors.textMuted} />
                   </TouchableOpacity>
                 </>
@@ -637,7 +641,7 @@ export function InsightsDashboard() {
                       <View style={[styles.actionBarIcon, { backgroundColor: `${colors.textMuted}12` }]}>
                         <History size={14} color={colors.textMuted} />
                       </View>
-                      <Text style={[styles.actionBarText, { color: colors.text }]}>History</Text>
+                      <Text style={[styles.actionBarText, { color: colors.text }]}>{t('common.history')}</Text>
                     </TouchableOpacity>
                     <View style={[styles.actionBarDivider, { backgroundColor: colors.border }]} />
                     <TouchableOpacity
@@ -648,7 +652,7 @@ export function InsightsDashboard() {
                       <View style={[styles.actionBarIcon, { backgroundColor: `${colors.textMuted}12` }]}>
                         <TrendingUp size={14} color={colors.textMuted} />
                       </View>
-                      <Text style={[styles.actionBarText, { color: colors.text }]}>Details</Text>
+                      <Text style={[styles.actionBarText, { color: colors.text }]}>{t('insights.details')}</Text>
                     </TouchableOpacity>
                   </View>
 

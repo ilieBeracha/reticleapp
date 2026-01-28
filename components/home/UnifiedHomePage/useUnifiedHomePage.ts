@@ -8,6 +8,7 @@
 import { useFocusEffect } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert } from 'react-native';
 
@@ -40,14 +41,15 @@ export function useUnifiedHomePage() {
   // ═══════════════════════════════════════════════════════════════════════════
   // AUTH & CONTEXT
   // ═══════════════════════════════════════════════════════════════════════════
+  const { t } = useTranslation();
   const { profileFullName, profileAvatarUrl, user } = useAuth();
   const { setOnSessionCreated, setOnTeamCreated } = useModals();
   const garminStatus = useGarminStore((s) => s.status);
   const isGarminConnected = garminStatus === 'CONNECTED';
 
   // User info
-  const greeting = getGreeting();
-  const firstName = profileFullName?.split(' ')[0] || 'Shooter';
+  const greeting = getGreeting(t);
+  const firstName = profileFullName?.split(' ')[0] || t('home.defaultFirstName');
   const avatarUrl = profileAvatarUrl ?? user?.user_metadata?.avatar_url ?? null;
   const fallbackInitial =
     profileFullName?.charAt(0)?.toUpperCase() ?? user?.email?.charAt(0)?.toUpperCase() ?? '?';
@@ -179,15 +181,18 @@ export function useUnifiedHomePage() {
   // Coach message
   const coachMessage = useMemo(
     () =>
-      getCoachMessage({
-        sessions: weeklyStats.sessions,
-        shots: weeklyStats.shots,
-        accuracy: weeklyStats.accuracy,
-        hasActiveSession: !!homeState.activeSession,
-        hasUpcoming: upcomingTrainings.length > 0,
-        streak,
-      }),
-    [weeklyStats, homeState.activeSession, upcomingTrainings, streak]
+      getCoachMessage(
+        {
+          sessions: weeklyStats.sessions,
+          shots: weeklyStats.shots,
+          accuracy: weeklyStats.accuracy,
+          hasActiveSession: !!homeState.activeSession,
+          hasUpcoming: upcomingTrainings.length > 0,
+          streak,
+        },
+        t
+      ),
+    [weeklyStats, homeState.activeSession, upcomingTrainings, streak, t]
   );
 
   // Default weapon stats
@@ -244,12 +249,14 @@ export function useUnifiedHomePage() {
       if (existing) {
         setStarting(false);
         Alert.alert(
-          'Active Session',
-          `You have an active session${existing.drill_name ? ` for "${existing.drill_name}"` : ''}. What would you like to do?`,
+          t('home.activeSession.title'),
+          existing.drill_name
+            ? t('home.activeSession.messageWithDrill', { drillName: existing.drill_name })
+            : t('home.activeSession.message', { drillName: '' }),
           [
-            { text: 'Continue', onPress: () => router.push(`/(protected)/activeSession?sessionId=${existing.id}`) },
+            { text: t('common.continue'), onPress: () => router.push(`/(protected)/activeSession?sessionId=${existing.id}`) },
             {
-              text: 'Delete & Start New',
+              text: t('home.activeSession.deleteAndStart'),
               style: 'destructive',
               onPress: async () => {
                 await deleteSession(existing.id);
@@ -257,7 +264,7 @@ export function useUnifiedHomePage() {
                 router.push('/(protected)/startEngagement');
               },
             },
-            { text: 'Cancel', style: 'cancel' },
+            { text: t('common.cancel'), style: 'cancel' },
           ]
         );
         return;

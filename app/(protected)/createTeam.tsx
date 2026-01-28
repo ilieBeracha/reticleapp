@@ -3,6 +3,7 @@ import { useColors } from '@/hooks/ui/useColors';
 import { Ionicons } from '@expo/vector-icons';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeInRight, FadeOutLeft } from 'react-native-reanimated';
+import { useTranslation } from 'react-i18next';
 
 /**
  * CREATE TEAM - Stepper Form Sheet
@@ -10,6 +11,7 @@ import Animated, { FadeInRight, FadeOutLeft } from 'react-native-reanimated';
  * Step 2: Squads (weapons are assigned per-member, not via policy)
  */
 export default function CreateTeamSheet() {
+  const { t } = useTranslation();
   const colors = useColors();
 
   const {
@@ -46,11 +48,10 @@ export default function CreateTeamSheet() {
           <Ionicons name="checkmark-circle" size={48} color={colors.primary} />
         </View>
 
-        <Text style={[styles.successTitle, { color: colors.text }]}>Team Created!</Text>
+        <Text style={[styles.successTitle, { color: colors.text }]}>{t('teams.teamCreated')}</Text>
 
         <Text style={[styles.successSubtitle, { color: colors.textMuted }]}>
-          <Text style={{ fontWeight: '600', color: colors.text }}>{createdTeam.name}</Text> is ready. You can invite
-          team members anytime.
+          {t('teams.teamReady', { teamName: createdTeam.name })}
         </Text>
 
         <View style={styles.successActions}>
@@ -60,7 +61,7 @@ export default function CreateTeamSheet() {
             activeOpacity={0.8}
           >
             <Ionicons name="arrow-forward" size={20} color="#fff" />
-            <Text style={styles.primaryBtnText}>Open Team</Text>
+            <Text style={styles.primaryBtnText}>{t('teams.openTeam')}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -82,7 +83,7 @@ export default function CreateTeamSheet() {
           <View style={[styles.headerIcon, { backgroundColor: colors.primary + '15' }]}>
             <Ionicons name="people" size={28} color={colors.primary} />
           </View>
-          <Text style={[styles.title, { color: colors.text }]}>Create Team</Text>
+          <Text style={[styles.title, { color: colors.text }]}>{t('teams.createTeam')}</Text>
 
           {/* Step indicator */}
           <View style={styles.stepIndicator}>
@@ -100,7 +101,7 @@ export default function CreateTeamSheet() {
               ))}
             </View>
             <Text style={[styles.stepText, { color: colors.textMuted }]}>
-              Step {currentStepNumber} of {totalSteps}
+              {t('teams.step', { current: currentStepNumber, total: totalSteps })}
             </Text>
           </View>
         </View>
@@ -108,15 +109,15 @@ export default function CreateTeamSheet() {
         {/* STEP 1: Name & Description */}
         {formStep === 'basics' && (
           <Animated.View entering={FadeInRight.duration(200)} exiting={FadeOutLeft.duration(200)}>
-            <Text style={[styles.stepTitle, { color: colors.text }]}>What's your team?</Text>
-            <Text style={[styles.stepSubtitle, { color: colors.textMuted }]}>Basic information about your team</Text>
+            <Text style={[styles.stepTitle, { color: colors.text }]}>{t('teams.whatsYourTeam')}</Text>
+            <Text style={[styles.stepSubtitle, { color: colors.textMuted }]}>{t('teams.basicInfo')}</Text>
 
             {/* Team Name */}
             <View style={styles.inputSection}>
               <View style={styles.labelRow}>
                 <Ionicons name="flag" size={16} color={colors.primary} />
-                <Text style={[styles.inputLabel, { color: colors.text }]}>Team Name</Text>
-                <Text style={[styles.required, { color: colors.destructive }]}>*</Text>
+                <Text style={[styles.inputLabel, { color: colors.text }]}>{t('teams.teamNameLabel')}</Text>
+                <Text style={[styles.required, { color: colors.destructive }]}>{t('common.required')}</Text>
               </View>
               <View
                 style={[
@@ -126,7 +127,7 @@ export default function CreateTeamSheet() {
               >
                 <TextInput
                   style={[styles.input, { color: colors.text }]}
-                  placeholder="e.g. Alpha Team, First Platoon..."
+                  placeholder={t('teams.teamNamePlaceholderExample')}
                   placeholderTextColor={colors.textMuted}
                   value={teamName}
                   onChangeText={setTeamName}
@@ -141,8 +142,8 @@ export default function CreateTeamSheet() {
             <View style={styles.inputSection}>
               <View style={styles.labelRow}>
                 <Ionicons name="document-text-outline" size={16} color={colors.textMuted} />
-                <Text style={[styles.inputLabel, { color: colors.text }]}>Description</Text>
-                <Text style={[styles.optional, { color: colors.textMuted }]}>optional</Text>
+                <Text style={[styles.inputLabel, { color: colors.text }]}>{t('teams.descriptionLabel')}</Text>
+                <Text style={[styles.optional, { color: colors.textMuted }]}>{t('common.optional')}</Text>
               </View>
               <View
                 style={[
@@ -153,7 +154,7 @@ export default function CreateTeamSheet() {
               >
                 <TextInput
                   style={[styles.textArea, { color: colors.text }]}
-                  placeholder="What's this team's purpose?"
+                  placeholder={t('teams.whatsThisPurpose')}
                   placeholderTextColor={colors.textMuted}
                   value={teamDescription}
                   onChangeText={setTeamDescription}
@@ -169,15 +170,15 @@ export default function CreateTeamSheet() {
         {/* STEP 2: Squads */}
         {formStep === 'squads' && (
           <Animated.View entering={FadeInRight.duration(200)} exiting={FadeOutLeft.duration(200)}>
-            <Text style={[styles.stepTitle, { color: colors.text }]}>Organize into squads</Text>
+            <Text style={[styles.stepTitle, { color: colors.text }]}>{t('teams.organizeIntoSquads')}</Text>
             <Text style={[styles.stepSubtitle, { color: colors.textMuted }]}>
-              Add sub-units to your team (optional)
+              {t('teams.addSubUnits')}
             </Text>
 
             {/* Templates */}
             {squads.length === 0 && (
               <View style={styles.templatesSection}>
-                <Text style={[styles.templatesLabel, { color: colors.textMuted }]}>Quick templates:</Text>
+                <Text style={[styles.templatesLabel, { color: colors.textMuted }]}>{t('teams.quickTemplates')}</Text>
                 <View style={styles.templateChips}>
                   {squadTemplates.map((template, index) => (
                     <TouchableOpacity
@@ -199,7 +200,7 @@ export default function CreateTeamSheet() {
               >
                 <TextInput
                   style={[styles.squadInput, { color: colors.text }]}
-                  placeholder="Enter squad name..."
+                  placeholder={t('teams.enterSquadName')}
                   placeholderTextColor={colors.textMuted}
                   value={newSquadName}
                   onChangeText={setNewSquadName}
@@ -246,7 +247,7 @@ export default function CreateTeamSheet() {
             {squads.length > 0 && (
               <TouchableOpacity style={styles.clearAllBtn} onPress={clearAllSquads}>
                 <Ionicons name="trash-outline" size={14} color={colors.destructive} />
-                <Text style={[styles.clearAllText, { color: colors.destructive }]}>Clear all</Text>
+                <Text style={[styles.clearAllText, { color: colors.destructive }]}>{t('teams.clearAll')}</Text>
               </TouchableOpacity>
             )}
 
@@ -255,7 +256,7 @@ export default function CreateTeamSheet() {
               <View style={[styles.infoCard, { backgroundColor: colors.secondary, marginTop: 20 }]}>
                 <Ionicons name="information-circle-outline" size={18} color={colors.textMuted} />
                 <Text style={[styles.infoText, { color: colors.textMuted }]}>
-                  Squads are optional. You can skip this step and add them later.
+                  {t('teams.squadsOptional')}
                 </Text>
               </View>
             )}
@@ -274,7 +275,7 @@ export default function CreateTeamSheet() {
               disabled={!canProceedToSquads}
               activeOpacity={0.8}
             >
-              <Text style={styles.nextButtonText}>Continue</Text>
+              <Text style={styles.nextButtonText}>{t('common.continue')}</Text>
               <Ionicons name="arrow-forward" size={18} color="#fff" />
             </TouchableOpacity>
           </>
@@ -288,7 +289,7 @@ export default function CreateTeamSheet() {
               activeOpacity={0.7}
             >
               <Ionicons name="arrow-back" size={18} color={colors.text} />
-              <Text style={[styles.backButtonText, { color: colors.text }]}>Back</Text>
+              <Text style={[styles.backButtonText, { color: colors.text }]}>{t('common.back')}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[
@@ -305,12 +306,12 @@ export default function CreateTeamSheet() {
               {submitting ? (
                 <>
                   <ActivityIndicator color="#fff" size="small" />
-                  <Text style={styles.createButtonText}>Creating...</Text>
+                  <Text style={styles.createButtonText}>{t('common.creating')}</Text>
                 </>
               ) : (
                 <>
                   <Ionicons name="checkmark-circle" size={20} color="#fff" />
-                  <Text style={styles.createButtonText}>Create Team</Text>
+                  <Text style={styles.createButtonText}>{t('teams.createTeam')}</Text>
                 </>
               )}
             </TouchableOpacity>

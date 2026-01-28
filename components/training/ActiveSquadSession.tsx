@@ -6,6 +6,7 @@
  */
 
 import { useColors } from '@/hooks/ui/useColors';
+import { useTranslation } from 'react-i18next';
 import { supabase } from '@/lib/supabase';
 import { getEngagementParticipants, getParticipantCounts } from '@/services/session/participants';
 import type { Engagement, EngagementParticipant } from '@/services/session/types';
@@ -32,6 +33,7 @@ interface ActiveSquadSessionProps {
 }
 
 export function ActiveSquadSession({ trainingId }: ActiveSquadSessionProps) {
+  const { t } = useTranslation();
   const colors = useColors();
   const [loading, setLoading] = useState(true);
   const [activeData, setActiveData] = useState<ActiveEngagementData | null>(null);
@@ -72,7 +74,7 @@ export function ActiveSquadSession({ trainingId }: ActiveSquadSessionProps) {
       setActiveData({
         engagement: engagement as Engagement,
         sessionId: session.id,
-        drillName: drillConfig?.name || (isGroup ? 'Group' : 'Squad'),
+        drillName: drillConfig?.name || (isGroup ? t('training.groupEngagement') : t('training.squadEngagement')),
         distanceM: drillConfig?.distance_m || null,
         roundsPerShooter: drillConfig?.rounds_per_shooter || null,
         engagementMode: engagement.engagement_mode as 'squad' | 'group',
@@ -115,7 +117,7 @@ export function ActiveSquadSession({ trainingId }: ActiveSquadSessionProps) {
   const { hasStarted, participants, engagementMode, drillName, distanceM } = activeData;
   const isGroup = engagementMode === 'group';
   const counts = getParticipantCounts(participants);
-  const modeLabel = isGroup ? 'Group' : 'Squad';
+  const modeLabel = isGroup ? t('training.groupType') : t('training.squadType');
 
   const accentColor = hasStarted ? colors.green : colors.orange;
 
@@ -157,12 +159,12 @@ export function ActiveSquadSession({ trainingId }: ActiveSquadSessionProps) {
         </View>
         <View style={styles.headerInfo}>
           <Text style={[styles.headerTitle, { color: colors.text }]}>
-            {hasStarted ? `${modeLabel} Session Active` : `${modeLabel} Lobby`}
+            {hasStarted ? t('training.sessionInProgress', { mode: modeLabel }) : t('training.lobbyActive', { mode: modeLabel })}
           </Text>
           <Text style={[styles.headerMeta, { color: colors.textMuted }]}>
             {drillName}
-            {distanceM ? ` · ${distanceM}m` : ''} · {counts.joined} joined
-            {counts.pending > 0 && ` · ${counts.pending} pending`}
+            {distanceM ? ` · ${distanceM}m` : ''} · {t('training.joinedCount', { count: counts.joined })}
+            {counts.pending > 0 && ` · ${t('training.pendingCount', { count: counts.pending })}`}
           </Text>
         </View>
         <View style={[styles.goBtn, { backgroundColor: accentColor + '20' }]}>

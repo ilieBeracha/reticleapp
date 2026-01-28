@@ -5,6 +5,7 @@ import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Camera, Edit3, Focus, Target, Trophy, X } from 'lucide-react-native';
 import React, { useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { COLORS, InputMethod, TargetType } from './types';
 
@@ -33,6 +34,7 @@ export const TargetForm = React.memo(function TargetForm({
   saving,
 }: TargetFormProps) {
   const colors = useColors();
+  const { t } = useTranslation();
 
   const handleTargetTypeChange = useCallback(
     (type: TargetType) => {
@@ -53,12 +55,12 @@ export const TargetForm = React.memo(function TargetForm({
   // Determine button text based on selection
   const getButtonText = () => {
     if (targetType === 'grouping') {
-      return 'Scan Target';
+      return t('target.scanTarget');
     }
     if (inputMethod === 'scan') {
-      return 'Scan Target';
+      return t('target.scanTarget');
     }
-    return 'Enter Results';
+    return t('target.enterResults');
   };
 
   const getButtonIcon = () => {
@@ -82,8 +84,8 @@ export const TargetForm = React.memo(function TargetForm({
             <Target size={24} color={colors.primary} />
           </View>
           <View>
-            <Text style={[styles.headerTitle, { color: colors.text }]}>Add Target</Text>
-            <Text style={[styles.headerSubtitle, { color: colors.textMuted }]}>Choose your training goal</Text>
+            <Text style={[styles.headerTitle, { color: colors.text }]}>{t('target.addTarget')}</Text>
+            <Text style={[styles.headerSubtitle, { color: colors.textMuted }]}>{t('target.chooseTrainingGoal')}</Text>
           </View>
         </View>
         <TouchableOpacity onPress={onClose} style={[styles.closeBtn, { backgroundColor: colors.card }]}>
@@ -93,7 +95,7 @@ export const TargetForm = React.memo(function TargetForm({
 
       {/* Target Type Selection: Grouping vs Achievement */}
       <View style={styles.section}>
-        <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>Training Goal</Text>
+        <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>{t('target.trainingGoal')}</Text>
         <View style={styles.typeRow}>
           {/* Grouping Target */}
           <TouchableOpacity
@@ -112,9 +114,9 @@ export const TargetForm = React.memo(function TargetForm({
               <Text
                 style={[styles.typeText, { color: colors.text }, targetType === 'grouping' && styles.typeTextSelected]}
               >
-                Grouping
+                {t('session.grouping')}
               </Text>
-              <Text style={[styles.typeHint, { color: colors.textMuted }]}>Measure shot consistency</Text>
+              <Text style={[styles.typeHint, { color: colors.textMuted }]}>{t('target.measuringShotConsistency')}</Text>
             </View>
             {targetType === 'grouping' && (
               <View style={styles.typeCheck}>
@@ -144,9 +146,9 @@ export const TargetForm = React.memo(function TargetForm({
                   targetType === 'engagement' && styles.typeTextSelected,
                 ]}
               >
-                Achievement
+                {t('session.achievement')}
               </Text>
-              <Text style={[styles.typeHint, { color: colors.textMuted }]}>Track hits & accuracy</Text>
+              <Text style={[styles.typeHint, { color: colors.textMuted }]}>{t('target.trackHitsAndAccuracy')}</Text>
             </View>
             {targetType === 'engagement' && (
               <View style={styles.typeCheck}>
@@ -168,19 +170,18 @@ export const TargetForm = React.memo(function TargetForm({
                 <Focus size={32} color={colors.primary} />
               </View>
             </View>
-            <Text style={[styles.infoTitle, { color: colors.text }]}>Measure Your Grouping</Text>
+            <Text style={[styles.infoTitle, { color: colors.text }]}>{t('target.measureYourGrouping')}</Text>
             <Text style={[styles.infoDesc, { color: colors.textMuted }]}>
-              Scan your paper target to measure shot dispersion and consistency. No hit percentage—just pure grouping
-              analysis.
+              {t('target.groupingInfoDescription')}
             </Text>
             <View style={styles.infoFeatures}>
               <View style={styles.infoFeature}>
                 <Ionicons name="analytics" size={14} color={colors.primary} />
-                <Text style={[styles.infoFeatureText, { color: colors.text }]}>Dispersion (cm)</Text>
+                <Text style={[styles.infoFeatureText, { color: colors.text }]}>{t('target.dispersionCm')}</Text>
               </View>
               <View style={styles.infoFeature}>
                 <Ionicons name="locate" size={14} color={colors.primary} />
-                <Text style={[styles.infoFeatureText, { color: colors.text }]}>Group size</Text>
+                <Text style={[styles.infoFeatureText, { color: colors.text }]}>{t('target.groupSize')}</Text>
               </View>
             </View>
           </View>
@@ -191,7 +192,7 @@ export const TargetForm = React.memo(function TargetForm({
       {targetType === 'engagement' && (
         <>
           <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>Input Method</Text>
+            <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>{t('target.inputMethod')}</Text>
             <View style={styles.methodRow}>
               {/* Scan Option */}
               <TouchableOpacity
@@ -213,9 +214,9 @@ export const TargetForm = React.memo(function TargetForm({
                     inputMethod === 'scan' && styles.methodTextSelected,
                   ]}
                 >
-                  Scan
+                  {t('target.scanMethod')}
                 </Text>
-                <Text style={[styles.methodHint, { color: colors.textMuted }]}>AI detection</Text>
+                <Text style={[styles.methodHint, { color: colors.textMuted }]}>{t('target.aiDetection')}</Text>
               </TouchableOpacity>
 
               {/* Manual Option */}
@@ -238,9 +239,9 @@ export const TargetForm = React.memo(function TargetForm({
                     inputMethod === 'manual' && styles.methodTextSelected,
                   ]}
                 >
-                  Manual
+                  {t('common.manual')}
                 </Text>
-                <Text style={[styles.methodHint, { color: colors.textMuted }]}>Enter counts</Text>
+                <Text style={[styles.methodHint, { color: colors.textMuted }]}>{t('target.enterCounts')}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -260,21 +261,19 @@ export const TargetForm = React.memo(function TargetForm({
                 </View>
               </View>
               <Text style={[styles.infoTitle, { color: colors.text }]}>
-                {inputMethod === 'scan' ? 'Scan Your Target' : 'Enter Your Results'}
+                {inputMethod === 'scan' ? t('target.scanYourTarget') : t('target.enterYourResults')}
               </Text>
               <Text style={[styles.infoDesc, { color: colors.textMuted }]}>
-                {inputMethod === 'scan'
-                  ? 'AI will detect bullet holes and calculate your hit percentage automatically.'
-                  : 'Manually enter the number of bullets fired and hits to track your accuracy.'}
+                {inputMethod === 'scan' ? t('target.scanInfoDescription') : t('target.manualInfoDescription')}
               </Text>
               <View style={styles.infoFeatures}>
                 <View style={styles.infoFeature}>
                   <Ionicons name="checkmark-circle" size={14} color={colors.primary} />
-                  <Text style={[styles.infoFeatureText, { color: colors.text }]}>Hit count</Text>
+                  <Text style={[styles.infoFeatureText, { color: colors.text }]}>{t('target.hitCount')}</Text>
                 </View>
                 <View style={styles.infoFeature}>
                   <Ionicons name="pie-chart" size={14} color={colors.primary} />
-                  <Text style={[styles.infoFeatureText, { color: colors.text }]}>Hit percentage</Text>
+                  <Text style={[styles.infoFeatureText, { color: colors.text }]}>{t('target.hitPercentage')}</Text>
                 </View>
               </View>
             </View>
@@ -302,7 +301,7 @@ export const TargetForm = React.memo(function TargetForm({
       </TouchableOpacity>
 
       <TouchableOpacity style={styles.cancelBtn} onPress={onClose} activeOpacity={0.7}>
-        <Text style={[styles.cancelBtnText, { color: colors.textMuted }]}>Cancel</Text>
+        <Text style={[styles.cancelBtnText, { color: colors.textMuted }]}>{t('common.cancel')}</Text>
       </TouchableOpacity>
 
       <View style={{ height: 20 }} />

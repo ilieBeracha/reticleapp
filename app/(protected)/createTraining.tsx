@@ -11,6 +11,7 @@
 import { useCreateTrainingV2 } from '@/components/training/create';
 import { AddDrillStep, TrainingDetailsStep } from '@/components/training/create/steps';
 import { useColors } from '@/hooks/ui/useColors';
+import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as Haptics from 'expo-haptics';
@@ -36,6 +37,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 export default function CreateTrainingScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
   const { teamId: teamIdParam } = useLocalSearchParams<{ teamId?: string }>();
 
   const {
@@ -78,22 +80,22 @@ export default function CreateTrainingScreen() {
           <View style={[styles.emptyIcon, { backgroundColor: colors.card }]}>
             <Users size={32} color={colors.textMuted} strokeWidth={1.5} />
           </View>
-          <Text style={[styles.emptyTitle, { color: colors.text }]}>No Teams Yet</Text>
+          <Text style={[styles.emptyTitle, { color: colors.text }]}>{t('training.noTeamsYet')}</Text>
           <Text style={[styles.emptyDesc, { color: colors.textMuted }]}>
-            Create or join a team to schedule trainings
+            {t('training.createOrJoinTeam')}
           </Text>
           <View style={styles.emptyActions}>
             <TouchableOpacity
               style={[styles.emptyBtn, { backgroundColor: colors.text }]}
               onPress={() => router.replace('/(protected)/createTeam')}
             >
-              <Text style={[styles.emptyBtnText, { color: colors.background }]}>Create Team</Text>
+              <Text style={[styles.emptyBtnText, { color: colors.background }]}>{t('teams.createTeam')}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.emptyBtnSecondary, { borderColor: colors.border }]}
               onPress={() => router.replace('/(protected)/acceptInvite')}
             >
-              <Text style={[styles.emptyBtnSecondaryText, { color: colors.text }]}>Join Team</Text>
+              <Text style={[styles.emptyBtnSecondaryText, { color: colors.text }]}>{t('teams.joinTeam')}</Text>
             </TouchableOpacity>
           </View>
         </Animated.View>
@@ -105,7 +107,7 @@ export default function CreateTrainingScreen() {
   // MAIN RENDER
   // ─────────────────────────────────────────────────────────────────────────
 
-  const stepLabels = ['Details', 'Drills'];
+  const stepLabels = [t('training.details'), t('training.drills')];
   const totalSteps = 2;
 
   return (
@@ -133,7 +135,7 @@ export default function CreateTrainingScreen() {
           </TouchableOpacity>
 
           <Text style={[styles.headerTitle, { color: colors.text }]}>
-            {currentStep === 1 ? 'New Training' : 'Add Drills'}
+            {currentStep === 1 ? t('training.newTraining') : t('training.addDrillsTitle')}
           </Text>
 
           <View style={styles.headerButtonPlaceholder} />
@@ -200,7 +202,7 @@ export default function CreateTrainingScreen() {
       <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 12, backgroundColor: colors.background }]}>
         {currentStep === 2 && drills.length > 0 && (
           <Text style={[styles.footerHint, { color: colors.textMuted }]}>
-            Team will be notified when training is created
+            {t('training.teamWillBeNotified')}
           </Text>
         )}
         {currentStep === 1 ? (
@@ -214,7 +216,7 @@ export default function CreateTrainingScreen() {
             activeOpacity={0.85}
           >
             <Text style={[styles.actionText, { color: step1Complete ? colors.background : colors.textMuted }]}>
-              Continue
+              {t('common.continue')}
             </Text>
             <ArrowRight size={16} color={step1Complete ? colors.background : colors.textMuted} strokeWidth={2.5} />
           </TouchableOpacity>
@@ -233,7 +235,7 @@ export default function CreateTrainingScreen() {
             ) : (
               <>
                 <Text style={[styles.actionText, { color: canCreate ? colors.background : colors.textMuted }]}>
-                  {drills.length === 0 ? 'Add at least one drill' : 'Create Training'}
+                  {drills.length === 0 ? t('training.addAtLeastOneDrill') : t('training.createTraining')}
                 </Text>
                 {drills.length > 0 && <Play size={14} color={colors.background} fill={colors.background} />}
               </>
@@ -249,7 +251,7 @@ export default function CreateTrainingScreen() {
       <PickerModal
         visible={showDatePicker}
         onClose={() => setShowDatePicker(false)}
-        title="Select Date"
+        title={t('training.selectDate')}
         mode="date"
         value={scheduledDate}
         onChange={setScheduledDate}
@@ -260,7 +262,7 @@ export default function CreateTrainingScreen() {
       <PickerModal
         visible={showTimePicker}
         onClose={() => setShowTimePicker(false)}
-        title="Select Time"
+        title={t('training.selectTime')}
         mode="time"
         value={scheduledDate}
         onChange={setScheduledDate}
@@ -296,6 +298,8 @@ function PickerModal({
   colors: ReturnType<typeof useColors>;
   bottomInset: number;
 }) {
+  const { t } = useTranslation();
+
   if (!visible) return null;
 
   return (
@@ -308,11 +312,11 @@ function PickerModal({
           <View style={[styles.pickerHandle, { backgroundColor: colors.border }]} />
           <View style={styles.pickerHeader}>
             <TouchableOpacity onPress={onClose} style={styles.pickerHeaderBtn} hitSlop={8}>
-              <Text style={[styles.pickerCancel, { color: colors.textMuted }]}>Cancel</Text>
+              <Text style={[styles.pickerCancel, { color: colors.textMuted }]}>{t('common.cancel')}</Text>
             </TouchableOpacity>
             <Text style={[styles.pickerTitle, { color: colors.text }]}>{title}</Text>
             <TouchableOpacity onPress={onClose} style={styles.pickerHeaderBtn} hitSlop={8}>
-              <Text style={[styles.pickerDone, { color: colors.primary }]}>Done</Text>
+              <Text style={[styles.pickerDone, { color: colors.primary }]}>{t('common.done')}</Text>
             </TouchableOpacity>
           </View>
           <View style={[styles.pickerDivider, { backgroundColor: colors.border }]} />

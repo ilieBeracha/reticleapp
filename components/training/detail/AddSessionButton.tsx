@@ -5,6 +5,7 @@
  */
 
 import { useColors } from '@/hooks/ui/useColors';
+import { useTranslation } from 'react-i18next';
 import type { DrillGoal } from '@/types/workspace';
 import * as Haptics from 'expo-haptics';
 import { Crosshair, Plus, Target } from 'lucide-react-native';
@@ -26,6 +27,7 @@ export interface AddSessionButtonProps {
 // ============================================================================
 
 export function AddSessionButton({ drillGoal, onPress, disabled = false }: AddSessionButtonProps) {
+  const { t } = useTranslation();
   const colors = useColors();
 
   const isGrouping = drillGoal === 'grouping';
@@ -55,9 +57,11 @@ export function AddSessionButton({ drillGoal, onPress, disabled = false }: AddSe
         <Plus size={18} color={accentColor} />
       </View>
       <View style={styles.textContainer}>
-        <Text style={[styles.title, { color: colors.text }]}>Add {isGrouping ? 'Grouping' : 'Engagement'} Session</Text>
+        <Text style={[styles.title, { color: colors.text }]}>
+          {isGrouping ? t('training.addGroupingSession') : t('training.addEngagementSession')}
+        </Text>
         <Text style={[styles.subtitle, { color: colors.textMuted }]}>
-          {isGrouping ? 'Practice shot consistency' : 'Practice target hits'}
+          {isGrouping ? t('training.practiceShotConsistency') : t('training.practiceTargetHits')}
         </Text>
       </View>
       {isGrouping ? (

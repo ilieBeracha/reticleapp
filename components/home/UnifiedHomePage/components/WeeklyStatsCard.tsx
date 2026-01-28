@@ -8,6 +8,7 @@
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { ChevronRight, Clock, Crosshair, Flame, Target, TrendingUp } from 'lucide-react-native';
+import { useTranslation } from 'react-i18next';
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeInDown, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
@@ -18,6 +19,7 @@ import type { WeeklyStatsCardProps } from '../UnifiedHomePage.types';
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
 export function WeeklyStatsCard({ stats, streak, colors }: WeeklyStatsCardProps) {
+  const { t } = useTranslation();
   const scale = useSharedValue(1);
 
   const animStyle = useAnimatedStyle(() => ({
@@ -43,7 +45,7 @@ export function WeeklyStatsCard({ stats, streak, colors }: WeeklyStatsCardProps)
       >
         <View style={s.emptyHeader}>
           <View style={s.headerRow}>
-            <Text style={[s.title, { color: colors.text }]}>This Week</Text>
+            <Text style={[s.title, { color: colors.text }]}>{t('home.thisWeek')}</Text>
             <ChevronRight size={16} color={colors.textMuted} style={{ opacity: 0.5 }} />
           </View>
         </View>
@@ -62,7 +64,7 @@ export function WeeklyStatsCard({ stats, streak, colors }: WeeklyStatsCardProps)
               <Text style={[s.emptyStatText, { color: colors.textMuted }]}>--</Text>
             </View>
           </View>
-          <Text style={[s.emptyMessage, { color: colors.textMuted }]}>No practice sessions yet this week</Text>
+          <Text style={[s.emptyMessage, { color: colors.textMuted }]}>{t('home.noSessionsThisWeek')}</Text>
         </View>
       </AnimatedTouchable>
     );
@@ -78,10 +80,10 @@ export function WeeklyStatsCard({ stats, streak, colors }: WeeklyStatsCardProps)
       {/* Header with streak */}
       <View style={s.header}>
         <View style={s.headerLeft}>
-          <Text style={[s.title, { color: colors.text }]}>This Week</Text>
+          <Text style={[s.title, { color: colors.text }]}>{t('home.thisWeek')}</Text>
           <View style={[s.sessionBadge, { backgroundColor: `${colors.primary}15` }]}>
             <Text style={[s.sessionBadgeText, { color: colors.primary }]}>
-              {stats.sessions} session{stats.sessions !== 1 ? 's' : ''}
+              {t('home.sessionsCount', { count: stats.sessions })}
             </Text>
           </View>
         </View>
@@ -101,25 +103,25 @@ export function WeeklyStatsCard({ stats, streak, colors }: WeeklyStatsCardProps)
         <StatItem
           icon={<Target size={14} color={colors.indigo} />}
           value={stats.shots.toLocaleString()}
-          label="Shots"
+          label={t('session.shots')}
           colors={colors}
         />
         <StatItem
           icon={<TrendingUp size={14} color={colors.green} />}
           value={`${stats.accuracy}%`}
-          label="Accuracy"
+          label={t('session.accuracy')}
           colors={colors}
         />
         <StatItem
           icon={<Crosshair size={14} color={colors.orange} />}
           value={stats.bestGroup}
-          label="Best Group"
+          label={t('session.bestGroup')}
           colors={colors}
         />
         <StatItem
           icon={<Clock size={14} color={colors.blue} />}
-          value={formatDuration(stats.totalTimeMinutes)}
-          label="Time"
+          value={formatDuration(stats.totalTimeMinutes, t)}
+          label={t('session.time')}
           colors={colors}
         />
       </View>

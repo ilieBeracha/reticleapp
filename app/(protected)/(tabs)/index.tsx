@@ -5,7 +5,30 @@ import { useColors } from '@/hooks/ui/useColors';
 import * as Sentry from '@sentry/react-native';
 import { Stack } from 'expo-router';
 import { Component, memo, type ErrorInfo, type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import { StyleSheet } from 'react-native';
+
+/**
+ * Error Fallback Component
+ * Uses hooks for translation (can't be used in error boundary class component)
+ */
+function ErrorFallback({ error, onReset }: { error: Error | null; onReset: () => void }) {
+  const { t } = useTranslation();
+  
+  return (
+    <ThemedView style={styles.errorContainer}>
+      <ThemedText type="title" style={styles.errorTitle}>
+        {t('common.somethingWentWrong')}
+      </ThemedText>
+      <ThemedText type="default" style={styles.errorMessage}>
+        {error?.message || t('common.unexpectedError')}
+      </ThemedText>
+      <ThemedText type="link" onPress={onReset} style={styles.errorRetry}>
+        {t('common.tryAgain')}
+      </ThemedText>
+    </ThemedView>
+  );
+}
 
 /**
  * Unified Home Screen
@@ -76,19 +99,8 @@ class HomeErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState
         return this.props.fallback;
       }
 
-      return (
-        <ThemedView style={styles.errorContainer}>
-          <ThemedText type="title" style={styles.errorTitle}>
-            Something went wrong
-          </ThemedText>
-          <ThemedText type="default" style={styles.errorMessage}>
-            {this.state.error?.message || 'An unexpected error occurred'}
-          </ThemedText>
-          <ThemedText type="link" onPress={this.handleReset} style={styles.errorRetry}>
-            Try again
-          </ThemedText>
-        </ThemedView>
-      );
+      // Note: Error boundary can't use hooks, so we'll use a simple component wrapper
+      return <ErrorFallback error={this.state.error} onReset={this.handleReset} />;
     }
 
     return this.props.children;
@@ -111,12 +123,13 @@ const MemoizedHomeScreenContent = memo(HomeScreenContent);
  */
 export default function HomeScreen() {
   const colors = useColors();
+  const { t } = useTranslation();
 
   return (
     <>
       <Stack.Screen
         options={{
-          title: 'Home',
+          title: t('navigation.home'),
           headerShown: true,
           // Optimize header rendering
           headerTransparent: false,

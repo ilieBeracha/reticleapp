@@ -26,6 +26,7 @@ import {
   ChevronRight,
   Shield,
 } from 'lucide-react-native';
+import { useTranslation } from 'react-i18next';
 import { useCallback, useState } from 'react';
 import {
   LayoutAnimation,
@@ -121,7 +122,7 @@ function AccordionItem({
               <Text style={[styles.countText, { color: colors.textMuted }]}>{count}</Text>
             </View>
           ) : (
-            <Text style={[styles.buildingText, { color: colors.textMuted }]}>building...</Text>
+            <Text style={[styles.buildingText, { color: colors.textMuted }]}>{t('insights.detailedBreakdown.building')}</Text>
           )}
         </View>
         {isExpanded ? (
@@ -158,6 +159,7 @@ export function DetailedBreakdownSection({
   onTrendPress,
   initialExpanded = [],
 }: DetailedBreakdownSectionProps) {
+  const { t } = useTranslation();
   const colors = useColors();
 
   // Expansion state
@@ -182,7 +184,7 @@ export function DetailedBreakdownSection({
       {/* Section Header */}
       <View style={styles.sectionHeader}>
         <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>
-          DETAILED BREAKDOWN
+          {t('insights.detailedBreakdown.title')}
         </Text>
       </View>
 
@@ -190,13 +192,13 @@ export function DetailedBreakdownSection({
       <View style={styles.accordionContainer}>
         {/* Strengths */}
         <AccordionItem
-          title="Strengths"
+          title={t('insights.detailedBreakdown.strengths')}
           count={strengths.length}
           icon={<Shield size={14} color={colors.green} />}
           iconBgColor={`${colors.green}15`}
           isExpanded={expandedSections.has('strengths')}
           onToggle={() => toggleSection('strengths')}
-          emptyText="Keep training to identify what you do best"
+          emptyText={t('insights.detailedBreakdown.strengthsEmpty')}
           colors={colors}
         >
           <StrengthsSection
@@ -209,13 +211,13 @@ export function DetailedBreakdownSection({
 
         {/* Weaknesses */}
         <AccordionItem
-          title="Weaknesses"
+          title={t('insights.detailedBreakdown.weaknesses')}
           count={weaknesses.length}
           icon={<AlertTriangle size={14} color={colors.red} />}
           iconBgColor={`${colors.red}15`}
           isExpanded={expandedSections.has('weaknesses')}
           onToggle={() => toggleSection('weaknesses')}
-          emptyText="Your performance is consistent across all areas"
+          emptyText={t('insights.detailedBreakdown.weaknessesEmpty')}
           colors={colors}
         >
           <WeaknessesSection
@@ -228,13 +230,13 @@ export function DetailedBreakdownSection({
 
         {/* Trends */}
         <AccordionItem
-          title="Trend Analysis"
+          title={t('insights.detailedBreakdown.trends')}
           count={trends.length}
           icon={<Activity size={14} color={colors.primary} />}
           iconBgColor={`${colors.primary}15`}
           isExpanded={expandedSections.has('trends')}
           onToggle={() => toggleSection('trends')}
-          emptyText="Continue training to see trends emerge over time"
+          emptyText={t('insights.detailedBreakdown.trendsEmpty')}
           colors={colors}
         >
           <TrendsSection

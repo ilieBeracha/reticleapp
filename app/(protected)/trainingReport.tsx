@@ -20,6 +20,7 @@ import { useTeamStore } from '@/store/teamStore';
 import { format, formatDistanceToNow } from 'date-fns';
 import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import {
   AlertCircle,
   ArrowLeft,
@@ -87,6 +88,7 @@ function TrainingOverviewCard({
   sessionCount: number;
   colors: ReturnType<typeof useColors>;
 }) {
+  const { t } = useTranslation();
   const duration = useMemo(() => {
     if (!training.started_at || !training.ended_at) return null;
     const start = new Date(training.started_at);
@@ -99,10 +101,10 @@ function TrainingOverviewCard({
   }, [training.started_at, training.ended_at]);
 
   const statusConfig = {
-    planned: { label: 'Scheduled', color: colors.textMuted, icon: Clock },
-    ongoing: { label: 'In Progress', color: '#10B981', icon: Target },
-    finished: { label: 'Completed', color: '#10B981', icon: CheckCircle2 },
-    cancelled: { label: 'Cancelled', color: colors.destructive, icon: XCircle },
+    planned: { label: t('training.status.planned'), color: colors.textMuted, icon: Clock },
+    ongoing: { label: t('training.status.ongoing'), color: '#10B981', icon: Target },
+    finished: { label: t('training.status.finished'), color: '#10B981', icon: CheckCircle2 },
+    cancelled: { label: t('training.status.cancelled'), color: colors.destructive, icon: XCircle },
   };
 
   const { label, color, icon: Icon } = statusConfig[training.status];
@@ -138,19 +140,19 @@ function TrainingOverviewCard({
         <View style={[styles.quickStats, { borderTopColor: colors.border }]}>
           <View style={styles.quickStat}>
             <Text style={[styles.quickStatValue, { color: colors.text }]}>{training.drills.length}</Text>
-            <Text style={[styles.quickStatLabel, { color: colors.textMuted }]}>Drills</Text>
+            <Text style={[styles.quickStatLabel, { color: colors.textMuted }]}>{t('training.drills')}</Text>
           </View>
           <View style={[styles.quickStatDivider, { backgroundColor: colors.border }]} />
           <View style={styles.quickStat}>
             <Text style={[styles.quickStatValue, { color: colors.text }]}>{sessionCount}</Text>
-            <Text style={[styles.quickStatLabel, { color: colors.textMuted }]}>Sessions</Text>
+            <Text style={[styles.quickStatLabel, { color: colors.textMuted }]}>{t('training.sessions')}</Text>
           </View>
           {duration && (
             <>
               <View style={[styles.quickStatDivider, { backgroundColor: colors.border }]} />
               <View style={styles.quickStat}>
                 <Text style={[styles.quickStatValue, { color: colors.text }]}>{duration}</Text>
-                <Text style={[styles.quickStatLabel, { color: colors.textMuted }]}>Duration</Text>
+                <Text style={[styles.quickStatLabel, { color: colors.textMuted }]}>{t('training.duration')}</Text>
               </View>
             </>
           )}
@@ -165,17 +167,18 @@ function TrainingOverviewCard({
 // ═══════════════════════════════════════════════════════════════════════════
 
 function AccessDenied({ colors }: { colors: ReturnType<typeof useColors> }) {
+  const { t } = useTranslation();
   return (
     <View style={styles.accessDenied}>
       <View style={[styles.accessIcon, { backgroundColor: colors.destructive + '15' }]}>
         <AlertCircle size={32} color={colors.destructive} />
       </View>
-      <Text style={[styles.accessTitle, { color: colors.text }]}>Commander Access Only</Text>
+      <Text style={[styles.accessTitle, { color: colors.text }]}>{t('training.commanderAccessOnly')}</Text>
       <Text style={[styles.accessDesc, { color: colors.textMuted }]}>
-        Training reports are only available to commanders and team owners.
+        {t('training.reportsCommanderOnly')}
       </Text>
       <TouchableOpacity style={[styles.accessBtn, { backgroundColor: colors.card }]} onPress={() => router.back()}>
-        <Text style={[styles.accessBtnText, { color: colors.text }]}>Go Back</Text>
+        <Text style={[styles.accessBtnText, { color: colors.text }]}>{t('common.goBack')}</Text>
       </TouchableOpacity>
     </View>
   );
@@ -186,6 +189,7 @@ function AccessDenied({ colors }: { colors: ReturnType<typeof useColors> }) {
 // ═══════════════════════════════════════════════════════════════════════════
 
 export default function TrainingReportScreen() {
+  const { t } = useTranslation();
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ trainingId: string }>();
@@ -213,7 +217,7 @@ export default function TrainingReportScreen() {
   // Load data
   const loadData = useCallback(async () => {
     if (!params.trainingId) {
-      setError('No training ID provided');
+      setError(t('training.noTrainingId'));
       setLoading(false);
       return;
     }
@@ -225,7 +229,7 @@ export default function TrainingReportScreen() {
       ]);
 
       if (!trainingData) {
-        setError('Training not found');
+        setError(t('training.notFound'));
       } else {
         setTraining(trainingData as TrainingWithDrills);
 
@@ -303,7 +307,7 @@ export default function TrainingReportScreen() {
       }
     } catch (err: any) {
       console.error('[TrainingReport] Failed to load:', err);
-      setError(err.message || 'Failed to load training report');
+      setError(err.message || t('training.failedLoadReport'));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -350,7 +354,7 @@ Generated by ReticleIQ`;
     const reportText = generateReportText();
 
     if (!reportText) {
-      Alert.alert('No Data', 'No report data available to share.');
+      Alert.alert(t('training.noData'), t('training.noReportData'));
       return;
     }
 
@@ -372,12 +376,12 @@ Generated by ReticleIQ`;
           <TouchableOpacity style={[styles.headerBtn, { backgroundColor: colors.card }]} onPress={() => router.back()}>
             <ArrowLeft size={20} color={colors.text} />
           </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: colors.text }]}>Report</Text>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>{t('training.report')}</Text>
           <View style={{ width: 40 }} />
         </View>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={[styles.loadingText, { color: colors.textMuted }]}>Loading report...</Text>
+          <Text style={[styles.loadingText, { color: colors.textMuted }]}>{t('training.loadingReport')}</Text>
         </View>
       </View>
     );
@@ -391,14 +395,14 @@ Generated by ReticleIQ`;
           <TouchableOpacity style={[styles.headerBtn, { backgroundColor: colors.card }]} onPress={() => router.back()}>
             <ArrowLeft size={20} color={colors.text} />
           </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: colors.text }]}>Report</Text>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>{t('training.report')}</Text>
           <View style={{ width: 40 }} />
         </View>
         <View style={styles.errorContainer}>
           <AlertCircle size={48} color={colors.textMuted} />
-          <Text style={[styles.errorTitle, { color: colors.text }]}>{error || 'Training not found'}</Text>
+          <Text style={[styles.errorTitle, { color: colors.text }]}>{error || t('training.notFound')}</Text>
           <TouchableOpacity style={[styles.errorBtn, { backgroundColor: colors.card }]} onPress={() => router.back()}>
-            <Text style={[styles.errorBtnText, { color: colors.text }]}>Go Back</Text>
+            <Text style={[styles.errorBtnText, { color: colors.text }]}>{t('common.goBack')}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -413,7 +417,7 @@ Generated by ReticleIQ`;
           <TouchableOpacity style={[styles.headerBtn, { backgroundColor: colors.card }]} onPress={() => router.back()}>
             <ArrowLeft size={20} color={colors.text} />
           </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: colors.text }]}>Report</Text>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>{t('training.report')}</Text>
           <View style={{ width: 40 }} />
         </View>
         <AccessDenied colors={colors} />
@@ -432,7 +436,7 @@ Generated by ReticleIQ`;
 
         <View style={styles.headerCenter}>
           <FileText size={16} color={colors.primary} />
-          <Text style={[styles.headerTitle, { color: colors.text }]}>Training Report</Text>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>{t('training.trainingReport')}</Text>
         </View>
 
         <View style={styles.headerActions}>
@@ -471,11 +475,11 @@ Generated by ReticleIQ`;
               <View style={[styles.emptyIcon, { backgroundColor: colors.secondary }]}>
                 <Users size={24} color={colors.textMuted} />
               </View>
-              <Text style={[styles.emptyTitle, { color: colors.text }]}>No Participant Data</Text>
+              <Text style={[styles.emptyTitle, { color: colors.text }]}>{t('training.noParticipantData')}</Text>
               <Text style={[styles.emptyDesc, { color: colors.textMuted }]}>
                 {training.status === 'planned'
-                  ? "This training hasn't started yet."
-                  : 'No sessions have been recorded for this training.'}
+                  ? t('training.notStartedYet')
+                  : t('training.noSessionsRecorded')}
               </Text>
             </View>
           </Animated.View>
@@ -494,7 +498,7 @@ Generated by ReticleIQ`;
             <Animated.View entering={FadeIn.delay(50).duration(300)} style={styles.insightsSection}>
               <View style={styles.sectionHeader}>
                 <CheckCircle2 size={16} color={colors.textMuted} />
-                <Text style={[styles.sectionTitle, { color: colors.text }]}>Performance Standards</Text>
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('training.performanceStandards')}</Text>
               </View>
 
               {/* Summary Card */}
@@ -502,19 +506,19 @@ Generated by ReticleIQ`;
                 <View style={styles.standardsSummaryRow}>
                   <View style={styles.standardsStat}>
                     <Text style={[styles.standardsStatValue, { color: colors.green }]}>{passedCount}</Text>
-                    <Text style={[styles.standardsStatLabel, { color: colors.textMuted }]}>Passed</Text>
+                    <Text style={[styles.standardsStatLabel, { color: colors.textMuted }]}>{t('training.passed')}</Text>
                   </View>
                   <View style={[styles.standardsDivider, { backgroundColor: colors.border }]} />
                   <View style={styles.standardsStat}>
                     <Text style={[styles.standardsStatValue, { color: colors.red }]}>{failedCount}</Text>
-                    <Text style={[styles.standardsStatLabel, { color: colors.textMuted }]}>Failed</Text>
+                    <Text style={[styles.standardsStatLabel, { color: colors.textMuted }]}>{t('training.failed')}</Text>
                   </View>
                   <View style={[styles.standardsDivider, { backgroundColor: colors.border }]} />
                   <View style={styles.standardsStat}>
                     <Text style={[styles.standardsStatValue, { color: passRate >= 50 ? colors.green : colors.red }]}>
                       {passRate}%
                     </Text>
-                    <Text style={[styles.standardsStatLabel, { color: colors.textMuted }]}>Pass Rate</Text>
+                    <Text style={[styles.standardsStatLabel, { color: colors.textMuted }]}>{t('training.passRate')}</Text>
                   </View>
                 </View>
               </View>
@@ -523,8 +527,8 @@ Generated by ReticleIQ`;
               <View style={styles.verdictsGrid}>
                 {evaluatedVerdicts.map(([sessionId, verdict]) => {
                   const session = sessions.find((s) => s.id === sessionId);
-                  const participantName = session?.user_full_name || 'Unknown';
-                  const drillName = session?.drill_name || session?.drill_config?.name || 'Unknown Drill';
+                  const participantName = session?.user_full_name || t('common.unknown');
+                  const drillName = session?.drill_name || session?.drill_config?.name || t('training.unknownDrill');
 
                   return (
                     <View
@@ -560,7 +564,7 @@ Generated by ReticleIQ`;
                           <Text
                             style={[styles.verdictBadgeText, { color: verdict.passed ? colors.green : colors.red }]}
                           >
-                            {verdict.passed ? 'PASS' : 'FAIL'}
+                            {verdict.passed ? t('training.pass') : t('training.fail')}
                           </Text>
                         </View>
                       </View>
@@ -591,7 +595,7 @@ Generated by ReticleIQ`;
           <Animated.View entering={FadeIn.delay(100).duration(300)} style={styles.insightsSection}>
             <View style={styles.sectionHeader}>
               <Trophy size={16} color={colors.textMuted} />
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>Participant Performance</Text>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('training.participantPerformance')}</Text>
             </View>
             <ParticipantInsights teamSessions={sessions} drills={training.drills} />
           </Animated.View>
@@ -599,7 +603,7 @@ Generated by ReticleIQ`;
 
         {/* Footer */}
         <Text style={[styles.footer, { color: colors.textMuted }]}>
-          Report generated {formatDistanceToNow(new Date(), { addSuffix: true })}
+          {t('training.reportGenerated', { time: formatDistanceToNow(new Date(), { addSuffix: true }) })}
         </Text>
       </ScrollView>
 
@@ -622,7 +626,7 @@ Generated by ReticleIQ`;
           activeOpacity={0.85}
         >
           <ArrowRight size={18} color={colors.background} />
-          <Text style={[styles.primaryBtnText, { color: colors.background }]}>Return to Training</Text>
+          <Text style={[styles.primaryBtnText, { color: colors.background }]}>{t('training.returnToTraining')}</Text>
         </TouchableOpacity>
 
         {/* Secondary: Exit to Home (small, subtle) */}
@@ -639,7 +643,7 @@ Generated by ReticleIQ`;
           activeOpacity={0.6}
         >
           <Home size={14} color={colors.textMuted} />
-          <Text style={[styles.secondaryBtnText, { color: colors.textMuted }]}>Exit to Home</Text>
+          <Text style={[styles.secondaryBtnText, { color: colors.textMuted }]}>{t('training.exitToHome')}</Text>
         </TouchableOpacity>
       </View>
     </View>

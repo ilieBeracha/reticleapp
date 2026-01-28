@@ -4,6 +4,7 @@ import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ArrowLeft, Check, Crosshair, Minus, Plus, Target, Timer } from 'lucide-react-native';
 import React, { useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
   ScrollView,
@@ -34,6 +35,7 @@ const CircularStepper = React.memo(function CircularStepper({
   label,
   sublabel,
 }: CircularStepperProps) {
+  const { t } = useTranslation();
   const handleDecrement = useCallback(() => {
     if (value > 0) {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -87,7 +89,7 @@ const CircularStepper = React.memo(function CircularStepper({
               !isGood && !isOkay && value > 0 && { color: COLORS.danger },
             ]}
           >
-            {percentage}% accuracy
+            {t('target.accuracyPercent', { percent: percentage })}
           </Text>
         </View>
 
@@ -110,7 +112,7 @@ const CircularStepper = React.memo(function CircularStepper({
             onChange(0);
           }}
         >
-          <Text style={[stepperStyles.quickText, value === 0 && stepperStyles.quickTextActive]}>None</Text>
+          <Text style={[stepperStyles.quickText, value === 0 && stepperStyles.quickTextActive]}>{t('common.none')}</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[stepperStyles.quickBtn, value === Math.floor(max / 2) && stepperStyles.quickBtnActive]}
@@ -120,7 +122,7 @@ const CircularStepper = React.memo(function CircularStepper({
           }}
         >
           <Text style={[stepperStyles.quickText, value === Math.floor(max / 2) && stepperStyles.quickTextActive]}>
-            Half
+            {t('common.half')}
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -130,7 +132,7 @@ const CircularStepper = React.memo(function CircularStepper({
             onChange(max);
           }}
         >
-          <Text style={[stepperStyles.quickText, value === max && stepperStyles.quickTextActive]}>All</Text>
+          <Text style={[stepperStyles.quickText, value === max && stepperStyles.quickTextActive]}>{t('common.all')}</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -275,6 +277,7 @@ export const TacticalResultsEntry = React.memo(function TacticalResultsEntry({
   saving,
 }: TacticalResultsEntryProps) {
   const colors = useColors();
+  const { t } = useTranslation();
   const hitsNum = parseInt(hits) || 0;
 
   const handleHitsChange = useCallback(
@@ -297,11 +300,11 @@ export const TacticalResultsEntry = React.memo(function TacticalResultsEntry({
           <ArrowLeft size={20} color={colors.text} />
         </TouchableOpacity>
         <View style={styles.headerCenter}>
-          <Text style={[styles.headerTitle, { color: colors.text }]}>Log Results</Text>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>{t('target.logResults')}</Text>
           <View style={styles.headerMeta}>
             <Crosshair size={14} color={colors.primary} />
             <Text style={[styles.headerSubtitle, { color: colors.textMuted }]}>
-              Tactical • {distance}m • {plannedBullets} bullets
+              {t('target.tacticalMeta', { distance, bullets: plannedBullets })}
             </Text>
           </View>
         </View>
@@ -314,8 +317,8 @@ export const TacticalResultsEntry = React.memo(function TacticalResultsEntry({
           value={hitsNum}
           max={plannedBullets}
           onChange={handleHitsChange}
-          label="Hits on Target"
-          sublabel={`Out of ${plannedBullets} bullets fired`}
+          label={t('target.hitsOnTarget')}
+          sublabel={t('target.outOfBulletsFired', { count: plannedBullets })}
         />
       </View>
 
@@ -326,8 +329,8 @@ export const TacticalResultsEntry = React.memo(function TacticalResultsEntry({
             <Timer size={18} color={colors.primary} />
           </View>
           <View style={styles.cardHeaderText}>
-            <Text style={[styles.cardTitle, { color: colors.text }]}>Engagement Time</Text>
-            <Text style={[styles.cardHint, { color: colors.textMuted }]}>Optional - how fast?</Text>
+            <Text style={[styles.cardTitle, { color: colors.text }]}>{t('target.engagementTime')}</Text>
+            <Text style={[styles.cardHint, { color: colors.textMuted }]}>{t('target.optionalHowFast')}</Text>
           </View>
         </View>
         <View style={styles.timeInputContainer}>
@@ -343,7 +346,7 @@ export const TacticalResultsEntry = React.memo(function TacticalResultsEntry({
             keyboardType="decimal-pad"
             returnKeyType="done"
           />
-          <Text style={[styles.timeUnit, { color: colors.textMuted }]}>seconds</Text>
+          <Text style={[styles.timeUnit, { color: colors.textMuted }]}>{t('target.seconds')}</Text>
         </View>
       </View>
 
@@ -360,8 +363,8 @@ export const TacticalResultsEntry = React.memo(function TacticalResultsEntry({
             <Check size={18} color={stageCleared ? '#000' : colors.textMuted} />
           </View>
           <View>
-            <Text style={[styles.toggleTitle, { color: colors.text }]}>Stage Cleared</Text>
-            <Text style={[styles.toggleHint, { color: colors.textMuted }]}>Completed tactical objective?</Text>
+            <Text style={[styles.toggleTitle, { color: colors.text }]}>{t('target.stageCleared')}</Text>
+            <Text style={[styles.toggleHint, { color: colors.textMuted }]}>{t('target.stageClearedHint')}</Text>
           </View>
         </View>
         <Switch
@@ -378,13 +381,13 @@ export const TacticalResultsEntry = React.memo(function TacticalResultsEntry({
       {/* Notes */}
       <View style={styles.notesSection}>
         <Text style={[styles.notesLabel, { color: colors.text }]}>
-          Notes <Text style={[styles.optionalLabel, { color: colors.textMuted }]}>(optional)</Text>
+          {t('common.notes')} <Text style={[styles.optionalLabel, { color: colors.textMuted }]}>({t('common.optional')})</Text>
         </Text>
         <TextInput
           style={[styles.notesInput, { backgroundColor: colors.card, color: colors.text, borderColor: colors.border }]}
           value={notes}
           onChangeText={setNotes}
-          placeholder="Any notes about this engagement..."
+          placeholder={t('target.engagementNotesPlaceholder')}
           placeholderTextColor={colors.textMuted}
           multiline
           numberOfLines={3}
@@ -404,7 +407,7 @@ export const TacticalResultsEntry = React.memo(function TacticalResultsEntry({
           ) : (
             <>
               <Target size={20} color="#fff" />
-              <Text style={styles.saveButtonText}>Save Target</Text>
+              <Text style={styles.saveButtonText}>{t('target.saveTarget')}</Text>
             </>
           )}
         </LinearGradient>
@@ -416,7 +419,7 @@ export const TacticalResultsEntry = React.memo(function TacticalResultsEntry({
         activeOpacity={0.7}
         disabled={saving}
       >
-        <Text style={[styles.cancelButtonText, { color: colors.textMuted }]}>Back to Setup</Text>
+        <Text style={[styles.cancelButtonText, { color: colors.textMuted }]}>{t('target.backToSetup')}</Text>
       </TouchableOpacity>
 
       <View style={{ height: 30 }} />

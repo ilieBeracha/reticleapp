@@ -8,6 +8,7 @@
 import { useColors } from '@/hooks/ui/useColors';
 import * as Haptics from 'expo-haptics';
 import { ChevronDown, ChevronUp, Grid3X3 } from 'lucide-react-native';
+import { useTranslation } from 'react-i18next';
 import { useCallback, useMemo, useState } from 'react';
 import {
   LayoutAnimation,
@@ -90,11 +91,12 @@ const ATTENTION_QUADRANTS: Set<ContextQuadrant> = new Set([
 // ============================================================================
 
 function EmptyState({ colors }: { colors: ReturnType<typeof useColors> }) {
+  const { t } = useTranslation();
   return (
     <View style={[styles.emptyState, { backgroundColor: `${colors.textMuted}06` }]}>
       <Grid3X3 size={20} color={colors.textMuted} strokeWidth={1.5} />
       <Text style={[styles.emptyText, { color: colors.textMuted }]}>
-        Train in different positions and distances to see context patterns
+        {t('insights.context.trainDifferentConditions')}
       </Text>
     </View>
   );
@@ -151,6 +153,7 @@ export function ContextSummarySection({
   onViewAll,
   maxVisible = 5,
 }: ContextSummarySectionProps) {
+  const { t } = useTranslation();
   const colors = useColors();
   const [isExpanded, setIsExpanded] = useState(false);
 
@@ -199,10 +202,10 @@ export function ContextSummarySection({
           </View>
           <View style={styles.headerTitleGroup}>
             <Text style={[styles.sectionTitle, { color: colors.text }]}>
-              Context Analysis
+              {t('insights.context.title')}
             </Text>
             <Text style={[styles.sectionSubtitle, { color: colors.textMuted }]}>
-              {relevantProfiles.length} condition{relevantProfiles.length !== 1 ? 's' : ''} tracked
+              {t('insights.context.conditionsTracked', { count: relevantProfiles.length })}
             </Text>
           </View>
         </View>
@@ -212,14 +215,14 @@ export function ContextSummarySection({
       {relevantProfiles.length > 0 ? (
         <View style={styles.groupsContainer}>
           <ProfileGroup
-            label="Needs attention"
+            label={t('insights.context.needsAttention')}
             count={attentionProfiles.length}
             accentColor={attentionProfiles.some(p => p.quadrant === 'struggling') ? colors.red : (colors.yellow || '#F59E0B')}
             profiles={attentionProfiles}
             onViewEvidence={onViewEvidence}
           />
           <ProfileGroup
-            label="Strong"
+            label={t('insights.context.strong')}
             count={strongProfiles.length}
             accentColor={colors.green}
             profiles={strongProfiles}
@@ -234,7 +237,7 @@ export function ContextSummarySection({
               activeOpacity={0.7}
             >
               <Text style={[styles.expandText, { color: colors.textMuted }]}>
-                {isExpanded ? 'Show less' : `+${hiddenCount} more conditions`}
+                {isExpanded ? t('insights.context.showLess') : t('insights.context.moreConditions', { count: hiddenCount })}
               </Text>
               {isExpanded ? (
                 <ChevronUp size={14} color={colors.textMuted} strokeWidth={2} />

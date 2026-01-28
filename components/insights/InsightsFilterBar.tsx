@@ -11,6 +11,7 @@ import { getUserWeapons, type UserWeapon } from '@/services/weaponService';
 import type { TeamWithRole } from '@/types/workspace';
 import * as Haptics from 'expo-haptics';
 import { Check, Filter, RotateCcw, X } from 'lucide-react-native';
+import { useTranslation } from 'react-i18next';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
@@ -28,34 +29,34 @@ import {
 // CONSTANTS
 // ============================================================================
 
-const TIME_OPTIONS: { value: TimeFilter; label: string; short: string }[] = [
-  { value: 'week', label: 'Last 7 Days', short: '7D' },
-  { value: 'month', label: 'Last 30 Days', short: '30D' },
-  { value: 'quarter', label: 'Last 90 Days', short: '90D' },
-  { value: 'year', label: 'Last Year', short: '1Y' },
-  { value: 'all', label: 'All Time', short: 'All' },
+const getTimeOptions = (t: ReturnType<typeof useTranslation>['t']): { value: TimeFilter; label: string; short: string }[] => [
+  { value: 'week', label: t('insights.filters.last7Days'), short: '7D' },
+  { value: 'month', label: t('insights.filters.last30Days'), short: '30D' },
+  { value: 'quarter', label: t('insights.filters.last90Days'), short: '90D' },
+  { value: 'year', label: t('insights.filters.lastYear'), short: '1Y' },
+  { value: 'all', label: t('insights.filters.allTime'), short: t('insights.filters.all') },
 ];
 
-const POSITION_OPTIONS: { value: PositionFilter; label: string }[] = [
-  { value: 'all', label: 'All Positions' },
-  { value: 'prone', label: 'Prone' },
-  { value: 'standing', label: 'Standing' },
-  { value: 'kneeling', label: 'Kneeling' },
-  { value: 'sitting', label: 'Sitting' },
+const getPositionOptions = (t: ReturnType<typeof useTranslation>['t']): { value: PositionFilter; label: string }[] => [
+  { value: 'all', label: t('insights.filters.allPositions') },
+  { value: 'prone', label: t('session.prone') },
+  { value: 'standing', label: t('session.standing') },
+  { value: 'kneeling', label: t('session.kneeling') },
+  { value: 'sitting', label: t('session.sitting') },
 ];
 
-const DISTANCE_OPTIONS: { value: DistanceFilter; label: string }[] = [
-  { value: 'all', label: 'All Distances' },
+const getDistanceOptions = (t: ReturnType<typeof useTranslation>['t']): { value: DistanceFilter; label: string }[] => [
+  { value: 'all', label: t('insights.filters.allDistances') },
   { value: 'close', label: DISTANCE_BUCKETS.close.label },
   { value: 'medium', label: DISTANCE_BUCKETS.medium.label },
   { value: 'long', label: DISTANCE_BUCKETS.long.label },
   { value: 'precision', label: DISTANCE_BUCKETS.precision.label },
 ];
 
-const DRILL_TYPE_OPTIONS: { value: DrillTypeFilter; label: string }[] = [
-  { value: 'all', label: 'All Types' },
-  { value: 'grouping', label: 'Grouping' },
-  { value: 'engagement', label: 'Engagement' },
+const getDrillTypeOptions = (t: ReturnType<typeof useTranslation>['t']): { value: DrillTypeFilter; label: string }[] => [
+  { value: 'all', label: t('insights.filters.allTypes') },
+  { value: 'grouping', label: t('session.grouping') },
+  { value: 'engagement', label: t('session.engagement') },
 ];
 
 // ============================================================================
@@ -72,7 +73,13 @@ interface InsightsFilterBarProps {
 // ============================================================================
 
 export function InsightsFilterBar({ filters, onFiltersChange }: InsightsFilterBarProps) {
+  const { t } = useTranslation();
   const colors = useColors();
+  
+  const TIME_OPTIONS = getTimeOptions(t);
+  const POSITION_OPTIONS = getPositionOptions(t);
+  const DISTANCE_OPTIONS = getDistanceOptions(t);
+  const DRILL_TYPE_OPTIONS = getDrillTypeOptions(t);
 
   // Data for filters
   const [weapons, setWeapons] = useState<UserWeapon[]>([]);
@@ -135,10 +142,10 @@ export function InsightsFilterBar({ filters, onFiltersChange }: InsightsFilterBa
       parts.push(DRILL_TYPE_OPTIONS.find((d) => d.value === filters.drillType)?.label || '');
     }
     if (filters.weaponId) {
-      parts.push(weapons.find((w) => w.id === filters.weaponId)?.name || 'Weapon');
+      parts.push(weapons.find((w) => w.id === filters.weaponId)?.name || t('weapons.weapon'));
     }
     if (filters.teamId) {
-      parts.push(teams.find((t) => t.id === filters.teamId)?.name || 'Team');
+      parts.push(teams.find((t) => t.id === filters.teamId)?.name || t('teams.team'));
     }
     return parts.join(' · ');
   }, [filters, weapons, teams]);
@@ -229,7 +236,7 @@ export function InsightsFilterBar({ filters, onFiltersChange }: InsightsFilterBa
 
             {/* Header */}
             <View style={styles.sheetHeader}>
-              <Text style={[styles.sheetTitle, { color: colors.text }]}>Filters</Text>
+              <Text style={[styles.sheetTitle, { color: colors.text }]}>{t('insights.filters.title')}</Text>
               <View style={styles.sheetHeaderRight}>
                 {activeFilterCount > 0 && (
                   <TouchableOpacity
@@ -237,7 +244,7 @@ export function InsightsFilterBar({ filters, onFiltersChange }: InsightsFilterBa
                     onPress={resetFilters}
                   >
                     <RotateCcw size={14} color={colors.textMuted} />
-                    <Text style={[styles.resetBtnText, { color: colors.textMuted }]}>Reset</Text>
+                    <Text style={[styles.resetBtnText, { color: colors.textMuted }]}>{t('common.reset')}</Text>
                   </TouchableOpacity>
                 )}
                 <TouchableOpacity
@@ -253,7 +260,7 @@ export function InsightsFilterBar({ filters, onFiltersChange }: InsightsFilterBa
             <ScrollView style={styles.sheetScroll} contentContainerStyle={styles.sheetContentInner} showsVerticalScrollIndicator={false}>
               {/* Position */}
               <FilterSection
-                title="Position"
+                title={t('session.position')}
                 options={POSITION_OPTIONS}
                 selectedValue={filters.position}
                 onSelect={(v) => updateFilter('position', v as PositionFilter)}
@@ -262,7 +269,7 @@ export function InsightsFilterBar({ filters, onFiltersChange }: InsightsFilterBa
 
               {/* Distance */}
               <FilterSection
-                title="Distance"
+                title={t('session.distance')}
                 options={DISTANCE_OPTIONS}
                 selectedValue={filters.distance}
                 onSelect={(v) => updateFilter('distance', v as DistanceFilter)}
@@ -271,7 +278,7 @@ export function InsightsFilterBar({ filters, onFiltersChange }: InsightsFilterBa
 
               {/* Drill Type */}
               <FilterSection
-                title="Type"
+                title={t('insights.filters.type')}
                 options={DRILL_TYPE_OPTIONS}
                 selectedValue={filters.drillType}
                 onSelect={(v) => updateFilter('drillType', v as DrillTypeFilter)}
@@ -281,9 +288,9 @@ export function InsightsFilterBar({ filters, onFiltersChange }: InsightsFilterBa
               {/* Weapon */}
               {weapons.length > 0 && (
                 <FilterSection
-                  title="Weapon"
+                  title={t('weapons.weapon')}
                   options={[
-                    { value: '', label: 'All Weapons' },
+                    { value: '', label: t('insights.filters.allWeapons') },
                     ...weapons.map((w) => ({ value: w.id, label: w.name })),
                   ]}
                   selectedValue={filters.weaponId || ''}
@@ -295,8 +302,8 @@ export function InsightsFilterBar({ filters, onFiltersChange }: InsightsFilterBa
               {/* Team */}
               {teams.length > 0 && (
                 <FilterSection
-                  title="Team"
-                  options={[{ value: '', label: 'All Teams' }, ...teams.map((t) => ({ value: t.id, label: t.name }))]}
+                  title={t('teams.team')}
+                  options={[{ value: '', label: t('insights.filters.allTeams') }, ...teams.map((t) => ({ value: t.id, label: t.name }))]}
                   selectedValue={filters.teamId || ''}
                   onSelect={(v) => updateFilter('teamId', v || null)}
                   colors={colors}
@@ -311,7 +318,7 @@ export function InsightsFilterBar({ filters, onFiltersChange }: InsightsFilterBa
                 onPress={() => setShowSheet(false)}
                 activeOpacity={0.8}
               >
-                <Text style={[styles.applyBtnText, { color: colors.background }]}>Apply Filters</Text>
+                <Text style={[styles.applyBtnText, { color: colors.background }]}>{t('insights.filters.applyFilters')}</Text>
               </TouchableOpacity>
             </View>
           </View>

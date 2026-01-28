@@ -9,6 +9,7 @@
 import { useColors } from '@/hooks/ui/useColors';
 import { supabase } from '@/lib/supabase';
 import type { EngagementParticipant } from '@/services/session/types';
+import { useTranslation } from 'react-i18next';
 import * as Haptics from 'expo-haptics';
 import { Check, ChevronDown, Crown, Target, User, Users } from 'lucide-react-native';
 import { useCallback, useEffect, useState } from 'react';
@@ -42,6 +43,7 @@ export function SquadParticipantsCard({
   drillGoal,
 }: SquadParticipantsCardProps) {
   const colors = useColors();
+  const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [participantStats, setParticipantStats] = useState<ParticipantStats[]>([]);
@@ -151,10 +153,10 @@ export function SquadParticipantsCard({
         </View>
 
         <View style={styles.headerContent}>
-          <Text style={[styles.title, { color: colors.text }]}>Squad Session</Text>
+          <Text style={[styles.title, { color: colors.text }]}>{t('session.squadSession')}</Text>
           <Text style={[styles.subtitle, { color: colors.textMuted }]}>
-            {submittedCount}/{totalParticipants} submitted
-            {squadTotalShots > 0 && ` • ${squadTotalShots} shots`}
+            {t('session.submittedCount', { submitted: submittedCount, total: totalParticipants })}
+            {squadTotalShots > 0 && ` • ${t('session.shotsCount', { count: squadTotalShots })}`}
             {squadAccuracy !== null && ` • ${squadAccuracy}%`}
           </Text>
         </View>
@@ -198,7 +200,7 @@ export function SquadParticipantsCard({
                     </Text>
                     {isMe && (
                       <View style={[styles.badge, { backgroundColor: colors.primary + '20' }]}>
-                        <Text style={[styles.badgeText, { color: colors.primary }]}>You</Text>
+                        <Text style={[styles.badgeText, { color: colors.primary }]}>{t('common.you')}</Text>
                       </View>
                     )}
                     {isCommander && <Crown size={12} color={colors.orange} />}
@@ -206,9 +208,9 @@ export function SquadParticipantsCard({
                   <Text style={[styles.participantMeta, { color: colors.textMuted }]}>
                     {participant.has_submitted
                       ? isGrouping && participant.best_dispersion != null
-                        ? `${participant.best_dispersion.toFixed(1)}cm • ${participant.total_shots} shots`
-                        : `${participant.total_shots} shots • ${participant.total_hits} hits`
-                      : 'No results yet'}
+                        ? `${participant.best_dispersion.toFixed(1)}cm • ${t('session.shotsCount', { count: participant.total_shots })}`
+                        : `${t('session.shotsCount', { count: participant.total_shots })} • ${t('session.hits', { count: participant.total_hits })}`
+                      : t('session.noResultsYet')}
                   </Text>
                 </View>
 

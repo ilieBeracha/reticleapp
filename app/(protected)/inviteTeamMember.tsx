@@ -10,6 +10,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { Crosshair, Plus } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
@@ -29,6 +30,7 @@ import {
 // ============================================================================
 export default function InviteTeamMemberSheet() {
   const colors = useColors();
+  const { t } = useTranslation();
   const { activeTeamId, teams, loadTeams } = useTeamStore();
   const { isSquadCommander, squadId: mySquadId, canManage: canManageTeam } = useTeamRoleFlags();
 
@@ -119,14 +121,19 @@ export default function InviteTeamMemberSheet() {
   const roleDisplay = useMemo(() => {
     if (finalTeamRole === 'squad_commander') {
       return {
-        label: 'Squad Commander',
-        description: `Will lead squad: ${squadName}`,
+        label: t('teams.squadCommander'),
+        description: t('invite.willLead', { squad: squadName }),
         icon: 'star-half' as const,
         color: '#10B981',
       };
     }
-    return { label: 'Team Member', description: 'Regular team member', icon: 'person' as const, color: colors.primary };
-  }, [finalTeamRole, squadName, colors.primary]);
+    return {
+      label: t('invite.teamMember'),
+      description: t('invite.regularMember'),
+      icon: 'person' as const,
+      color: colors.primary,
+    };
+  }, [finalTeamRole, squadName, colors.primary, t]);
 
   // Handlers
   const handleWeaponCreated = useCallback(
@@ -154,11 +161,11 @@ export default function InviteTeamMemberSheet() {
   const handleNext = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     if (step === 0 && !selectedTeamId) {
-      Alert.alert('Select Team', 'Please select a team to invite to.');
+      Alert.alert(t('invite.selectTeam'), t('invite.pleaseSelectTeam'));
       return;
     }
     if (step < totalSteps) setStep(step + 1);
-  }, [step, selectedTeamId, totalSteps]);
+  }, [step, selectedTeamId, totalSteps, t]);
 
   const handleBack = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -175,7 +182,7 @@ export default function InviteTeamMemberSheet() {
 
     if (assignToSquad && !squadName.trim()) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-      Alert.alert('Squad Name Required', 'Please enter a squad name.');
+      Alert.alert(t('invite.squadNameRequired'), t('invite.pleaseEnterSquadName'));
       return;
     }
 
@@ -218,7 +225,7 @@ export default function InviteTeamMemberSheet() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (error: any) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      Alert.alert('Error', error.message || 'Failed to create invitation');
+      Alert.alert(t('errors.error'), error.message || t('errors.generic'));
     } finally {
       setIsCreating(false);
     }
@@ -228,7 +235,7 @@ export default function InviteTeamMemberSheet() {
     if (!createdCode) return;
     await Clipboard.setStringAsync(createdCode);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    Alert.alert('Copied!', 'Invite code copied to clipboard.');
+    Alert.alert(t('invite.copied'), t('invite.inviteCodeCopied'));
   };
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -240,10 +247,8 @@ export default function InviteTeamMemberSheet() {
         <View style={[styles.emptyIcon, { backgroundColor: colors.secondary }]}>
           <Ionicons name="people-outline" size={48} color={colors.textMuted} />
         </View>
-        <Text style={[styles.emptyTitle, { color: colors.text }]}>No Teams</Text>
-        <Text style={[styles.emptyDesc, { color: colors.textMuted }]}>
-          Create a team first before inviting members.
-        </Text>
+        <Text style={[styles.emptyTitle, { color: colors.text }]}>{t('invite.noTeamsTitle')}</Text>
+        <Text style={[styles.emptyDesc, { color: colors.textMuted }]}>{t('invite.noTeamsMessage')}</Text>
         <TouchableOpacity
           style={[styles.emptyButton, { backgroundColor: colors.primary }]}
           onPress={() => {
@@ -253,7 +258,7 @@ export default function InviteTeamMemberSheet() {
           activeOpacity={0.8}
         >
           <Ionicons name="add" size={20} color="#fff" />
-          <Text style={styles.emptyButtonText}>Create Team</Text>
+          <Text style={styles.emptyButtonText}>{t('teams.createTeam')}</Text>
         </TouchableOpacity>
       </View>
     );
@@ -273,7 +278,7 @@ export default function InviteTeamMemberSheet() {
           <Ionicons name="checkmark-circle" size={36} color={colors.primary} />
         </View>
 
-        <Text style={[styles.successTitle, { color: colors.text }]}>Invite Created!</Text>
+        <Text style={[styles.successTitle, { color: colors.text }]}>{t('invite.inviteCreated')}</Text>
 
         <TouchableOpacity
           style={[styles.codeBox, { backgroundColor: colors.background, borderColor: colors.border }]}
@@ -284,7 +289,7 @@ export default function InviteTeamMemberSheet() {
           <Ionicons name="copy-outline" size={20} color={colors.textMuted} />
         </TouchableOpacity>
 
-        <Text style={[styles.successHint, { color: colors.textMuted }]}>Tap to copy • Code expires in 7 days</Text>
+        <Text style={[styles.successHint, { color: colors.textMuted }]}>{t('invite.tapToCopy')}</Text>
 
         <View style={[styles.successTeamCard, { backgroundColor: colors.secondary }]}>
           <Ionicons name="people" size={18} color={colors.text} />
@@ -308,7 +313,7 @@ export default function InviteTeamMemberSheet() {
             activeOpacity={0.8}
           >
             <Ionicons name="add" size={18} color={colors.text} />
-            <Text style={[styles.secondaryBtnText, { color: colors.text }]}>Create Another</Text>
+            <Text style={[styles.secondaryBtnText, { color: colors.text }]}>{t('invite.createAnother')}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -317,7 +322,7 @@ export default function InviteTeamMemberSheet() {
             activeOpacity={0.8}
           >
             <Ionicons name="checkmark" size={18} color="#fff" />
-            <Text style={styles.primaryBtnText}>Done</Text>
+            <Text style={styles.primaryBtnText}>{t('common.done')}</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -339,9 +344,9 @@ export default function InviteTeamMemberSheet() {
         <View style={[styles.headerIcon, { backgroundColor: colors.primary + '15' }]}>
           <Ionicons name="person-add" size={28} color={colors.primary} />
         </View>
-        <Text style={[styles.title, { color: colors.text }]}>Invite Team Member</Text>
+        <Text style={[styles.title, { color: colors.text }]}>{t('invite.title')}</Text>
         <Text style={[styles.subtitle, { color: colors.textMuted }]}>
-          {selectedTeam?.name ? `To ${selectedTeam.name}` : 'Generate an invite code'}
+          {selectedTeam?.name ? t('invite.toTeam', { teamName: selectedTeam.name }) : t('invite.generateCode')}
         </Text>
       </View>
 
@@ -370,9 +375,9 @@ export default function InviteTeamMemberSheet() {
         <View style={styles.stepContent}>
           <View style={styles.sectionHeader}>
             <Ionicons name="people" size={16} color={colors.primary} />
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>Select Team</Text>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('invite.selectTeam')}</Text>
           </View>
-          <Text style={[styles.sectionDesc, { color: colors.textMuted }]}>Which team should this member join?</Text>
+          <Text style={[styles.sectionDesc, { color: colors.textMuted }]}>{t('invite.whichTeam')}</Text>
 
           <View style={styles.teamsList}>
             {teams.map((team) => (
@@ -427,9 +432,11 @@ export default function InviteTeamMemberSheet() {
             <View style={[styles.squadCommanderBanner, { backgroundColor: '#F59E0B15', borderColor: '#F59E0B30' }]}>
               <Ionicons name="shield" size={18} color="#F59E0B" />
               <View style={styles.squadCommanderBannerContent}>
-                <Text style={[styles.squadCommanderBannerTitle, { color: '#F59E0B' }]}>Inviting to Your Squad</Text>
+                <Text style={[styles.squadCommanderBannerTitle, { color: '#F59E0B' }]}>
+                  {t('invite.invitingToSquad')}
+                </Text>
                 <Text style={[styles.squadCommanderBannerText, { color: '#B45309' }]}>
-                  As Squad Commander of {mySquadId}, new members will be added to your squad as soldiers.
+                  {t('invite.squadCommanderInviteDesc', { squad: mySquadId })}
                 </Text>
               </View>
             </View>
@@ -464,9 +471,9 @@ export default function InviteTeamMemberSheet() {
                   <Ionicons name="layers-outline" size={18} color={assignToSquad ? colors.primary : colors.text} />
                 </View>
                 <View>
-                  <Text style={[styles.squadToggleTitle, { color: colors.text }]}>Assign to Squad</Text>
+                  <Text style={[styles.squadToggleTitle, { color: colors.text }]}>{t('invite.assignToSquad')}</Text>
                   <Text style={[styles.squadToggleDesc, { color: colors.textMuted }]}>
-                    Optional: add to a specific squad
+                    {t('invite.assignToSquadDesc')}
                   </Text>
                 </View>
               </View>
@@ -492,7 +499,7 @@ export default function InviteTeamMemberSheet() {
               {/* Existing Squads */}
               {squadsList.length > 0 && (
                 <View style={styles.squadChipsSection}>
-                  <Text style={[styles.squadInputLabel, { color: colors.textMuted }]}>EXISTING SQUADS</Text>
+                  <Text style={[styles.squadInputLabel, { color: colors.textMuted }]}>{t('invite.existingSquads')}</Text>
                   <View style={styles.squadChips}>
                     {squadsList.map((squad: string) => (
                       <TouchableOpacity
@@ -523,7 +530,7 @@ export default function InviteTeamMemberSheet() {
               {/* Custom Squad Input */}
               <View style={styles.squadInputSection}>
                 <Text style={[styles.squadInputLabel, { color: colors.textMuted }]}>
-                  {squadsList.length > 0 ? 'OR ENTER NEW SQUAD' : 'SQUAD NAME'}
+                  {squadsList.length > 0 ? t('invite.orEnterNewSquad') : t('invite.squadNameLabel')}
                 </Text>
                 <View
                   style={[
@@ -533,7 +540,7 @@ export default function InviteTeamMemberSheet() {
                 >
                   <TextInput
                     style={[styles.input, { color: colors.text }]}
-                    placeholder="Enter squad name..."
+                    placeholder={t('invite.enterSquadName')}
                     placeholderTextColor={colors.textMuted}
                     value={squadName}
                     onChangeText={setSquadName}
@@ -570,8 +577,10 @@ export default function InviteTeamMemberSheet() {
                       <Ionicons name="star-half" size={16} color={makeSquadCommander ? '#10B981' : colors.textMuted} />
                     </View>
                     <View>
-                      <Text style={[styles.commanderTitle, { color: colors.text }]}>Make Squad Commander</Text>
-                      <Text style={[styles.commanderDesc, { color: colors.textMuted }]}>Will lead "{squadName}"</Text>
+                      <Text style={[styles.commanderTitle, { color: colors.text }]}>{t('invite.makeSquadCommander')}</Text>
+                      <Text style={[styles.commanderDesc, { color: colors.textMuted }]}>
+                        {t('invite.willLead', { squad: squadName })}
+                      </Text>
                     </View>
                   </View>
                   <Switch
@@ -616,9 +625,9 @@ export default function InviteTeamMemberSheet() {
                   <Crosshair size={18} color={assignWeapon ? colors.green : colors.text} />
                 </View>
                 <View>
-                  <Text style={[styles.squadToggleTitle, { color: colors.text }]}>Pre-assign Weapon</Text>
+                  <Text style={[styles.squadToggleTitle, { color: colors.text }]}>{t('invite.preassignWeapon')}</Text>
                   <Text style={[styles.squadToggleDesc, { color: colors.textMuted }]}>
-                    {assignWeapon ? 'Select from team catalog' : 'Or let user add their own'}
+                    {assignWeapon ? t('invite.selectFromCatalog') : t('invite.orLetUserAdd')}
                   </Text>
                 </View>
               </View>
@@ -640,17 +649,17 @@ export default function InviteTeamMemberSheet() {
           {/* Weapon Selection (when enabled) */}
           {assignWeapon && (
             <View style={[styles.squadSection, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <Text style={[styles.squadInputLabel, { color: colors.textMuted }]}>TEAM WEAPONS</Text>
+              <Text style={[styles.squadInputLabel, { color: colors.textMuted }]}>{t('invite.teamWeaponsLabel')}</Text>
 
               {loadingWeapons ? (
                 <View style={styles.weaponLoadingContainer}>
                   <ActivityIndicator size="small" color={colors.textMuted} />
-                  <Text style={[styles.weaponLoadingText, { color: colors.textMuted }]}>Loading weapons...</Text>
+                  <Text style={[styles.weaponLoadingText, { color: colors.textMuted }]}>{t('invite.loadingWeapons')}</Text>
                 </View>
               ) : teamWeapons.length === 0 ? (
                 <View style={[styles.weaponEmptyContainer, { backgroundColor: colors.secondary }]}>
                   <Crosshair size={24} color={colors.textMuted} />
-                  <Text style={[styles.weaponEmptyText, { color: colors.textMuted }]}>No weapons in team catalog</Text>
+                  <Text style={[styles.weaponEmptyText, { color: colors.textMuted }]}>{t('invite.noWeaponsInCatalog')}</Text>
                   <TouchableOpacity
                     style={[styles.addWeaponBtn, { backgroundColor: colors.green }]}
                     onPress={() => {
@@ -660,7 +669,7 @@ export default function InviteTeamMemberSheet() {
                     activeOpacity={0.8}
                   >
                     <Plus size={16} color="#fff" />
-                    <Text style={styles.addWeaponBtnText}>Add Weapon</Text>
+                    <Text style={styles.addWeaponBtnText}>{t('weapons.addWeapon')}</Text>
                   </TouchableOpacity>
                 </View>
               ) : (
@@ -714,7 +723,7 @@ export default function InviteTeamMemberSheet() {
                     <View style={[styles.weaponIconBox, { backgroundColor: colors.secondary }]}>
                       <Plus size={16} color={colors.textMuted} />
                     </View>
-                    <Text style={[styles.addWeaponRowText, { color: colors.textMuted }]}>Add new weapon</Text>
+                    <Text style={[styles.addWeaponRowText, { color: colors.textMuted }]}>{t('invite.addNewWeapon')}</Text>
                   </TouchableOpacity>
                 </View>
               )}
@@ -724,12 +733,12 @@ export default function InviteTeamMemberSheet() {
           {/* Summary Card */}
           <View style={[styles.summaryCard, { backgroundColor: colors.secondary }]}>
             <View style={styles.summaryRow}>
-              <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>Team</Text>
+              <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>{t('invite.summaryTeam')}</Text>
               <Text style={[styles.summaryValue, { color: colors.text }]}>{selectedTeam?.name}</Text>
             </View>
             <View style={[styles.summaryDivider, { backgroundColor: colors.border }]} />
             <View style={styles.summaryRow}>
-              <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>Role</Text>
+              <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>{t('invite.summaryRole')}</Text>
               <View style={[styles.summaryBadge, { backgroundColor: roleDisplay.color + '20' }]}>
                 <Ionicons name={roleDisplay.icon} size={12} color={roleDisplay.color} />
                 <Text style={[styles.summaryBadgeText, { color: roleDisplay.color }]}>{roleDisplay.label}</Text>
@@ -739,7 +748,7 @@ export default function InviteTeamMemberSheet() {
               <>
                 <View style={[styles.summaryDivider, { backgroundColor: colors.border }]} />
                 <View style={styles.summaryRow}>
-                  <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>Squad</Text>
+                  <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>{t('invite.summarySquad')}</Text>
                   <Text style={[styles.summaryValue, { color: colors.text }]}>{squadName}</Text>
                 </View>
               </>
@@ -748,26 +757,24 @@ export default function InviteTeamMemberSheet() {
               <>
                 <View style={[styles.summaryDivider, { backgroundColor: colors.border }]} />
                 <View style={styles.summaryRow}>
-                  <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>Weapon</Text>
+                  <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>{t('invite.summaryWeapon')}</Text>
                   <Text style={[styles.summaryValue, { color: colors.green }]}>
-                    {teamWeapons.find((w) => w.id === selectedWeaponId)?.name || 'Selected'}
+                    {teamWeapons.find((w) => w.id === selectedWeaponId)?.name || t('common.select')}
                   </Text>
                 </View>
               </>
             )}
             <View style={[styles.summaryDivider, { backgroundColor: colors.border }]} />
             <View style={styles.summaryRow}>
-              <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>Expires</Text>
-              <Text style={[styles.summaryValue, { color: colors.text }]}>7 days</Text>
+              <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>{t('invite.summaryExpires')}</Text>
+              <Text style={[styles.summaryValue, { color: colors.text }]}>{t('invite.days7')}</Text>
             </View>
           </View>
 
           {/* Info Banner */}
           <View style={[styles.infoCard, { backgroundColor: colors.secondary }]}>
             <Ionicons name="information-circle-outline" size={18} color={colors.textMuted} />
-            <Text style={[styles.infoText, { color: colors.textMuted }]}>
-              The invite code can only be used once and will expire after 7 days.
-            </Text>
+            <Text style={[styles.infoText, { color: colors.textMuted }]}>{t('invite.codeOnlyOnce')}</Text>
           </View>
         </View>
       )}
@@ -782,7 +789,9 @@ export default function InviteTeamMemberSheet() {
           activeOpacity={0.8}
         >
           <Ionicons name="arrow-back" size={18} color={colors.text} />
-          <Text style={[styles.backButtonText, { color: colors.text }]}>{step === 0 ? 'Cancel' : 'Back'}</Text>
+          <Text style={[styles.backButtonText, { color: colors.text }]}>
+            {step === 0 ? t('common.cancel') : t('common.back')}
+          </Text>
         </TouchableOpacity>
 
         {step === 0 ? (
@@ -792,7 +801,7 @@ export default function InviteTeamMemberSheet() {
             activeOpacity={0.8}
             disabled={!selectedTeamId}
           >
-            <Text style={styles.nextButtonText}>Continue</Text>
+            <Text style={styles.nextButtonText}>{t('common.continue')}</Text>
             <Ionicons name="arrow-forward" size={18} color="#fff" />
           </TouchableOpacity>
         ) : (
@@ -807,7 +816,7 @@ export default function InviteTeamMemberSheet() {
             ) : (
               <>
                 <Ionicons name="ticket" size={18} color="#fff" />
-                <Text style={styles.createButtonText}>Generate Code</Text>
+                <Text style={styles.createButtonText}>{t('invite.generateCode')}</Text>
               </>
             )}
           </TouchableOpacity>

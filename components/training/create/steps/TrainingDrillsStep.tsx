@@ -9,6 +9,7 @@
  */
 
 import { useColors } from '@/hooks/ui/useColors';
+import { useTranslation } from 'react-i18next';
 import * as Haptics from 'expo-haptics';
 import {
   Check,
@@ -41,18 +42,18 @@ interface TrainingDrillsStepProps {
 // CONSTANTS
 // ============================================================================
 
-const GOAL_CONFIG = {
+const getGoalConfig = (t: (key: string) => string) => ({
   grouping: {
     color: '#10B981',
-    label: 'Grouping',
+    label: t('session.grouping'),
     icon: Target,
   },
   engagement: {
     color: '#F59E0B',
-    label: 'Engagement',
+    label: t('session.engagement'),
     icon: Crosshair,
   },
-};
+});
 
 // ============================================================================
 // MAIN COMPONENT
@@ -69,9 +70,11 @@ export function TrainingDrillsStep({
   onMoveDrill,
   onCreateNew,
 }: TrainingDrillsStepProps) {
+  const { t } = useTranslation();
   const colors = useColors();
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<'all' | 'grouping' | 'engagement'>('all');
+  const GOAL_CONFIG = getGoalConfig(t);
 
   // Filter drills
   const filteredDrills = teamDrills.filter((drill) => {
@@ -97,11 +100,12 @@ export function TrainingDrillsStep({
           style={[styles.programSection, { backgroundColor: colors.card, borderColor: colors.border }]}
         >
           <View style={styles.programHeader}>
-            <Text style={[styles.programTitle, { color: colors.text }]}>Training Program</Text>
+            <Text style={[styles.programTitle, { color: colors.text }]}>{t('training.trainingProgram')}</Text>
             <View style={styles.programStats}>
               <Text style={[styles.programStat, { color: colors.textMuted }]}>
-                {drills.length} drill{drills.length !== 1 ? 's' : ''} • {totalShots} shots
-                {totalTime > 0 && ` • ${Math.floor(totalTime / 60)}m`}
+                {totalTime > 0 
+                  ? t('training.drillsShotsTimeWithTime', { drills: drills.length, shots: totalShots, time: Math.floor(totalTime / 60) })
+                  : t('training.drillsShotsTime', { drills: drills.length, shots: totalShots })}
               </Text>
             </View>
           </View>
@@ -139,7 +143,7 @@ export function TrainingDrillsStep({
                   <View style={[styles.goalPill, { backgroundColor: `${goal.color}15` }]}>
                     <View style={[styles.goalDot, { backgroundColor: goal.color }]} />
                     <Text style={[styles.goalPillText, { color: goal.color }]}>
-                      {drill.drill_goal === 'grouping' ? 'GRP' : 'ENG'}
+                      {drill.drill_goal === 'grouping' ? t('training.groupingType') : t('training.engagementType')}
                     </Text>
                   </View>
 
@@ -165,7 +169,7 @@ export function TrainingDrillsStep({
       <View style={[styles.library, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <View style={styles.libraryHeader}>
           <Text style={[styles.libraryTitle, { color: colors.text }]}>
-            {drills.length === 0 ? 'Select Drills' : 'Add More'}
+            {drills.length === 0 ? t('training.selectDrills') : t('training.addMore')}
           </Text>
           {canCreateDrills && (
             <TouchableOpacity
@@ -177,7 +181,7 @@ export function TrainingDrillsStep({
               activeOpacity={0.7}
             >
               <Plus size={14} color={colors.background} strokeWidth={2.5} />
-              <Text style={[styles.createBtnText, { color: colors.background }]}>New</Text>
+              <Text style={[styles.createBtnText, { color: colors.background }]}>{t('common.new')}</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -185,9 +189,9 @@ export function TrainingDrillsStep({
         {!hasTeam ? (
           <View style={styles.emptyState}>
             <Target size={40} color={colors.textMuted} strokeWidth={1.2} />
-            <Text style={[styles.emptyTitle, { color: colors.text }]}>Select a team first</Text>
+            <Text style={[styles.emptyTitle, { color: colors.text }]}>{t('training.selectTeamFirst')}</Text>
             <Text style={[styles.emptySubtitle, { color: colors.textMuted }]}>
-              Go back and select a team to see their drills
+              {t('training.selectTeamToSeeDrills')}
             </Text>
           </View>
         ) : (
@@ -197,7 +201,7 @@ export function TrainingDrillsStep({
               <Search size={16} color={colors.textMuted} />
               <TextInput
                 style={[styles.searchInput, { color: colors.text }]}
-                placeholder="Search drills..."
+                placeholder={t('training.searchDrills')}
                 placeholderTextColor={colors.textMuted}
                 value={searchQuery}
                 onChangeText={setSearchQuery}
@@ -238,7 +242,7 @@ export function TrainingDrillsStep({
                   >
                     {filter !== 'all' && <View style={[styles.filterDot, { backgroundColor: filterColor }]} />}
                     <Text style={[styles.filterText, { color: isActive ? filterColor : colors.textMuted }]}>
-                      {filter === 'all' ? 'All' : filter === 'grouping' ? 'Grouping' : 'Engagement'}
+                      {filter === 'all' ? t('common.all') : filter === 'grouping' ? t('session.grouping') : t('session.engagement')}
                     </Text>
                   </TouchableOpacity>
                 );
@@ -284,8 +288,9 @@ export function TrainingDrillsStep({
                           {drill.name}
                         </Text>
                         <Text style={[styles.drillMeta, { color: colors.textMuted }]}>
-                          {drill.distance_m}m • {drill.rounds_per_shooter} shots
-                          {drill.time_limit_seconds ? ` • ${drill.time_limit_seconds}s` : ''}
+                          {drill.time_limit_seconds 
+                            ? t('training.drillMetaWithTime', { distance: drill.distance_m, shots: drill.rounds_per_shooter, time: drill.time_limit_seconds })
+                            : t('training.drillMeta', { distance: drill.distance_m, shots: drill.rounds_per_shooter })}
                         </Text>
                       </View>
 
@@ -306,12 +311,12 @@ export function TrainingDrillsStep({
             ) : (
               <View style={styles.emptyState}>
                 <Text style={[styles.emptyTitle, { color: colors.text }]}>
-                  {teamDrills.length === 0 ? 'No drills yet' : 'No matching drills'}
+                  {teamDrills.length === 0 ? t('training.noDrillsYet') : t('training.noMatchingDrills')}
                 </Text>
                 <Text style={[styles.emptySubtitle, { color: colors.textMuted }]}>
                   {teamDrills.length === 0
-                    ? 'Create your first drill to get started'
-                    : 'Try a different search or filter'}
+                    ? t('training.createFirstDrill')
+                    : t('training.tryDifferentSearch')}
                 </Text>
                 {teamDrills.length === 0 && canCreateDrills && (
                   <TouchableOpacity
@@ -320,7 +325,7 @@ export function TrainingDrillsStep({
                     activeOpacity={0.8}
                   >
                     <Plus size={16} color={colors.background} />
-                    <Text style={[styles.emptyBtnText, { color: colors.background }]}>Create First Drill</Text>
+                    <Text style={[styles.emptyBtnText, { color: colors.background }]}>{t('training.createFirstDrill')}</Text>
                   </TouchableOpacity>
                 )}
               </View>

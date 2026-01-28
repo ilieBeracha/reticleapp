@@ -10,6 +10,7 @@
  */
 
 import { useColors } from '@/hooks/ui/useColors';
+import { useTranslation } from 'react-i18next';
 import * as Haptics from 'expo-haptics';
 import { Crosshair, Trophy } from 'lucide-react-native';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -33,25 +34,29 @@ interface PurposeOptionConfig {
   color: string;
 }
 
-const PURPOSE_OPTIONS: PurposeOptionConfig[] = [
-  {
-    id: 'grouping',
-    label: 'Grouping',
-    description: 'Measure shot dispersion & consistency',
-    icon: Crosshair,
-    color: '#3B82F6', // Blue
-  },
-  {
-    id: 'engagement',
-    label: 'Hitting Targets',
-    description: 'Zone-based scoring & hit tracking',
-    icon: Trophy,
-    color: '#F59E0B', // Amber
-  },
-];
+function getPurposeOptions(t: (key: string) => string): PurposeOptionConfig[] {
+  return [
+    {
+      id: 'grouping',
+      label: t('session.grouping'),
+      description: t('session.groupingDescription'),
+      icon: Crosshair,
+      color: '#3B82F6', // Blue
+    },
+    {
+      id: 'engagement',
+      label: t('session.hittingTargets'),
+      description: t('session.engagementDescription'),
+      icon: Trophy,
+      color: '#F59E0B', // Amber
+    },
+  ];
+}
 
 export function PurposeSelector({ selected, onSelect, disabled = false }: PurposeSelectorProps) {
+  const { t } = useTranslation();
   const colors = useColors();
+  const PURPOSE_OPTIONS = getPurposeOptions(t);
 
   const handlePress = (purpose: DrillGoal) => {
     if (disabled) return;

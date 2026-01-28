@@ -9,6 +9,7 @@ import type { TrainingWithDetails } from '@/types/workspace';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { ChevronRight } from 'lucide-react-native';
+import { useTranslation } from 'react-i18next';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, {
@@ -65,9 +66,18 @@ function getTeamColor(teamId: string | undefined): string {
   return TEAM_COLORS[Math.abs(hash) % TEAM_COLORS.length];
 }
 
-const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const getDayNames = (t: ReturnType<typeof useTranslation>['t']) => [
+  t('time.dayNames.sun'),
+  t('time.dayNames.mon'),
+  t('time.dayNames.tue'),
+  t('time.dayNames.wed'),
+  t('time.dayNames.thu'),
+  t('time.dayNames.fri'),
+  t('time.dayNames.sat'),
+];
 
-function buildDayData(trainings: TrainingWithDetails[]): DayData[] {
+function buildDayData(trainings: TrainingWithDetails[], t: ReturnType<typeof useTranslation>['t']): DayData[] {
+  const DAY_NAMES = getDayNames(t);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
@@ -89,7 +99,7 @@ function buildDayData(trainings: TrainingWithDetails[]): DayData[] {
 
     days.push({
       date,
-      dayName: i === 0 ? 'Today' : DAY_NAMES[date.getDay()],
+      dayName: i === 0 ? t('time.today') : DAY_NAMES[date.getDay()],
       dayNumber: date.getDate(),
       isToday: i === 0,
       trainings: dayTrainings,
@@ -99,8 +109,8 @@ function buildDayData(trainings: TrainingWithDetails[]): DayData[] {
   return days;
 }
 
-function formatTrainingTime(training: TrainingWithDetails): string {
-  if (training.status === 'ongoing') return 'LIVE';
+function formatTrainingTime(training: TrainingWithDetails, t: ReturnType<typeof useTranslation>['t']): string {
+  if (training.status === 'ongoing') return t('training.live');
   const dateString = training.scheduled_at;
   if (!dateString) return '';
   const date = new Date(dateString);
@@ -248,9 +258,10 @@ function DayColumn({
 }
 
 function ExpandedTrainingItem({ training, colors }: { training: TrainingWithDetails; colors: Colors }) {
+  const { t } = useTranslation();
   const teamColor = getTeamColor(training.team?.id);
   const isLive = training.status === 'ongoing';
-  const timeStr = formatTrainingTime(training);
+  const timeStr = formatTrainingTime(training, t);
 
   const handlePress = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -282,7 +293,7 @@ function ExpandedTrainingItem({ training, colors }: { training: TrainingWithDeta
           {isLive ? (
             <View style={[s.liveBadge, { backgroundColor: `${colors.orange}20` }]}>
               <View style={[s.liveBadgeDot, { backgroundColor: colors.orange }]} />
-              <Text style={[s.liveBadgeText, { color: colors.orange }]}>LIVE</Text>
+              <Text style={[s.liveBadgeText, { color: colors.orange }]}>{t('training.live')}</Text>
             </View>
           ) : timeStr ? (
             <Text style={[s.expandedTime, { color: colors.textMuted }]}>{timeStr}</Text>
@@ -299,7 +310,8 @@ function ExpandedTrainingItem({ training, colors }: { training: TrainingWithDeta
 // ═══════════════════════════════════════════════════════════════════════════
 
 export function TimelineStrip({ colors, trainings }: TimelineStripProps) {
-  const days = useMemo(() => buildDayData(trainings), [trainings]);
+  const { t } = useTranslation();
+  const days = useMemo(() => buildDayData(trainings, t), [trainings, t]);
 
   // Auto-expand today if there's a live training
   const liveDayIndex = useMemo(
@@ -329,9 +341,9 @@ export function TimelineStrip({ colors, trainings }: TimelineStripProps) {
     >
       {/* Header */}
       <View style={s.header}>
-        <Text style={[s.headerTitle, { color: colors.textMuted }]}>SCHEDULE</Text>
+        <Text style={[s.headerTitle, { color: colors.textMuted }]}>{t('home.schedule')}</Text>
         <TouchableOpacity onPress={handleGoToTeam} activeOpacity={0.7} style={s.headerLink}>
-          <Text style={[s.headerLinkText, { color: colors.primary }]}>Team</Text>
+          <Text style={[s.headerLinkText, { color: colors.primary }]}>{t('teams.team')}</Text>
           <ChevronRight size={12} color={colors.primary} />
         </TouchableOpacity>
       </View>

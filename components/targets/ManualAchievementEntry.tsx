@@ -5,16 +5,17 @@ import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ArrowLeft, Minus, Plus, Trophy } from 'lucide-react-native';
 import React, { useCallback, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { COLORS } from './types';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // DISTANCE CATEGORIES (for optional distance selection)
 // ═══════════════════════════════════════════════════════════════════════════
-const DISTANCE_CATEGORIES = [
-  { label: 'Close', range: '5-15m', distances: [5, 7, 10, 15] },
-  { label: 'Medium', range: '25-50m', distances: [25, 35, 50] },
-  { label: 'Long', range: '100m+', distances: [100, 200, 300] },
+const getDistanceCategories = (t: (key: string) => string) => [
+  { label: t('target.distanceCategory.close'), range: '5-15m', distances: [5, 7, 10, 15] },
+  { label: t('target.distanceCategory.medium'), range: '25-50m', distances: [25, 35, 50] },
+  { label: t('target.distanceCategory.long'), range: '100m+', distances: [100, 200, 300] },
 ];
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -42,6 +43,7 @@ const Stepper = React.memo(function Stepper({
   percentageOf,
 }: StepperProps) {
   const colors = useColors();
+  const { t } = useTranslation();
 
   const handleDecrement = useCallback(() => {
     if (value > min) {
@@ -106,7 +108,9 @@ const Stepper = React.memo(function Stepper({
             )}
           </View>
           {percentage !== null && (
-            <Text style={[styles.stepperPercentage, { color: getPercentageColor() }]}>{percentage}% accuracy</Text>
+            <Text style={[styles.stepperPercentage, { color: getPercentageColor() }]}>
+              {t('target.accuracyPercent', { percent: percentage })}
+            </Text>
           )}
         </View>
 
@@ -135,7 +139,7 @@ const Stepper = React.memo(function Stepper({
             }}
           >
             <Text style={[styles.quickText, { color: colors.textMuted }, value === 0 && styles.quickTextActive]}>
-              None
+              {t('common.none')}
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -156,7 +160,7 @@ const Stepper = React.memo(function Stepper({
                 value === Math.floor(percentageOf / 2) && styles.quickTextActive,
               ]}
             >
-              Half
+              {t('common.half')}
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -169,7 +173,7 @@ const Stepper = React.memo(function Stepper({
             <Text
               style={[styles.quickText, { color: colors.textMuted }, value === percentageOf && styles.quickTextActive]}
             >
-              All
+              {t('common.all')}
             </Text>
           </TouchableOpacity>
         </View>
@@ -205,6 +209,8 @@ export const ManualAchievementEntry = React.memo(function ManualAchievementEntry
   lockBullets = false,
 }: ManualAchievementEntryProps) {
   const colors = useColors();
+  const { t } = useTranslation();
+  const distanceCategories = useMemo(() => getDistanceCategories(t), [t]);
 
   // State
   const initialBullets = Math.max(1, Math.min(defaultBullets ?? 5, maxBullets));
@@ -251,10 +257,10 @@ export const ManualAchievementEntry = React.memo(function ManualAchievementEntry
           <ArrowLeft size={20} color={colors.text} />
         </TouchableOpacity>
         <View style={styles.headerCenter}>
-          <Text style={[styles.headerTitle, { color: colors.text }]}>Manual Entry</Text>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>{t('session.manualEntry')}</Text>
           <View style={styles.headerMeta}>
             <Trophy size={14} color={colors.primary} />
-            <Text style={[styles.headerSubtitle, { color: colors.textMuted }]}>Achievement Target</Text>
+            <Text style={[styles.headerSubtitle, { color: colors.textMuted }]}>{t('target.achievementTarget')}</Text>
           </View>
         </View>
         <View style={{ width: 40 }} />
@@ -262,8 +268,8 @@ export const ManualAchievementEntry = React.memo(function ManualAchievementEntry
 
       {/* Distance Selection */}
       <View style={styles.section}>
-        <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>Distance</Text>
-        {DISTANCE_CATEGORIES.map((category) => (
+        <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>{t('session.distance')}</Text>
+        {distanceCategories.map((category) => (
           <View key={category.label} style={styles.distanceCategory}>
             <View style={styles.distanceCategoryHeader}>
               <Text style={[styles.distanceCategoryLabel, { color: colors.text }]}>{category.label}</Text>
@@ -309,7 +315,7 @@ export const ManualAchievementEntry = React.memo(function ManualAchievementEntry
           min={1}
           max={maxBullets}
           onChange={(v) => handleBulletsChange(v)}
-          label="Bullets Fired"
+          label={t('target.bulletsFired')}
         />
         {/* Quick select for bullets */}
         <View style={styles.bulletsQuickRow}>
@@ -349,8 +355,8 @@ export const ManualAchievementEntry = React.memo(function ManualAchievementEntry
           min={0}
           max={bulletsFired}
           onChange={handleHitsChange}
-          label="Hits on Target"
-          sublabel={`Out of ${bulletsFired} bullets fired`}
+          label={t('target.hitsOnTarget')}
+          sublabel={t('target.outOfBulletsFired', { count: bulletsFired })}
           showPercentage
           percentageOf={bulletsFired}
         />
@@ -362,22 +368,22 @@ export const ManualAchievementEntry = React.memo(function ManualAchievementEntry
       >
         <View style={styles.summaryRow}>
           <View style={styles.summaryItem}>
-            <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>Distance</Text>
+            <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>{t('session.distance')}</Text>
             <Text style={[styles.summaryValue, { color: colors.text }]}>{distance}m</Text>
           </View>
           <View style={[styles.summaryDivider, { backgroundColor: `${colors.primary}30` }]} />
           <View style={styles.summaryItem}>
-            <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>Bullets</Text>
+            <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>{t('session.bullets')}</Text>
             <Text style={[styles.summaryValue, { color: colors.text }]}>{bulletsFired}</Text>
           </View>
           <View style={[styles.summaryDivider, { backgroundColor: `${colors.primary}30` }]} />
           <View style={styles.summaryItem}>
-            <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>Hits</Text>
+            <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>{t('session.hits')}</Text>
             <Text style={[styles.summaryValue, { color: colors.text }]}>{hits}</Text>
           </View>
           <View style={[styles.summaryDivider, { backgroundColor: `${colors.primary}30` }]} />
           <View style={styles.summaryItem}>
-            <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>Accuracy</Text>
+            <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>{t('session.accuracy')}</Text>
             <Text style={[styles.summaryValue, { color: colors.primary }]}>{accuracy}%</Text>
           </View>
         </View>
@@ -396,14 +402,14 @@ export const ManualAchievementEntry = React.memo(function ManualAchievementEntry
           ) : (
             <>
               <Ionicons name="checkmark-circle" size={22} color="#fff" />
-              <Text style={styles.saveButtonText}>Save Result</Text>
+              <Text style={styles.saveButtonText}>{t('target.saveResult')}</Text>
             </>
           )}
         </LinearGradient>
       </TouchableOpacity>
 
       <TouchableOpacity style={styles.cancelButton} onPress={onBack} activeOpacity={0.7} disabled={saving}>
-        <Text style={[styles.cancelButtonText, { color: colors.textMuted }]}>Back</Text>
+        <Text style={[styles.cancelButtonText, { color: colors.textMuted }]}>{t('common.back')}</Text>
       </TouchableOpacity>
 
       <View style={{ height: 30 }} />

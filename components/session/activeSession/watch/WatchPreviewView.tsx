@@ -7,6 +7,7 @@
 
 import { useColors } from '@/hooks/ui/useColors';
 import type { SessionDrillConfig } from '@/services/session/types';
+import { useTranslation } from 'react-i18next';
 import { MapPin, Target, Watch, X, Zap } from 'lucide-react-native';
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { EdgeInsets } from 'react-native-safe-area-context';
@@ -37,6 +38,7 @@ export function WatchPreviewView({
   isTeamTraining,
 }: WatchPreviewViewProps) {
   const colors = useColors();
+  const { t } = useTranslation();
 
   return (
     <View style={[sharedStyles.container, { backgroundColor: colors.background }]}>
@@ -62,12 +64,10 @@ export function WatchPreviewView({
         </View>
 
         <Text style={[styles.title, { color: colors.text }]}>
-          {watchAppNotOpen ? 'Open Watch App' : 'Tap Watch to Start'}
+          {watchAppNotOpen ? t('session.openWatchApp') : t('session.tapWatchToStart')}
         </Text>
         <Text style={[styles.subtitle, { color: colors.textMuted, paddingHorizontal: 40 }]}>
-          {watchAppNotOpen
-            ? 'Open ReticleIQ on your Garmin and tap to begin'
-            : "Session is ready. Tap your watch when you're in position."}
+          {watchAppNotOpen ? t('session.openReticleIQOnGarmin') : t('session.sessionReadyTapWatch')}
         </Text>
 
         {drill && (
@@ -76,7 +76,9 @@ export function WatchPreviewView({
             <Text style={[styles.drillChipText, { color: colors.text }]}>{drill.distance_m}m</Text>
             <View style={[styles.drillChipDivider, { backgroundColor: colors.border }]} />
             <Zap size={14} color={colors.textMuted} />
-            <Text style={[styles.drillChipText, { color: colors.text }]}>{drill.rounds_per_shooter} shots</Text>
+            <Text style={[styles.drillChipText, { color: colors.text }]}>
+              {t('session.shotsCount', { count: drill.rounds_per_shooter })}
+            </Text>
           </View>
         )}
 
@@ -89,7 +91,7 @@ export function WatchPreviewView({
 
         <View style={{ marginTop: 40, alignItems: 'center' }}>
           <ActivityIndicator size="small" color={colors.textMuted} />
-          <Text style={[{ fontSize: 12, marginTop: 8 }, { color: colors.textMuted }]}>Waiting...</Text>
+          <Text style={[{ fontSize: 12, marginTop: 8 }, { color: colors.textMuted }]}>{t('session.waiting')}</Text>
         </View>
       </View>
 
@@ -99,7 +101,7 @@ export function WatchPreviewView({
           onPress={onContinueWithoutWatch}
           disabled={ending}
         >
-          <Text style={[styles.subtleBtnText, { color: colors.textMuted }]}>Use Phone Instead</Text>
+          <Text style={[styles.subtleBtnText, { color: colors.textMuted }]}>{t('session.usePhoneInstead')}</Text>
         </TouchableOpacity>
       </View>
     </View>

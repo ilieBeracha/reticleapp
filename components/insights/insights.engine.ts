@@ -240,7 +240,7 @@ export function serializeContextKey(key: ContextKey): string {
 /**
  * Create human-readable label for context key.
  */
-export function labelContextKey(key: ContextKey): string {
+export function labelContextKey(key: ContextKey, t: TranslationFunction = (k: string) => k): string {
   const parts: string[] = [];
   if (key.position) parts.push(key.position.charAt(0).toUpperCase() + key.position.slice(1));
   if (key.distanceBucket) {
@@ -248,8 +248,8 @@ export function labelContextKey(key: ContextKey): string {
     if (bucket) parts.push(bucket.label);
   }
   if (key.weaponCategory) parts.push(key.weaponCategory);
-  if (key.isTimed) parts.push('timed');
-  return parts.length > 0 ? parts.join(' @ ') : 'All conditions';
+  if (key.isTimed) parts.push(t('insights.context.timed'));
+  return parts.length > 0 ? parts.join(' @ ') : t('insights.context.allConditions');
 }
 
 /**
@@ -497,7 +497,7 @@ function isEngagementSession(session: SessionWithDetails): boolean {
  * - "Best Group (Median)" = median of best dispersions per session
  *   NOTE: This is NOT "median grouping" — each session contributes its BEST group.
  */
-export function computeTotals(sessions: SessionWithDetails[]): TotalsMetric[] {
+export function computeTotals(sessions: SessionWithDetails[], t: TranslationFunction = (k: string) => k): TotalsMetric[] {
   const completed = sessions.filter((s) => s.status === 'completed');
   const totals: TotalsMetric[] = [];
 
@@ -538,7 +538,7 @@ export function computeTotals(sessions: SessionWithDetails[]): TotalsMetric[] {
   // Sessions count
   totals.push({
     id: 'sessions',
-    label: 'Sessions',
+    label: t('session.sessions'),
     value: completed.length,
     unit: '',
     evidenceIds: allSessionIds,
@@ -548,10 +548,10 @@ export function computeTotals(sessions: SessionWithDetails[]): TotalsMetric[] {
   if (engagementShots > 0) {
     totals.push({
       id: 'shots',
-      label: 'Shots Fired',
+      label: t('insights.totals.shotsFired'),
       value: engagementShots,
       unit: '',
-      subtitle: 'engagement',
+      subtitle: t('insights.totals.engagement'),
       evidenceIds: engagementSessionIds,
     });
   }
@@ -562,10 +562,10 @@ export function computeTotals(sessions: SessionWithDetails[]): TotalsMetric[] {
     const overallAccuracy = Math.round((engagementHits / engagementShots) * 100);
     totals.push({
       id: 'overall_accuracy',
-      label: 'Overall Accuracy',
+      label: t('insights.totals.overallAccuracy'),
       value: overallAccuracy,
       unit: '%',
-      subtitle: 'weighted',
+      subtitle: t('insights.totals.weighted'),
       evidenceIds: engagementSessionIds,
     });
   }
@@ -576,10 +576,10 @@ export function computeTotals(sessions: SessionWithDetails[]): TotalsMetric[] {
   if (medianAccuracy !== null) {
     totals.push({
       id: 'typical_accuracy',
-      label: 'Typical Session',
+      label: t('insights.totals.typicalSession'),
       value: Math.round(medianAccuracy),
       unit: '%',
-      subtitle: 'median',
+      subtitle: t('insights.totals.median'),
       evidenceIds: engagementSessionIds,
     });
   }
@@ -589,7 +589,7 @@ export function computeTotals(sessions: SessionWithDetails[]): TotalsMetric[] {
     const overallAccuracy = Math.round((engagementHits / engagementShots) * 100);
     totals.push({
       id: 'accuracy',
-      label: 'Accuracy',
+      label: t('session.accuracy'),
       value: overallAccuracy,
       unit: '%',
       subtitle: DRILL_GOAL.ENGAGEMENT,
@@ -601,10 +601,10 @@ export function computeTotals(sessions: SessionWithDetails[]): TotalsMetric[] {
   if (medianAccuracy !== null) {
     totals.push({
       id: 'hit_pct',
-      label: 'Hit %',
+      label: t('insights.totals.hitPercent'),
       value: Math.round(medianAccuracy),
       unit: '%',
-      subtitle: 'median',
+      subtitle: t('insights.totals.median'),
       evidenceIds: engagementSessionIds,
     });
   }
@@ -617,10 +617,10 @@ export function computeTotals(sessions: SessionWithDetails[]): TotalsMetric[] {
   if (medianBestDispersion !== null) {
     totals.push({
       id: 'best_group_median',
-      label: 'Best Group (Median)',
+      label: t('insights.totals.bestGroupMedian'),
       value: Math.round(medianBestDispersion * 10) / 10,
       unit: 'cm',
-      subtitle: 'of best groups',
+      subtitle: t('insights.totals.ofBestGroups'),
       evidenceIds: groupingSessionIds,
     });
   }
@@ -629,7 +629,7 @@ export function computeTotals(sessions: SessionWithDetails[]): TotalsMetric[] {
   if (medianBestDispersion !== null) {
     totals.push({
       id: 'median_group',
-      label: 'Median Group',
+      label: t('insights.totals.medianGroup'),
       value: Math.round(medianBestDispersion * 10) / 10,
       unit: 'cm',
       subtitle: DRILL_GOAL.GROUPING,
@@ -726,7 +726,8 @@ function groupByCategory(
 export function computeStrengths(
   sessions: SessionWithDetails[],
   filters: InsightsFilters,
-  thresholdConfig: ThresholdConfig = DEFAULT_THRESHOLD_CONFIG
+  thresholdConfig: ThresholdConfig = DEFAULT_THRESHOLD_CONFIG,
+  t: TranslationFunction = (k: string) => k
 ): StrengthCard[] {
   const strengths: StrengthCard[] = [];
   const completed = sessions.filter((s) => s.status === 'completed');
@@ -964,7 +965,8 @@ export function computeStrengths(
 export function computeWeaknesses(
   sessions: SessionWithDetails[],
   filters: InsightsFilters,
-  thresholdConfig: ThresholdConfig = DEFAULT_THRESHOLD_CONFIG
+  thresholdConfig: ThresholdConfig = DEFAULT_THRESHOLD_CONFIG,
+  t: TranslationFunction = (k: string) => k
 ): WeaknessCard[] {
   const weaknesses: WeaknessCard[] = [];
   const completed = sessions.filter((s) => s.status === 'completed');
@@ -1031,8 +1033,8 @@ export function computeWeaknesses(
         label: position.charAt(0).toUpperCase() + position.slice(1),
         primaryValue: `${Math.round(stats.accuracy)}%`,
         context: hasHighVariance
-          ? 'High variance within this position'
-          : `${Math.round(Math.abs(accuracyDelta))}% below baseline`,
+          ? t('insights.weaknesses.highVarianceWithinPosition')
+          : t('insights.weaknesses.percentBelowBaseline', { percent: Math.round(Math.abs(accuracyDelta)) }),
         metric: {
           value: stats.accuracy,
           baseline: baselineAccuracy,
@@ -1066,7 +1068,7 @@ export function computeWeaknesses(
           category: 'variance',
           label: `${position.charAt(0).toUpperCase() + position.slice(1)} Consistency`,
           primaryValue: `${Math.round(variance * 100)}%`,
-          context: 'Coefficient of variation (within position)',
+          context: t('insights.weaknesses.coefficientOfVariation'),
           metric: {
             value: variance * 100,
             baseline: 15, // Expected CV for consistent shooter
@@ -1113,7 +1115,7 @@ export function computeWeaknesses(
         category: 'position', // Distance is a form of context weakness
         label: distanceLabel,
         primaryValue: `${Math.round(stats.accuracy)}%`,
-        context: `${Math.round(Math.abs(accuracyDelta))}% below baseline`,
+        context: t('insights.weaknesses.percentBelowBaseline', { percent: Math.round(Math.abs(accuracyDelta)) }),
         metric: {
           value: stats.accuracy,
           baseline: baselineAccuracy,
@@ -1143,7 +1145,8 @@ export function computeWeaknesses(
  */
 export function computeTrends(
   sessions: SessionWithDetails[],
-  filters: InsightsFilters
+  filters: InsightsFilters,
+  t: TranslationFunction = (k: string) => k
 ): TrendData[] {
   const trends: TrendData[] = [];
   const completed = sessions
@@ -1219,10 +1222,10 @@ export function computeTrends(
       trends.push({
         id: 'trend-accuracy',
         metricType: 'accuracy',
-        label: 'Overall Accuracy',
+        label: t('insights.trendsData.overallAccuracy'),
         direction: delta > 0 ? 'improving' : 'declining',
         magnitude: Math.round(delta),
-        timeWindow: `over ${accuracyDataPoints.length} weeks`,
+        timeWindow: t('insights.trendsData.overWeeks', { weeks: accuracyDataPoints.length }),
         dataPoints: accuracyDataPoints,
         evidenceIds: allSessionIds,
       });
@@ -1272,11 +1275,11 @@ export function computeTrends(
       trends.push({
         id: 'trend-grouping',
         metricType: DRILL_GOAL.GROUPING,
-        label: 'Grouping Consistency',
+        label: t('insights.trendsData.groupingConsistency'),
         direction: delta > 0 ? 'improving' : 'declining',
         magnitude: Math.round(Math.abs(secondAvg - firstAvg) * 10) / 10,
-        timeWindow: `over ${groupingDataPoints.length} weeks`,
-        trigger: delta > 0 ? 'Tighter groups over time' : 'Groups expanding',
+        timeWindow: t('insights.trendsData.overWeeks', { weeks: groupingDataPoints.length }),
+        trigger: delta > 0 ? t('insights.trendsData.tighterGroupsOverTime') : t('insights.trendsData.groupsExpanding'),
         dataPoints: groupingDataPoints,
         evidenceIds: allSessionIds,
       });
@@ -1297,7 +1300,8 @@ export function generateRecommendations(
   strengths: StrengthCard[],
   weaknesses: WeaknessCard[],
   trends: TrendData[],
-  sessions: SessionWithDetails[]
+  sessions: SessionWithDetails[],
+  t: TranslationFunction = (k: string) => k
 ): Recommendation[] {
   const recommendations: Recommendation[] = [];
 
@@ -1310,16 +1314,16 @@ export function generateRecommendations(
         id: `rec-${weakness.id}`,
         type: 'drill',
         priority: weakness.variance ? 'high' : 'medium',
-        title: 'Focus Drill',
-        description: `${weakness.label} position training`,
-        goal: weakness.variance ? 'reduce variance' : 'improve baseline',
+        title: t('insights.recommendations.focusDrill'),
+        description: t('insights.recommendations.positionTraining', { position: weakness.label }),
+        goal: weakness.variance ? t('insights.recommendations.reduceVariance') : t('insights.recommendations.improveBaseline'),
         drill: {
-          name: `${weakness.label} Practice`,
+          name: t('insights.recommendations.positionPractice', { position: weakness.label }),
           position: weakness.label.toLowerCase(),
           rounds: 20,
-          goal: 'Improve consistency',
+          goal: t('insights.recommendations.improveConsistency'),
         },
-        reason: weakness.context || 'Below baseline performance',
+        reason: weakness.context || t('insights.recommendations.belowBaselinePerformance'),
         evidenceIds: weakness.evidenceIds.slice(0, 5),
       });
     }
@@ -1329,10 +1333,10 @@ export function generateRecommendations(
         id: `rec-${weakness.id}`,
         type: 'structure',
         priority: 'high',
-        title: 'Consistency Focus',
-        description: `Work on ${weakness.label.toLowerCase()} consistency`,
-        goal: 'reduce session-to-session variance',
-        reason: `${weakness.variance}% coefficient of variation`,
+        title: t('insights.recommendations.consistencyFocus'),
+        description: t('insights.recommendations.workOnConsistency', { label: weakness.label.toLowerCase() }),
+        goal: t('insights.recommendations.reduceSessionVariance'),
+        reason: t('insights.recommendations.percentCoefficientOfVariation', { variance: weakness.variance }),
         evidenceIds: weakness.evidenceIds.slice(0, 5),
       });
     }
@@ -1346,10 +1350,15 @@ export function generateRecommendations(
         id: `rec-trend-${trend.id}`,
         type: 'structure',
         priority: 'medium',
-        title: 'Address Decline',
-        description: `${trend.label} has declined ${Math.abs(trend.magnitude)}${trend.metricType === 'accuracy' ? '%' : 'cm'} ${trend.timeWindow}`,
-        goal: 'reverse negative trend',
-        reason: trend.trigger || 'Performance declining over time',
+        title: t('insights.recommendations.addressDecline'),
+        description: t('insights.recommendations.trendDeclined', {
+          label: trend.label,
+          magnitude: Math.abs(trend.magnitude),
+          unit: trend.metricType === 'accuracy' ? '%' : 'cm',
+          timeWindow: trend.timeWindow,
+        }),
+        goal: t('insights.recommendations.reverseNegativeTrend'),
+        reason: trend.trigger || t('insights.recommendations.performanceDecliningOverTime'),
         evidenceIds: trend.evidenceIds.slice(0, 5),
       });
     });
@@ -1361,10 +1370,10 @@ export function generateRecommendations(
       id: 'rec-build-strength',
       type: 'drill',
       priority: 'low',
-      title: 'Build on Strength',
-      description: `Continue ${topStrength.label} practice`,
-      goal: 'maintain excellence',
-      reason: 'No significant weaknesses detected',
+      title: t('insights.recommendations.buildOnStrength'),
+      description: t('insights.recommendations.continuePractice', { label: topStrength.label }),
+      goal: t('insights.recommendations.maintainExcellence'),
+      reason: t('insights.recommendations.noSignificantWeaknessesDetected'),
       evidenceIds: topStrength.evidenceIds.slice(0, 5),
     });
   }
@@ -1400,7 +1409,8 @@ export function generateRecommendations(
  */
 export function computeContextProfiles(
   sessions: SessionWithDetails[],
-  thresholdConfig: ThresholdConfig = DEFAULT_THRESHOLD_CONFIG
+  thresholdConfig: ThresholdConfig = DEFAULT_THRESHOLD_CONFIG,
+  t: TranslationFunction = (k: string) => k
 ): ComputedContextProfiles {
   const completed = sessions.filter((s) => s.status === 'completed');
 
@@ -1559,7 +1569,7 @@ export function computeContextProfiles(
       quadrant,
       confidence,
       isPreliminary,
-      label: labelContextKey(key),
+      label: labelContextKey(key, t),
     });
   });
 
@@ -1873,10 +1883,13 @@ export function computeOverviewStatus(
  * - Explicit baseline strategy
  * - Improved semantic clarity for grouping metrics
  */
+type TranslationFunction = (key: string, options?: any) => string;
+
 export function computeInsights(
   allSessions: SessionWithDetails[],
   filters: InsightsFilters = DEFAULT_FILTERS,
-  thresholdConfig: ThresholdConfig = DEFAULT_THRESHOLD_CONFIG
+  thresholdConfig: ThresholdConfig = DEFAULT_THRESHOLD_CONFIG,
+  t: TranslationFunction = (key: string) => key
 ): ComputedInsights {
   // Apply filters
   const sessions = applyFilters(allSessions, filters);
@@ -1900,12 +1913,12 @@ export function computeInsights(
   const hasEnoughData = completed.length >= MIN_SESSIONS_FOR_INSIGHTS;
 
   // Compute all sections with context-aware thresholds
-  const totals = computeTotals(sessions);
-  const strengths = hasEnoughData ? computeStrengths(sessions, filters, thresholdConfig) : [];
-  const weaknesses = hasEnoughData ? computeWeaknesses(sessions, filters, thresholdConfig) : [];
-  const trends = hasEnoughData ? computeTrends(sessions, filters) : [];
+  const totals = computeTotals(sessions, t);
+  const strengths = hasEnoughData ? computeStrengths(sessions, filters, thresholdConfig, t) : [];
+  const weaknesses = hasEnoughData ? computeWeaknesses(sessions, filters, thresholdConfig, t) : [];
+  const trends = hasEnoughData ? computeTrends(sessions, filters, t) : [];
   const recommendations = hasEnoughData
-    ? generateRecommendations(strengths, weaknesses, trends, sessions)
+    ? generateRecommendations(strengths, weaknesses, trends, sessions, t)
     : [];
 
   return {

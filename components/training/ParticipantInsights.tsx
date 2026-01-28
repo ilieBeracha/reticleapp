@@ -6,6 +6,7 @@
  */
 
 import { useColors } from '@/hooks/ui/useColors';
+import { useTranslation } from 'react-i18next';
 import type { SessionWithDetails } from '@/services/session/types';
 import {
   AlertTriangle,
@@ -150,6 +151,7 @@ function LeaderboardItem({
   isExpanded: boolean;
   onToggle: () => void;
 }) {
+  const { t } = useTranslation();
   const trend = useMemo(() => getPerformanceTrend(participant.drillResults), [participant.drillResults]);
 
   const rankConfig = {
@@ -199,7 +201,7 @@ function LeaderboardItem({
               {trend === 'declining' && <TrendingDown size={14} color={colors.orange} />}
             </View>
             <Text style={[styles.participantMeta, { color: colors.textMuted }]}>
-              {participant.drillsCompleted}/{totalDrills} drills • {participant.totalShots} shots
+              {t('training.drillsShots', { drills: participant.drillsCompleted, total: totalDrills, shots: participant.totalShots })}
             </Text>
           </View>
 
@@ -221,7 +223,7 @@ function LeaderboardItem({
                 >
                   {participant.accuracy}%
                 </Text>
-                <Text style={[styles.statLabel, { color: colors.textMuted }]}>accuracy</Text>
+                <Text style={[styles.statLabel, { color: colors.textMuted }]}>{t('session.accuracy')}</Text>
               </View>
             )}
             {hasGrouping && participant.bestDispersion !== null && (
@@ -229,7 +231,7 @@ function LeaderboardItem({
                 <Text style={[styles.statValue, { color: colors.green }]}>
                   {participant.bestDispersion.toFixed(1)}cm
                 </Text>
-                <Text style={[styles.statLabel, { color: colors.textMuted }]}>best group</Text>
+                <Text style={[styles.statLabel, { color: colors.textMuted }]}>{t('training.bestGroup')}</Text>
               </View>
             )}
           </View>
@@ -250,7 +252,7 @@ function LeaderboardItem({
                 <View style={styles.quickStat}>
                   <Focus size={12} color={colors.textMuted} />
                   <Text style={[styles.quickStatValue, { color: colors.text }]}>{participant.consistencyScore}%</Text>
-                  <Text style={[styles.quickStatLabel, { color: colors.textMuted }]}>consistency</Text>
+                  <Text style={[styles.quickStatLabel, { color: colors.textMuted }]}>{t('training.consistency')}</Text>
                 </View>
               )}
               {participant.avgTimePerDrill && (
@@ -259,13 +261,13 @@ function LeaderboardItem({
                   <Text style={[styles.quickStatValue, { color: colors.text }]}>
                     {Math.round(participant.avgTimePerDrill / 60)}m
                   </Text>
-                  <Text style={[styles.quickStatLabel, { color: colors.textMuted }]}>avg/drill</Text>
+                  <Text style={[styles.quickStatLabel, { color: colors.textMuted }]}>{t('training.avgPerDrill')}</Text>
                 </View>
               )}
               <View style={styles.quickStat}>
                 <Target size={12} color={colors.textMuted} />
                 <Text style={[styles.quickStatValue, { color: colors.text }]}>{completionRate}%</Text>
-                <Text style={[styles.quickStatLabel, { color: colors.textMuted }]}>completion</Text>
+                <Text style={[styles.quickStatLabel, { color: colors.textMuted }]}>{t('training.completion')}</Text>
               </View>
             </View>
 
@@ -328,6 +330,7 @@ function TeamSummaryStats({
   sessions: SessionWithDetails[];
   colors: ReturnType<typeof useColors>;
 }) {
+  const { t } = useTranslation();
   const stats = useMemo(() => {
     const withAccuracy = participants.filter((p) => p.accuracy !== null);
     const avgAccuracy =
@@ -384,28 +387,28 @@ function TeamSummaryStats({
 
   return (
     <View style={[styles.summaryStats, { backgroundColor: colors.card }]}>
-      <Text style={[styles.summaryTitle, { color: colors.text }]}>Team Performance</Text>
+      <Text style={[styles.summaryTitle, { color: colors.text }]}>{t('training.teamPerformance')}</Text>
       
       {/* Session Type Breakdown */}
       <View style={[styles.typeBreakdown, { borderBottomColor: colors.border }]}>
         {stats.soloCount > 0 && (
           <View style={[styles.typeBadge, { backgroundColor: colors.primary + '15' }]}>
-            <Text style={[styles.typeBadgeText, { color: colors.primary }]}>{stats.soloCount} Solo</Text>
+            <Text style={[styles.typeBadgeText, { color: colors.primary }]}>{t('training.soloCount', { count: stats.soloCount })}</Text>
           </View>
         )}
         {stats.teamCount > 0 && (
           <View style={[styles.typeBadge, { backgroundColor: colors.blue + '15' }]}>
-            <Text style={[styles.typeBadgeText, { color: colors.blue }]}>{stats.teamCount} Team</Text>
+            <Text style={[styles.typeBadgeText, { color: colors.blue }]}>{t('training.teamCount', { count: stats.teamCount })}</Text>
           </View>
         )}
         {stats.squadCount > 0 && (
           <View style={[styles.typeBadge, { backgroundColor: colors.orange + '15' }]}>
-            <Text style={[styles.typeBadgeText, { color: colors.orange }]}>{stats.squadCount} Squad</Text>
+            <Text style={[styles.typeBadgeText, { color: colors.orange }]}>{t('training.squadCount', { count: stats.squadCount })}</Text>
           </View>
         )}
         {stats.groupingCount > 0 && (
           <View style={[styles.typeBadge, { backgroundColor: colors.green + '15' }]}>
-            <Text style={[styles.typeBadgeText, { color: colors.green }]}>{stats.groupingCount} Grouping</Text>
+            <Text style={[styles.typeBadgeText, { color: colors.green }]}>{t('training.groupingCount', { count: stats.groupingCount })}</Text>
           </View>
         )}
       </View>
@@ -414,7 +417,7 @@ function TeamSummaryStats({
         <View style={styles.statBox}>
           <Users size={16} color={colors.primary} />
           <Text style={[styles.statBoxValue, { color: colors.text }]}>{participants.length}</Text>
-          <Text style={[styles.statBoxLabel, { color: colors.textMuted }]}>Participants</Text>
+          <Text style={[styles.statBoxLabel, { color: colors.textMuted }]}>{t('training.participants')}</Text>
         </View>
         {stats.teamAccuracy !== null && hasAccuracySessions && (
           <View style={styles.statBox}>
@@ -422,32 +425,32 @@ function TeamSummaryStats({
             <Text style={[styles.statBoxValue, { color: stats.teamAccuracy >= 70 ? colors.green : colors.orange }]}>
               {stats.teamAccuracy}%
             </Text>
-            <Text style={[styles.statBoxLabel, { color: colors.textMuted }]}>Team Accuracy</Text>
+            <Text style={[styles.statBoxLabel, { color: colors.textMuted }]}>{t('training.teamAccuracy')}</Text>
           </View>
         )}
         <View style={styles.statBox}>
           <Trophy size={16} color={colors.green} />
           <Text style={[styles.statBoxValue, { color: colors.text }]}>{stats.completionRate}%</Text>
-          <Text style={[styles.statBoxLabel, { color: colors.textMuted }]}>Full Completion</Text>
+          <Text style={[styles.statBoxLabel, { color: colors.textMuted }]}>{t('training.fullCompletion')}</Text>
         </View>
         {stats.bestTeamDispersion !== null && (
           <View style={styles.statBox}>
             <Focus size={16} color={colors.green} />
             <Text style={[styles.statBoxValue, { color: colors.green }]}>{stats.bestTeamDispersion.toFixed(1)}cm</Text>
-            <Text style={[styles.statBoxLabel, { color: colors.textMuted }]}>Best Group</Text>
+            <Text style={[styles.statBoxLabel, { color: colors.textMuted }]}>{t('training.bestGroup')}</Text>
           </View>
         )}
         <View style={styles.statBox}>
           <Zap size={16} color={colors.text} />
           <Text style={[styles.statBoxValue, { color: colors.text }]}>{stats.allSessionShots}</Text>
-          <Text style={[styles.statBoxLabel, { color: colors.textMuted }]}>Total Shots</Text>
+          <Text style={[styles.statBoxLabel, { color: colors.textMuted }]}>{t('training.totalShots')}</Text>
         </View>
       </View>
 
       {/* Note about accuracy calculation */}
       {hasSquadSessions && hasAccuracySessions && (
         <Text style={[styles.accuracyNote, { color: colors.textMuted }]}>
-          * Accuracy calculated from solo/team engagements only
+          {t('training.accuracyNote')}
         </Text>
       )}
     </View>
@@ -459,6 +462,7 @@ function TeamSummaryStats({
 // ═══════════════════════════════════════════════════════════════════════════
 
 export function ParticipantInsights({ teamSessions, drills }: ParticipantInsightsProps) {
+  const { t } = useTranslation();
   const colors = useColors();
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
 
@@ -499,7 +503,7 @@ export function ParticipantInsights({ teamSessions, drills }: ParticipantInsight
     userDrillMap.forEach((drillSessions, userId) => {
       // Get user name from first session
       const firstSession = Array.from(drillSessions.values())[0]?.[0];
-      const userName = firstSession?.user_full_name || 'Unknown';
+      const userName = firstSession?.user_full_name || t('common.unknown');
 
       if (!userMap.has(userId)) {
         userMap.set(userId, {
@@ -529,7 +533,7 @@ export function ParticipantInsights({ teamSessions, drills }: ParticipantInsight
         const drillName = drill?.name 
           || firstSession?.drill_name 
           || firstSession?.drill_config?.name 
-          || 'Session';
+          || t('session.title');
         const drillGoal = (
           drill?.drill_goal 
           || firstSession?.drill_config?.drill_goal 
@@ -656,8 +660,8 @@ export function ParticipantInsights({ teamSessions, drills }: ParticipantInsight
     if (topPerformer && topPerformer.accuracy !== null && topPerformer.accuracy >= 70) {
       result.push({
         type: 'positive',
-        title: `Top Shooter: ${topPerformer.userName}`,
-        description: `${topPerformer.accuracy}% accuracy across ${topPerformer.drillsCompleted} drills`,
+        title: t('training.topShooter', { name: topPerformer.userName }),
+        description: t('training.topShooterDescription', { accuracy: topPerformer.accuracy, drills: topPerformer.drillsCompleted }),
         userId: topPerformer.userId,
       });
     }
@@ -669,8 +673,8 @@ export function ParticipantInsights({ teamSessions, drills }: ParticipantInsight
       if (mostConsistent.consistencyScore && mostConsistent.consistencyScore >= 80) {
         result.push({
           type: 'positive',
-          title: `Most Consistent: ${mostConsistent.userName}`,
-          description: `${mostConsistent.consistencyScore}% consistency score across drills`,
+          title: t('training.mostConsistent', { name: mostConsistent.userName }),
+          description: t('training.mostConsistentDescription', { score: mostConsistent.consistencyScore }),
           userId: mostConsistent.userId,
         });
       }
@@ -683,8 +687,8 @@ export function ParticipantInsights({ teamSessions, drills }: ParticipantInsight
     if (struggling.length > 0) {
       result.push({
         type: 'warning',
-        title: `${struggling.length} participant${struggling.length > 1 ? 's' : ''} may need support`,
-        description: struggling.map((p) => p.userName).join(', ') + ' - consider follow-up training',
+        title: t('training.strugglingParticipants', { count: struggling.length }),
+        description: t('training.strugglingDescription', { names: struggling.map((p) => p.userName).join(', ') }),
       });
     }
 
@@ -697,8 +701,8 @@ export function ParticipantInsights({ teamSessions, drills }: ParticipantInsight
       if (bestGrouper.bestDispersion !== null && bestGrouper.bestDispersion <= 5) {
         result.push({
           type: 'positive',
-          title: `Tightest Group: ${bestGrouper.userName}`,
-          description: `${bestGrouper.bestDispersion.toFixed(1)}cm group size`,
+          title: t('training.tightestGroup', { name: bestGrouper.userName }),
+          description: t('training.tightestGroupDescription', { size: bestGrouper.bestDispersion.toFixed(1) }),
           userId: bestGrouper.userId,
         });
       }
@@ -709,8 +713,8 @@ export function ParticipantInsights({ teamSessions, drills }: ParticipantInsight
     if (incomplete.length > 0 && incomplete.length <= 3) {
       result.push({
         type: 'info',
-        title: `${incomplete.length} did not complete all drills`,
-        description: incomplete.map((p) => `${p.userName} (${p.drillsCompleted}/${drills.length})`).join(', '),
+        title: t('training.incompleteParticipants', { count: incomplete.length }),
+        description: incomplete.map((p) => t('training.incompleteDescription', { name: p.userName, completed: p.drillsCompleted, total: drills.length })).join(', '),
       });
     }
 
@@ -721,7 +725,7 @@ export function ParticipantInsights({ teamSessions, drills }: ParticipantInsight
     return (
       <View style={[styles.emptyContainer, { backgroundColor: colors.card }]}>
         <Users size={32} color={colors.textMuted} />
-        <Text style={[styles.emptyText, { color: colors.textMuted }]}>No participant data available</Text>
+        <Text style={[styles.emptyText, { color: colors.textMuted }]}>{t('training.noParticipantData')}</Text>
       </View>
     );
   }
@@ -734,7 +738,7 @@ export function ParticipantInsights({ teamSessions, drills }: ParticipantInsight
       {/* Insights */}
       {insights.length > 0 && (
         <View style={styles.insightsSection}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>Key Insights</Text>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('training.keyInsights')}</Text>
           <View style={styles.insightsList}>
             {insights.slice(0, 4).map((insight, idx) => (
               <InsightCard key={idx} insight={insight} colors={colors} />
@@ -747,8 +751,8 @@ export function ParticipantInsights({ teamSessions, drills }: ParticipantInsight
       <View style={styles.leaderboardSection}>
         <View style={styles.sectionHeader}>
           <Trophy size={16} color={colors.textMuted} />
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>Rankings</Text>
-          <Text style={[styles.sectionSubtitle, { color: colors.textMuted }]}>{participants.length} participants</Text>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('training.rankings')}</Text>
+          <Text style={[styles.sectionSubtitle, { color: colors.textMuted }]}>{t('training.participantsCount', { count: participants.length })}</Text>
         </View>
 
         <View style={styles.leaderboardList}>

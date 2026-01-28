@@ -3,6 +3,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { CameraView } from 'expo-camera';
 import { LinearGradient } from 'expo-linear-gradient';
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Dimensions, Image, Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { COLORS, Step } from './types';
 
@@ -35,6 +36,7 @@ export const CameraFlow = React.memo(function CameraFlow({
   onClose,
 }: CameraFlowProps) {
   const isVisible = step === 'camera' || step === 'preview' || step === 'analyzing';
+  const { t } = useTranslation();
 
   return (
     <Modal
@@ -53,7 +55,7 @@ export const CameraFlow = React.memo(function CameraFlow({
                 <TouchableOpacity onPress={onClose} style={styles.backBtn}>
                   <Ionicons name="arrow-back" size={24} color="#fff" />
                 </TouchableOpacity>
-                <Text style={styles.title}>Scan Target</Text>
+                <Text style={styles.title}>{t('target.scanTarget')}</Text>
                 <View style={{ width: 40 }} />
               </View>
 
@@ -69,7 +71,7 @@ export const CameraFlow = React.memo(function CameraFlow({
               <View style={styles.instructions}>
                 <View style={styles.instructionBadge}>
                   <Ionicons name="scan-outline" size={16} color={COLORS.primary} />
-                  <Text style={styles.instructionText}>Align target within frame</Text>
+                  <Text style={styles.instructionText}>{t('target.alignTargetWithinFrame')}</Text>
                 </View>
               </View>
 
@@ -102,14 +104,14 @@ export const CameraFlow = React.memo(function CameraFlow({
               <TouchableOpacity onPress={onRetake} style={styles.backBtn}>
                 <Ionicons name="arrow-back" size={24} color="#fff" />
               </TouchableOpacity>
-              <Text style={styles.title}>Review Photo</Text>
+              <Text style={styles.title}>{t('target.reviewPhoto')}</Text>
               <View style={{ width: 40 }} />
             </View>
 
             <View style={{ flex: 1 }} />
 
             <View style={styles.previewActions}>
-              <Text style={styles.previewHint}>Make sure the target is clearly visible</Text>
+              <Text style={styles.previewHint}>{t('target.previewHint')}</Text>
               <TouchableOpacity style={styles.submitBtn} onPress={onSubmitPhoto} activeOpacity={0.9}>
                 <LinearGradient
                   colors={[...BUTTON_GRADIENT]}
@@ -118,12 +120,12 @@ export const CameraFlow = React.memo(function CameraFlow({
                   style={styles.submitBtnGradient}
                 >
                   <Ionicons name="scan" size={22} color="#fff" />
-                  <Text style={styles.submitBtnText}>Analyze Target</Text>
+                  <Text style={styles.submitBtnText}>{t('target.analyzeTarget')}</Text>
                 </LinearGradient>
               </TouchableOpacity>
               <TouchableOpacity style={styles.retakeBtn} onPress={onRetake} activeOpacity={0.7}>
                 <Ionicons name="camera-outline" size={20} color="#fff" />
-                <Text style={styles.retakeBtnText}>Retake</Text>
+                <Text style={styles.retakeBtnText}>{t('target.retake')}</Text>
               </TouchableOpacity>
             </View>
           </LinearGradient>
@@ -144,8 +146,8 @@ export const CameraFlow = React.memo(function CameraFlow({
             )}
             <View style={styles.analyzingInfo}>
               <ActivityIndicator size="large" color={COLORS.primary} />
-              <Text style={styles.analyzingTitle}>Analyzing Target</Text>
-              <Text style={styles.analyzingSubtitle}>Detecting bullet holes...</Text>
+              <Text style={styles.analyzingTitle}>{t('target.analyzingTarget')}</Text>
+              <Text style={styles.analyzingSubtitle}>{t('target.detectingHoles')}</Text>
             </View>
           </View>
         </View>

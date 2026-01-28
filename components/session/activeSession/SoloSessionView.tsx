@@ -12,6 +12,7 @@
 import { TargetCard } from '@/components/session/TargetCard';
 import { WeatherStrip } from '@/components/session/WeatherDisplay';
 import { useColors } from '@/hooks/ui/useColors';
+import { useTranslation } from 'react-i18next';
 import type { SessionDrillConfig, SessionWithDetails } from '@/services/session/types';
 import { isGroupingSession } from '@/utils/drillGoal';
 import { Camera, Check, Crosshair, Square, Target, X } from 'lucide-react-native';
@@ -69,6 +70,7 @@ export function SoloSessionView({
   onEndSession,
   onClose,
 }: SoloSessionViewProps) {
+  const { t } = useTranslation();
   const colors = useColors();
 
   const isGrouping = isGroupingSession(session);
@@ -79,8 +81,8 @@ export function SoloSessionView({
       <View style={[sharedStyles.emptyIcon, { backgroundColor: colors.secondary }]}>
         <Target size={28} color={colors.textMuted} />
       </View>
-      <Text style={[sharedStyles.emptyTitle, { color: colors.text }]}>Ready to shoot</Text>
-      <Text style={[sharedStyles.emptyDesc, { color: colors.textMuted }]}>Add your first target to get started</Text>
+      <Text style={[sharedStyles.emptyTitle, { color: colors.text }]}>{t('session.readyToShoot')}</Text>
+      <Text style={[sharedStyles.emptyDesc, { color: colors.textMuted }]}>{t('session.addFirstTarget')}</Text>
     </View>
   );
 
@@ -94,7 +96,7 @@ export function SoloSessionView({
 
         <View style={sharedStyles.headerCenter}>
           <Text style={[sharedStyles.headerTitle, { color: colors.text }]} numberOfLines={1}>
-            {session.drill_name || session.training_title || 'Practice'}
+            {session.drill_name || session.training_title || t('session.practice')}
           </Text>
         </View>
 
@@ -116,7 +118,7 @@ export function SoloSessionView({
           {weatherLoading ? (
             <View style={[styles.weatherLoading, { backgroundColor: colors.card }]}>
               <ActivityIndicator size="small" color={colors.textMuted} />
-              <Text style={[styles.weatherLoadingText, { color: colors.textMuted }]}>Loading weather...</Text>
+              <Text style={[styles.weatherLoadingText, { color: colors.textMuted }]}>{t('session.loadingWeather')}</Text>
             </View>
           ) : weatherError ? (
             <View style={[styles.weatherLoading, { backgroundColor: colors.card }]}>
@@ -167,14 +169,14 @@ export function SoloSessionView({
           <View style={styles.actionRow}>
             <TouchableOpacity style={[styles.actionBtn, { backgroundColor: colors.text }]} onPress={onScanRoute}>
               <Camera size={18} color={colors.background} />
-              <Text style={[styles.actionBtnText, { color: colors.background }]}>Scan</Text>
+              <Text style={[styles.actionBtnText, { color: colors.background }]}>{t('session.scanTarget')}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.actionBtn, { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }]}
               onPress={onManualRoute}
             >
               <Crosshair size={18} color={colors.text} />
-              <Text style={[styles.actionBtnText, { color: colors.text }]}>Manual</Text>
+              <Text style={[styles.actionBtnText, { color: colors.text }]}>{t('session.manualEntry')}</Text>
             </TouchableOpacity>
           </View>
         </Animated.View>
@@ -183,7 +185,9 @@ export function SoloSessionView({
       {/* Target list */}
       <View style={sharedStyles.listContainer}>
         {targets.length > 1 && (
-          <Text style={[sharedStyles.sectionLabel, { color: colors.textMuted }]}>PREVIOUS ({targets.length - 1})</Text>
+          <Text style={[sharedStyles.sectionLabel, { color: colors.textMuted }]}>
+            {t('session.previous', { count: targets.length - 1 })}
+          </Text>
         )}
         <FlatList
           data={targets.length > 1 ? targets.slice(1) : []}
@@ -223,7 +227,7 @@ export function SoloSessionView({
                   },
                 ]}
               >
-                {drillComplete ? 'Complete Drill' : 'End Session'}
+                {drillComplete ? t('session.completeDrill') : t('session.endSession')}
               </Text>
             </>
           )}

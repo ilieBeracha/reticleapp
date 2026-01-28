@@ -18,9 +18,9 @@ const getAndroidPackage = () => {
 };
 
 const getScheme = () => {
-  if (IS_DEV) return 'retic-dev';
-  if (IS_PREVIEW) return 'retic-preview';
-  return 'retic';
+  if (IS_DEV) return 'retic';
+  if (IS_PREVIEW) return 'retic';
+  return 'reticle';
 };
 
 const getSlug = () => {
@@ -76,6 +76,7 @@ export default ({ config }) => {
       'expo-build-properties',
       'expo-secure-store',
       'expo-web-browser',
+      'expo-localization',
       [
         'expo-local-authentication',
         {

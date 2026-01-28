@@ -6,6 +6,7 @@ import { type CategoryDrill, type DrillType, groupDrillsByType } from '@/constan
 import { getCategoryConfig } from '@/constants/weaponCategories';
 import { useColors } from '@/hooks/ui/useColors';
 import type { WeaponCategory } from '@/types/workspace';
+import { useTranslation } from 'react-i18next';
 import * as Haptics from 'expo-haptics';
 import { Award, Check, Target } from 'lucide-react-native';
 import { memo } from 'react';
@@ -24,18 +25,18 @@ interface CategoryDrillPickerProps {
   filterTypes?: DrillType[];
 }
 
-const DRILL_TYPE_LABELS: Record<DrillType, string> = {
-  zeroing: 'Zeroing',
-  grouping: 'Grouping',
-  qualification: 'Qualification',
-  speed: 'Speed',
-  accuracy: 'Accuracy',
-  transition: 'Transitions',
-  movement: 'Movement',
-  stress: 'Stress',
-  diagnostic: 'Diagnostic',
-  competition: 'Competition',
-};
+const getDrillTypeLabels = (t: (key: string) => string): Record<DrillType, string> => ({
+  zeroing: t('training.categoryZeroing'),
+  grouping: t('session.grouping'),
+  qualification: t('training.categoryQualification'),
+  speed: t('training.categorySpeed'),
+  accuracy: t('session.accuracy'),
+  transition: t('session.transitions'),
+  movement: t('session.movement'),
+  stress: t('session.stress'),
+  diagnostic: t('session.diagnostic'),
+  competition: t('session.competition'),
+});
 
 const DIFFICULTY_COLORS: Record<string, string> = {
   beginner: '#10B981',
@@ -56,8 +57,10 @@ export function CategoryDrillPicker({
   filterTypes,
 }: CategoryDrillPickerProps) {
   const colors = useColors();
+  const { t } = useTranslation();
   const categoryConfig = category ? getCategoryConfig(category) : null;
   const groupedDrills: Partial<Record<DrillType, CategoryDrill[]>> = category ? groupDrillsByType(category) : {};
+  const DRILL_TYPE_LABELS = getDrillTypeLabels(t);
 
   // Filter drill types based on filterTypes prop
   const allDrillTypes = Object.keys(groupedDrills) as DrillType[];
@@ -69,7 +72,7 @@ export function CategoryDrillPicker({
         <View style={[styles.emptyIcon, { backgroundColor: colors.secondary }]}>
           <Target size={28} color={colors.textMuted} />
         </View>
-        <Text style={[styles.emptyText, { color: colors.textMuted }]}>Select a weapon to see drills</Text>
+        <Text style={[styles.emptyText, { color: colors.textMuted }]}>{t('session.selectWeaponToSeeDrills')}</Text>
       </View>
     );
   }
@@ -88,7 +91,7 @@ export function CategoryDrillPicker({
       {showHeader && categoryConfig && (
         <View style={styles.header}>
           <Text style={[styles.headerTitle, { color: colors.text }]}>{categoryConfig.label}</Text>
-          <Text style={[styles.headerSub, { color: colors.textMuted }]}>{drillTypes.length} drill types available</Text>
+          <Text style={[styles.headerSub, { color: colors.textMuted }]}>{t('session.drillTypesAvailable', { count: drillTypes.length })}</Text>
         </View>
       )}
 
@@ -132,11 +135,12 @@ const DrillCard = memo(function DrillCard({
   onPress: () => void;
 }) {
   const colors = useColors();
+  const { t } = useTranslation();
   const diffColor = DIFFICULTY_COLORS[drill.difficulty] || colors.textMuted;
 
   const specs = [
     `${drill.distances[0]}m`,
-    `${drill.rounds} rds`,
+    t('session.rounds', { count: drill.rounds }),
     drill.totalTimeLimit ? `${drill.totalTimeLimit}s` : null,
   ].filter(Boolean);
 

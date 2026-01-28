@@ -17,6 +17,7 @@ import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { ChevronRight, Users } from 'lucide-react-native';
 import { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeInDown, FadeOutUp } from 'react-native-reanimated';
 
@@ -36,6 +37,7 @@ interface SquadLobbyBannerProps {
 }
 
 export function SquadLobbyBanner({ trainingId, userId, onLobbyChanged }: SquadLobbyBannerProps) {
+  const { t } = useTranslation();
   const colors = useColors();
 
   const [activeLobby, setActiveLobby] = useState<ActiveLobby | null>(null);
@@ -110,7 +112,7 @@ export function SquadLobbyBanner({ trainingId, userId, onLobbyChanged }: SquadLo
       setActiveLobby({
         engagementId: engagement.id,
         sessionId: session.id,
-        drillName: drillConfig?.name || (isGroup ? 'Group Engagement' : 'Squad Engagement'),
+        drillName: drillConfig?.name || (isGroup ? t('training.groupEngagement') : t('training.squadEngagement')),
         participantCount: counts.total,
         hasStarted: !!engagement.started_at,
         engagementMode: engagement.engagement_mode as 'squad' | 'group',
@@ -207,7 +209,7 @@ export function SquadLobbyBanner({ trainingId, userId, onLobbyChanged }: SquadLo
 
   const isInProgress = activeLobby.hasStarted;
   const isGroup = activeLobby.engagementMode === 'group';
-  const modeLabel = isGroup ? 'Group' : 'Squad';
+  const modeLabel = isGroup ? t('training.groupType') : t('training.squadType');
   const accentColor = isInProgress ? colors.green : colors.orange;
 
   return (
@@ -223,11 +225,11 @@ export function SquadLobbyBanner({ trainingId, userId, onLobbyChanged }: SquadLo
 
         <View style={styles.content}>
           <Text style={[styles.title, { color: colors.text }]}>
-            {isInProgress ? `${modeLabel} Session In Progress` : `${modeLabel} Lobby Active`}
+            {isInProgress ? t('training.sessionInProgress', { mode: modeLabel }) : t('training.lobbyActive', { mode: modeLabel })}
           </Text>
           <Text style={[styles.subtitle, { color: colors.textMuted }]}>
             {activeLobby.drillName}
-            {!isInProgress && activeLobby.participantCount > 0 && ` · ${activeLobby.participantCount} waiting`}
+            {!isInProgress && activeLobby.participantCount > 0 && ` · ${t('training.waiting', { count: activeLobby.participantCount })}`}
           </Text>
         </View>
 

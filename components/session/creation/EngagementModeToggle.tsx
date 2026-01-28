@@ -16,6 +16,7 @@
  */
 
 import { useColors } from '@/hooks/ui/useColors';
+import { useTranslation } from 'react-i18next';
 import * as Haptics from 'expo-haptics';
 import { User, Users, UsersRound } from 'lucide-react-native';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -32,6 +33,7 @@ interface EngagementModeToggleProps {
 }
 
 export function EngagementModeToggle({ value, onChange, disabled = false }: EngagementModeToggleProps) {
+  const { t } = useTranslation();
   const colors = useColors();
 
   const handlePress = (mode: EngagementMode) => {
@@ -46,7 +48,7 @@ export function EngagementModeToggle({ value, onChange, disabled = false }: Enga
 
   return (
     <View style={styles.container}>
-      <Text style={[styles.label, { color: colors.textMuted }]}>Mode</Text>
+      <Text style={[styles.label, { color: colors.textMuted }]}>{t('session.mode')}</Text>
       <View style={[styles.toggleContainer, { backgroundColor: colors.card, borderColor: colors.border }]}>
         {/* Solo Option */}
         <TouchableOpacity
@@ -56,7 +58,7 @@ export function EngagementModeToggle({ value, onChange, disabled = false }: Enga
           activeOpacity={0.7}
         >
           <User size={16} color={isSolo ? '#fff' : colors.textMuted} strokeWidth={2} />
-          <Text style={[styles.optionText, { color: isSolo ? '#fff' : colors.text }]}>Solo</Text>
+          <Text style={[styles.optionText, { color: isSolo ? '#fff' : colors.text }]}>{t('session.solo')}</Text>
         </TouchableOpacity>
 
         {/* Squad Option */}
@@ -67,7 +69,7 @@ export function EngagementModeToggle({ value, onChange, disabled = false }: Enga
           activeOpacity={0.7}
         >
           <Users size={16} color={isSquad ? '#fff' : colors.textMuted} strokeWidth={2} />
-          <Text style={[styles.optionText, { color: isSquad ? '#fff' : colors.text }]}>Squad</Text>
+          <Text style={[styles.optionText, { color: isSquad ? '#fff' : colors.text }]}>{t('session.squad')}</Text>
         </TouchableOpacity>
 
         {/* Group Option */}
@@ -78,7 +80,7 @@ export function EngagementModeToggle({ value, onChange, disabled = false }: Enga
           activeOpacity={0.7}
         >
           <UsersRound size={16} color={isGroup ? '#fff' : colors.textMuted} strokeWidth={2} />
-          <Text style={[styles.optionText, { color: isGroup ? '#fff' : colors.text }]}>Group</Text>
+          <Text style={[styles.optionText, { color: isGroup ? '#fff' : colors.text }]}>{t('session.group')}</Text>
         </TouchableOpacity>
       </View>
     </View>

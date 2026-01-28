@@ -17,9 +17,9 @@ import { SquadLobbyBanner } from '@/components/training/SquadLobbyBanner';
 import { TrainingHero, TrainingSettingsModal } from '@/components/training/detail';
 import { useAuth } from '@/contexts/AuthContext';
 import { useModals } from '@/contexts/ModalContext';
+import { useTrainingRealtime } from '@/hooks/realtime';
 import { useColors } from '@/hooks/ui/useColors';
 import { usePermissions } from '@/hooks/usePermissions';
-import { useTrainingRealtime } from '@/hooks/realtime';
 import { getTrainingSessionsWithStats, SessionWithDetails } from '@/services/sessionService';
 import { finishTraining, startTraining } from '@/services/trainingService';
 import { useTeamStore } from '@/store/teamStore';
@@ -27,6 +27,7 @@ import type { TrainingDrill } from '@/types/workspace';
 import { format, formatDistanceToNow } from 'date-fns';
 import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from 'expo-router';
+import { t } from 'i18next';
 import {
   AlertCircle,
   ArrowLeft,
@@ -42,6 +43,7 @@ import {
   Users,
 } from 'lucide-react-native';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { interpolate, useAnimatedRef, useAnimatedStyle, useScrollViewOffset } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -80,6 +82,7 @@ function HeaderSection({
   isUpdatingStatus: boolean;
   headerAnimatedStyle: any;
 }) {
+  const { t } = useTranslation();
   const uniqueShooters = new Set(completedSessions.map((s) => s.user_id)).size;
 
   return (
@@ -106,13 +109,15 @@ function HeaderSection({
       <View style={styles.statusBar}>
         <View style={[styles.statusItem, { backgroundColor: colors.primary + '12' }]}>
           <Target size={14} color={colors.primary} />
-          <Text style={[styles.statusText, { color: colors.primary }]}>{completedSessions.length} completed</Text>
+          <Text style={[styles.statusText, { color: colors.primary }]}>
+            {t('training.completedSessions', { count: completedSessions.length })}
+          </Text>
         </View>
         {uniqueShooters > 0 && (
           <View style={[styles.statusItem, { backgroundColor: colors.blue + '12' }]}>
             <Users size={14} color={colors.blue} />
             <Text style={[styles.statusText, { color: colors.blue }]}>
-              {uniqueShooters} shooter{uniqueShooters !== 1 ? 's' : ''}
+              {t('training.shootersCount', { count: uniqueShooters })}
             </Text>
           </View>
         )}
@@ -128,7 +133,7 @@ function HeaderSection({
             ) : (
               <>
                 <Play size={10} color="#fff" fill="#fff" />
-                <Text style={styles.commanderPillText}>Start</Text>
+                <Text style={styles.commanderPillText}>{t('training.startTraining')}</Text>
               </>
             )}
           </TouchableOpacity>
@@ -144,7 +149,7 @@ function HeaderSection({
             ) : (
               <>
                 <Flag size={10} color="#fff" />
-                <Text style={styles.commanderPillText}>End</Text>
+                <Text style={styles.commanderPillText}>{t('training.endTraining')}</Text>
               </>
             )}
           </TouchableOpacity>
@@ -166,6 +171,7 @@ function TabBar({
   onTabChange: (tab: 'drills' | 'results') => void;
   colors: any;
 }) {
+  const { t } = useTranslation();
   return (
     <View style={[styles.tabBar, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
       <TouchableOpacity
@@ -174,7 +180,7 @@ function TabBar({
       >
         <Target size={16} color={activeTab === 'drills' ? colors.primary : colors.textMuted} />
         <Text style={[styles.tabText, { color: activeTab === 'drills' ? colors.primary : colors.textMuted }]}>
-          Drills
+          {t('training.drills')}
         </Text>
       </TouchableOpacity>
       <TouchableOpacity
@@ -183,7 +189,7 @@ function TabBar({
       >
         <Trophy size={16} color={activeTab === 'results' ? colors.primary : colors.textMuted} />
         <Text style={[styles.tabText, { color: activeTab === 'results' ? colors.primary : colors.textMuted }]}>
-          Results
+          {t('training.results')}
         </Text>
       </TouchableOpacity>
     </View>
@@ -202,6 +208,7 @@ function SummaryCard({
   completedSessions: SessionWithDetails[];
   colors: any;
 }) {
+  const { t } = useTranslation();
   if (completedSessions.length === 0) return null;
 
   const totalShots = completedSessions.reduce((sum, s) => sum + (s.stats?.shots_fired || 0), 0);
@@ -220,8 +227,8 @@ function SummaryCard({
       </View>
       <Text style={[styles.summaryHeadline, { color: colors.text }]}>
         {avgAccuracy !== null
-          ? `${avgAccuracy}% Hit Rate`
-          : `${completedSessions.length} Session${completedSessions.length !== 1 ? 's' : ''}`}
+          ? t('training.hitRate', { percent: avgAccuracy })
+          : t('training.sessionsCount', { count: completedSessions.length })}
       </Text>
       <Text style={[styles.summarySubtitle, { color: colors.textMuted }]}>
         {format(new Date(training.scheduled_at), 'MMM d, yyyy')}
@@ -229,7 +236,7 @@ function SummaryCard({
       <View style={[styles.metricsRow, { borderTopColor: colors.border }]}>
         <View style={styles.metric}>
           <Text style={[styles.metricValue, { color: colors.text }]}>{totalShots || '—'}</Text>
-          <Text style={[styles.metricLabel, { color: colors.textMuted }]}>Shots</Text>
+          <Text style={[styles.metricLabel, { color: colors.textMuted }]}>{t('session.shots')}</Text>
         </View>
         <View style={[styles.metricDivider, { backgroundColor: colors.border }]} />
         <View style={styles.metric}>
@@ -237,13 +244,13 @@ function SummaryCard({
             {bestGroup !== null ? `${bestGroup.toFixed(1)}` : '—'}
           </Text>
           <Text style={[styles.metricLabel, { color: colors.textMuted }]}>
-            {bestGroup !== null ? 'Best (cm)' : 'Group'}
+            {bestGroup !== null ? t('training.bestCm') : t('session.grouping')}
           </Text>
         </View>
         <View style={[styles.metricDivider, { backgroundColor: colors.border }]} />
         <View style={styles.metric}>
           <Text style={[styles.metricValue, { color: colors.text }]}>{uniqueShooters || '—'}</Text>
-          <Text style={[styles.metricLabel, { color: colors.textMuted }]}>Shooters</Text>
+          <Text style={[styles.metricLabel, { color: colors.textMuted }]}>{t('training.shooters')}</Text>
         </View>
       </View>
     </View>
@@ -260,6 +267,7 @@ function CompletedSessionsList({
   completedSessions: SessionWithDetails[];
   colors: any;
 }) {
+  const { t } = useTranslation();
   if (completedSessions.length === 0) return null;
 
   // Group sessions by user
@@ -267,14 +275,14 @@ function CompletedSessionsList({
   completedSessions.forEach((s) => {
     const uid = s.user_id;
     if (!groupedByUser.has(uid)) {
-      groupedByUser.set(uid, { name: (s as any).user_full_name || 'Unknown', sessions: [] });
+      groupedByUser.set(uid, { name: (s as any).user_full_name || t('common.unknown'), sessions: [] });
     }
     groupedByUser.get(uid)!.sessions.push(s);
   });
 
   return (
     <View style={styles.section}>
-      <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>SESSION HISTORY</Text>
+      <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>{t('training.sessionHistorySection')}</Text>
 
       {Array.from(groupedByUser.entries()).map(([uid, { name, sessions }]) => (
         <View key={uid} style={styles.userGroup}>
@@ -303,10 +311,10 @@ function CompletedSessionsList({
  * Single Session Row (for completed sessions)
  */
 function SessionRow({ session, colors, isLast }: { session: SessionWithDetails; colors: any; isLast: boolean }) {
-  const drillName = session.drill_config?.name || session.drill_name || 'Session';
+  const { t } = useTranslation();
+  const drillName = session.drill_config?.name || session.drill_name || t('session.title');
   // Check both drill_config and engagement for drill_goal (engagement is authoritative)
-  const isGrouping =
-    session.engagement?.drill_goal === 'grouping' || session.drill_config?.drill_goal === 'grouping';
+  const isGrouping = session.engagement?.drill_goal === 'grouping' || session.drill_config?.drill_goal === 'grouping';
   const engagementMode = session.engagement?.engagement_mode;
   const isSquadOrGroup = engagementMode === 'squad' || engagementMode === 'group';
   const accuracy =
@@ -331,17 +339,21 @@ function SessionRow({ session, colors, isLast }: { session: SessionWithDetails; 
   const getMetaText = () => {
     if (isSquadOrGroup) {
       // Squad/Group: show participants + shots
-      return `${participantCount} shooter${participantCount !== 1 ? 's' : ''} · ${shots} rds${hits > 0 ? ` · ${hits} hits` : ''}`;
+      return `${t('training.shootersCount', { count: participantCount })} · ${shots} ${t('session.shots')}${hits > 0 ? ` · ${hits} ${t('session.hits')}` : ''}`;
     } else if (isGrouping) {
       // Grouping: show distance, shots, and targets scanned
       const parts = [];
       if (distance) parts.push(`${distance}m`);
-      if (shots > 0) parts.push(`${shots} rds`);
-      if (targetCount > 0) parts.push(`${targetCount} target${targetCount !== 1 ? 's' : ''}`);
-      return parts.length > 0 ? parts.join(' · ') : (groupSize != null ? `Group: ${groupSize.toFixed(1)}cm` : 'Completed');
+      if (shots > 0) parts.push(`${shots} ${t('session.shots')}`);
+      if (targetCount > 0) parts.push(t('training.targetsCount', { count: targetCount }));
+      return parts.length > 0
+        ? parts.join(' · ')
+        : groupSize != null
+          ? t('training.groupSize', { size: groupSize.toFixed(1) })
+          : t('training.completed');
     } else {
       // Solo engagement: show distance + shots
-      return `${distance ? `${distance}m · ` : ''}${shots > 0 ? `${shots} rds` : 'No data'}`;
+      return `${distance ? `${distance}m · ` : ''}${shots > 0 ? `${shots} ${t('session.shots')}` : t('common.noData')}`;
     }
   };
 
@@ -368,13 +380,13 @@ function SessionRow({ session, colors, isLast }: { session: SessionWithDetails; 
           {isSquadOrGroup && (
             <View style={[styles.squadBadge, { backgroundColor: colors.primary + '15' }]}>
               <Text style={[styles.squadBadgeText, { color: colors.primary }]}>
-                {engagementMode === 'group' ? 'GROUP' : 'SQUAD'}
+                {engagementMode === 'group' ? t('training.groupType') : t('training.squadType')}
               </Text>
             </View>
           )}
           {isGrouping && !isSquadOrGroup && (
             <View style={[styles.squadBadge, { backgroundColor: colors.orange + '15' }]}>
-              <Text style={[styles.squadBadgeText, { color: colors.orange }]}>GROUPING</Text>
+              <Text style={[styles.squadBadgeText, { color: colors.orange }]}>{t('training.groupingType')}</Text>
             </View>
           )}
         </View>
@@ -411,6 +423,7 @@ function PlannedDrillsList({
   colors: any;
   onStartDrill: (drill: TrainingDrill) => void;
 }) {
+  const { t } = useTranslation();
   if (!training.drills || training.drills.length === 0) return null;
 
   const canStart = training.status === 'ongoing';
@@ -418,7 +431,7 @@ function PlannedDrillsList({
   return (
     <View style={styles.section}>
       <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>
-        {canStart ? 'AVAILABLE DRILLS' : 'PLANNED DRILLS'}
+        {canStart ? t('training.availableDrills') : t('training.plannedDrills')}
       </Text>
 
       <View style={[styles.sessionsList, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -438,9 +451,7 @@ function PlannedDrillsList({
       </View>
 
       {training.status === 'planned' && (
-        <Text style={[styles.drillsHint, { color: colors.textMuted }]}>
-          Start the training to enable drill execution
-        </Text>
+        <Text style={[styles.drillsHint, { color: colors.textMuted }]}>{t('training.startTrainingToEnable')}</Text>
       )}
     </View>
   );
@@ -464,15 +475,16 @@ function DrillRow({
   isLast: boolean;
   onStart: () => void;
 }) {
+  const { t } = useTranslation();
   const isGrouping = drill.drill_goal === 'grouping';
   const goalColor = isGrouping ? colors.blue : colors.orange;
 
   // Execution policy display
   const policy = (drill.execution_policy || 'locked') as 'locked' | 'guided' | 'free';
   const policyConfigs = {
-    locked: { Icon: Lock, color: colors.blue, label: 'Locked' },
-    guided: { Icon: Sparkles, color: colors.green, label: 'Guided' },
-    free: { Icon: Unlock, color: colors.orange, label: 'Free' },
+    locked: { Icon: Lock, color: colors.blue, label: t('training.locked') },
+    guided: { Icon: Sparkles, color: colors.green, label: t('training.guided') },
+    free: { Icon: Unlock, color: colors.orange, label: t('training.free') },
   };
   const policyConfig = policyConfigs[policy];
 
@@ -489,7 +501,7 @@ function DrillRow({
       <View style={styles.sessionInfo}>
         <View style={styles.drillNameRow}>
           <Text style={[styles.sessionName, { color: colors.text }]} numberOfLines={1}>
-            {drill.name || `Drill ${index + 1}`}
+            {drill.name || t('training.drill', { number: index + 1 })}
           </Text>
           <View style={[styles.policyBadge, { backgroundColor: `${policyConfig.color}15` }]}>
             <policyConfig.Icon size={10} color={policyConfig.color} />
@@ -497,11 +509,11 @@ function DrillRow({
           </View>
         </View>
         <Text style={[styles.sessionMeta, { color: colors.textMuted }]}>
-          {isGrouping ? 'Grouping' : 'Engagement'}
+          {isGrouping ? t('session.grouping') : t('session.engagement')}
           {drill.distance_m != null ? ` · ${drill.distance_m}m` : ''}
-          {drill.rounds_per_shooter != null ? ` · ${drill.rounds_per_shooter} rds` : ''}
-          {drill.position && ` · ${drill.position}`}
-          {drill.distance_m == null && drill.rounds_per_shooter == null && ' · Soldier chooses'}
+          {drill.rounds_per_shooter != null ? ` · ${drill.rounds_per_shooter} ${t('session.shots')}` : ''}
+          {drill.position && ` · ${t(`session.${drill.position}`)}`}
+          {drill.distance_m == null && drill.rounds_per_shooter == null && ` · ${t('training.soldierChooses')}`}
         </Text>
       </View>
       {canStart && (
@@ -525,13 +537,12 @@ function EmptyState({
   completedSessions: SessionWithDetails[];
   colors: any;
 }) {
+  const { t } = useTranslation();
   // Show pending notice if drills exist but no sessions
   if (completedSessions.length === 0 && training.drills?.length > 0) {
     return (
       <View style={[styles.pendingNotice, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        <Text style={[styles.pendingText, { color: colors.textMuted }]}>
-          No completed sessions yet. Soldiers can start these drills from the home screen.
-        </Text>
+        <Text style={[styles.pendingText, { color: colors.textMuted }]}>{t('training.noCompletedSessionsYet')}</Text>
       </View>
     );
   }
@@ -543,8 +554,8 @@ function EmptyState({
         <View style={[styles.emptyIcon, { backgroundColor: colors.secondary }]}>
           <Target size={24} color={colors.textMuted} />
         </View>
-        <Text style={[styles.emptyTitle, { color: colors.text }]}>No Drills Yet</Text>
-        <Text style={[styles.emptySubtitle, { color: colors.textMuted }]}>This training has no drills configured</Text>
+        <Text style={[styles.emptyTitle, { color: colors.text }]}>{t('training.noDrillsYet')}</Text>
+        <Text style={[styles.emptySubtitle, { color: colors.textMuted }]}>{t('training.noDrillsConfigured')}</Text>
       </View>
     );
   }
@@ -667,7 +678,9 @@ function TrainingSummaryContent({
             {/* Empty state for results */}
             {completedSessions.length === 0 && (
               <View style={[styles.emptyResults, { borderColor: colors.border }]}>
-                <Text style={[styles.emptyResultsText, { color: colors.textMuted }]}>No completed sessions yet</Text>
+                <Text style={[styles.emptyResultsText, { color: colors.textMuted }]}>
+                  {t('training.noCompletedSessions')}
+                </Text>
               </View>
             )}
           </>
@@ -676,7 +689,7 @@ function TrainingSummaryContent({
 
       {/* Footer */}
       <Text style={[styles.footer, { color: colors.textMuted }]}>
-        Created {formatDistanceToNow(new Date(training.created_at), { addSuffix: true })}
+        {t('training.created')} {formatDistanceToNow(new Date(training.created_at), { addSuffix: true })}
       </Text>
     </Animated.ScrollView>
   );
@@ -687,6 +700,7 @@ function TrainingSummaryContent({
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export default function TrainingDetailScreen() {
+  const { t } = useTranslation();
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { session } = useAuth();
@@ -759,7 +773,7 @@ export default function TrainingDetailScreen() {
       }
 
       console.log('[TrainingDetail] Realtime update received:', updatedTraining.status);
-      
+
       // Update local training state with new status
       setTraining((prev: any) => {
         if (!prev) return prev;
@@ -906,10 +920,8 @@ export default function TrainingDetailScreen() {
         </View>
         <View style={styles.notFoundContainer}>
           <AlertCircle size={48} color={colors.textMuted} />
-          <Text style={[styles.notFoundTitle, { color: colors.text }]}>Training Not Found</Text>
-          <Text style={[styles.notFoundText, { color: colors.textMuted }]}>
-            This training may have been deleted or you don't have access.
-          </Text>
+          <Text style={[styles.notFoundTitle, { color: colors.text }]}>{t('training.trainingNotFound')}</Text>
+          <Text style={[styles.notFoundText, { color: colors.textMuted }]}>{t('training.notFoundMessage')}</Text>
         </View>
       </View>
     );

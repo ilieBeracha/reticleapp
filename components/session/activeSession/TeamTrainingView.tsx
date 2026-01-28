@@ -10,6 +10,7 @@
 
 import { TargetCard } from '@/components/session/TargetCard';
 import { useColors } from '@/hooks/ui/useColors';
+import { useTranslation } from 'react-i18next';
 import type { SessionDrillConfig, SessionWithDetails } from '@/services/session/types';
 import { isGroupingSession } from '@/utils/drillGoal';
 import { Camera, Check, Crosshair, Lock, MapPin, Square, Target, Zap } from 'lucide-react-native';
@@ -53,6 +54,7 @@ export function TeamTrainingView({
   onEndSession,
   ending,
 }: TeamTrainingViewProps) {
+  const { t } = useTranslation();
   const colors = useColors();
 
   const isGrouping = isGroupingSession(session);
@@ -87,12 +89,12 @@ export function TeamTrainingView({
           <View style={styles.statusRow}>
             <View style={[styles.modeBadge, { backgroundColor: colors.primary + '15' }]}>
               <Lock size={12} color={colors.primary} />
-              <Text style={[styles.modeText, { color: colors.primary }]}>LOCKED</Text>
+              <Text style={[styles.modeText, { color: colors.primary }]}>{t('session.locked')}</Text>
             </View>
             {drillComplete && (
               <View style={[styles.modeBadge, { backgroundColor: '#10B98120' }]}>
                 <Check size={12} color="#10B981" />
-                <Text style={[styles.modeText, { color: '#10B981' }]}>COMPLETE</Text>
+                <Text style={[styles.modeText, { color: '#10B981' }]}>{t('session.complete')}</Text>
               </View>
             )}
           </View>
@@ -152,19 +154,19 @@ export function TeamTrainingView({
             {isGrouping ? (
               <>
                 <Camera size={20} color={colors.background} />
-                <Text style={[styles.actionText, { color: colors.background }]}>Scan Target</Text>
+                <Text style={[styles.actionText, { color: colors.background }]}>{t('session.scanTarget')}</Text>
               </>
             ) : (
               <>
                 <Crosshair size={20} color={colors.background} />
-                <Text style={[styles.actionText, { color: colors.background }]}>Log Result</Text>
+                <Text style={[styles.actionText, { color: colors.background }]}>{t('session.logResult')}</Text>
               </>
             )}
           </TouchableOpacity>
           {/* Alternative option (small, subtle) */}
           <TouchableOpacity style={styles.altAction} onPress={isGrouping ? onManualRoute : onScanRoute}>
             <Text style={[styles.altText, { color: colors.textMuted }]}>
-              {isGrouping ? 'or enter manually' : 'or scan paper'}
+              {isGrouping ? t('session.orEnterManually') : t('session.orScanPaper')}
             </Text>
           </TouchableOpacity>
         </Animated.View>
@@ -173,7 +175,9 @@ export function TeamTrainingView({
       {/* Previous targets list */}
       {targets.length > 1 && (
         <View style={styles.prevList}>
-          <Text style={[styles.prevLabel, { color: colors.textMuted }]}>PREVIOUS ({targets.length - 1})</Text>
+          <Text style={[styles.prevLabel, { color: colors.textMuted }]}>
+            {t('session.previous', { count: targets.length - 1 })}
+          </Text>
           <FlatList
             data={targets.slice(1)}
             renderItem={({ item, index }) => (
@@ -204,7 +208,7 @@ export function TeamTrainingView({
             <>
               {drillComplete ? <Check size={18} color="#fff" /> : <Square size={16} color={colors.text} />}
               <Text style={[styles.endBtnText, { color: drillComplete ? '#fff' : colors.text }]}>
-                {drillComplete ? 'Complete & Return' : 'End Execution'}
+                {drillComplete ? t('session.completeAndReturn') : t('session.endExecution')}
               </Text>
             </>
           )}

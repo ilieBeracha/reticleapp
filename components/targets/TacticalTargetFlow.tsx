@@ -6,6 +6,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { ArrowLeft, Check, ChevronRight, Crosshair, Minus, Plus, Ruler, Target, Timer } from 'lucide-react-native';
 import React, { useCallback, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
   Alert,
@@ -22,10 +23,10 @@ import { COLORS } from './types';
 // ═══════════════════════════════════════════════════════════════════════════
 // DISTANCE CATEGORIES
 // ═══════════════════════════════════════════════════════════════════════════
-const DISTANCE_CATEGORIES = [
-  { label: 'Close', range: '5-15m', distances: [5, 7, 10, 15] },
-  { label: 'Medium', range: '25-50m', distances: [25, 35, 50] },
-  { label: 'Long', range: '100m+', distances: [100, 200, 300] },
+const getDistanceCategories = (t: (key: string) => string) => [
+  { label: t('target.distanceCategory.close'), range: '5-15m', distances: [5, 7, 10, 15] },
+  { label: t('target.distanceCategory.medium'), range: '25-50m', distances: [25, 35, 50] },
+  { label: t('target.distanceCategory.long'), range: '100m+', distances: [100, 200, 300] },
 ];
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -168,6 +169,7 @@ interface HitsStepperProps {
 }
 
 const HitsStepper = React.memo(function HitsStepper({ value, onChange, bulletsFired }: HitsStepperProps) {
+  const { t } = useTranslation();
   const handleDecrement = useCallback(() => {
     if (value > 0) {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -186,8 +188,8 @@ const HitsStepper = React.memo(function HitsStepper({ value, onChange, bulletsFi
 
   return (
     <View style={hitsStyles.container}>
-      <Text style={hitsStyles.label}>HITS ON TARGET</Text>
-      <Text style={hitsStyles.sublabel}>Out of {bulletsFired} shots fired</Text>
+      <Text style={hitsStyles.label}>{t('target.hitsOnTarget')}</Text>
+      <Text style={hitsStyles.sublabel}>{t('target.outOfBulletsFired', { count: bulletsFired })}</Text>
 
       <View style={hitsStyles.row}>
         <TouchableOpacity
@@ -217,7 +219,7 @@ const HitsStepper = React.memo(function HitsStepper({ value, onChange, bulletsFi
       </View>
 
       {/* Accuracy display */}
-      <Text style={hitsStyles.accuracyText}>{accuracy}% accuracy</Text>
+      <Text style={hitsStyles.accuracyText}>{t('target.accuracyPercent', { percent: accuracy })}</Text>
 
       {/* Quick select - only show values up to bulletsFired */}
       <View style={hitsStyles.quickRow}>
@@ -335,6 +337,8 @@ export function TacticalTargetFlow({
   onComplete,
   onCancel,
 }: TacticalTargetFlowProps) {
+  const { t } = useTranslation();
+  const distanceCategories = getDistanceCategories(t);
   // ALWAYS skip setup step - go directly to results
   // - Grouping: enter group size (cm) + shots count
   // - Engagement: enter hits count
@@ -366,21 +370,21 @@ export function TacticalTargetFlow({
   const handleContinue = useCallback(() => {
     if (distance <= 0) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-      Alert.alert('Invalid Distance', 'Please select a valid distance.');
+      Alert.alert(t('target.invalidDistanceTitle'), t('target.invalidDistanceMessage'));
       return;
     }
     if (bullets <= 0) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-      Alert.alert('Invalid Bullets', 'Please enter a valid number of bullets.');
+      Alert.alert(t('target.invalidBulletsTitle'), t('target.invalidBulletsMessage'));
       return;
     }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setStep('results');
-  }, [distance, bullets]);
+  }, [distance, bullets, t]);
 
   const handleSave = useCallback(async () => {
     if (!sessionId) {
-      Alert.alert('Error', 'Session ID missing');
+      Alert.alert(t('common.error'), t('target.sessionIdMissing'));
       return;
     }
 
@@ -388,13 +392,13 @@ export function TacticalTargetFlow({
 
     if (isGrouping && !groupSizeCm) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-      Alert.alert('Missing Group Size', 'Please enter the group size in cm.');
+      Alert.alert(t('target.missingGroupSizeTitle'), t('target.missingGroupSizeMessage'));
       return;
     }
 
     if (isGrouping && groupingShots < 2) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-      Alert.alert('Missing Shots', 'A group requires at least 2 shots.');
+      Alert.alert(t('target.missingShotsTitle'), t('target.missingShotsMessage'));
       return;
     }
 
@@ -443,7 +447,7 @@ export function TacticalTargetFlow({
     } catch (error: any) {
       console.error('Failed to add target:', error);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      Alert.alert('Error', error.message || 'Failed to add target');
+      Alert.alert(t('common.error'), error.message || t('target.failedToAddTarget'));
       setSaving(false);
     }
   }, [
@@ -458,6 +462,7 @@ export function TacticalTargetFlow({
     stageCleared,
     notes,
     onComplete,
+    t,
   ]);
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -482,8 +487,12 @@ export function TacticalTargetFlow({
               )}
             </View>
             <View>
-              <Text style={styles.headerTitle}>{isGrouping ? 'Grouping Target' : 'Tactical Target'}</Text>
-              <Text style={styles.headerSubtitle}>{isGrouping ? 'Manual group size entry' : 'Manual hit logging'}</Text>
+              <Text style={styles.headerTitle}>
+                {isGrouping ? t('target.groupingTarget') : t('target.tactical')}
+              </Text>
+              <Text style={styles.headerSubtitle}>
+                {isGrouping ? t('target.manualGroupSizeEntry') : t('target.manualHitLogging')}
+              </Text>
             </View>
           </View>
           <TouchableOpacity onPress={handleClose} style={styles.closeBtn}>
@@ -493,8 +502,8 @@ export function TacticalTargetFlow({
 
         {/* Distance Selection */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Distance</Text>
-          {DISTANCE_CATEGORIES.map((category) => (
+          <Text style={styles.sectionTitle}>{t('session.distance')}</Text>
+          {distanceCategories.map((category) => (
             <View key={category.label} style={styles.distanceCategory}>
               <View style={styles.distanceCategoryHeader}>
                 <Text style={styles.distanceCategoryLabel}>{category.label}</Text>
@@ -526,12 +535,12 @@ export function TacticalTargetFlow({
         {/* Bullets Stepper */}
         <View style={styles.section}>
           <Stepper
-            label={isGrouping ? 'Shots in Group' : 'Bullets to Fire'}
+            label={isGrouping ? t('target.shotsInGroup') : t('target.bulletsToFire')}
             value={bullets}
             onChange={lockBullets ? () => {} : setBullets}
             min={lockBullets ? bullets : 1}
             max={lockBullets ? bullets : 100}
-            unit="bullets"
+            unit={t('target.bulletsUnit')}
             disabled={lockBullets}
           />
         </View>
@@ -544,13 +553,13 @@ export function TacticalTargetFlow({
             end={{ x: 1, y: 0 }}
             style={styles.submitBtnGradient}
           >
-            <Text style={styles.submitBtnText}>Enter Results</Text>
+            <Text style={styles.submitBtnText}>{t('target.enterResults')}</Text>
             <ChevronRight size={20} color="#fff" />
           </LinearGradient>
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.cancelBtn} onPress={handleClose} activeOpacity={0.7}>
-          <Text style={styles.cancelBtnText}>Cancel</Text>
+          <Text style={styles.cancelBtnText}>{t('common.cancel')}</Text>
         </TouchableOpacity>
 
         <View style={{ height: 20 }} />
@@ -581,11 +590,11 @@ export function TacticalTargetFlow({
           <View style={{ width: 40 }} />
         )}
         <View style={styles.headerCenter}>
-          <Text style={styles.headerTitle}>Log Results</Text>
+          <Text style={styles.headerTitle}>{t('target.logResults')}</Text>
           <View style={styles.headerMeta}>
             {isGrouping ? <Target size={14} color={COLORS.primary} /> : <Crosshair size={14} color={COLORS.primary} />}
             <Text style={styles.headerSubtitle}>
-              {isGrouping ? `Grouping • ${distance}m` : `Engagement • ${distance}m • ${bullets} shots`}
+              {isGrouping ? t('target.groupingMeta', { distance }) : t('target.engagementMeta', { distance, shots: bullets })}
             </Text>
           </View>
         </View>
@@ -602,8 +611,8 @@ export function TacticalTargetFlow({
             <View style={styles.groupingIconContainer}>
               <Ruler size={24} color={COLORS.primary} />
             </View>
-            <Text style={styles.groupingTitle}>Group Size</Text>
-            <Text style={styles.groupingSublabel}>Measure shot dispersion</Text>
+            <Text style={styles.groupingTitle}>{t('target.groupSize')}</Text>
+            <Text style={styles.groupingSublabel}>{t('target.measureShotDispersion')}</Text>
           </View>
 
           <View style={styles.groupingInputRow}>
@@ -641,7 +650,7 @@ export function TacticalTargetFlow({
           {/* Total Shots in Group (Required) */}
           <View style={styles.groupingShotsSection}>
             <Text style={styles.groupingShotsLabel}>
-              Total Shots <Text style={{ color: COLORS.danger }}>*</Text>
+              {t('target.totalShots')} <Text style={{ color: COLORS.danger }}>*</Text>
             </Text>
             <View style={styles.groupingShotsRow}>
               <TouchableOpacity
@@ -708,8 +717,8 @@ export function TacticalTargetFlow({
               <Timer size={18} color={COLORS.primary} />
             </View>
             <View style={styles.cardHeaderText}>
-              <Text style={styles.cardTitle}>Engagement Time</Text>
-              <Text style={styles.cardHint}>{time ? `${time}s` : 'Optional - how fast?'}</Text>
+              <Text style={styles.cardTitle}>{t('target.engagementTime')}</Text>
+              <Text style={styles.cardHint}>{time ? `${time}s` : t('target.optionalHowFast')}</Text>
             </View>
           </View>
 
@@ -722,7 +731,7 @@ export function TacticalTargetFlow({
                 setTime('');
               }}
             >
-              <Text style={[styles.timeChipText, !time && styles.timeChipTextSelected]}>Skip</Text>
+              <Text style={[styles.timeChipText, !time && styles.timeChipTextSelected]}>{t('common.skip')}</Text>
             </TouchableOpacity>
             {[3, 5, 10, 15, 20, 30].map((seconds) => {
               const isSelected = time === String(seconds);
@@ -743,7 +752,7 @@ export function TacticalTargetFlow({
 
           {/* Custom input */}
           <View style={styles.timeCustomRow}>
-            <Text style={styles.timeCustomLabel}>Custom:</Text>
+            <Text style={styles.timeCustomLabel}>{t('common.custom')}:</Text>
             <TextInput
               style={styles.timeCustomInput}
               value={time}
@@ -766,8 +775,8 @@ export function TacticalTargetFlow({
               <Check size={18} color={stageCleared ? '#000' : COLORS.textMuted} />
             </View>
             <View>
-              <Text style={styles.toggleTitle}>Stage Cleared</Text>
-              <Text style={styles.toggleHint}>Completed tactical objective?</Text>
+              <Text style={styles.toggleTitle}>{t('target.stageCleared')}</Text>
+              <Text style={styles.toggleHint}>{t('target.stageClearedHint')}</Text>
             </View>
           </View>
           <Switch
@@ -785,13 +794,13 @@ export function TacticalTargetFlow({
       {/* Notes */}
       <View style={styles.notesSection}>
         <Text style={styles.notesLabel}>
-          Notes <Text style={styles.optionalLabel}>(optional)</Text>
+          {t('common.notes')} <Text style={styles.optionalLabel}>({t('common.optional')})</Text>
         </Text>
         <TextInput
           style={styles.notesInput}
           value={notes}
           onChangeText={setNotes}
-          placeholder={isGrouping ? 'Any notes about this group...' : 'Any notes about this engagement...'}
+          placeholder={isGrouping ? t('target.groupNotesPlaceholder') : t('target.engagementNotesPlaceholder')}
           placeholderTextColor={COLORS.textDim}
           multiline
           numberOfLines={3}
@@ -811,7 +820,7 @@ export function TacticalTargetFlow({
           ) : (
             <>
               <Target size={20} color="#fff" />
-              <Text style={styles.submitBtnText}>Save Target</Text>
+              <Text style={styles.submitBtnText}>{t('target.saveTarget')}</Text>
             </>
           )}
         </LinearGradient>
@@ -824,7 +833,7 @@ export function TacticalTargetFlow({
           activeOpacity={0.7}
           disabled={saving}
         >
-          <Text style={styles.cancelBtnText}>Back to Setup</Text>
+          <Text style={styles.cancelBtnText}>{t('target.backToSetup')}</Text>
         </TouchableOpacity>
       )}
 

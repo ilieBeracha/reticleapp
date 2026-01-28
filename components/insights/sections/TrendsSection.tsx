@@ -19,6 +19,7 @@ import {
   TrendingDown,
   TrendingUp,
 } from 'lucide-react-native';
+import { useTranslation } from 'react-i18next';
 import { Dimensions, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { AIExplanationBlock, WhyButton } from '../AIExplanationBlock';
@@ -55,11 +56,12 @@ interface MiniChartProps {
 }
 
 function MiniChart({ dataPoints, direction, colors }: MiniChartProps) {
+  const { t } = useTranslation();
   if (dataPoints.length < 2) {
     return (
       <View style={[styles.chartContainer, { backgroundColor: colors.background }]}>
         <Text style={[styles.noDataText, { color: colors.textMuted }]}>
-          Not enough data
+          {t('insights.charts.notEnoughData')}
         </Text>
       </View>
     );
@@ -164,6 +166,7 @@ interface TrendCardProps {
 }
 
 function TrendCard({ trend, onPress, colors }: TrendCardProps) {
+  const { t } = useTranslation();
   const isImproving = trend.direction === 'improving';
   const isDeclining = trend.direction === 'declining';
   const accentColor = isImproving
@@ -305,16 +308,17 @@ function TrendCard({ trend, onPress, colors }: TrendCardProps) {
 // ============================================================================
 
 function EmptyState({ colors }: { colors: ReturnType<typeof useColors> }) {
+  const { t } = useTranslation();
   return (
     <View style={[styles.emptyState, { backgroundColor: colors.card }]}>
       <View style={[styles.emptyIconContainer, { backgroundColor: `${colors.primary}10` }]}>
         <Activity size={24} color={colors.primary} />
       </View>
       <Text style={[styles.emptyTitle, { color: colors.text }]}>
-        Tracking your progress
+        {t('insights.trendsSection.trackingProgress')}
       </Text>
       <Text style={[styles.emptyText, { color: colors.textMuted }]}>
-        Continue training to see trends emerge over time
+        {t('insights.detailedBreakdown.trendsEmpty')}
       </Text>
     </View>
   );
@@ -330,6 +334,7 @@ export function TrendsSection({
   maxVisible = 3,
   hideHeader = false,
 }: TrendsSectionProps) {
+  const { t } = useTranslation();
   const colors = useColors();
   const visibleTrends = trends.slice(0, maxVisible);
 
@@ -342,11 +347,11 @@ export function TrendsSection({
               <Activity size={14} color={colors.primary} />
             </View>
             <Text style={[styles.sectionTitle, { color: colors.text }]}>
-              Trends
+              {t('insights.detailedBreakdown.trends')}
             </Text>
           </View>
           <Text style={[styles.sectionSubtitle, { color: colors.textMuted }]}>
-            How your performance is changing
+            {t('insights.trendsSection.howPerformanceChanging')}
           </Text>
         </View>
       )}
@@ -363,7 +368,7 @@ export function TrendsSection({
           ))}
           {trends.length > maxVisible && (
             <Text style={[styles.moreText, { color: colors.textMuted }]}>
-              +{trends.length - maxVisible} more trends
+              {t('insights.trendsSection.more', { count: trends.length - maxVisible })}
             </Text>
           )}
         </View>

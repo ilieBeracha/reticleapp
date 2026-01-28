@@ -7,6 +7,7 @@
 
 import { isGroupingPaper, isPaperTarget } from '@/constants/drill';
 import { useColors } from '@/hooks/ui/useColors';
+import { useTranslation } from 'react-i18next';
 import { Target } from 'lucide-react-native';
 import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
@@ -17,6 +18,7 @@ interface HeroTargetProps {
 
 export function HeroTarget({ target, onPress }: HeroTargetProps) {
   const colors = useColors();
+  const { t } = useTranslation();
 
   const isPaper = isPaperTarget(target.target_type);
   const paperResult = target.paper_result;
@@ -31,7 +33,11 @@ export function HeroTarget({ target, onPress }: HeroTargetProps) {
   const dispersion = paperResult?.dispersion_cm;
   const hits = paperResult?.hits_total ?? target.tactical_result?.hits ?? 0;
 
-  const typeLabel = isGrouping ? 'Grouping' : isScanned ? 'Scanned' : 'Manual';
+  const typeLabel = isGrouping
+    ? t('session.grouping')
+    : isScanned
+      ? t('session.scannedLabel')
+      : t('session.manualLabel');
   const typeColor = isGrouping ? '#22C55E' : isScanned ? '#A78BFA' : '#60A5FA';
 
   return (
@@ -63,10 +69,10 @@ export function HeroTarget({ target, onPress }: HeroTargetProps) {
       {/* Bottom: Key metric only */}
       <View style={styles.overlay}>
         <Text style={styles.metricValue}>
-          {isGrouping && dispersion != null ? `${dispersion.toFixed(1)}cm` : `${hits} ${isScanned ? 'holes' : 'hits'}`}
+          {isGrouping && dispersion != null ? `${dispersion.toFixed(1)}cm` : `${hits} ${isScanned ? t('session.holes') : t('session.hits')}`}
         </Text>
         <Text style={styles.metricLabel}>
-          {isGrouping ? 'group size' : isScanned ? 'detected' : 'recorded'}
+          {isGrouping ? t('session.groupSize') : isScanned ? t('session.detected') : t('session.recorded')}
         </Text>
       </View>
     </TouchableOpacity>

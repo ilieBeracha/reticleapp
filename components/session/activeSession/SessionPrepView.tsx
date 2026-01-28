@@ -1,5 +1,6 @@
 import { isGroupingGoal } from '@/constants/drill';
 import { useColors } from '@/hooks/ui/useColors';
+import { useTranslation } from 'react-i18next';
 import type { SessionWithDetails } from '@/services/session/types';
 import { activateSession, updateSession } from '@/services/sessionService';
 import { getUserWeapon, type UserWeapon } from '@/services/weaponService';
@@ -77,6 +78,7 @@ function PulsingRing({ color }: { color: string }) {
 }
 
 export function SessionPrepView({ session, insets, onSessionActivated, onBack, onClose }: SessionPrepViewProps) {
+  const { t } = useTranslation();
   const colors = useColors();
   const isWatchConnected = useIsGarminConnected();
   const { refreshDevices } = useGarminStore();
@@ -89,7 +91,7 @@ export function SessionPrepView({ session, insets, onSessionActivated, onBack, o
   const [timeLimit, setTimeLimit] = useState<number | null>(null);
 
   const drill = session.drill_config;
-  const drillName = session.drill_name || drill?.name || 'Practice Session';
+  const drillName = session.drill_name || drill?.name || t('session.practiceSession');
   const isGrouping = isGroupingGoal(drill?.drill_goal);
   const isTeamSession = !!session.team_id;
   const timeLimitOptions = [30, 60, 90, 120, 180];
@@ -225,7 +227,7 @@ export function SessionPrepView({ session, insets, onSessionActivated, onBack, o
         </TouchableOpacity>
         <View style={styles.headerCenter}>
           <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>
-            Ready to Start
+            {t('session.readyToStart')}
           </Text>
         </View>
         <TouchableOpacity style={[styles.closeButton, { backgroundColor: colors.secondary }]} onPress={handleClose}>
@@ -283,7 +285,7 @@ export function SessionPrepView({ session, insets, onSessionActivated, onBack, o
                 <Target size={18} color={colors.text} />
               </View>
               <View style={styles.infoCardContent}>
-                <Text style={[styles.infoCardLabel, { color: colors.textMuted }]}>Weapon</Text>
+                <Text style={[styles.infoCardLabel, { color: colors.textMuted }]}>{t('session.weapon')}</Text>
                 <Text style={[styles.infoCardValue, { color: colors.text }]} numberOfLines={1}>
                   {weaponName}
                 </Text>
@@ -301,7 +303,7 @@ export function SessionPrepView({ session, insets, onSessionActivated, onBack, o
                 <Users size={18} color={colors.primary} />
               </View>
               <View style={styles.infoCardContent}>
-                <Text style={[styles.infoCardLabel, { color: colors.textMuted }]}>Training</Text>
+                <Text style={[styles.infoCardLabel, { color: colors.textMuted }]}>{t('training.title')}</Text>
                 <Text style={[styles.infoCardValue, { color: colors.text }]} numberOfLines={1}>
                   {session.training_title}
                 </Text>
@@ -329,10 +331,10 @@ export function SessionPrepView({ session, insets, onSessionActivated, onBack, o
 
           <View style={styles.watchText}>
             <Text style={[styles.watchStatus, { color: colors.text }]}>
-              {isWatchConnected ? 'Watch Connected' : 'No Watch'}
+              {isWatchConnected ? t('session.watchConnected') : t('session.noWatch')}
             </Text>
             <Text style={[styles.watchHint, { color: colors.textMuted }]}>
-              {isWatchConnected ? 'Ready to track' : 'Phone only mode'}
+              {isWatchConnected ? t('session.readyToTrack') : t('session.phoneOnlyMode')}
             </Text>
           </View>
 
@@ -366,7 +368,7 @@ export function SessionPrepView({ session, insets, onSessionActivated, onBack, o
                 <Settings size={18} color={colors.orange} />
               </View>
               <View style={styles.sensitivityHeaderText}>
-                <Text style={[styles.sensitivityLabel, { color: colors.textMuted }]}>Shot Detection</Text>
+                <Text style={[styles.sensitivityLabel, { color: colors.textMuted }]}>{t('session.shotDetection')}</Text>
                 <Text style={[styles.sensitivityValue, { color: colors.text }]}>
                   {currentSensitivity.toFixed(1)}G{' '}
                   <Text style={{ color: colors.textMuted, fontWeight: '400' }}>({detectionConfig.description})</Text>
@@ -384,10 +386,10 @@ export function SessionPrepView({ session, insets, onSessionActivated, onBack, o
                 {/* Preset Buttons */}
                 <View style={styles.sensitivityPresets}>
                   {[
-                    { id: 'light', label: 'Light', value: 0.8, desc: '.22, test' },
-                    { id: 'medium', label: 'Medium', value: 2.5, desc: '9mm, 5.56' },
-                    { id: 'heavy', label: 'Heavy', value: 4.0, desc: '.45, .308' },
-                    { id: 'shotgun', label: 'Shotgun', value: 5.5, desc: '12ga' },
+                    { id: 'light', label: t('session.sensitivityLight'), value: 0.8, desc: '.22, test' },
+                    { id: 'medium', label: t('session.sensitivityMedium'), value: 2.5, desc: '9mm, 5.56' },
+                    { id: 'heavy', label: t('session.sensitivityHeavy'), value: 4.0, desc: '.45, .308' },
+                    { id: 'shotgun', label: t('session.sensitivityShotgun'), value: 5.5, desc: '12ga' },
                   ].map((preset) => {
                     const isSelected = Math.abs(currentSensitivity - preset.value) < 0.3;
                     return (
@@ -430,13 +432,13 @@ export function SessionPrepView({ session, insets, onSessionActivated, onBack, o
                     }}
                   >
                     <Text style={[styles.autoButtonText, { color: isAutoSensitivity ? colors.green : colors.text }]}>
-                      ✨ Auto ({weaponCaliber})
+                      ✨ {t('session.auto')} ({weaponCaliber})
                     </Text>
                   </TouchableOpacity>
                 )}
 
                 <Text style={[styles.sensitivityHint, { color: colors.textMuted }]}>
-                  Lower = detects lighter recoil. Higher = reduces false positives.
+                  {t('session.sensitivityHint')}
                 </Text>
               </Animated.View>
             )}
@@ -454,9 +456,9 @@ export function SessionPrepView({ session, insets, onSessionActivated, onBack, o
                 <Clock size={18} color={colors.primary} />
               </View>
               <View style={styles.timeLimitHeaderText}>
-                <Text style={[styles.timeLimitLabel, { color: colors.textMuted }]}>Time Limit</Text>
+                <Text style={[styles.timeLimitLabel, { color: colors.textMuted }]}>{t('session.timeLimit')}</Text>
                 <Text style={[styles.timeLimitValue, { color: colors.text }]}>
-                  {timeLimit == null ? 'No limit' : `${timeLimit}s`}
+                  {timeLimit == null ? t('session.noTimeLimit') : `${timeLimit}s`}
                 </Text>
               </View>
             </View>
@@ -473,7 +475,7 @@ export function SessionPrepView({ session, insets, onSessionActivated, onBack, o
                 }}
               >
                 <Text style={[styles.timeLimitOptionText, { color: timeLimit == null ? colors.primary : colors.text }]}>
-                  No limit
+                  {t('session.noTimeLimit')}
                 </Text>
               </TouchableOpacity>
               {timeLimitOptions.map((value) => {
@@ -508,8 +510,8 @@ export function SessionPrepView({ session, insets, onSessionActivated, onBack, o
           <Ionicons name="information-circle" size={18} color={colors.blue} />
           <Text style={[styles.infoText, { color: colors.blue }]}>
             {isWatchConnected
-              ? 'Watch will track your shots. Tap the watch button after each shot.'
-              : 'You can connect your watch later during the session.'}
+              ? t('session.watchWillTrack')
+              : t('session.connectWatchLater')}
           </Text>
         </Animated.View>
       </View>
@@ -531,7 +533,7 @@ export function SessionPrepView({ session, insets, onSessionActivated, onBack, o
               ) : (
                 <>
                   <Watch size={20} color="#fff" />
-                  <Text style={styles.primaryButtonText}>Start with Watch</Text>
+                  <Text style={styles.primaryButtonText}>{t('session.startWithWatch')}</Text>
                 </>
               )}
             </TouchableOpacity>
@@ -542,7 +544,7 @@ export function SessionPrepView({ session, insets, onSessionActivated, onBack, o
               disabled={activating}
             >
               <Phone size={18} color={colors.text} />
-              <Text style={[styles.secondaryButtonText, { color: colors.text }]}>Phone Only</Text>
+              <Text style={[styles.secondaryButtonText, { color: colors.text }]}>{t('session.phoneOnly')}</Text>
             </TouchableOpacity>
           </>
         ) : (
@@ -556,7 +558,7 @@ export function SessionPrepView({ session, insets, onSessionActivated, onBack, o
             ) : (
               <>
                 <Zap size={20} color={colors.background} />
-                <Text style={[styles.primaryButtonText, { color: colors.background }]}>Start Session</Text>
+                <Text style={[styles.primaryButtonText, { color: colors.background }]}>{t('session.startSession')}</Text>
               </>
             )}
           </TouchableOpacity>

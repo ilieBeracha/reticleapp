@@ -20,6 +20,7 @@ import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { Check, Target, Users, X } from 'lucide-react-native';
 import { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeInDown, FadeOutUp } from 'react-native-reanimated';
 
@@ -44,6 +45,7 @@ interface SquadInvitationBannerProps {
 }
 
 export function SquadInvitationBanner({ trainingId, userId, onInvitationChanged }: SquadInvitationBannerProps) {
+  const { t } = useTranslation();
   const colors = useColors();
 
   const [loading, setLoading] = useState(true);
@@ -131,7 +133,7 @@ export function SquadInvitationBanner({ trainingId, userId, onInvitationChanged 
       setActiveEngagement({
         engagementId: engagement.id,
         sessionId: engagement.session_id,
-        drillName: drillConfig?.name || (isGroup ? 'Group Engagement' : 'Squad Engagement'),
+        drillName: drillConfig?.name || (isGroup ? t('training.groupEngagement') : t('training.squadEngagement')),
         distanceM: drillConfig?.distance_m || null,
         roundsPerShooter: drillConfig?.rounds_per_shooter || null,
         commanderName: commanderProfile?.full_name || null,
@@ -291,7 +293,7 @@ export function SquadInvitationBanner({ trainingId, userId, onInvitationChanged 
   const { hasStarted, participationState, engagementMode } = activeEngagement;
   const isInProgress = hasStarted;
   const isGroup = engagementMode === 'group';
-  const modeLabel = isGroup ? 'Group' : 'Squad';
+  const modeLabel = isGroup ? t('training.groupType') : t('training.squadType');
   const isPending = participationState === 'pending';
   const isJoined = participationState === 'joined';
   const hasParticipation = isPending || isJoined;
@@ -299,17 +301,17 @@ export function SquadInvitationBanner({ trainingId, userId, onInvitationChanged 
   // Button text based on state
   const getActionText = () => {
     if (isInProgress) {
-      return isJoined ? 'Join Session' : 'View Progress';
+      return isJoined ? t('training.joinSession') : t('training.viewProgress');
     }
-    if (isPending) return 'Accept & Join';
-    if (isJoined) return 'Return to Lobby';
-    return 'Join';
+    if (isPending) return t('training.acceptAndJoin');
+    if (isJoined) return t('training.returnToLobby');
+    return t('training.join');
   };
   
   // Decline button text
   const getDeclineText = () => {
-    if (isPending) return 'Decline';
-    return 'Leave';
+    if (isPending) return t('common.decline');
+    return t('training.leave');
   };
 
   return (
@@ -337,20 +339,20 @@ export function SquadInvitationBanner({ trainingId, userId, onInvitationChanged 
         <View style={styles.headerText}>
           <Text style={[styles.title, { color: colors.text }]}>
             {isInProgress
-              ? `${modeLabel} Session In Progress`
+              ? t('training.sessionInProgress', { mode: modeLabel })
               : isPending
-                ? `${modeLabel} Invitation`
+                ? t('training.invitation', { mode: modeLabel })
                 : isJoined
-                  ? `${modeLabel} Engagement Ready`
-                  : `${modeLabel} Engagement Available`}
+                  ? t('training.engagementReady', { mode: modeLabel })
+                  : t('training.engagementAvailable', { mode: modeLabel })}
           </Text>
           {activeEngagement.commanderName && (
             <Text style={[styles.subtitle, { color: colors.textMuted }]}>
               {isInProgress
-                ? `${activeEngagement.commanderName}'s session`
+                ? t('training.commanderSession', { name: activeEngagement.commanderName })
                 : isPending
-                  ? `${activeEngagement.commanderName} invited you`
-                  : `Started by ${activeEngagement.commanderName}`}
+                  ? t('training.commanderInvited', { name: activeEngagement.commanderName })
+                  : t('training.startedBy', { name: activeEngagement.commanderName })}
             </Text>
           )}
         </View>
@@ -364,7 +366,7 @@ export function SquadInvitationBanner({ trainingId, userId, onInvitationChanged 
           <Text style={[styles.drillMeta, { color: colors.textMuted }]}>
             {activeEngagement.distanceM && `${activeEngagement.distanceM}m`}
             {activeEngagement.distanceM && activeEngagement.roundsPerShooter && ' · '}
-            {activeEngagement.roundsPerShooter && `${activeEngagement.roundsPerShooter} rds`}
+            {activeEngagement.roundsPerShooter && `${activeEngagement.roundsPerShooter} ${t('session.shots')}`}
           </Text>
         )}
       </View>

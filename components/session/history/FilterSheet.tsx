@@ -1,6 +1,7 @@
 import { useColors } from '@/hooks/ui/useColors';
 import { Ionicons } from '@expo/vector-icons';
 import React, { useCallback, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Modal,
   Platform,
@@ -91,6 +92,7 @@ export function FilterSheet({
   availableWeapons = [],
 }: FilterSheetProps) {
   const colors = useColors();
+  const { t } = useTranslation();
   
   // Local state for editing
   const [localFilters, setLocalFilters] = useState<SessionFilters>(filters);
@@ -147,10 +149,10 @@ export function FilterSheet({
             <Ionicons name="close" size={24} color={colors.text} />
           </TouchableOpacity>
           <Text style={[styles.headerTitle, { color: colors.text }]}>
-            Filters {activeCount > 0 && `(${activeCount})`}
+            {activeCount > 0 ? t('session.filtersWithCount', { count: activeCount }) : t('session.filters')}
           </Text>
           <TouchableOpacity onPress={handleReset} style={styles.headerButton}>
-            <Text style={[styles.resetText, { color: colors.primary }]}>Reset</Text>
+            <Text style={[styles.resetText, { color: colors.primary }]}>{t('common.reset')}</Text>
           </TouchableOpacity>
         </View>
 
@@ -160,12 +162,12 @@ export function FilterSheet({
           showsVerticalScrollIndicator={false}
         >
           {/* Sort */}
-          <SectionHeader title="SORT BY" colors={colors} />
+          <SectionHeader title={t('session.sortBySection')} colors={colors} />
           <View style={styles.pillRow}>
             {SORT_OPTIONS.map(option => (
               <FilterPill
                 key={option.value}
-                label={option.label}
+                label={t(`session.sortField.${option.value}`)}
                 selected={localSort.field === option.value}
                 onPress={() => setLocalSort(prev => ({
                   field: option.value,
@@ -192,7 +194,7 @@ export function FilterSheet({
                 color={localSort.direction === 'desc' ? '#fff' : colors.text} 
               />
               <Text style={{ color: localSort.direction === 'desc' ? '#fff' : colors.text, marginLeft: 4 }}>
-                Newest
+                {t('session.newest')}
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -211,18 +213,18 @@ export function FilterSheet({
                 color={localSort.direction === 'asc' ? '#fff' : colors.text} 
               />
               <Text style={{ color: localSort.direction === 'asc' ? '#fff' : colors.text, marginLeft: 4 }}>
-                Oldest
+                {t('session.oldest')}
               </Text>
             </TouchableOpacity>
           </View>
 
           {/* Date Range */}
-          <SectionHeader title="TIME PERIOD" colors={colors} />
+          <SectionHeader title={t('session.timePeriodSection')} colors={colors} />
           <View style={styles.pillRow}>
             {DATE_RANGE_OPTIONS.map(option => (
               <FilterPill
                 key={option.value}
-                label={option.label}
+                label={t(`session.dateRange.${option.value}`)}
                 selected={localFilters.dateRange === option.value}
                 onPress={() => setLocalFilters(prev => ({ ...prev, dateRange: option.value }))}
                 colors={colors}
@@ -231,12 +233,12 @@ export function FilterSheet({
           </View>
 
           {/* Status */}
-          <SectionHeader title="STATUS" colors={colors} />
+          <SectionHeader title={t('session.statusSection')} colors={colors} />
           <View style={styles.pillRow}>
             {STATUS_OPTIONS.map(option => (
               <FilterPill
                 key={option.value}
-                label={option.label}
+                label={t(`common.${option.value}`)}
                 selected={localFilters.status.includes(option.value as any)}
                 onPress={() => toggleArrayFilter('status', option.value)}
                 color={option.color}
@@ -246,12 +248,12 @@ export function FilterSheet({
           </View>
 
           {/* Drill Goal */}
-          <SectionHeader title="DRILL TYPE" colors={colors} />
+          <SectionHeader title={t('session.drillTypeSection')} colors={colors} />
           <View style={styles.pillRow}>
             {DRILL_GOAL_OPTIONS.map(option => (
               <FilterPill
                 key={option.value}
-                label={option.label}
+                label={option.value === 'grouping' ? t('session.grouping') : t('session.engagement')}
                 selected={localFilters.drillGoal.includes(option.value as any)}
                 onPress={() => toggleArrayFilter('drillGoal', option.value)}
                 colors={colors}
@@ -260,16 +262,16 @@ export function FilterSheet({
           </View>
 
           {/* Session Mode */}
-          <SectionHeader title="SESSION MODE" colors={colors} />
+          <SectionHeader title={t('session.sessionModeSection')} colors={colors} />
           <View style={styles.pillRow}>
             <FilterPill
-              label="Solo"
+              label={t('session.solo')}
               selected={localFilters.sessionMode.includes('solo')}
               onPress={() => toggleArrayFilter('sessionMode', 'solo')}
               colors={colors}
             />
             <FilterPill
-              label="Group"
+              label={t('session.group')}
               selected={localFilters.sessionMode.includes('group')}
               onPress={() => toggleArrayFilter('sessionMode', 'group')}
               colors={colors}
@@ -277,7 +279,7 @@ export function FilterSheet({
           </View>
 
           {/* Distance */}
-          <SectionHeader title="DISTANCE" colors={colors} />
+          <SectionHeader title={t('session.distanceSection')} colors={colors} />
           <View style={styles.pillRow}>
             {DISTANCE_PRESETS.slice(0, 6).map(distance => (
               <FilterPill
@@ -298,10 +300,10 @@ export function FilterSheet({
           </View>
 
           {/* Source */}
-          <SectionHeader title="SOURCE" colors={colors} />
+          <SectionHeader title={t('session.sourceSection')} colors={colors} />
           <View style={styles.pillRow}>
             <FilterPill
-              label="Watch"
+              label={t('session.watch')}
               selected={localFilters.watchControlled === true}
               onPress={() => setLocalFilters(prev => ({
                 ...prev,
@@ -310,7 +312,7 @@ export function FilterSheet({
               colors={colors}
             />
             <FilterPill
-              label="Manual"
+              label={t('session.manualLabel')}
               selected={localFilters.watchControlled === false}
               onPress={() => setLocalFilters(prev => ({
                 ...prev,
@@ -319,7 +321,7 @@ export function FilterSheet({
               colors={colors}
             />
             <FilterPill
-              label="Team"
+              label={t('session.teamLabel')}
               selected={localFilters.hasTeam === true}
               onPress={() => setLocalFilters(prev => ({
                 ...prev,
@@ -328,7 +330,7 @@ export function FilterSheet({
               colors={colors}
             />
             <FilterPill
-              label="Personal"
+              label={t('session.personalLabel')}
               selected={localFilters.hasTeam === false}
               onPress={() => setLocalFilters(prev => ({
                 ...prev,
@@ -341,7 +343,7 @@ export function FilterSheet({
           {/* Weapons (if available) */}
           {availableWeapons.length > 0 && (
             <>
-              <SectionHeader title="WEAPON" colors={colors} />
+              <SectionHeader title={t('session.weaponSection')} colors={colors} />
               <View style={styles.pillRow}>
                 {availableWeapons.slice(0, 8).map(weapon => (
                   <FilterPill
@@ -366,7 +368,7 @@ export function FilterSheet({
             onPress={handleApply}
             activeOpacity={0.8}
           >
-            <Text style={styles.applyButtonText}>Apply Filters</Text>
+            <Text style={styles.applyButtonText}>{t('session.applyFilters')}</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>

@@ -8,6 +8,7 @@
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { ChevronRight, Target, TrendingUp } from 'lucide-react-native';
+import { useTranslation } from 'react-i18next';
 import { useEffect } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, {
@@ -37,6 +38,7 @@ const RADIUS = (SIZE - STROKE_WIDTH) / 2;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
 export function WeeklyProgressRing({ stats, colors, weeklyGoal = 5 }: WeeklyProgressRingProps) {
+  const { t } = useTranslation();
   const progress = useSharedValue(0);
   const scale = useSharedValue(1);
   const completionPercent = Math.min((stats.sessions / weeklyGoal) * 100, 100);
@@ -108,17 +110,17 @@ export function WeeklyProgressRing({ stats, colors, weeklyGoal = 5 }: WeeklyProg
           </Svg>
           <View style={s.ringCenter}>
             <Text style={[s.ringValue, { color: colors.text }]}>{stats.sessions}</Text>
-            <Text style={[s.ringLabel, { color: colors.textMuted }]}>of {weeklyGoal}</Text>
+            <Text style={[s.ringLabel, { color: colors.textMuted }]}>{t('home.ofGoal', { goal: weeklyGoal })}</Text>
           </View>
         </View>
 
         {/* Right: Stats & Info */}
         <View style={s.content}>
           <View style={s.header}>
-            <Text style={[s.title, { color: colors.text }]}>Weekly Goal</Text>
+            <Text style={[s.title, { color: colors.text }]}>{t('home.weeklyGoal')}</Text>
             {isGoalMet && (
               <View style={[s.badge, { backgroundColor: `${colors.green}15` }]}>
-                <Text style={[s.badgeText, { color: colors.green }]}>Complete!</Text>
+                <Text style={[s.badgeText, { color: colors.green }]}>{t('home.complete')}</Text>
               </View>
             )}
           </View>
@@ -127,19 +129,19 @@ export function WeeklyProgressRing({ stats, colors, weeklyGoal = 5 }: WeeklyProg
             <View style={s.statItem}>
               <Target size={14} color={colors.indigo} />
               <Text style={[s.statValue, { color: colors.text }]}>{stats.shots.toLocaleString()}</Text>
-              <Text style={[s.statLabel, { color: colors.textMuted }]}>shots</Text>
+              <Text style={[s.statLabel, { color: colors.textMuted }]}>{t('session.shots')}</Text>
             </View>
             <View style={[s.divider, { backgroundColor: colors.border }]} />
             <View style={s.statItem}>
               <TrendingUp size={14} color={colors.green} />
               <Text style={[s.statValue, { color: colors.text }]}>{stats.accuracy}%</Text>
-              <Text style={[s.statLabel, { color: colors.textMuted }]}>avg</Text>
+              <Text style={[s.statLabel, { color: colors.textMuted }]}>{t('biometrics.avg')}</Text>
             </View>
           </View>
 
           <View style={s.progressTextRow}>
             <Text style={[s.progressText, { color: colors.textMuted }]}>
-              {isGoalMet ? 'Great work this week!' : `${weeklyGoal - stats.sessions} more to hit your goal`}
+              {isGoalMet ? t('home.greatWorkThisWeek') : t('home.moreToHitGoal', { count: weeklyGoal - stats.sessions })}
             </Text>
             <ChevronRight size={16} color={colors.textMuted} style={{ opacity: 0.5 }} />
           </View>

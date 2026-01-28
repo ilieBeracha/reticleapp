@@ -7,6 +7,7 @@
 
 import { useColors } from '@/hooks/ui/useColors';
 import type { SessionDrillConfig } from '@/services/session/types';
+import { useTranslation } from 'react-i18next';
 import { MapPin, Target, Watch, X } from 'lucide-react-native';
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { EdgeInsets } from 'react-native-safe-area-context';
@@ -34,6 +35,7 @@ export function WatchWaitingView({
   isTeamTraining,
 }: WatchWaitingViewProps) {
   const colors = useColors();
+  const { t } = useTranslation();
 
   return (
     <View style={[sharedStyles.container, { backgroundColor: colors.background }]}>
@@ -63,9 +65,9 @@ export function WatchWaitingView({
           <Watch size={56} color={isWatchConnected ? '#10B981' : colors.textMuted} strokeWidth={1.5} />
         </View>
 
-        <Text style={[styles.title, { color: colors.text }]}>Session Running on Watch</Text>
+        <Text style={[styles.title, { color: colors.text }]}>{t('session.sessionRunningOnWatch')}</Text>
         <Text style={[styles.subtitle, { color: colors.textMuted }]}>
-          Focus on your shooting. Check your wrist for time.
+          {t('session.focusOnShooting')}
         </Text>
 
         {drill && (
@@ -74,7 +76,7 @@ export function WatchWaitingView({
             <Text style={[styles.drillChipText, { color: colors.text }]}>{drill.distance_m}m</Text>
             <View style={[styles.drillChipDivider, { backgroundColor: colors.border }]} />
             <Target size={14} color={colors.textMuted} />
-            <Text style={[styles.drillChipText, { color: colors.text }]}>{drill.rounds_per_shooter} shots</Text>
+            <Text style={[styles.drillChipText, { color: colors.text }]}>{t('session.shotsCount', { count: drill.rounds_per_shooter })}</Text>
           </View>
         )}
       </View>
@@ -88,7 +90,7 @@ export function WatchWaitingView({
           {ending ? (
             <ActivityIndicator size="small" color={colors.textMuted} />
           ) : (
-            <Text style={[styles.subtleBtnText, { color: colors.textMuted }]}>End Session from Phone</Text>
+            <Text style={[styles.subtleBtnText, { color: colors.textMuted }]}>{t('session.endSessionFromPhone')}</Text>
           )}
         </TouchableOpacity>
       </View>

@@ -1,4 +1,5 @@
 import { formatMaxShots } from '@/utils/drillShots';
+import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import { Crosshair, Play, Target } from 'lucide-react-native';
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -24,6 +25,7 @@ export function DrillCard({
   isStarting,
   isCompleted,
 }: DrillCardProps) {
+  const { t } = useTranslation();
   const canStart = trainingStatus === 'ongoing' && onStartDrill && !isCompleted;
   const isPaper = drill.target_type === 'paper';
   const isLive = trainingStatus === 'ongoing';
@@ -79,10 +81,10 @@ export function DrillCard({
             <Text style={[styles.meta, { color: colors.textMuted }]}>{drill.distance_m}m</Text>
             <View style={[styles.metaDot, { backgroundColor: colors.border }]} />
             <Text style={[styles.meta, { color: colors.textMuted }]}>
-              {drill.strings_count ?? 1} rounds •{' '}
+              {t('training.roundsCount', { count: drill.strings_count ?? 1 })} •{' '}
               {isPaper
-                ? `Scan (max ${formatMaxShots(drill.rounds_per_shooter)})`
-                : `${drill.rounds_per_shooter} shots/round`}
+                ? t('training.scanMax', { max: formatMaxShots(drill.rounds_per_shooter) })
+                : t('training.shotsPerRound', { shots: drill.rounds_per_shooter })}
             </Text>
             {drill.time_limit_seconds && (
               <>
@@ -97,7 +99,7 @@ export function DrillCard({
         {isCompleted && (
           <View style={styles.completedBadge}>
             <Ionicons name="checkmark-circle" size={18} color="#93C5FD" />
-            <Text style={styles.completedText}>Done</Text>
+            <Text style={styles.completedText}>{t('common.done')}</Text>
           </View>
         )}
 
@@ -108,7 +110,7 @@ export function DrillCard({
             ) : (
               <>
                 <Play size={14} color={colors.background} fill={colors.background} />
-                <Text style={[styles.startText, { color: colors.background }]}>Start</Text>
+                <Text style={[styles.startText, { color: colors.background }]}>{t('common.start')}</Text>
               </>
             )}
           </View>
@@ -117,7 +119,7 @@ export function DrillCard({
         {!canStart && !isCompleted && trainingStatus !== 'ongoing' && (
           <View style={[styles.statusBadge, { backgroundColor: colors.secondary }]}>
             <Text style={[styles.statusText, { color: colors.textMuted }]}>
-              {trainingStatus === 'planned' ? 'Pending' : 'Inactive'}
+              {trainingStatus === 'planned' ? t('common.pending') : t('training.inactive')}
             </Text>
           </View>
         )}

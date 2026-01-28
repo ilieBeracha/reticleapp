@@ -13,6 +13,7 @@ import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { Clock, HelpCircle, History } from 'lucide-react-native';
 import { useCallback, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, {
   FadeIn,
@@ -76,6 +77,7 @@ function SectionHeader({ title, tooltip, colors }: SectionHeaderProps) {
 export function UnifiedHomePage() {
   const colors = useColors();
   const router = useRouter();
+  const { t } = useTranslation();
   const viewAllScale = useSharedValue(1);
 
   const viewAllAnimStyle = useAnimatedStyle(() => ({
@@ -185,8 +187,8 @@ export function UnifiedHomePage() {
         {/* SECTION: QUICK ACTIONS */}
         {/* ─────────────────────────────────────────────────────────────────── */}
         <SectionHeader
-          title="QUICK ACTIONS"
-          tooltip="Start a new session, continue an active one, or check your default weapon stats."
+          title={t('home.quickActions')}
+          tooltip={t('home.quickActionsTooltip')}
           colors={colors}
         />
         <HeroActions
@@ -211,8 +213,8 @@ export function UnifiedHomePage() {
         {/* SECTION: THIS WEEK */}
         {/* ─────────────────────────────────────────────────────────────────── */}
         <SectionHeader
-          title="THIS WEEK"
-          tooltip="Your weekly stats including shots fired, accuracy, best group, and time spent training. Tap the card for details."
+          title={t('home.thisWeek')}
+          tooltip={t('home.thisWeekTooltip')}
           colors={colors}
         />
         <DailyTip
@@ -228,8 +230,8 @@ export function UnifiedHomePage() {
         {/* SECTION: RECENT ACTIVITY */}
         {/* ─────────────────────────────────────────────────────────────────── */}
         <SectionHeader
-          title="RECENT ACTIVITY"
-          tooltip="Your latest training sessions. Tap any session to view details, targets, and results."
+          title={t('home.recentActivity')}
+          tooltip={t('home.recentActivityTooltip')}
           colors={colors}
         />
         <RecentActivitySection sessions={recentSessions} colors={colors} onSessionPress={handleSessionPress} />
@@ -255,10 +257,10 @@ export function UnifiedHomePage() {
               </View>
               <View>
                 <Text style={[localStyles.viewAllTitle, { color: colors.text }]}>
-                  {recentSessions.length > 0 ? 'View All Sessions' : 'Session History'}
+                  {recentSessions.length > 0 ? t('home.viewAllSessions') : t('home.sessionHistory')}
                 </Text>
                 <Text style={[localStyles.viewAllSubtitle, { color: colors.textMuted }]}>
-                  {recentSessions.length > 0 ? 'Browse full history' : 'Your training log'}
+                  {recentSessions.length > 0 ? t('home.browseFullHistory') : t('home.yourTrainingLog')}
                 </Text>
               </View>
             </View>

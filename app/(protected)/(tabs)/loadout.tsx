@@ -30,6 +30,7 @@ import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { ChevronRight, Crosshair, Plus, Star, Target, User, Users, Zap } from 'lucide-react-native';
 import { useCallback, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
   Modal,
@@ -48,12 +49,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 type SourceFilter = 'all' | 'personal' | 'team_assigned' | 'team_pool';
 
-const SOURCE_FILTER_CONFIG: Record<SourceFilter, { label: string; shortLabel: string }> = {
-  all: { label: 'All', shortLabel: 'All' },
-  personal: { label: 'Personal', shortLabel: 'Mine' },
-  team_assigned: { label: 'Assigned', shortLabel: 'Assigned' },
-  team_pool: { label: 'Team Pool', shortLabel: 'Pool' },
-};
+function getSourceFilterConfig(t: (key: string) => string): Record<SourceFilter, { label: string; shortLabel: string }> {
+  return {
+    all: { label: t('loadout.filters.all'), shortLabel: t('loadout.filters.all') },
+    personal: { label: t('loadout.filters.personal'), shortLabel: t('loadout.filters.mine') },
+    team_assigned: { label: t('loadout.filters.assigned'), shortLabel: t('loadout.filters.assigned') },
+    team_pool: { label: t('loadout.filters.teamPool'), shortLabel: t('loadout.filters.pool') },
+  };
+}
 
 // ============================================================================
 // HELPERS
@@ -83,14 +86,14 @@ function getSourceIcon(source: WeaponSource, color: string, size = 10) {
   }
 }
 
-function getSourceConfig(source: WeaponSource) {
+function getSourceConfig(source: WeaponSource, t: (key: string) => string) {
   switch (source) {
     case 'personal':
-      return { label: 'Personal', color: '#10B981', bg: '#10B98115' };
+      return { label: t('loadout.filters.personal'), color: '#10B981', bg: '#10B98115' };
     case 'team_assigned':
-      return { label: 'Assigned', color: '#3B82F6', bg: '#3B82F615' };
+      return { label: t('loadout.filters.assigned'), color: '#3B82F6', bg: '#3B82F615' };
     case 'team_pool':
-      return { label: 'Pool', color: '#8B5CF6', bg: '#8B5CF615' };
+      return { label: t('loadout.filters.pool'), color: '#8B5CF6', bg: '#8B5CF615' };
   }
 }
 
@@ -112,7 +115,9 @@ interface SourceFilterPillsProps {
 }
 
 function SourceFilterPills({ selected, onChange, counts, colors }: SourceFilterPillsProps) {
+  const { t } = useTranslation();
   const filters: SourceFilter[] = ['all', 'personal', 'team_assigned', 'team_pool'];
+  const SOURCE_FILTER_CONFIG = getSourceFilterConfig(t);
 
   // Only show filters that have weapons (except 'all' which is always shown)
   const visibleFilters = filters.filter((f) => f === 'all' || counts[f] > 0);
@@ -168,21 +173,22 @@ interface StatsOverviewProps {
 }
 
 function StatsOverview({ weaponCount, totalSessions, totalRounds, colors }: StatsOverviewProps) {
+  const { t } = useTranslation();
   return (
     <View style={[s.statsRow, { backgroundColor: colors.card }]}>
       <View style={s.statItem}>
         <Text style={[s.statValue, { color: colors.text }]}>{weaponCount}</Text>
-        <Text style={[s.statLabel, { color: colors.textMuted }]}>Weapons</Text>
+        <Text style={[s.statLabel, { color: colors.textMuted }]}>{t('weapons.weapons')}</Text>
       </View>
       <View style={[s.statDivider, { backgroundColor: colors.border }]} />
       <View style={s.statItem}>
         <Text style={[s.statValue, { color: colors.text }]}>{totalSessions}</Text>
-        <Text style={[s.statLabel, { color: colors.textMuted }]}>Sessions</Text>
+        <Text style={[s.statLabel, { color: colors.textMuted }]}>{t('session.sessions')}</Text>
       </View>
       <View style={[s.statDivider, { backgroundColor: colors.border }]} />
       <View style={s.statItem}>
         <Text style={[s.statValue, { color: colors.text }]}>{formatNumber(totalRounds)}</Text>
-        <Text style={[s.statLabel, { color: colors.textMuted }]}>Rounds</Text>
+        <Text style={[s.statLabel, { color: colors.textMuted }]}>{t('weapons.rounds')}</Text>
       </View>
     </View>
   );
@@ -202,8 +208,9 @@ interface WeaponCardProps {
 }
 
 function WeaponCard({ weapon, stats, isDefault, onPress, onSetDefault, colors }: WeaponCardProps) {
+  const { t } = useTranslation();
   const categoryConfig = weapon.category ? getCategoryConfig(weapon.category) : null;
-  const sourceConfig = getSourceConfig(weapon.source);
+  const sourceConfig = getSourceConfig(weapon.source, t);
   const isTeamWeapon = weapon.source !== 'personal';
 
   // Use blue accent for team weapons, primary for personal
@@ -241,7 +248,7 @@ function WeaponCard({ weapon, stats, isDefault, onPress, onSetDefault, colors }:
               </View>
             )}
             <Text style={[s.cardMeta, { color: colors.textMuted }]} numberOfLines={1}>
-              {categoryConfig?.label || 'Weapon'}
+              {categoryConfig?.label || t('weapons.weapon')}
               {weapon.caliber ? ` · ${weapon.caliber}` : ''}
             </Text>
           </View>
@@ -256,7 +263,7 @@ function WeaponCard({ weapon, stats, isDefault, onPress, onSetDefault, colors }:
         {/* Stats inline */}
         <View style={s.cardStats}>
           <Text style={[s.cardStatText, { color: colors.textMuted }]}>
-            {stats?.total_sessions ?? 0} sess · {formatNumber(stats?.total_rounds_fired ?? 0)} rds
+            {stats?.total_sessions ?? 0} {t('loadout.sess')} · {formatNumber(stats?.total_rounds_fired ?? 0)} {t('loadout.rds')}
           </Text>
         </View>
 
@@ -291,6 +298,7 @@ function WeaponCard({ weapon, stats, isDefault, onPress, onSetDefault, colors }:
 // ============================================================================
 
 export default function LoadoutScreen() {
+  const { t } = useTranslation();
   const colors = useColors();
   const insets = useSafeAreaInsets();
 
@@ -467,7 +475,7 @@ export default function LoadoutScreen() {
         {/* Header */}
         <View style={s.header}>
           <View style={s.headerTop}>
-            <Text style={[s.title, { color: colors.text }]}>Loadout</Text>
+            <Text style={[s.title, { color: colors.text }]}>{t('navigation.loadout')}</Text>
             <TouchableOpacity
               style={[s.addBtn, { backgroundColor: colors.primary }]}
               onPress={handleAddWeapon}
@@ -492,7 +500,7 @@ export default function LoadoutScreen() {
         {/* Section Header */}
         <View style={s.sectionHeader}>
           <Text style={[s.sectionTitle, { color: colors.text }]}>
-            {sourceFilter === 'all' ? 'All Weapons' : SOURCE_FILTER_CONFIG[sourceFilter].label}
+            {sourceFilter === 'all' ? t('loadout.allWeapons') : getSourceFilterConfig(t)[sourceFilter].label}
           </Text>
           {filteredWeapons.length > 0 && (
             <Text style={[s.sectionCount, { color: colors.textMuted }]}>{filteredWeapons.length}</Text>
@@ -521,20 +529,20 @@ export default function LoadoutScreen() {
             </View>
             <Text style={[s.emptyTitle, { color: colors.text }]}>
               {sourceFilter === 'all'
-                ? 'No weapons yet'
-                : `No ${SOURCE_FILTER_CONFIG[sourceFilter].label.toLowerCase()} weapons`}
+                ? t('loadout.noWeaponsYet')
+                : t('loadout.noFilterWeapons', { filter: getSourceFilterConfig(t)[sourceFilter].label })}
             </Text>
             <Text style={[s.emptySubtitle, { color: colors.textMuted }]}>
               {sourceFilter === 'all'
-                ? 'Add your first weapon to start tracking performance'
+                ? t('loadout.addFirstWeaponMessage')
                 : sourceFilter === 'personal'
-                  ? 'Create a personal weapon to get started'
-                  : 'Team weapons will appear here when available'}
+                  ? t('loadout.createPersonalWeaponMessage')
+                  : t('loadout.teamWeaponsMessage')}
             </Text>
             {sourceFilter === 'all' || sourceFilter === 'personal' ? (
               <TouchableOpacity style={[s.emptyButton, { backgroundColor: colors.primary }]} onPress={handleAddWeapon}>
                 <Plus size={16} color="#fff" />
-                <Text style={s.emptyButtonText}>Add Weapon</Text>
+                <Text style={s.emptyButtonText}>{t('loadout.addWeapon')}</Text>
               </TouchableOpacity>
             ) : null}
           </View>
