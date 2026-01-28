@@ -171,9 +171,7 @@ export const TargetForm = React.memo(function TargetForm({
               </View>
             </View>
             <Text style={[styles.infoTitle, { color: colors.text }]}>{t('target.measureYourGrouping')}</Text>
-            <Text style={[styles.infoDesc, { color: colors.textMuted }]}>
-              {t('target.groupingInfoDescription')}
-            </Text>
+            <Text style={[styles.infoDesc, { color: colors.textMuted }]}>{t('target.groupingInfoDescription')}</Text>
             <View style={styles.infoFeatures}>
               <View style={styles.infoFeature}>
                 <Ionicons name="analytics" size={14} color={colors.primary} />
