@@ -96,6 +96,7 @@ function AccordionItem({
   emptyText,
   colors,
 }: AccordionItemProps) {
+  const { t } = useTranslation();
   const handleToggle = useCallback(() => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
