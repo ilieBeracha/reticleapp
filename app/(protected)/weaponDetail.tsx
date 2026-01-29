@@ -7,7 +7,7 @@
 
 import { getCategoryConfig } from '@/constants/weaponCategories';
 import { useColors } from '@/hooks/ui/useColors';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/services/supabase';
 import {
   deleteUserWeapon,
   getDefaultWeaponId,

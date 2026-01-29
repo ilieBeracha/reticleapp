@@ -19,7 +19,7 @@
 
 import { useAuth } from '@/contexts/AuthContext';
 import { useColors } from '@/hooks/ui/useColors';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/services/supabase';
 import { getDashboardFeatures } from '@/services/sessionService';
 import type { SessionWithDetails } from '@/services/sessionService';
 import { Ionicons } from '@expo/vector-icons';

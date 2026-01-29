@@ -26,7 +26,7 @@ import { getCategoryConfig } from '@/constants/weaponCategories';
 import { useColors } from '@/hooks/ui/useColors';
 import { useOpenWeather } from '@/hooks/useOpenWeather';
 import { usePermissions } from '@/hooks/usePermissions';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/services/supabase';
 import type { DrillPreset } from '@/services/presetService';
 import { createEngagement } from '@/services/session/participants';
 import type { DrillGoal, EngagementMode } from '@/services/session/types';

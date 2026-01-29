@@ -4,7 +4,7 @@
  * Teams are the primary entity - no organization layer
  */
 
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/services/supabase';
 import type {
   Team,
   TeamInvitation,

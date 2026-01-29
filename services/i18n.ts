@@ -3,8 +3,8 @@ import * as Localization from 'expo-localization';
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
 
-import en from './locales/en.json';
-import he from './locales/he.json';
+import en from './i18n-locales/en.json';
+import he from './i18n-locales/he.json';
 
 export const LANGUAGE_KEY = '@app_language';
 export type Language = 'en' | 'he';

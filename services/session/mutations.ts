@@ -1,6 +1,6 @@
 import { TARGET_TYPE } from '@/constants/drill';
 import { SESSION_STATUS } from '@/constants/session';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/services/supabase';
 import { buildSessionContext, evaluateAndStoreVerdict } from '@/services/standards/standardsEngine';
 import { markWeaponUsed } from '@/services/weaponService';
 import { getDrillRequirements } from './drillContract';

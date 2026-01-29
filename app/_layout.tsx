@@ -4,7 +4,7 @@ import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { LanguageProvider } from '@/contexts/LanguageContext';
 import { ModalProvider } from '@/contexts/ModalContext';
 import { ThemeProvider, useTheme } from '@/contexts/ThemeContext';
-import i18n, { initI18n } from '@/lib/i18n';
+import i18n, { initI18n } from '@/services/i18n';
 import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
 import * as Sentry from '@sentry/react-native';
 import { useFonts } from 'expo-font';

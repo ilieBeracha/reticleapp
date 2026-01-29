@@ -14,7 +14,7 @@
  * Participants must be from the same team as the session owner.
  */
 
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/services/supabase';
 import type { DrillGoal } from '@/types/workspace';
 import type {
   Engagement,

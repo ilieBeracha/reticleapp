@@ -10,7 +10,7 @@
 
 import { useColors } from '@/hooks/ui/useColors';
 import { useTranslation } from 'react-i18next';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/services/supabase';
 import { calculateGroupTotals, updateParticipantResults } from '@/services/session/participants';
 import type { EngagementParticipant } from '@/services/session/types';
 import * as Haptics from 'expo-haptics';

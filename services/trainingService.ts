@@ -5,7 +5,7 @@
  * Team-first architecture: Trainings belong to teams directly
  */
 
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/services/supabase';
 import type {
     CreateTrainingDrillInput,
     CreateTrainingInput,

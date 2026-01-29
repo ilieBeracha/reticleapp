@@ -11,7 +11,7 @@
  */
 
 import { useColors } from '@/hooks/ui/useColors';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/services/supabase';
 import { getEngagementParticipants, getParticipantCounts } from '@/services/session/participants';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';

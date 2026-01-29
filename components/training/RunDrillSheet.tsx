@@ -13,7 +13,7 @@
 
 import { RANGE_CATEGORIES, type RangeCategory } from '@/constants/drill';
 import { useColors } from '@/hooks/ui/useColors';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/services/supabase';
 import { getOrCreateSetupSession } from '@/services/session/mutations';
 import { getUserWeapon, type UserWeapon } from '@/services/weaponService';
 import type { TrainingDrill } from '@/types/workspace';

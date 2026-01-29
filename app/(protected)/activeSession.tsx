@@ -18,7 +18,7 @@
 import { PAPER_TYPE } from '@/constants/drill';
 import { useColors } from '@/hooks/ui/useColors';
 import { useOpenWeather } from '@/hooks/useOpenWeather';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/services/supabase';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';

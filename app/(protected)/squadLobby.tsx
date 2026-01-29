@@ -15,7 +15,7 @@
 import { InviteParticipantsPanel } from '@/components/session/creation/InviteParticipantsPanel';
 import { useParticipantsRealtime } from '@/hooks/realtime/participants/useParticipantsRealtime';
 import { useColors } from '@/hooks/ui/useColors';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/services/supabase';
 import { notifySquadEngagementInvites, notifySquadEngagementStarting } from '@/services/pushService';
 import { updateSession } from '@/services/session/mutations';
 import {

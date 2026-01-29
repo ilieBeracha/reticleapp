@@ -31,7 +31,7 @@
  * ```
  */
 
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/services/supabase';
 import { useCallback, useState } from 'react';
 import type {
   AIContextResponse,

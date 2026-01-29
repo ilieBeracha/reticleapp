@@ -7,7 +7,7 @@
  */
 
 import { useColors } from '@/hooks/ui/useColors';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/services/supabase';
 import type { EngagementParticipant } from '@/services/session/types';
 import { useTranslation } from 'react-i18next';
 import * as Haptics from 'expo-haptics';

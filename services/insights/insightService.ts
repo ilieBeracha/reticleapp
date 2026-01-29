@@ -10,7 +10,7 @@
  * - Manual regeneration requests
  */
 
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/services/supabase';
 import { generateInsights } from './insightEngine';
 import type {
   GeneratedInsight,

@@ -8,7 +8,7 @@
  */
 
 // WeaponPolicy removed - team context now controls weapon access directly
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/services/supabase';
 import type { WeaponCategory } from '@/types/workspace';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 

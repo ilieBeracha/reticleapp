@@ -5,7 +5,7 @@
  * They allow users to save their favorite drill configurations for quick access.
  */
 
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/services/supabase';
 import type { DrillGoal, WeaponCategory } from '@/types/workspace';
 
 // ============================================================================

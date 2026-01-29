@@ -7,7 +7,7 @@
  * This is infrastructure - domain hooks build on top of this.
  */
 
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/services/supabase';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type {
   ChannelChangePayload,

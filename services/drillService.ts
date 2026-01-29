@@ -5,7 +5,7 @@
  * Drills have 6 core properties: name, goal, target_type, distance, shots, time_limit
  */
 
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/services/supabase';
 import type { DrillTemplate } from '@/types/drillTypes';
 import type { CreateDrillInput, Drill, DrillGoal, DrillInstanceConfig } from '@/types/workspace';
 

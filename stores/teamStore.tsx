@@ -77,7 +77,7 @@ export const useTeamStore = create<TeamStore>((set, get) => ({
         set({ loading: true, error: null });
       }
 
-      const { supabase } = await import('@/lib/supabase');
+      const { supabase } = await import('@/services/supabase');
       const { data: { session } } = await supabase.auth.getSession();
 
       if (!session?.user) {

@@ -11,7 +11,7 @@
  */
 
 import { useColors } from '@/hooks/ui/useColors';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/services/supabase';
 import { useTranslation } from 'react-i18next';
 import * as Haptics from 'expo-haptics';
 import { Check, UserMinus, UserPlus, Users } from 'lucide-react-native';

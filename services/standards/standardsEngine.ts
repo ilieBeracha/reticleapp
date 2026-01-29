@@ -8,7 +8,7 @@
  *       AI can only advise, explain, and compare - never judge.
  */
 
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/services/supabase';
 import type { 
   TeamStandard, 
   StandardModifier, 

@@ -1,5 +1,5 @@
 // contexts/AuthContext.tsx
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/services/supabase';
 import { useTeamStore } from '@/stores/teamStore';
 import { Session, User } from '@supabase/supabase-js';
 import * as Linking from 'expo-linking';
