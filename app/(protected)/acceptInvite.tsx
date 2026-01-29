@@ -2,14 +2,15 @@ import { useColors } from '@/hooks/ui/useColors';
 import { getCurrentUserId } from '@/services/authService';
 import { acceptTeamInvitation, getInvitationByCode } from '@/services/teamService';
 import { assignTeamWeapon, getTeamWeapon } from '@/services/weaponService';
-import { useTeamStore } from '@/store/teamStore';
-import { useTrainingStore } from '@/store/trainingStore';
+import { useTeamStore } from '@/stores/teamStore';
+import { useTrainingStore } from '@/stores/trainingStore';
 import type { TeamInvitation, TeamRole } from '@/types/workspace';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { Crosshair } from 'lucide-react-native';
 import { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
   Alert,
@@ -29,6 +30,7 @@ import {
  */
 export default function AcceptInviteSheet() {
   const colors = useColors();
+  const { t } = useTranslation();
 
   const [inviteCode, setInviteCode] = useState('');
   const [validatedInvite, setValidatedInvite] = useState<(TeamInvitation & { team_name?: string }) | null>(null);
@@ -92,13 +94,13 @@ export default function AcceptInviteSheet() {
     const code = inviteCode.trim().toUpperCase();
 
     if (!code) {
-      setError('Please enter an invite code');
+      setError(t('invite.pleaseEnterCode'));
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
       return;
     }
 
     if (code.length !== 8) {
-      setError('Invite code must be 8 characters');
+      setError(t('invite.codeMustBe8'));
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
       return;
     }
@@ -114,12 +116,12 @@ export default function AcceptInviteSheet() {
         setValidatedInvite(invite);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       } else {
-        setError('Invalid or expired invite code');
+        setError(t('invite.invalidOrExpired'));
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       }
     } catch (error: any) {
       console.error('Failed to validate invite:', error);
-      setError(error.message || 'Invalid or expired invite code');
+      setError(error.message || t('invite.invalidOrExpired'));
       setValidatedInvite(null);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     } finally {
@@ -166,10 +168,10 @@ export default function AcceptInviteSheet() {
 
   const handleDecline = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    Alert.alert('Decline Invitation', "Are you sure you don't want to join this team?", [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('invite.declineInvitationTitle'), t('invite.declineInvitationMessage'), [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'Decline',
+        text: t('common.decline'),
         style: 'destructive',
         onPress: () => {
           setInviteCode('');
@@ -178,7 +180,7 @@ export default function AcceptInviteSheet() {
         },
       },
     ]);
-  }, []);
+  }, [t]);
 
   const handleReset = useCallback(() => {
     setInviteCode('');
@@ -213,13 +215,13 @@ export default function AcceptInviteSheet() {
 
   const getRoleLabel = (role: TeamRole | string | null | undefined): string => {
     const labels: Record<string, string> = {
-      owner: 'Owner',
-      commander: 'Team Commander',
-      team_commander: 'Team Commander',
-      squad_commander: 'Squad Commander',
-      soldier: 'Soldier',
+      owner: t('roles.owner'),
+      commander: t('roles.teamCommander'),
+      team_commander: t('roles.teamCommander'),
+      squad_commander: t('roles.squadCommander'),
+      soldier: t('roles.soldier'),
     };
-    if (!role) return 'Soldier';
+    if (!role) return t('roles.soldier');
     return labels[String(role)] || String(role);
   };
 
@@ -245,7 +247,7 @@ export default function AcceptInviteSheet() {
           <Ionicons name="checkmark-circle" size={66} color={colors.primary} />
         </View>
 
-        <Text style={[styles.successTitle, { color: colors.text }]}>You’re in</Text>
+        <Text style={[styles.successTitle, { color: colors.text }]}>{t('invite.youreIn')}</Text>
         <Text style={[styles.successTeam, { color: colors.text }]} numberOfLines={1}>
           {acceptedResult.team_name}
         </Text>
@@ -258,14 +260,14 @@ export default function AcceptInviteSheet() {
         >
           <Ionicons name={getRoleIcon(acceptedResult.role)} size={16} color={getRoleColor(acceptedResult.role)} />
           <Text style={[styles.successRole, { color: getRoleColor(acceptedResult.role) }]}>
-            Joined as {getRoleLabel(acceptedResult.role)}
+            {t('invite.joinedAs', { role: getRoleLabel(acceptedResult.role) })}
           </Text>
         </View>
 
         {preassignedWeapon && (
           <View style={[styles.successWeaponChip, { backgroundColor: colors.green + '15' }]}>
             <Crosshair size={14} color={colors.green} />
-            <Text style={[styles.successWeaponText, { color: colors.green }]}>{preassignedWeapon.name} assigned</Text>
+            <Text style={[styles.successWeaponText, { color: colors.green }]}>{t('invite.weaponAssigned', { weapon: preassignedWeapon.name })}</Text>
           </View>
         )}
 
@@ -276,7 +278,7 @@ export default function AcceptInviteSheet() {
             activeOpacity={0.85}
           >
             <Ionicons name="people" size={18} color="#fff" />
-            <Text style={styles.primaryActionText}>Open Team</Text>
+            <Text style={styles.primaryActionText}>{t('teams.openTeam')}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -284,7 +286,7 @@ export default function AcceptInviteSheet() {
             onPress={handleCloseSheet}
             activeOpacity={0.7}
           >
-            <Text style={[styles.secondaryActionText, { color: colors.text }]}>Done</Text>
+            <Text style={[styles.secondaryActionText, { color: colors.text }]}>{t('common.done')}</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -313,9 +315,9 @@ export default function AcceptInviteSheet() {
         <View style={[styles.headerIcon, { backgroundColor: colors.primary + '15' }]}>
           <Ionicons name="enter" size={28} color={colors.primary} />
         </View>
-        <Text style={[styles.title, { color: colors.text }]}>Join Team</Text>
+        <Text style={[styles.title, { color: colors.text }]}>{t('invite.joinTeam')}</Text>
         <Text style={[styles.subtitle, { color: colors.textMuted }]}>
-          {validatedInvite ? 'Review invitation' : 'Enter invite code to get started'}
+          {validatedInvite ? t('invite.reviewInvitation') : t('invite.enterCodeToStart')}
         </Text>
 
         {validatedInvite && (
@@ -325,7 +327,7 @@ export default function AcceptInviteSheet() {
             activeOpacity={0.7}
           >
             <Ionicons name="refresh" size={16} color={colors.text} />
-            <Text style={[styles.resetBtnText, { color: colors.text }]}>Enter Different Code</Text>
+            <Text style={[styles.resetBtnText, { color: colors.text }]}>{t('invite.enterDifferentCode')}</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -334,7 +336,7 @@ export default function AcceptInviteSheet() {
         <>
           <View style={[styles.inputCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Text style={[styles.inputLabel, { color: colors.text }]}>
-              <Ionicons name="key-outline" size={14} color={colors.text} /> Invite Code
+              <Ionicons name="key-outline" size={14} color={colors.text} /> {t('invite.inviteCodeLabel')}
             </Text>
             <View
               style={[
@@ -387,7 +389,7 @@ export default function AcceptInviteSheet() {
             ) : (
               <>
                 <Ionicons name="checkmark-circle" size={20} color="#fff" />
-                <Text style={styles.validateButtonText}>Validate Code</Text>
+                <Text style={styles.validateButtonText}>{t('invite.validateCode')}</Text>
               </>
             )}
           </TouchableOpacity>
@@ -395,10 +397,9 @@ export default function AcceptInviteSheet() {
           <View style={[styles.helpCard, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
             <Ionicons name="help-circle-outline" size={20} color={colors.textMuted} />
             <View style={styles.helpContent}>
-              <Text style={[styles.helpTitle, { color: colors.text }]}>How to get an invite code?</Text>
+              <Text style={[styles.helpTitle, { color: colors.text }]}>{t('invite.howToGetCode')}</Text>
               <Text style={[styles.helpText, { color: colors.textMuted }]}>
-                Ask a team owner or commander to generate an invite code for you. They can share it via any messaging
-                app.
+                {t('invite.howToGetCodeDesc')}
               </Text>
             </View>
           </View>
@@ -408,7 +409,7 @@ export default function AcceptInviteSheet() {
           <View style={[styles.teamCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <View style={styles.inviteCardTopRow}>
               <View style={[styles.sectionPill, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
-                <Text style={[styles.sectionPillText, { color: colors.textMuted }]}>INVITATION</Text>
+                <Text style={[styles.sectionPillText, { color: colors.textMuted }]}>{t('invite.invitation')}</Text>
               </View>
             </View>
 
@@ -422,7 +423,7 @@ export default function AcceptInviteSheet() {
                   {validatedInvite.team_name || 'Team'}
                 </Text>
                 <Text style={[styles.teamSubtitle, { color: colors.textMuted }]}>
-                  Review details, then join the team
+                  {t('invite.reviewDetails')}
                 </Text>
               </View>
             </View>
@@ -432,7 +433,7 @@ export default function AcceptInviteSheet() {
             <View style={styles.detailRow}>
               <View style={styles.detailLabelRow}>
                 <Ionicons name="shield-outline" size={14} color={colors.textMuted} />
-                <Text style={[styles.detailLabel, { color: colors.textMuted }]}>Role</Text>
+                <Text style={[styles.detailLabel, { color: colors.textMuted }]}>{t('invite.roleLabel')}</Text>
               </View>
               <View
                 style={[
@@ -454,7 +455,7 @@ export default function AcceptInviteSheet() {
             <View style={styles.detailRow}>
               <View style={styles.detailLabelRow}>
                 <Ionicons name="time-outline" size={14} color={colors.textMuted} />
-                <Text style={[styles.detailLabel, { color: colors.textMuted }]}>Expires</Text>
+                <Text style={[styles.detailLabel, { color: colors.textMuted }]}>{t('invite.expiresLabel')}</Text>
               </View>
               <Text style={[styles.detailValue, { color: colors.text }]}>
                 {new Date(validatedInvite.expires_at).toLocaleDateString()}
@@ -464,7 +465,7 @@ export default function AcceptInviteSheet() {
             <View style={styles.detailRow}>
               <View style={styles.detailLabelRow}>
                 <Ionicons name="key-outline" size={14} color={colors.textMuted} />
-                <Text style={[styles.detailLabel, { color: colors.textMuted }]}>Code</Text>
+                <Text style={[styles.detailLabel, { color: colors.textMuted }]}>{t('invite.codeLabel')}</Text>
               </View>
               <Text style={[styles.detailValueMono, { color: colors.text }]}>
                 ••••{' '}
@@ -479,7 +480,7 @@ export default function AcceptInviteSheet() {
               <View style={styles.detailRow}>
                 <View style={styles.detailLabelRow}>
                   <Crosshair size={14} color={colors.textMuted} />
-                  <Text style={[styles.detailLabel, { color: colors.textMuted }]}>Weapon</Text>
+                  <Text style={[styles.detailLabel, { color: colors.textMuted }]}>{t('invite.weaponLabel')}</Text>
                 </View>
                 <View style={[styles.weaponChip, { backgroundColor: colors.green + '18', borderColor: colors.border }]}>
                   <Crosshair size={12} color={colors.green} />
@@ -506,7 +507,7 @@ export default function AcceptInviteSheet() {
               activeOpacity={0.7}
             >
               <Ionicons name="close" size={18} color={colors.text} />
-              <Text style={[styles.declineButtonText, { color: colors.text }]}>Decline</Text>
+              <Text style={[styles.declineButtonText, { color: colors.text }]}>{t('common.decline')}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -526,7 +527,7 @@ export default function AcceptInviteSheet() {
               ) : (
                 <>
                   <Ionicons name="checkmark-done" size={18} color="#fff" />
-                  <Text style={styles.acceptButtonText}>Join Team</Text>
+                  <Text style={styles.acceptButtonText}>{t('invite.joinTeam')}</Text>
                 </>
               )}
             </TouchableOpacity>

@@ -5,12 +5,13 @@
  * Used in Team tab header when user has multiple teams.
  */
 import { useColors } from '@/hooks/ui/useColors';
-import { useTeamStore } from '@/store/teamStore';
+import { useTeamStore } from '@/stores/teamStore';
 import type { TeamWithRole } from '@/types/workspace';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { Check, ChevronDown, Crown, Plus, Shield, Target, UserPlus, Users } from 'lucide-react-native';
 import { useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -18,15 +19,15 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 // ROLE CONFIG
 // ─────────────────────────────────────────────────────────────────────────────
 
-const ROLE_CONFIG: Record<string, { color: string; label: string; icon: any }> = {
-  owner: { color: '#A78BFA', label: 'Owner', icon: Crown },
-  commander: { color: '#F87171', label: 'Commander', icon: Crown },
-  team_commander: { color: '#F87171', label: 'Commander', icon: Crown },
-  squad_commander: { color: '#FBBF24', label: 'Squad Lead', icon: Shield },
-  soldier: { color: '#34D399', label: 'Soldier', icon: Target },
-};
-
-function getRoleConfig(role: string | null | undefined) {
+function getRoleConfig(role: string | null | undefined, t: (key: string) => string) {
+  const ROLE_CONFIG: Record<string, { color: string; label: string; icon: any }> = {
+    owner: { color: '#A78BFA', label: t('teams.roles.owner'), icon: Crown },
+    commander: { color: '#F87171', label: t('teams.roles.commander'), icon: Crown },
+    team_commander: { color: '#F87171', label: t('teams.roles.commander'), icon: Crown },
+    squad_commander: { color: '#FBBF24', label: t('teams.roles.squadCommander'), icon: Shield },
+    soldier: { color: '#34D399', label: t('teams.roles.soldier'), icon: Target },
+  };
+  
   if (!role) return ROLE_CONFIG.soldier;
   const normalized = role === 'commander' ? 'team_commander' : role;
   return ROLE_CONFIG[normalized] || ROLE_CONFIG.soldier;
@@ -50,11 +51,12 @@ interface TeamSwitcherPillProps {
 }
 
 export function TeamSwitcherPill({ onPress }: TeamSwitcherPillProps) {
+  const { t } = useTranslation();
   const colors = useColors();
   const { teams, activeTeamId } = useTeamStore();
 
   const activeTeam = teams.find((t) => t.id === activeTeamId);
-  const teamName = activeTeam?.name || 'Select Team';
+  const teamName = activeTeam?.name || t('teams.selectTeam');
 
   return (
     <TouchableOpacity
@@ -79,6 +81,7 @@ export function TeamSwitcherPill({ onPress }: TeamSwitcherPillProps) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export function TeamSwitcherSheet({ visible, onClose }: TeamSwitcherSheetProps) {
+  const { t } = useTranslation();
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { teams, activeTeamId, setActiveTeam } = useTeamStore();
@@ -117,14 +120,14 @@ export function TeamSwitcherSheet({ visible, onClose }: TeamSwitcherSheetProps) 
 
           {/* Header */}
           <View style={styles.header}>
-            <Text style={[styles.headerTitle, { color: colors.text }]}>Switch Team</Text>
+            <Text style={[styles.headerTitle, { color: colors.text }]}>{t('teams.switchTeam')}</Text>
           </View>
 
           {/* Team List */}
           <ScrollView style={styles.list} showsVerticalScrollIndicator={false}>
             {teams.map((team) => {
               const isActive = team.id === activeTeamId;
-              const roleConfig = getRoleConfig(team.my_role);
+              const roleConfig = getRoleConfig(team.my_role, t);
               const RoleIcon = roleConfig.icon;
 
               return (
@@ -147,7 +150,7 @@ export function TeamSwitcherSheet({ visible, onClose }: TeamSwitcherSheetProps) 
                       <Text style={[styles.teamRole, { color: roleConfig.color }]}>{roleConfig.label}</Text>
                       {team.member_count && (
                         <Text style={[styles.teamMembers, { color: colors.textMuted }]}>
-                          · {team.member_count} members
+                          · {t('teams.membersCount', { count: team.member_count })}
                         </Text>
                       )}
                     </View>
@@ -171,7 +174,7 @@ export function TeamSwitcherSheet({ visible, onClose }: TeamSwitcherSheetProps) 
               activeOpacity={0.8}
             >
               <Plus size={16} color="#fff" />
-              <Text style={styles.actionBtnText}>Create Team</Text>
+              <Text style={styles.actionBtnText}>{t('teams.createTeam')}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -180,7 +183,7 @@ export function TeamSwitcherSheet({ visible, onClose }: TeamSwitcherSheetProps) 
               activeOpacity={0.8}
             >
               <UserPlus size={16} color={colors.text} />
-              <Text style={[styles.actionBtnText, { color: colors.text }]}>Join Team</Text>
+              <Text style={[styles.actionBtnText, { color: colors.text }]}>{t('teams.joinTeam')}</Text>
             </TouchableOpacity>
           </View>
         </View>

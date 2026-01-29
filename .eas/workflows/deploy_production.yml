@@ -1,0 +1,162 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches: ['main']
+  workflow_dispatch:
+    inputs:
+      skip_migrations:
+        type: boolean
+        description: "Skip database migrations (deploy app only)"
+        default: false
+
+jobs:
+  # Step 1: Manual approval gate before any production changes
+  approve_deployment:
+    name: Approve Production Deployment
+    type: require-approval
+    environment: production
+
+  # Step 2: Backup production database BEFORE any changes
+  backup_production_db:
+    name: Backup Production Database
+    type: custom
+    needs: [approve_deployment]
+    environment: production
+    runs_on: linux-medium
+    outputs:
+      backup_file: ${{ steps.backup.outputs.backup_file }}
+      backup_timestamp: ${{ steps.backup.outputs.backup_timestamp }}
+    steps:
+      - name: Checkout repository
+        uses: eas/checkout
+
+      - name: Install Supabase CLI and pg tools
+        run: |
+          curl -fsSL https://supabase.com/install.sh | sh
+          sudo apt-get update && sudo apt-get install -y postgresql-client
+          supabase --version
+
+      - name: Create timestamped backup
+        id: backup
+        run: |
+          TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+          BACKUP_FILE="backup_prod_${TIMESTAMP}.dump"
+
+          echo "Creating backup: ${BACKUP_FILE}"
+
+          # Create backup using pg_dump (schema + data)
+          PGPASSWORD="${SUPABASE_DB_PASSWORD}" pg_dump \
+            -h "${SUPABASE_PROD_DB_HOST}" \
+            -p 5432 \
+            -U postgres \
+            -d postgres \
+            --no-owner \
+            --no-acl \
+            --clean \
+            --if-exists \
+            -F c \
+            -f "${BACKUP_FILE}"
+
+          echo "Backup created successfully: ${BACKUP_FILE}"
+          echo "Backup size: $(ls -lh ${BACKUP_FILE} | awk '{print $5}')"
+
+          # Set outputs
+          set-output backup_file "${BACKUP_FILE}"
+          set-output backup_timestamp "${TIMESTAMP}"
+        outputs:
+          - backup_file
+          - backup_timestamp
+
+  # Step 3: Apply migrations (schema only, no data changes)
+  apply_migrations:
+    name: Apply Database Migrations
+    type: custom
+    needs: [backup_production_db]
+    if: "${{ inputs.skip_migrations != 'true' }}"
+    environment: production
+    runs_on: linux-medium
+    steps:
+      - name: Checkout repository
+        uses: eas/checkout
+
+      - name: Install Supabase CLI
+        run: |
+          curl -fsSL https://supabase.com/install.sh | sh
+          supabase --version
+
+      - name: Link to production project
+        run: |
+          supabase link --project-ref "${SUPABASE_PROD_PROJECT_REF}"
+
+      - name: Apply pending migrations
+        run: |
+          echo "Checking for pending migrations..."
+
+          # List pending migrations
+          supabase migration list
+
+          # Apply migrations (this is safe - only runs unapplied migrations)
+          supabase db push --include-all
+
+          echo "Migrations applied successfully"
+
+  # Step 4: Build iOS app (runs in parallel with Android)
+  build_ios:
+    name: Build iOS Production
+    type: build
+    needs: [apply_migrations]
+    environment: production
+    params:
+      platform: ios
+      profile: production
+      message: "Production build from deploy workflow"
+
+  # Step 5: Build Android app (runs in parallel with iOS)
+  build_android:
+    name: Build Android Production
+    type: build
+    needs: [apply_migrations]
+    environment: production
+    params:
+      platform: android
+      profile: production
+      message: "Production build from deploy workflow"
+
+  # Step 6: Submit iOS to App Store
+  submit_ios:
+    name: Submit to App Store
+    type: submit
+    needs: [build_ios]
+    environment: production
+    params:
+      build_id: "${{ needs.build_ios.outputs.build_id }}"
+      profile: production
+
+  # Step 7: Submit Android to Play Store
+  submit_android:
+    name: Submit to Play Store
+    type: submit
+    needs: [build_android]
+    environment: production
+    params:
+      build_id: "${{ needs.build_android.outputs.build_id }}"
+      profile: production
+
+  # Step 8: Deploy web/API routes (if using EAS Hosting)
+  deploy_web:
+    name: Deploy Web
+    type: deploy
+    needs: [apply_migrations]
+    environment: production
+    params:
+      prod: true
+
+  # Step 9: Send Slack notification on completion
+  notify_success:
+    name: Notify Deployment Success
+    type: slack
+    needs: [submit_ios, submit_android, deploy_web]
+    params:
+      webhook_url: "${{ env.SLACK_WEBHOOK_URL }}"
+      message: "Production Deployment Complete - iOS and Android submitted to stores, Web deployed"

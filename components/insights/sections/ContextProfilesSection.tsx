@@ -29,7 +29,7 @@ import {
 } from 'lucide-react-native';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-import type { ContextProfile, ContextQuadrant } from '../insights.types';
+import type { ContextProfile, ContextQuadrant } from '@/types/insights';
 
 // ============================================================================
 // PROPS

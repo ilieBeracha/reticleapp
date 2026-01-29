@@ -1,5 +1,6 @@
 import { useColors } from '@/hooks/ui/useColors';
-import type { SessionWithDetails } from '@/services/session/types';
+import type { SessionWithDetails } from '@/types/session';
+import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useMemo } from 'react';
@@ -15,11 +16,11 @@ import {
   View,
 } from 'react-native';
 
-import { countActiveFilters } from './SessionHistory.helpers';
-import type { SessionHistoryCatalogProps } from './SessionHistory.types';
+import { countActiveFilters } from '@/utils/sessionHistory.helpers';
+import type { SessionHistoryCatalogProps } from '@/types/sessionHistory';
 import { FilterSheet } from './FilterSheet';
 import { SessionCard } from './SessionCard';
-import { useSessionHistory } from './useSessionHistory';
+import { useSessionHistory } from '@/hooks/session/useSessionHistory';
 
 /**
  * SessionHistoryCatalog - Full session history with search, filters, and sorting
@@ -37,6 +38,7 @@ export function SessionHistoryCatalog({
   onSessionSelect,
 }: SessionHistoryCatalogProps) {
   const colors = useColors();
+  const { t } = useTranslation();
   const router = useRouter();
   
   const {
@@ -99,12 +101,12 @@ export function SessionHistoryCatalog({
       <View style={styles.emptyContainer}>
         <Ionicons name="document-text-outline" size={48} color={colors.textMuted} />
         <Text style={[styles.emptyTitle, { color: colors.text }]}>
-          {searchQuery || activeFilterCount > 0 ? 'No matching sessions' : 'No sessions yet'}
+          {searchQuery || activeFilterCount > 0 ? t('session.noMatchingSessions') : t('session.noSessionsYet')}
         </Text>
         <Text style={[styles.emptySubtitle, { color: colors.textMuted }]}>
           {searchQuery || activeFilterCount > 0
-            ? 'Try adjusting your search or filters'
-            : 'Complete a shooting session to see it here'}
+            ? t('session.tryAdjustingSearchOrFilters')
+            : t('session.completeShootingSessionToSee')}
         </Text>
         {activeFilterCount > 0 && (
           <TouchableOpacity
@@ -112,7 +114,7 @@ export function SessionHistoryCatalog({
             onPress={resetFilters}
           >
             <Text style={[styles.clearFiltersText, { color: colors.primary }]}>
-              Clear filters
+              {t('session.clearFilters')}
             </Text>
           </TouchableOpacity>
         )}
@@ -134,9 +136,9 @@ export function SessionHistoryCatalog({
       {/* Header */}
       {!hideHeader && (
         <View style={styles.header}>
-          <Text style={[styles.title, { color: colors.text }]}>Session History</Text>
+          <Text style={[styles.title, { color: colors.text }]}>{t('session.sessionHistory')}</Text>
           <Text style={[styles.subtitle, { color: colors.textMuted }]}>
-            {filteredSessions.length} session{filteredSessions.length !== 1 ? 's' : ''}
+            {t('session.sessionsCount', { count: filteredSessions.length })}
           </Text>
         </View>
       )}
@@ -147,7 +149,7 @@ export function SessionHistoryCatalog({
           <Ionicons name="search" size={18} color={colors.textMuted} />
           <TextInput
             style={[styles.searchText, { color: colors.text }]}
-            placeholder="Search sessions..."
+            placeholder={t('session.searchSessions')}
             placeholderTextColor={colors.textMuted}
             value={searchQuery}
             onChangeText={setSearchQuery}
@@ -192,7 +194,7 @@ export function SessionHistoryCatalog({
             color={colors.textMuted} 
           />
           <Text style={[styles.sortText, { color: colors.textMuted }]}>
-            Sorted by {sort.field}
+            {t('session.sortedBy', { field: t(`session.sortField.${sort.field}`) })}
           </Text>
         </TouchableOpacity>
       </View>

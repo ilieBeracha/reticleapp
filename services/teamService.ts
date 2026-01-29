@@ -4,15 +4,15 @@
  * Teams are the primary entity - no organization layer
  */
 
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/services/supabase';
 import type {
-  Team,
-  TeamInvitation,
-  TeamMember,
-  TeamMemberWithProfile,
-  TeamRole,
-  TeamWithMembers,
-  TeamWithRole,
+    Team,
+    TeamInvitation,
+    TeamMember,
+    TeamMemberWithProfile,
+    TeamRole,
+    TeamWithMembers,
+    TeamWithRole,
 } from '@/types/workspace';
 
 function normalizeTeamInvitation(row: any): TeamInvitation {
@@ -60,6 +60,7 @@ function normalizeTeamMemberWithProfile(row: any): TeamMemberWithProfile {
 export interface CreateTeamInput {
   name: string;
   description?: string;
+  specialty?: string;
   squads?: string[];
 }
 
@@ -67,6 +68,7 @@ export interface UpdateTeamInput {
   team_id: string;
   name?: string;
   description?: string;
+  specialty?: string | null;
   squads?: string[];
 }
 
@@ -84,8 +86,28 @@ export async function createTeam(input: CreateTeamInput): Promise<Team> {
     console.error('Failed to create team:', error);
     throw new Error(error.message || 'Failed to create team');
   }
-  
-  return data as Team;
+
+  const team = data as Team;
+
+  // If specialty was provided, update the team with it
+  // (RPC doesn't support specialty parameter yet)
+  if (input.specialty) {
+    const { data: updatedTeam, error: updateError } = await supabase
+      .from('teams')
+      .update({ specialty: input.specialty })
+      .eq('id', team.id)
+      .select()
+      .single();
+
+    if (updateError) {
+      console.warn('Failed to set team specialty:', updateError);
+      // Don't throw - team was created successfully, specialty is optional
+    } else {
+      return updatedTeam as Team;
+    }
+  }
+
+  return team;
 }
 
 /**
@@ -105,6 +127,7 @@ export async function getMyTeams(): Promise<TeamWithRole[]> {
     description: t.description,
     squads: t.squads,
     team_type: t.team_type,
+    specialty: t.specialty || null,
     created_by: t.created_by,
     created_at: t.created_at,
     updated_at: t.created_at, // RPC doesn't return updated_at
@@ -167,18 +190,14 @@ export async function getTeamWithMembers(teamId: string): Promise<TeamWithMember
  * Update a team
  */
 export async function updateTeam(input: UpdateTeamInput): Promise<Team> {
-  const updates: Partial<Team> = {};
-  
+  const updates: Record<string, any> = {};
+
   if (input.name !== undefined) updates.name = input.name;
   if (input.description !== undefined) updates.description = input.description;
   if (input.squads !== undefined) updates.squads = input.squads;
+  if (input.specialty !== undefined) updates.specialty = input.specialty;
 
-  const { data, error } = await supabase
-    .from('teams')
-    .update(updates)
-    .eq('id', input.team_id)
-    .select()
-    .single();
+  const { data, error } = await supabase.from('teams').update(updates).eq('id', input.team_id).select().single();
 
   if (error) {
     console.error('Failed to update team:', error);
@@ -194,10 +213,7 @@ export async function updateTeam(input: UpdateTeamInput): Promise<Team> {
  */
 export async function deleteTeam(teamId: string): Promise<void> {
   // Delete trainings first (they reference team_id)
-  const { error: trainingsError } = await supabase
-    .from('trainings')
-    .delete()
-    .eq('team_id', teamId);
+  const { error: trainingsError } = await supabase.from('trainings').delete().eq('team_id', teamId);
 
   if (trainingsError) {
     console.error('Failed to delete team trainings:', trainingsError);
@@ -205,10 +221,7 @@ export async function deleteTeam(teamId: string): Promise<void> {
   }
 
   // Delete drill templates
-  const { error: drillsError } = await supabase
-    .from('drill_templates')
-    .delete()
-    .eq('team_id', teamId);
+  const { error: drillsError } = await supabase.from('drill_templates').delete().eq('team_id', teamId);
 
   if (drillsError) {
     console.error('Failed to delete team drills:', drillsError);
@@ -216,10 +229,7 @@ export async function deleteTeam(teamId: string): Promise<void> {
   }
 
   // Delete invitations
-  const { error: invitesError } = await supabase
-    .from('team_invitations')
-    .delete()
-    .eq('team_id', teamId);
+  const { error: invitesError } = await supabase.from('team_invitations').delete().eq('team_id', teamId);
 
   if (invitesError) {
     console.error('Failed to delete team invitations:', invitesError);
@@ -227,10 +237,7 @@ export async function deleteTeam(teamId: string): Promise<void> {
   }
 
   // Delete members
-  const { error: membersError } = await supabase
-    .from('team_members')
-    .delete()
-    .eq('team_id', teamId);
+  const { error: membersError } = await supabase.from('team_members').delete().eq('team_id', teamId);
 
   if (membersError) {
     console.error('Failed to delete team members:', membersError);
@@ -238,10 +245,7 @@ export async function deleteTeam(teamId: string): Promise<void> {
   }
 
   // Finally delete the team
-  const { error } = await supabase
-    .from('teams')
-    .delete()
-    .eq('id', teamId);
+  const { error } = await supabase.from('teams').delete().eq('id', teamId);
 
   if (error) {
     console.error('Failed to delete team:', error);
@@ -287,11 +291,7 @@ export async function addTeamMember(input: AddTeamMemberInput): Promise<TeamMemb
  * Remove a member from a team
  */
 export async function removeTeamMember(teamId: string, userId: string): Promise<void> {
-  const { error } = await supabase
-    .from('team_members')
-    .delete()
-    .eq('team_id', teamId)
-    .eq('user_id', userId);
+  const { error } = await supabase.from('team_members').delete().eq('team_id', teamId).eq('user_id', userId);
 
   if (error) {
     console.error('Failed to remove team member:', error);
@@ -310,7 +310,7 @@ export async function updateTeamMemberRole(
   details?: Record<string, any>
 ): Promise<TeamMember> {
   const updates: any = { role };
-  
+
   if (details !== undefined) {
     // Extract squad_id to update the column directly (not just in JSONB)
     if ('squad_id' in details) {
@@ -344,7 +344,8 @@ export async function updateTeamMemberRole(
 export async function getTeamMembers(teamId: string): Promise<TeamMemberWithProfile[]> {
   const { data, error } = await supabase
     .from('team_members')
-    .select(`
+    .select(
+      `
       team_id,
       user_id,
       role,
@@ -352,7 +353,8 @@ export async function getTeamMembers(teamId: string): Promise<TeamMemberWithProf
       joined_at,
       details,
       profile:profiles!user_id(id, email, full_name, avatar_url)
-    `)
+    `
+    )
     .eq('team_id', teamId)
     .order('joined_at', { ascending: false });
 
@@ -390,12 +392,14 @@ export interface CreateInvitationInput {
  * Create a team invitation
  */
 export async function createTeamInvitation(input: CreateInvitationInput): Promise<TeamInvitation> {
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
 
   // Generate unique invite code
   const inviteCode = generateInviteCode();
-  
+
   // Calculate expiry (default 7 days)
   const expiresAt = new Date();
   expiresAt.setDate(expiresAt.getDate() + (input.expires_in_days || 7));
@@ -445,13 +449,17 @@ export async function acceptTeamInvitation(inviteCode: string): Promise<{
 /**
  * Get invitation by code (for preview)
  */
-export async function getInvitationByCode(inviteCode: string): Promise<TeamInvitation & { team_name?: string } | null> {
+export async function getInvitationByCode(
+  inviteCode: string
+): Promise<(TeamInvitation & { team_name?: string }) | null> {
   const { data, error } = await supabase
     .from('team_invitations')
-    .select(`
+    .select(
+      `
       *,
       team:teams(name)
-    `)
+    `
+    )
     .eq('invite_code', inviteCode)
     .eq('status', 'pending')
     .gt('expires_at', new Date().toISOString())
@@ -520,19 +528,17 @@ export interface TeamCommanderStatus {
  */
 export async function getTeamCommanderStatus(teamId: string): Promise<TeamCommanderStatus> {
   // Get team squads
-  const { data: team } = await supabase
-    .from('teams')
-    .select('squads')
-    .eq('id', teamId)
-    .single();
+  const { data: team } = await supabase.from('teams').select('squads').eq('id', teamId).single();
 
   // Check for existing commander
   const { data: commander } = await supabase
     .from('team_members')
-    .select(`
+    .select(
+      `
       role,
       profile:profiles!user_id(full_name)
-    `)
+    `
+    )
     .eq('team_id', teamId)
     .eq('role', 'commander')
     .maybeSingle();
@@ -575,15 +581,13 @@ function generateInviteCode(): string {
  * Check if user is team owner or commander
  */
 export async function canManageTeam(teamId: string): Promise<boolean> {
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   if (!user) return false;
 
   // Check if owner (created_by)
-  const { data: team } = await supabase
-    .from('teams')
-    .select('created_by')
-    .eq('id', teamId)
-    .single();
+  const { data: team } = await supabase.from('teams').select('created_by').eq('id', teamId).single();
 
   if (team?.created_by === user.id) return true;
 
@@ -602,7 +606,9 @@ export async function canManageTeam(teamId: string): Promise<boolean> {
  * Get user's role in a team
  */
 export async function getMyRoleInTeam(teamId: string): Promise<TeamRole | null> {
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   if (!user) return null;
 
   const { data } = await supabase
@@ -612,5 +618,5 @@ export async function getMyRoleInTeam(teamId: string): Promise<TeamRole | null> 
     .eq('user_id', user.id)
     .single();
 
-  return data?.role as TeamRole || null;
+  return (data?.role as TeamRole) || null;
 }

@@ -3,6 +3,9 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Redirect } from 'expo-router';
 
 export default function Index() {
+  if (__DEV__) {
+    require('../ReactotronConfig');
+  }
   const { user, loading: authLoading, transitioning } = useAuth();
 
   // Show loading while checking auth or during transitions

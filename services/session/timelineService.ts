@@ -12,7 +12,7 @@
 // 4. This service saves the assembled data to DB
 // ============================================================================
 
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/services/supabase';
 import type { GarminTimelineData } from '@/services/garminService';
 
 // ============================================================================

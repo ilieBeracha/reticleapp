@@ -16,7 +16,7 @@ import type {
     WatchDetailsPayload,
     WatchSummaryPayload,
     WatchTimelineChunkPayload
-} from '../session/watchTypes';
+} from '@/types/session.watch';
 import type {
     GarminBiometrics,
     GarminInboundMessage,
@@ -26,7 +26,7 @@ import type {
     GarminSteadiness,
     GarminTimelineData,
     WatchErrorPayload
-} from './garmin.types';
+} from '@/types/garmin';
 
 // ============================================================================
 // HANDLER CONTEXT

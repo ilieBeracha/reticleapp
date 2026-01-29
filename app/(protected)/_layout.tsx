@@ -2,7 +2,7 @@ import { Header } from '@/components/shared/Header';
 import { useColors } from '@/hooks/ui/useColors';
 import { useOrphanedSessionCheck } from '@/hooks/useOrphanedSessionCheck';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
-import { useGarminInitialize } from '@/store/garminStore';
+import { useGarminInitialize } from '@/stores/garminStore';
 import { router, Stack } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -80,11 +80,11 @@ export default function ProtectedLayout() {
         name="createTeam"
         options={{
           headerShown: false,
-          presentation: 'containedModal',
+          presentation: 'formSheet',
           gestureEnabled: true,
           sheetGrabberVisible: true,
-          contentStyle: { backgroundColor: colors.card, paddingTop: insets.top },
-          sheetAllowedDetents: [0.8, 0.95],
+          contentStyle: { backgroundColor: colors.card },
+          sheetAllowedDetents: [0.85, 0.95],
           sheetInitialDetentIndex: 0,
           sheetLargestUndimmedDetentIndex: -1,
         }}
@@ -119,7 +119,7 @@ export default function ProtectedLayout() {
       />
 
       <Stack.Screen
-        name="createSession"
+        name="startEngagement"
         options={{
           headerShown: false,
           presentation: 'containedModal',
@@ -233,36 +233,22 @@ export default function ProtectedLayout() {
       />
 
       <Stack.Screen
+        name="squadLobby"
+        options={{
+          headerShown: false,
+          presentation: 'card',
+          gestureEnabled: true,
+          contentStyle: { backgroundColor: colors.background },
+        }}
+      />
+
+      <Stack.Screen
         name="activeSession"
         options={{
           headerShown: false,
           presentation: 'card',
           gestureEnabled: false,
           contentStyle: { backgroundColor: colors.background },
-        }}
-      />
-
-      <Stack.Screen
-        name="trainingLive"
-        options={{
-          headerShown: false,
-          presentation: 'card',
-          gestureEnabled: false,
-          contentStyle: { backgroundColor: '#0A0A0A' },
-        }}
-      />
-
-      <Stack.Screen
-        name="addTarget"
-        options={{
-          headerShown: false,
-          presentation: 'formSheet',
-          gestureEnabled: true,
-          sheetGrabberVisible: false,
-          contentStyle: { backgroundColor: colors.card },
-          sheetAllowedDetents: [0.85, 0.95],
-          sheetInitialDetentIndex: 0,
-          sheetLargestUndimmedDetentIndex: -1,
         }}
       />
 
@@ -305,26 +291,6 @@ export default function ProtectedLayout() {
       />
 
       <Stack.Screen
-        name="scans"
-        options={{
-          headerShown: false,
-          presentation: 'card',
-          gestureEnabled: true,
-          contentStyle: { backgroundColor: colors.background },
-        }}
-      />
-
-      <Stack.Screen
-        name="drillLibrary"
-        options={{
-          headerShown: false,
-          presentation: 'card',
-          gestureEnabled: true,
-          contentStyle: { backgroundColor: colors.background },
-        }}
-      />
-
-      <Stack.Screen
         name="weaponDetail"
         options={{
           headerShown: false,
@@ -341,20 +307,6 @@ export default function ProtectedLayout() {
           presentation: 'card',
           gestureEnabled: false,
           contentStyle: { backgroundColor: colors.background },
-        }}
-      />
-
-      <Stack.Screen
-        name="analysis"
-        options={{
-          headerShown: false,
-          presentation: 'formSheet',
-          gestureEnabled: true,
-          sheetGrabberVisible: true,
-          contentStyle: { backgroundColor: colors.card },
-          sheetAllowedDetents: [0.75, 1],
-          sheetInitialDetentIndex: 0,
-          sheetLargestUndimmedDetentIndex: -1,
         }}
       />
 

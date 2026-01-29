@@ -3,12 +3,14 @@
  * Countdown timer for auto-close functionality
  */
 
+import { useTranslation } from 'react-i18next';
 import { Timer } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import type { AutoCloseCountdownProps } from './types';
+import type { AutoCloseCountdownProps } from '@/types/trainingDetail';
 
 export function AutoCloseCountdown({ autoCloseAt, colors, onExpired }: AutoCloseCountdownProps) {
+  const { t } = useTranslation();
   const [timeLeft, setTimeLeft] = useState('');
   const [isExpired, setIsExpired] = useState(false);
 
@@ -19,7 +21,7 @@ export function AutoCloseCountdown({ autoCloseAt, colors, onExpired }: AutoClose
       const diff = end.getTime() - now.getTime();
 
       if (diff <= 0) {
-        setTimeLeft('Closing...');
+        setTimeLeft(t('training.closing'));
         setIsExpired(true);
         onExpired();
         return;
@@ -49,7 +51,7 @@ export function AutoCloseCountdown({ autoCloseAt, colors, onExpired }: AutoClose
     <View style={[styles.container, { backgroundColor: colors.orange + '15' }]}>
       <Timer size={14} color={colors.orange} />
       <Text style={[styles.text, { color: colors.orange }]}>
-        Auto-close in <Text style={styles.timeValue}>{timeLeft}</Text>
+        {t('training.autoCloseIn')} <Text style={styles.timeValue}>{timeLeft}</Text>
       </Text>
     </View>
   );

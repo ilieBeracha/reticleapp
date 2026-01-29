@@ -129,3 +129,12 @@ export const Colors = {
     indigo: '#7A8BAD',
   },
 };
+
+// Primary action button gradient - sleek dark with subtle depth
+export const BUTTON_GRADIENT = ['rgba(55,55,55,0.98)', 'rgba(38,38,38,0.98)', 'rgba(23,23,23,0.98)'] as const;
+
+// Disabled/loading button gradient
+export const BUTTON_GRADIENT_DISABLED = ['#4B5563', '#374151'] as const;
+
+// Utility type for color keys
+export type ColorKeys = keyof typeof Colors.light;

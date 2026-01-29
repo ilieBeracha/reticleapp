@@ -5,15 +5,18 @@
  */
 import { BaseAvatar } from '@/components/shared/Avatar';
 import { useAuth } from '@/contexts/AuthContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useColors } from '@/hooks/ui/useColors';
 import { useAppContext } from '@/hooks/useAppContext';
 import { useNotifications } from '@/hooks/useNotifications';
+import { Language } from '@/services/i18n';
 import { sendTestNotification } from '@/services/notifications';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { useCallback, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Alert, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 
 const delay = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
@@ -24,13 +27,21 @@ const THEME_OPTIONS = [
   { value: 'system' as const, label: 'System', icon: 'phone-portrait' as const },
 ];
 
+const LANGUAGE_OPTIONS: { value: Language; label: string; nativeLabel: string }[] = [
+  { value: 'en', label: 'English', nativeLabel: 'English' },
+  { value: 'he', label: 'Hebrew', nativeLabel: 'עברית' },
+];
+
 export default function ProfileSheet() {
   const colors = useColors();
+  const { t } = useTranslation();
   const { fullName, email } = useAppContext();
   const { signOut, profileAvatarUrl } = useAuth();
   const { isEnabled: notificationsEnabled, requestPermission } = useNotifications();
   const { preference, setPreference } = useTheme();
+  const { language, setLanguage } = useLanguage();
   const [showThemeOptions, setShowThemeOptions] = useState(false);
+  const [showLanguageOptions, setShowLanguageOptions] = useState(false);
 
   const handleTestNotification = useCallback(async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -77,7 +88,7 @@ export default function ProfileSheet() {
     >
       {/* Header */}
       <View style={styles.header}>
-        <Text style={[styles.title, { color: colors.text }]}>Profile</Text>
+        <Text style={[styles.title, { color: colors.text }]}>{t('profile.title')}</Text>
       </View>
 
       {/* Profile Card */}
@@ -108,7 +119,7 @@ export default function ProfileSheet() {
 
       {/* Settings Section */}
       <View style={styles.section}>
-        <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>SETTINGS</Text>
+        <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>{t('settings.title').toUpperCase()}</Text>
 
         <View style={[styles.menuGroup, { backgroundColor: colors.background }]}>
           {/* Notifications Toggle */}
@@ -122,9 +133,9 @@ export default function ProfileSheet() {
               <Ionicons name="notifications" size={18} color="#fff" />
             </View>
             <View style={styles.menuItemContent}>
-              <Text style={[styles.menuItemText, { color: colors.text }]}>Notifications</Text>
+              <Text style={[styles.menuItemText, { color: colors.text }]}>{t('settings.notifications')}</Text>
               <Text style={[styles.menuItemSubtitle, { color: colors.textMuted }]}>
-                {notificationsEnabled ? 'Enabled' : 'Disabled'}
+                {notificationsEnabled ? t('settings.enableNotifications') : t('common.no')}
               </Text>
             </View>
             <Switch
@@ -170,9 +181,9 @@ export default function ProfileSheet() {
               <Ionicons name="color-palette" size={18} color="#fff" />
             </View>
             <View style={styles.menuItemContent}>
-              <Text style={[styles.menuItemText, { color: colors.text }]}>Appearance</Text>
+              <Text style={[styles.menuItemText, { color: colors.text }]}>{t('settings.appearance')}</Text>
               <Text style={[styles.menuItemSubtitle, { color: colors.textMuted }]}>
-                {THEME_OPTIONS.find((o) => o.value === preference)?.label || 'System'}
+                {THEME_OPTIONS.find((o) => o.value === preference)?.label || t('settings.systemMode')}
               </Text>
             </View>
             <Ionicons name={showThemeOptions ? 'chevron-down' : 'chevron-forward'} size={16} color={colors.textMuted} />
@@ -202,6 +213,59 @@ export default function ProfileSheet() {
                     </View>
                     <Text style={[styles.themeOptionText, { color: isSelected ? colors.primary : colors.text }]}>
                       {option.label}
+                    </Text>
+                    {isSelected && <Ionicons name="checkmark" size={18} color={colors.primary} />}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          )}
+
+          {/* Language */}
+          <View style={[styles.separator, { backgroundColor: colors.border }]} />
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              setShowLanguageOptions(!showLanguageOptions);
+            }}
+          >
+            <View style={[styles.iconContainer, { backgroundColor: '#F59E0B' }]}>
+              <Ionicons name="language" size={18} color="#fff" />
+            </View>
+            <View style={styles.menuItemContent}>
+              <Text style={[styles.menuItemText, { color: colors.text }]}>{t('settings.language')}</Text>
+              <Text style={[styles.menuItemSubtitle, { color: colors.textMuted }]}>
+                {LANGUAGE_OPTIONS.find((o) => o.value === language)?.nativeLabel || 'English'}
+              </Text>
+            </View>
+            <Ionicons name={showLanguageOptions ? 'chevron-down' : 'chevron-forward'} size={16} color={colors.textMuted} />
+          </TouchableOpacity>
+
+          {/* Language Options (expandable) */}
+          {showLanguageOptions && (
+            <View style={[styles.themeOptionsContainer, { backgroundColor: colors.secondary }]}>
+              {LANGUAGE_OPTIONS.map((option) => {
+                const isSelected = language === option.value;
+                return (
+                  <TouchableOpacity
+                    key={option.value}
+                    style={[styles.themeOption, isSelected && { backgroundColor: colors.primary + '15' }]}
+                    onPress={() => {
+                      Haptics.selectionAsync();
+                      setLanguage(option.value);
+                    }}
+                  >
+                    <View
+                      style={[
+                        styles.themeOptionIcon,
+                        { backgroundColor: isSelected ? colors.primary : colors.textMuted + '30' },
+                      ]}
+                    >
+                      <Ionicons name="globe-outline" size={16} color={isSelected ? '#fff' : colors.textMuted} />
+                    </View>
+                    <Text style={[styles.themeOptionText, { color: isSelected ? colors.primary : colors.text }]}>
+                      {option.nativeLabel}
                     </Text>
                     {isSelected && <Ionicons name="checkmark" size={18} color={colors.primary} />}
                   </TouchableOpacity>
@@ -250,7 +314,7 @@ export default function ProfileSheet() {
             <Ionicons name="log-out-outline" size={18} color="#fff" />
           </View>
           <View style={styles.menuItemContent}>
-            <Text style={[styles.menuItemText, { color: colors.destructive }]}>Sign Out</Text>
+            <Text style={[styles.menuItemText, { color: colors.destructive }]}>{t('auth.signOut')}</Text>
           </View>
         </TouchableOpacity>
       </View>

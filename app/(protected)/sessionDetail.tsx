@@ -4,21 +4,19 @@
  * Shows session summary, stats, and image previews.
  * Opens as a formSheet modal above tabs.
  */
-import { useSessionTimeline } from '@/components/session';
 import { WeatherStrip } from '@/components/session/WeatherDisplay';
-import { isEngagementPaper, isGroupingPaper, isPaperTarget } from '@/constants';
+import { isEngagementPaper, isGroupingPaper, isPaperTarget } from '@/constants/drill';
+import { useAuth } from '@/contexts/AuthContext';
+import { useSessionTimeline } from '@/hooks/session/useSessionTimeline';
 import { useColors } from '@/hooks/ui/useColors';
-import { getSessionInsights, triggerInsightGeneration, type SessionInsight } from '@/services/insights';
+import { getSessionInsights, triggerInsightGeneration } from '@/services/insights/insightService';
+import { getSessionById } from '@/services/session/queries';
+import { calculateSessionStats } from '@/services/session/stats';
+import { getSessionTargetsWithResults } from '@/services/session/targets';
 import type { ShotDetail } from '@/services/session/timelineService';
-import type { DecodedWeather } from '@/services/session/watchTypes';
-import {
-  calculateSessionStats,
-  getSessionById,
-  getSessionTargetsWithResults,
-  type SessionStats,
-  type SessionTargetWithResults,
-  type SessionWithDetails,
-} from '@/services/sessionService';
+import type { SessionInsight } from '@/types/insights.pipeline';
+import type { SessionStats, SessionTargetWithResults, SessionWithDetails } from '@/types/session';
+import type { DecodedWeather } from '@/types/session.watch';
 import { isGroupingSession } from '@/utils/drillGoal';
 import { format, intervalToDuration } from 'date-fns';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -50,6 +48,7 @@ import {
   Zap,
 } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -59,8 +58,10 @@ const IMAGE_SIZE = (SCREEN_WIDTH - 64) / 3;
 
 export default function SessionDetailScreen() {
   const colors = useColors();
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const { sessionId } = useLocalSearchParams<{ sessionId: string }>();
+  const { user } = useAuth();
 
   const [session, setSession] = useState<SessionWithDetails | null>(null);
   const [stats, setStats] = useState<SessionStats | null>(null);
@@ -334,7 +335,7 @@ export default function SessionDetailScreen() {
       >
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={[styles.loadingText, { color: colors.textMuted }]}>Loading session...</Text>
+          <Text style={[styles.loadingText, { color: colors.textMuted }]}>{t('session.loadingSession')}</Text>
         </View>
       </ScrollView>
     );
@@ -345,26 +346,30 @@ export default function SessionDetailScreen() {
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={styles.emptyContainer}>
           <Target size={48} color={colors.textMuted} />
-          <Text style={[styles.emptyTitle, { color: colors.text }]}>Session not found</Text>
+          <Text style={[styles.emptyTitle, { color: colors.text }]}>{t('session.sessionNotFound')}</Text>
           <TouchableOpacity
             style={[styles.backButton, { backgroundColor: colors.card, borderColor: colors.border }]}
             onPress={() => router.back()}
           >
-            <Text style={[styles.backButtonText, { color: colors.text }]}>Go Back</Text>
+            <Text style={[styles.backButtonText, { color: colors.text }]}>{t('common.goBack')}</Text>
           </TouchableOpacity>
         </View>
       </View>
     );
   }
 
-  const title = session.drill_name || session.training_title || 'Solo Practice';
-  const source = session.team_name || 'Personal';
+  const title = session.drill_name || session.training_title || t('session.soloPractice');
+  const source = session.team_name || t('session.personal');
   const sessionDate = format(new Date(session.started_at), 'MMM d, yyyy');
   const sessionTime = format(new Date(session.started_at), 'HH:mm');
   const isCompleted = session.status === 'completed';
 
   // Determine if this is a grouping or engagement session
   const isGroupingDrill = isGroupingSession(session);
+
+  // Check if this is a squad/group engagement (hide certain config fields for these)
+  const engagementMode = session.engagement?.engagement_mode;
+  const isSquadOrGroup = engagementMode === 'squad' || engagementMode === 'group';
 
   return (
     <ScrollView
@@ -388,7 +393,7 @@ export default function SessionDetailScreen() {
             style={[styles.statusBadge, { backgroundColor: isCompleted ? `${colors.green}22` : `${colors.orange}22` }]}
           >
             <Text style={[styles.statusText, { color: isCompleted ? colors.green : colors.orange }]}>
-              {isCompleted ? 'Completed' : 'In Progress'}
+              {isCompleted ? t('session.completed') : t('session.inProgress')}
             </Text>
           </View>
         </View>
@@ -431,7 +436,7 @@ export default function SessionDetailScreen() {
                   <AimIcon size={14} color={colors.orange} />
                 </View>
                 <View style={styles.contextItemContent}>
-                  <Text style={[styles.contextLabel, { color: colors.textMuted }]}>Weapon</Text>
+                  <Text style={[styles.contextLabel, { color: colors.textMuted }]}>{t('session.weapon')}</Text>
                   <Text style={[styles.contextValue, { color: colors.text }]} numberOfLines={1}>
                     {session.weapon_name}
                   </Text>
@@ -439,13 +444,14 @@ export default function SessionDetailScreen() {
               </View>
             )}
 
-            {session.drill_config?.position && (
+            {/* Hide position for squad/group - often just defaults */}
+            {!isSquadOrGroup && session.drill_config?.position && (
               <View style={styles.contextItem}>
                 <View style={[styles.contextIconBg, { backgroundColor: `${colors.blue}15` }]}>
                   <Focus size={14} color={colors.blue} />
                 </View>
                 <View style={styles.contextItemContent}>
-                  <Text style={[styles.contextLabel, { color: colors.textMuted }]}>Position</Text>
+                  <Text style={[styles.contextLabel, { color: colors.textMuted }]}>{t('session.position')}</Text>
                   <Text style={[styles.contextValue, { color: colors.text }]} numberOfLines={1}>
                     {session.drill_config.position.charAt(0).toUpperCase() + session.drill_config.position.slice(1)}
                   </Text>
@@ -454,16 +460,18 @@ export default function SessionDetailScreen() {
             )}
           </View>
 
-          {/* Row 2: Distance & Drill Goal */}
+          {/* Row 2: Distance & Drill Goal - hide distance for squad/group (often defaults) */}
           <View style={styles.contextRow}>
-            {session.drill_config?.distance_m && (
+            {!isSquadOrGroup && session.drill_config?.distance_m && (
               <View style={styles.contextItem}>
                 <View style={[styles.contextIconBg, { backgroundColor: `${colors.indigo}15` }]}>
                   <Ruler size={14} color={colors.indigo} />
                 </View>
                 <View style={styles.contextItemContent}>
-                  <Text style={[styles.contextLabel, { color: colors.textMuted }]}>Distance</Text>
-                  <Text style={[styles.contextValue, { color: colors.text }]}>{session.drill_config.distance_m}m</Text>
+                  <Text style={[styles.contextLabel, { color: colors.textMuted }]}>{t('session.distance')}</Text>
+                  <Text style={[styles.contextValue, { color: colors.text }]}>
+                    {t('session.distanceMeters', { distance: session.drill_config.distance_m })}
+                  </Text>
                 </View>
               </View>
             )}
@@ -481,9 +489,9 @@ export default function SessionDetailScreen() {
                   <Target size={14} color={isGroupingDrill ? colors.green : colors.primary} />
                 </View>
                 <View style={styles.contextItemContent}>
-                  <Text style={[styles.contextLabel, { color: colors.textMuted }]}>Type</Text>
+                  <Text style={[styles.contextLabel, { color: colors.textMuted }]}>{t('session.sessionType')}</Text>
                   <Text style={[styles.contextValue, { color: colors.text }]}>
-                    {isGroupingDrill ? 'Grouping' : 'Engagement'}
+                    {isGroupingDrill ? t('session.grouping') : t('session.engagement')}
                   </Text>
                 </View>
               </View>
@@ -508,9 +516,9 @@ export default function SessionDetailScreen() {
                 )}
               </View>
               <View style={styles.contextItemContent}>
-                <Text style={[styles.contextLabel, { color: colors.textMuted }]}>Measured</Text>
+                <Text style={[styles.contextLabel, { color: colors.textMuted }]}>{t('session.measured')}</Text>
                 <Text style={[styles.contextValue, { color: colors.text }]}>
-                  {session.watch_controlled ? 'Watch-assisted' : 'Manual entry'}
+                  {session.watch_controlled ? t('session.watchAssisted') : t('session.manualEntry')}
                 </Text>
               </View>
             </View>
@@ -521,7 +529,7 @@ export default function SessionDetailScreen() {
                   <Timer size={14} color={colors.red} />
                 </View>
                 <View style={styles.contextItemContent}>
-                  <Text style={[styles.contextLabel, { color: colors.textMuted }]}>Time Limit</Text>
+                  <Text style={[styles.contextLabel, { color: colors.textMuted }]}>{t('session.timeLimit')}</Text>
                   <Text style={[styles.contextValue, { color: colors.text }]}>
                     {session.drill_config.time_limit_seconds >= 60
                       ? `${Math.floor(session.drill_config.time_limit_seconds / 60)}m ${session.drill_config.time_limit_seconds % 60 > 0 ? `${session.drill_config.time_limit_seconds % 60}s` : ''}`
@@ -532,22 +540,24 @@ export default function SessionDetailScreen() {
             )}
           </View>
 
-          {/* Bullets per shooter (if set) */}
-          {session.drill_config?.rounds_per_shooter && session.drill_config.rounds_per_shooter > 0 && (
-            <View style={styles.contextRow}>
-              <View style={styles.contextItem}>
-                <View style={[styles.contextIconBg, { backgroundColor: `${colors.textMuted}15` }]}>
-                  <Target size={14} color={colors.textMuted} />
-                </View>
-                <View style={styles.contextItemContent}>
-                  <Text style={[styles.contextLabel, { color: colors.textMuted }]}>Bullets</Text>
-                  <Text style={[styles.contextValue, { color: colors.text }]}>
-                    {session.drill_config.rounds_per_shooter} per shooter
-                  </Text>
+          {/* Bullets per shooter - hide for squad/group engagements (often just defaults) */}
+          {!isSquadOrGroup &&
+            session.drill_config?.rounds_per_shooter &&
+            session.drill_config.rounds_per_shooter > 0 && (
+              <View style={styles.contextRow}>
+                <View style={styles.contextItem}>
+                  <View style={[styles.contextIconBg, { backgroundColor: `${colors.textMuted}15` }]}>
+                    <Target size={14} color={colors.textMuted} />
+                  </View>
+                  <View style={styles.contextItemContent}>
+                    <Text style={[styles.contextLabel, { color: colors.textMuted }]}>{t('session.bullets')}</Text>
+                    <Text style={[styles.contextValue, { color: colors.text }]}>
+                      {session.drill_config.rounds_per_shooter} {t('session.perShooter')}
+                    </Text>
+                  </View>
                 </View>
               </View>
-            </View>
-          )}
+            )}
 
           {/* Input Method Preference (if set) */}
           {session.drill_config?.input_method && (
@@ -589,7 +599,9 @@ export default function SessionDetailScreen() {
             >
               <Users size={14} color={colors.green} />
               <View style={styles.trainingContextContent}>
-                <Text style={[styles.trainingContextLabel, { color: colors.green }]}>Part of Team Training</Text>
+                <Text style={[styles.trainingContextLabel, { color: colors.green }]}>
+                  {t('session.partOfTeamTraining')}
+                </Text>
                 <Text style={[styles.trainingContextTitle, { color: colors.text }]} numberOfLines={1}>
                   {session.training_title}
                 </Text>
@@ -603,7 +615,7 @@ export default function SessionDetailScreen() {
       {/* Stats Grid */}
       {stats && stats.targetCount > 0 ? (
         <Animated.View entering={FadeIn.duration(300)} style={styles.statsSection}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>Performance</Text>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('session.performance')}</Text>
 
           {/* Entry breakdown indicator */}
           {(entryBreakdown.scanned > 0 || entryBreakdown.manual > 0) && (
@@ -612,7 +624,7 @@ export default function SessionDetailScreen() {
                 <View style={styles.entryBreakdownItem}>
                   <View style={[styles.entryBreakdownDot, { backgroundColor: '#A78BFA' }]} />
                   <Text style={[styles.entryBreakdownText, { color: colors.textMuted }]}>
-                    {entryBreakdown.scanned} scanned
+                    {entryBreakdown.scanned} {t('session.scanned')}
                   </Text>
                 </View>
               )}
@@ -620,7 +632,7 @@ export default function SessionDetailScreen() {
                 <View style={styles.entryBreakdownItem}>
                   <View style={[styles.entryBreakdownDot, { backgroundColor: '#60A5FA' }]} />
                   <Text style={[styles.entryBreakdownText, { color: colors.textMuted }]}>
-                    {entryBreakdown.manual} manual
+                    {entryBreakdown.manual} {t('session.manual')}
                   </Text>
                 </View>
               )}
@@ -637,7 +649,7 @@ export default function SessionDetailScreen() {
                     <Target size={18} color={colors.indigo} />
                   </View>
                   <Text style={[styles.statValue, { color: colors.text }]}>{stats.totalShotsFired}</Text>
-                  <Text style={[styles.statLabel, { color: colors.textMuted }]}>Shots</Text>
+                  <Text style={[styles.statLabel, { color: colors.textMuted }]}>{t('session.shots')}</Text>
                 </View>
 
                 {/* Best Group Size */}
@@ -653,7 +665,7 @@ export default function SessionDetailScreen() {
                   >
                     {stats.bestDispersionCm !== null ? `${stats.bestDispersionCm}cm` : '—'}
                   </Text>
-                  <Text style={[styles.statLabel, { color: colors.textMuted }]}>Best Group</Text>
+                  <Text style={[styles.statLabel, { color: colors.textMuted }]}>{t('session.bestGroup')}</Text>
                 </View>
               </>
             ) : (
@@ -667,7 +679,8 @@ export default function SessionDetailScreen() {
                     </View>
                     <Text style={[styles.statValue, { color: colors.text }]}>{stats.accuracyPct}%</Text>
                     <Text style={[styles.statLabel, { color: colors.textMuted }]}>
-                      Accuracy{hasScannedWithoutDeclaration ? '*' : ''}
+                      {t('session.accuracy')}
+                      {hasScannedWithoutDeclaration ? '*' : ''}
                     </Text>
                   </View>
                 ) : hasScannedWithoutDeclaration ? (
@@ -676,7 +689,7 @@ export default function SessionDetailScreen() {
                       <Crosshair size={18} color={colors.orange} />
                     </View>
                     <Text style={[styles.statValue, { color: colors.orange }]}>—</Text>
-                    <Text style={[styles.statLabel, { color: colors.textMuted }]}>No shot count</Text>
+                    <Text style={[styles.statLabel, { color: colors.textMuted }]}>{t('session.noShotCount')}</Text>
                   </View>
                 ) : null}
 
@@ -689,7 +702,9 @@ export default function SessionDetailScreen() {
                     {stats.totalHits}/{stats.totalShotsFired}
                   </Text>
                   <Text style={[styles.statLabel, { color: colors.textMuted }]}>
-                    {hasScannedWithoutDeclaration ? 'Holes detected' : 'Hits'}
+                    {hasScannedWithoutDeclaration
+                      ? t('session.holesDetected', { count: stats.totalHits })
+                      : t('session.hits')}
                   </Text>
                 </View>
 
@@ -699,7 +714,7 @@ export default function SessionDetailScreen() {
                     <Award size={18} color={colors.orange} />
                   </View>
                   <Text style={[styles.statValue, { color: colors.text }]}>{stats.targetCount}</Text>
-                  <Text style={[styles.statLabel, { color: colors.textMuted }]}>Targets</Text>
+                  <Text style={[styles.statLabel, { color: colors.textMuted }]}>{t('session.targets')}</Text>
                 </View>
               </>
             )}
@@ -707,24 +722,81 @@ export default function SessionDetailScreen() {
 
           {/* Accuracy note if scanned without declaration - only for engagement */}
           {!isGroupingDrill && hasScannedWithoutDeclaration && stats.accuracyPct > 0 && (
-            <Text style={[styles.accuracyNote, { color: colors.textMuted }]}>
-              * Accuracy excludes scanned targets without declared shots
-            </Text>
+            <Text style={[styles.accuracyNote, { color: colors.textMuted }]}>{t('session.accuracyExcludes')}</Text>
           )}
         </Animated.View>
-      ) : stats?.targetCount === 0 ? (
+      ) : stats?.targetCount === 0 && !isSquadOrGroup ? (
+        // Only show "no targets" for solo sessions - squad/group track differently
         <View style={[styles.emptyStats, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <Target size={32} color={colors.textMuted} />
-          <Text style={[styles.emptyStatsText, { color: colors.textMuted }]}>No targets recorded</Text>
+          <Text style={[styles.emptyStatsText, { color: colors.textMuted }]}>{t('session.noTargetsRecorded')}</Text>
         </View>
       ) : null}
+
+      {/* Participants Section - Squad/Group engagements only */}
+      {session.engagement?.engagement_participants && session.engagement.engagement_participants.length > 0 && (
+        <Animated.View entering={FadeInDown.delay(100).duration(300)} style={styles.participantsSection}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('training.participants')}</Text>
+          <View style={[styles.participantsList, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            {session.engagement.engagement_participants
+              .filter((p) => p.state === 'joined')
+              .map((participant, idx, arr) => {
+                const isSelf = participant.user_id === user?.id;
+                const shots = participant.shots_fired ?? 0;
+                const displayName = isSelf
+                  ? t('common.you')
+                  : participant.user_full_name || `${t('squads.shooter')} ${idx + 1}`;
+                const initial = isSelf ? 'Y' : (participant.user_full_name?.charAt(0) || `${idx + 1}`).toUpperCase();
+                return (
+                  <View
+                    key={participant.id}
+                    style={[
+                      styles.participantRow,
+                      idx < arr.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.border },
+                    ]}
+                  >
+                    <View style={styles.participantInfo}>
+                      <View
+                        style={[
+                          styles.participantAvatar,
+                          { backgroundColor: isSelf ? colors.primary + '20' : colors.secondary },
+                        ]}
+                      >
+                        <Text
+                          style={[styles.participantInitial, { color: isSelf ? colors.primary : colors.textMuted }]}
+                        >
+                          {initial}
+                        </Text>
+                      </View>
+                      <View>
+                        <Text style={[styles.participantName, { color: colors.text }]}>{displayName}</Text>
+                        <Text style={[styles.participantRole, { color: colors.textMuted }]}>
+                          {participant.role === 'spotter' ? t('squads.spotter') : t('squads.shooter')}
+                        </Text>
+                      </View>
+                    </View>
+                    <View style={styles.participantStats}>
+                      {shots > 0 ? (
+                        <Text style={[styles.participantShotCount, { color: colors.text }]}>
+                          {t('session.shotsCount', { count: shots })}
+                        </Text>
+                      ) : (
+                        <Text style={[styles.participantShotCount, { color: colors.textMuted }]}>—</Text>
+                      )}
+                    </View>
+                  </View>
+                );
+              })}
+          </View>
+        </Animated.View>
+      )}
 
       {/* Watch Data / Biometrics Section */}
       {watchData && (watchData.heartRate || watchData.steadiness || watchData.splits) && (
         <Animated.View entering={FadeInDown.delay(150).duration(300)} style={styles.biometricsSection}>
           <View style={styles.biometricsHeader}>
             <Watch size={14} color={colors.green} />
-            <Text style={[styles.sectionTitle, { color: colors.text, marginBottom: 0 }]}>Watch Data</Text>
+            <Text style={[styles.sectionTitle, { color: colors.text, marginBottom: 0 }]}>{t('biometrics.title')}</Text>
           </View>
 
           {/* Heart Rate & Breathing Row */}
@@ -736,14 +808,14 @@ export default function SessionDetailScreen() {
                     <Heart size={18} color={colors.red} />
                   </View>
                   <View style={styles.bioContent}>
-                    <Text style={[styles.bioLabel, { color: colors.textMuted }]}>Heart Rate</Text>
+                    <Text style={[styles.bioLabel, { color: colors.textMuted }]}>{t('biometrics.heartRate')}</Text>
                     <View style={styles.bioValues}>
                       <Text style={[styles.bioValue, { color: colors.text }]}>{watchData.heartRate.avg}</Text>
-                      <Text style={[styles.bioUnit, { color: colors.textMuted }]}>avg</Text>
+                      <Text style={[styles.bioUnit, { color: colors.textMuted }]}>{t('biometrics.avg')}</Text>
                       {watchData.heartRate.max != null && (
                         <>
                           <Text style={[styles.bioValue, { color: colors.orange }]}>{watchData.heartRate.max}</Text>
-                          <Text style={[styles.bioUnit, { color: colors.textMuted }]}>max</Text>
+                          <Text style={[styles.bioUnit, { color: colors.textMuted }]}>{t('biometrics.max')}</Text>
                         </>
                       )}
                     </View>
@@ -757,10 +829,10 @@ export default function SessionDetailScreen() {
                     <Wind size={18} color={colors.blue} />
                   </View>
                   <View style={styles.bioContent}>
-                    <Text style={[styles.bioLabel, { color: colors.textMuted }]}>Breathing</Text>
+                    <Text style={[styles.bioLabel, { color: colors.textMuted }]}>{t('biometrics.breathing')}</Text>
                     <View style={styles.bioValues}>
                       <Text style={[styles.bioValue, { color: colors.text }]}>{watchData.avgBreathRate}</Text>
-                      <Text style={[styles.bioUnit, { color: colors.textMuted }]}>breaths/min</Text>
+                      <Text style={[styles.bioUnit, { color: colors.textMuted }]}>{t('biometrics.breathsPerMin')}</Text>
                     </View>
                   </View>
                 </View>
@@ -782,7 +854,7 @@ export default function SessionDetailScreen() {
                 <Activity size={18} color={watchData.steadiness.avg_score >= 70 ? colors.green : colors.orange} />
               </View>
               <View style={styles.steadinessContent}>
-                <Text style={[styles.bioLabel, { color: colors.textMuted }]}>Steadiness</Text>
+                <Text style={[styles.bioLabel, { color: colors.textMuted }]}>{t('biometrics.steadiness')}</Text>
                 <Text
                   style={[
                     styles.steadinessValue,
@@ -807,7 +879,7 @@ export default function SessionDetailScreen() {
             <View style={styles.splitsSection}>
               <View style={styles.splitsHeader}>
                 <Timer size={14} color={colors.primary} />
-                <Text style={[styles.splitsTitle, { color: colors.text }]}>Split Times</Text>
+                <Text style={[styles.splitsTitle, { color: colors.text }]}>{t('session.splitTimes')}</Text>
               </View>
               <View style={styles.splitsRow}>
                 {watchData.fastestSplitMs != null && (
@@ -817,27 +889,27 @@ export default function SessionDetailScreen() {
                         ? `${watchData.fastestSplitMs}ms`
                         : `${(watchData.fastestSplitMs / 1000).toFixed(2)}s`}
                     </Text>
-                    <Text style={[styles.splitLabel, { color: colors.green }]}>fastest</Text>
+                    <Text style={[styles.splitLabel, { color: colors.green }]}>{t('session.fastest')}</Text>
                   </View>
                 )}
                 {watchData.avgSplitMs != null && (
                   <View style={[styles.splitCard, { backgroundColor: `${colors.primary}15` }]}>
                     <Text style={[styles.splitValue, { color: colors.primary }]}>
                       {watchData.avgSplitMs < 1000
-                        ? `${watchData.avgSplitMs}ms`
-                        : `${(watchData.avgSplitMs / 1000).toFixed(2)}s`}
+                        ? `${watchData.avgSplitMs}${t('units.ms')}`
+                        : `${(watchData.avgSplitMs / 1000).toFixed(2)}${t('units.seconds')}`}
                     </Text>
-                    <Text style={[styles.splitLabel, { color: colors.primary }]}>average</Text>
+                    <Text style={[styles.splitLabel, { color: colors.primary }]}>{t('session.average')}</Text>
                   </View>
                 )}
                 {watchData.slowestSplitMs != null && (
                   <View style={[styles.splitCard, { backgroundColor: `${colors.orange}15` }]}>
                     <Text style={[styles.splitValue, { color: colors.orange }]}>
                       {watchData.slowestSplitMs < 1000
-                        ? `${watchData.slowestSplitMs}ms`
-                        : `${(watchData.slowestSplitMs / 1000).toFixed(2)}s`}
+                        ? `${watchData.slowestSplitMs}${t('units.ms')}`
+                        : `${(watchData.slowestSplitMs / 1000).toFixed(2)}${t('units.seconds')}`}
                     </Text>
-                    <Text style={[styles.splitLabel, { color: colors.orange }]}>slowest</Text>
+                    <Text style={[styles.splitLabel, { color: colors.orange }]}>{t('session.slowest')}</Text>
                   </View>
                 )}
               </View>
@@ -847,7 +919,7 @@ export default function SessionDetailScreen() {
           {/* Per-Shot Biometrics Preview */}
           {watchData.biometrics?.shot_biometrics && watchData.biometrics.shot_biometrics.length > 0 && (
             <View style={styles.shotBioSection}>
-              <Text style={[styles.shotBioTitle, { color: colors.textMuted }]}>Per-Shot Data</Text>
+              <Text style={[styles.shotBioTitle, { color: colors.textMuted }]}>{t('session.perShotData')}</Text>
               <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
@@ -1000,7 +1072,7 @@ export default function SessionDetailScreen() {
         <Animated.View entering={FadeInDown.delay(175).duration(300)} style={styles.insightsSection}>
           <View style={styles.insightsHeader}>
             <Activity size={14} color={colors.primary} />
-            <Text style={[styles.sectionTitle, { color: colors.text, marginBottom: 0 }]}>Performance Insights</Text>
+            <Text style={[styles.sectionTitle, { color: colors.text, marginBottom: 0 }]}>{t('insights.title')}</Text>
           </View>
 
           {/* Main Metrics Row */}
@@ -1024,7 +1096,7 @@ export default function SessionDetailScreen() {
                   {timelineInsights.avgScore}%
                 </Text>
                 <Text style={[styles.insightLabel, { color: colors.textMuted }]}>
-                  {timelineInsights.usingStress ? 'Calmness' : 'Steadiness'}
+                  {timelineInsights.usingStress ? t('biometrics.calm') : t('biometrics.steadiness')}
                 </Text>
               </View>
 
@@ -1052,7 +1124,7 @@ export default function SessionDetailScreen() {
                       },
                     ]}
                   >
-                    {timelineInsights.trend === 'improving' ? 'Improving' : 'Declining'}
+                    {timelineInsights.trend === 'improving' ? t('insights.improving') : t('insights.declining')}
                   </Text>
                 </View>
               )}
@@ -1069,14 +1141,14 @@ export default function SessionDetailScreen() {
                 >
                   {timelineInsights.pausePct}%
                 </Text>
-                <Text style={[styles.insightLabel, { color: colors.textMuted }]}>Breath Pause</Text>
+                <Text style={[styles.insightLabel, { color: colors.textMuted }]}>{t('biometrics.breathPause')}</Text>
               </View>
 
               {/* Flinch Count */}
               {timelineInsights.flinchCount > 0 && (
                 <View style={styles.insightMetric}>
                   <Text style={[styles.insightValue, { color: colors.red }]}>{timelineInsights.flinchCount}</Text>
-                  <Text style={[styles.insightLabel, { color: colors.textMuted }]}>Flinches</Text>
+                  <Text style={[styles.insightLabel, { color: colors.textMuted }]}>{t('biometrics.flinches')}</Text>
                 </View>
               )}
             </View>
@@ -1084,7 +1156,9 @@ export default function SessionDetailScreen() {
 
           {/* Shot-by-Shot Performance Bars */}
           <View style={[styles.shotBarsCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Text style={[styles.shotBarsTitle, { color: colors.textMuted }]}>Shot-by-Shot Performance</Text>
+            <Text style={[styles.shotBarsTitle, { color: colors.textMuted }]}>
+              {t('session.shotByShotPerformance')}
+            </Text>
             <View style={styles.shotBarsContainer}>
               {timelineInsights.shots.slice(0, 25).map((shot: any, idx: number) => {
                 const score = timelineInsights.scores[idx] as number;
@@ -1107,7 +1181,7 @@ export default function SessionDetailScreen() {
             </View>
             {timelineInsights.shots.length > 25 && (
               <Text style={[styles.shotBarsMore, { color: colors.textMuted }]}>
-                +{timelineInsights.shots.length - 25} more shots
+                +{timelineInsights.shots.length - 25} {t('session.moreShots')}
               </Text>
             )}
 
@@ -1115,15 +1189,15 @@ export default function SessionDetailScreen() {
             <View style={styles.barsLegend}>
               <View style={styles.legendItem}>
                 <View style={[styles.legendDot, { backgroundColor: colors.green }]} />
-                <Text style={[styles.legendText, { color: colors.textMuted }]}>Pause</Text>
+                <Text style={[styles.legendText, { color: colors.textMuted }]}>{t('biometrics.pauseOptimal')}</Text>
               </View>
               <View style={styles.legendItem}>
                 <View style={[styles.legendDot, { backgroundColor: colors.orange }]} />
-                <Text style={[styles.legendText, { color: colors.textMuted }]}>Exhale</Text>
+                <Text style={[styles.legendText, { color: colors.textMuted }]}>{t('biometrics.exhale')}</Text>
               </View>
               <View style={styles.legendItem}>
                 <View style={[styles.legendDot, { backgroundColor: colors.red }]} />
-                <Text style={[styles.legendText, { color: colors.textMuted }]}>Inhale</Text>
+                <Text style={[styles.legendText, { color: colors.textMuted }]}>{t('biometrics.inhale')}</Text>
               </View>
             </View>
           </View>
@@ -1140,10 +1214,11 @@ export default function SessionDetailScreen() {
                 <ArrowUp size={14} color={colors.green} />
                 <View>
                   <Text style={[styles.bestWorstValue, { color: colors.green }]}>
-                    Shot #{timelineInsights.bestShot}
+                    {t('session.shot')} #{timelineInsights.bestShot}
                   </Text>
                   <Text style={[styles.bestWorstScore, { color: colors.green }]}>
-                    {timelineInsights.bestScore}% {timelineInsights.usingStress ? 'calm' : 'steady'}
+                    {timelineInsights.bestScore}%{' '}
+                    {timelineInsights.usingStress ? t('biometrics.calm') : t('biometrics.steady')}
                   </Text>
                 </View>
               </View>
@@ -1155,9 +1230,12 @@ export default function SessionDetailScreen() {
               >
                 <ArrowDown size={14} color={colors.red} />
                 <View>
-                  <Text style={[styles.bestWorstValue, { color: colors.red }]}>Shot #{timelineInsights.worstShot}</Text>
+                  <Text style={[styles.bestWorstValue, { color: colors.red }]}>
+                    {t('session.shot')} #{timelineInsights.worstShot}
+                  </Text>
                   <Text style={[styles.bestWorstScore, { color: colors.red }]}>
-                    {timelineInsights.worstScore}% {timelineInsights.usingStress ? 'calm' : 'steady'}
+                    {timelineInsights.worstScore}%{' '}
+                    {timelineInsights.usingStress ? t('biometrics.calm') : t('biometrics.steady')}
                   </Text>
                 </View>
               </View>
@@ -1166,7 +1244,9 @@ export default function SessionDetailScreen() {
 
           {/* Breath Discipline Breakdown */}
           <View style={[styles.breathBreakdownCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Text style={[styles.breathBreakdownTitle, { color: colors.text }]}>Breath Discipline</Text>
+            <Text style={[styles.breathBreakdownTitle, { color: colors.text }]}>
+              {t('biometrics.breathDiscipline')}
+            </Text>
             <View style={styles.breathBar}>
               {timelineInsights.pausePct > 0 && (
                 <View
@@ -1197,15 +1277,17 @@ export default function SessionDetailScreen() {
             <View style={styles.breathBreakdownLegend}>
               <View style={styles.breathLegendItem}>
                 <View style={[styles.breathLegendDot, { backgroundColor: colors.green }]} />
-                <Text style={[styles.breathLegendText, { color: colors.textMuted }]}>Pause (optimal)</Text>
+                <Text style={[styles.breathLegendText, { color: colors.textMuted }]}>
+                  {t('biometrics.pauseOptimal')}
+                </Text>
               </View>
               <View style={styles.breathLegendItem}>
                 <View style={[styles.breathLegendDot, { backgroundColor: colors.orange }]} />
-                <Text style={[styles.breathLegendText, { color: colors.textMuted }]}>Exhale</Text>
+                <Text style={[styles.breathLegendText, { color: colors.textMuted }]}>{t('biometrics.exhale')}</Text>
               </View>
               <View style={styles.breathLegendItem}>
                 <View style={[styles.breathLegendDot, { backgroundColor: colors.red }]} />
-                <Text style={[styles.breathLegendText, { color: colors.textMuted }]}>Inhale</Text>
+                <Text style={[styles.breathLegendText, { color: colors.textMuted }]}>{t('biometrics.inhale')}</Text>
               </View>
             </View>
           </View>
@@ -1222,7 +1304,9 @@ export default function SessionDetailScreen() {
             ]}
           >
             <ActivityIndicator size="small" color={colors.primary} />
-            <Text style={[styles.loadingInsightsText, { color: colors.textMuted }]}>Loading biometric insights...</Text>
+            <Text style={[styles.loadingInsightsText, { color: colors.textMuted }]}>
+              {t('biometrics.loadingBiometrics')}
+            </Text>
           </View>
         </Animated.View>
       )}
@@ -1230,7 +1314,7 @@ export default function SessionDetailScreen() {
       {/* Image Gallery */}
       {targetImages.length > 0 && (
         <Animated.View entering={FadeInDown.delay(100).duration(300)} style={styles.imagesSection}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>Target Scans</Text>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('session.targetScans')}</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.imagesScroll}>
             {targetImages.map((img, index) => (
               <TouchableOpacity
@@ -1259,7 +1343,7 @@ export default function SessionDetailScreen() {
       {/* Timeline */}
       {targets.length > 0 && (
         <Animated.View entering={FadeInDown.delay(200).duration(300)} style={styles.timelineSection}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>Session Timeline</Text>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('session.sessionTimeline')}</Text>
           <View style={styles.timeline}>
             {targets.map((target, index) => {
               const isPaper = isPaperTarget(target.target_type);
@@ -1322,7 +1406,11 @@ export default function SessionDetailScreen() {
                               { color: isGroupingTarget ? colors.green : isPaper ? colors.indigo : colors.orange },
                             ]}
                           >
-                            {isGroupingTarget ? 'Grouping' : isPaper ? 'Achievement' : 'Tactical'}
+                            {isGroupingTarget
+                              ? t('session.grouping')
+                              : isPaper
+                                ? t('session.achievement')
+                                : t('session.tactical')}
                           </Text>
                         </View>
                         {/* Entry method badge for paper targets */}
@@ -1334,7 +1422,7 @@ export default function SessionDetailScreen() {
                             ]}
                           >
                             <Text style={[styles.entryMethodText, { color: isScanned ? '#A78BFA' : '#60A5FA' }]}>
-                              {isScanned ? 'Scan' : 'Manual'}
+                              {isScanned ? t('session.scanned') : t('session.manual')}
                             </Text>
                           </View>
                         )}
@@ -1355,12 +1443,16 @@ export default function SessionDetailScreen() {
                                 <Text style={[styles.timelineStatValue, { color: colors.green }]}>
                                   {dispersion.toFixed(1)}cm
                                 </Text>
-                                <Text style={[styles.timelineStatLabel, { color: colors.textMuted }]}>group</Text>
+                                <Text style={[styles.timelineStatLabel, { color: colors.textMuted }]}>
+                                  {t('session.grouping')}
+                                </Text>
                               </View>
                             )}
                             <View style={styles.timelineStat}>
                               <Text style={[styles.timelineStatValue, { color: colors.text }]}>{shots}</Text>
-                              <Text style={[styles.timelineStatLabel, { color: colors.textMuted }]}>shots</Text>
+                              <Text style={[styles.timelineStatLabel, { color: colors.textMuted }]}>
+                                {t('session.shots')}
+                              </Text>
                             </View>
                           </>
                         ) : isScanned ? (
@@ -1376,7 +1468,9 @@ export default function SessionDetailScreen() {
                                   <Text style={[styles.timelineStatValue, { color: colors.text }]}>
                                     {actualShotsDeclared}
                                   </Text>
-                                  <Text style={[styles.timelineStatLabel, { color: colors.textMuted }]}>fired</Text>
+                                  <Text style={[styles.timelineStatLabel, { color: colors.textMuted }]}>
+                                    {t('session.fired')}
+                                  </Text>
                                 </View>
                                 <View style={styles.timelineStat}>
                                   <Text
@@ -1390,7 +1484,9 @@ export default function SessionDetailScreen() {
                                   >
                                     {accuracy}%
                                   </Text>
-                                  <Text style={[styles.timelineStatLabel, { color: colors.textMuted }]}>acc</Text>
+                                  <Text style={[styles.timelineStatLabel, { color: colors.textMuted }]}>
+                                    {t('session.accuracy')}
+                                  </Text>
                                 </View>
                               </>
                             )}
@@ -1400,11 +1496,15 @@ export default function SessionDetailScreen() {
                           <>
                             <View style={styles.timelineStat}>
                               <Text style={[styles.timelineStatValue, { color: colors.text }]}>{shots}</Text>
-                              <Text style={[styles.timelineStatLabel, { color: colors.textMuted }]}>shots</Text>
+                              <Text style={[styles.timelineStatLabel, { color: colors.textMuted }]}>
+                                {t('session.shots')}
+                              </Text>
                             </View>
                             <View style={styles.timelineStat}>
                               <Text style={[styles.timelineStatValue, { color: colors.text }]}>{hits}</Text>
-                              <Text style={[styles.timelineStatLabel, { color: colors.textMuted }]}>hits</Text>
+                              <Text style={[styles.timelineStatLabel, { color: colors.textMuted }]}>
+                                {t('session.hits')}
+                              </Text>
                             </View>
                             {accuracy !== null && (
                               <View style={styles.timelineStat}>
@@ -1419,7 +1519,9 @@ export default function SessionDetailScreen() {
                                 >
                                   {accuracy}%
                                 </Text>
-                                <Text style={[styles.timelineStatLabel, { color: colors.textMuted }]}>acc</Text>
+                                <Text style={[styles.timelineStatLabel, { color: colors.textMuted }]}>
+                                  {t('session.accuracy')}
+                                </Text>
                               </View>
                             )}
                           </>
@@ -1642,7 +1744,7 @@ const styles = StyleSheet.create({
   },
   entryBreakdown: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: 16,
     paddingVertical: 8,
     paddingHorizontal: 12,
@@ -1847,6 +1949,54 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     marginTop: 8,
     fontStyle: 'italic',
+  },
+
+  // Participants Section (Squad/Group)
+  participantsSection: {
+    marginBottom: 24,
+    gap: 12,
+  },
+  participantsList: {
+    borderRadius: 14,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  participantRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 12,
+  },
+  participantInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  participantAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  participantInitial: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  participantName: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  participantRole: {
+    fontSize: 11,
+    marginTop: 1,
+  },
+  participantStats: {
+    alignItems: 'flex-end',
+  },
+  participantShotCount: {
+    fontSize: 13,
+    fontWeight: '600',
   },
 
   // Biometrics Section

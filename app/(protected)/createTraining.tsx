@@ -2,20 +2,22 @@
  * CREATE TRAINING - Simple 2-Step Flow
  *
  * 1. Details - Team, name, schedule
- * 2. Sessions - Add simple sessions (like solo createSession)
+ * 2. Sessions - Define drill configurations for the training
  *
- * No drill catalog, no presets, no complexity.
- * Just add sessions and go.
+ * Training = context only (who/when/what drills).
+ * Execution happens via startEngagement when soldiers actually shoot.
  */
 
-import { useCreateTrainingV2 } from '@/components/training/create';
-import { QuickSessionsStep, TrainingDetailsStep } from '@/components/training/create/steps';
+import { AddDrillStep } from '@/components/training/create/steps/AddDrillStep';
+import { TrainingDetailsStep } from '@/components/training/create/steps/TrainingDetailsStep';
+import { useCreateTrainingV2 } from '@/hooks/training/useCreateTrainingV2';
 import { useColors } from '@/hooks/ui/useColors';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from 'expo-router';
 import { ArrowRight, ChevronLeft, Play, Users } from 'lucide-react-native';
+import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
   Modal,
@@ -36,6 +38,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 export default function CreateTrainingScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
   const { teamId: teamIdParam } = useLocalSearchParams<{ teamId?: string }>();
 
   const {
@@ -57,6 +60,13 @@ export default function CreateTrainingScreen() {
     currentStep,
     step1Complete,
     canCreate,
+    // Participants
+    participantMode,
+    selectedMemberIds,
+    members,
+    loadingMembers,
+    requiredMemberIds,
+    currentUserId,
     // Actions
     handleSelectTeam,
     handleRemoveDrill,
@@ -65,6 +75,8 @@ export default function CreateTrainingScreen() {
     handleNextStep,
     handleBackStep,
     handleCreate,
+    handleSetParticipantMode,
+    handleToggleMember,
   } = useCreateTrainingV2({ teamIdParam });
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -78,22 +90,20 @@ export default function CreateTrainingScreen() {
           <View style={[styles.emptyIcon, { backgroundColor: colors.card }]}>
             <Users size={32} color={colors.textMuted} strokeWidth={1.5} />
           </View>
-          <Text style={[styles.emptyTitle, { color: colors.text }]}>No Teams Yet</Text>
-          <Text style={[styles.emptyDesc, { color: colors.textMuted }]}>
-            Create or join a team to schedule trainings
-          </Text>
+          <Text style={[styles.emptyTitle, { color: colors.text }]}>{t('training.noTeamsYet')}</Text>
+          <Text style={[styles.emptyDesc, { color: colors.textMuted }]}>{t('training.createOrJoinTeam')}</Text>
           <View style={styles.emptyActions}>
             <TouchableOpacity
               style={[styles.emptyBtn, { backgroundColor: colors.text }]}
               onPress={() => router.replace('/(protected)/createTeam')}
             >
-              <Text style={[styles.emptyBtnText, { color: colors.background }]}>Create Team</Text>
+              <Text style={[styles.emptyBtnText, { color: colors.background }]}>{t('teams.createTeam')}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.emptyBtnSecondary, { borderColor: colors.border }]}
               onPress={() => router.replace('/(protected)/acceptInvite')}
             >
-              <Text style={[styles.emptyBtnSecondaryText, { color: colors.text }]}>Join Team</Text>
+              <Text style={[styles.emptyBtnSecondaryText, { color: colors.text }]}>{t('teams.joinTeam')}</Text>
             </TouchableOpacity>
           </View>
         </Animated.View>
@@ -105,13 +115,13 @@ export default function CreateTrainingScreen() {
   // MAIN RENDER
   // ─────────────────────────────────────────────────────────────────────────
 
-  const stepLabels = ['Details', 'Sessions'];
+  const stepLabels = [t('training.details'), t('training.drills')];
   const totalSteps = 2;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Fixed Header */}
-      <View style={[styles.headerContainer, { paddingTop: insets.top + 8 }]}>
+      <View style={[styles.headerContainer, { paddingTop: insets.top + 4 }]}>
         <View style={styles.header}>
           <TouchableOpacity
             style={[styles.headerButton, { backgroundColor: colors.card }]}
@@ -126,65 +136,35 @@ export default function CreateTrainingScreen() {
             activeOpacity={0.7}
           >
             {currentStep > 1 ? (
-              <ChevronLeft size={18} color={colors.text} />
+              <ChevronLeft size={18} color={colors.text} strokeWidth={2.5} />
             ) : (
-              <Ionicons name="close" size={18} color={colors.text} />
+              <Ionicons name="close" size={16} color={colors.text} />
             )}
           </TouchableOpacity>
 
-          <View style={styles.headerCenter}>
-            <Text style={[styles.headerTitle, { color: colors.text }]}>
-              {currentStep === 1 ? 'New Training' : 'Add Sessions'}
-            </Text>
-            <Text style={[styles.headerStep, { color: colors.textMuted }]}>
-              Step {currentStep} of {totalSteps}
-            </Text>
-          </View>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>
+            {currentStep === 1 ? t('training.newTraining') : t('training.addDrillsTitle')}
+          </Text>
 
           <View style={styles.headerButtonPlaceholder} />
         </View>
 
-        {/* Progress indicator */}
+        {/* Progress indicator - minimal pill style */}
         <View style={styles.progressContainer}>
-          {stepLabels.map((label, idx) => {
-            const isActive = currentStep === idx + 1;
-            const isComplete = currentStep > idx + 1;
-            return (
-              <View key={label} style={styles.progressStep}>
-                <View
-                  style={[
-                    styles.progressDot,
-                    {
-                      backgroundColor: isActive || isComplete ? colors.text : colors.border,
-                    },
-                    isActive && styles.progressDotActive,
-                  ]}
-                />
-                <Text
-                  style={[
-                    styles.progressStepLabel,
-                    {
-                      color: isActive ? colors.text : colors.textMuted,
-                      fontWeight: isActive ? '600' : '400',
-                    },
-                  ]}
-                >
-                  {label}
-                </Text>
-              </View>
-            );
-          })}
-          <View style={[styles.progressLine, { backgroundColor: colors.border }]}>
+          <View style={[styles.progressTrack, { backgroundColor: colors.border }]}>
             <View
               style={[
-                styles.progressLineFill,
+                styles.progressFill,
                 {
                   backgroundColor: colors.text,
-                  width: currentStep > 1 ? '100%' : '0%',
+                  width: `${(currentStep / totalSteps) * 100}%`,
                 },
               ]}
             />
           </View>
+          <Text style={[styles.progressText, { color: colors.textMuted }]}>
+            {currentStep}/{totalSteps}
+          </Text>
         </View>
       </View>
 
@@ -204,74 +184,78 @@ export default function CreateTrainingScreen() {
               title={title}
               scheduledDate={scheduledDate}
               manualStart={manualStart}
+              participantMode={participantMode}
+              selectedMemberIds={selectedMemberIds}
+              members={members}
+              loadingMembers={loadingMembers}
+              requiredMemberIds={requiredMemberIds}
+              currentUserId={currentUserId}
               onSelectTeam={handleSelectTeam}
               onTitleChange={setTitle}
               onOpenDatePicker={() => setShowDatePicker(true)}
               onOpenTimePicker={() => setShowTimePicker(true)}
               onToggleManualStart={() => setManualStart(!manualStart)}
+              onSetParticipantMode={handleSetParticipantMode}
+              onToggleMember={handleToggleMember}
             />
           </Animated.View>
         )}
 
-        {/* Step 2: Add Sessions (Simple Flow) */}
+        {/* Step 2: Add Drills (Training defines drill configs, not sessions) */}
         {currentStep === 2 && (
           <Animated.View entering={FadeInDown.duration(300)} style={styles.step2Container}>
-            <QuickSessionsStep
-              sessions={drills}
-              onAddSession={addDrill}
-              onRemoveSession={handleRemoveDrill}
-              onMoveSession={handleMoveDrill}
+            <AddDrillStep
+              drills={drills}
+              onAddDrill={addDrill}
+              onRemoveDrill={handleRemoveDrill}
+              onMoveDrill={handleMoveDrill}
             />
           </Animated.View>
         )}
       </ScrollView>
 
       {/* Fixed Bottom Button */}
-      <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 16, backgroundColor: colors.background }]}>
-        <View style={[styles.bottomBarInner, { borderTopColor: colors.border }]}>
-          {currentStep === 2 && drills.length > 0 && (
-            <Text style={[styles.footerHint, { color: colors.textMuted }]}>
-              Team will be notified when training is created
+      <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 12, backgroundColor: colors.background }]}>
+        {currentStep === 2 && drills.length > 0 && (
+          <Text style={[styles.footerHint, { color: colors.textMuted }]}>{t('training.teamWillBeNotified')}</Text>
+        )}
+        {currentStep === 1 ? (
+          <TouchableOpacity
+            style={[styles.actionButton, { backgroundColor: step1Complete ? colors.text : colors.secondary }]}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              handleNextStep();
+            }}
+            disabled={!step1Complete}
+            activeOpacity={0.85}
+          >
+            <Text style={[styles.actionText, { color: step1Complete ? colors.background : colors.textMuted }]}>
+              {t('common.continue')}
             </Text>
-          )}
-          {currentStep === 1 ? (
-            <TouchableOpacity
-              style={[styles.actionButton, { backgroundColor: step1Complete ? colors.text : colors.secondary }]}
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                handleNextStep();
-              }}
-              disabled={!step1Complete}
-              activeOpacity={0.85}
-            >
-              <Text style={[styles.actionText, { color: step1Complete ? colors.background : colors.textMuted }]}>
-                Next: Add Sessions
-              </Text>
-              <ArrowRight size={18} color={step1Complete ? colors.background : colors.textMuted} strokeWidth={2} />
-            </TouchableOpacity>
-          ) : (
-            <TouchableOpacity
-              style={[styles.actionButton, { backgroundColor: canCreate ? colors.text : colors.secondary }]}
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                handleCreate();
-              }}
-              disabled={!canCreate}
-              activeOpacity={0.85}
-            >
-              {submitting ? (
-                <ActivityIndicator size="small" color={colors.background} />
-              ) : (
-                <>
-                  <Text style={[styles.actionText, { color: canCreate ? colors.background : colors.textMuted }]}>
-                    {drills.length === 0 ? 'Add at least one session' : 'Create Training'}
-                  </Text>
-                  {drills.length > 0 && <Play size={16} color={colors.background} fill={colors.background} />}
-                </>
-              )}
-            </TouchableOpacity>
-          )}
-        </View>
+            <ArrowRight size={16} color={step1Complete ? colors.background : colors.textMuted} strokeWidth={2.5} />
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            style={[styles.actionButton, { backgroundColor: canCreate ? colors.text : colors.secondary }]}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              handleCreate();
+            }}
+            disabled={!canCreate}
+            activeOpacity={0.85}
+          >
+            {submitting ? (
+              <ActivityIndicator size="small" color={colors.background} />
+            ) : (
+              <>
+                <Text style={[styles.actionText, { color: canCreate ? colors.background : colors.textMuted }]}>
+                  {drills.length === 0 ? t('training.addAtLeastOneDrill') : t('training.createTraining')}
+                </Text>
+                {drills.length > 0 && <Play size={14} color={colors.background} fill={colors.background} />}
+              </>
+            )}
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* ═══════════════════════════════════════════════════════════════════
@@ -281,7 +265,7 @@ export default function CreateTrainingScreen() {
       <PickerModal
         visible={showDatePicker}
         onClose={() => setShowDatePicker(false)}
-        title="Select Date"
+        title={t('training.selectDate')}
         mode="date"
         value={scheduledDate}
         onChange={setScheduledDate}
@@ -292,7 +276,7 @@ export default function CreateTrainingScreen() {
       <PickerModal
         visible={showTimePicker}
         onClose={() => setShowTimePicker(false)}
-        title="Select Time"
+        title={t('training.selectTime')}
         mode="time"
         value={scheduledDate}
         onChange={setScheduledDate}
@@ -328,22 +312,25 @@ function PickerModal({
   colors: ReturnType<typeof useColors>;
   bottomInset: number;
 }) {
+  const { t } = useTranslation();
+
   if (!visible) return null;
 
   return (
-    <Modal visible transparent animationType="slide" onRequestClose={onClose}>
+    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={styles.pickerOverlay} onPress={onClose}>
         <Pressable style={[styles.pickerSheet, { backgroundColor: colors.card }]} onPress={(e) => e.stopPropagation()}>
-          <View style={[styles.pickerGrabber, { backgroundColor: colors.border }]} />
+          <View style={[styles.pickerHandle, { backgroundColor: colors.border }]} />
           <View style={styles.pickerHeader}>
-            <TouchableOpacity onPress={onClose}>
-              <Text style={[styles.pickerCancel, { color: colors.textMuted }]}>Cancel</Text>
+            <TouchableOpacity onPress={onClose} style={styles.pickerHeaderBtn} hitSlop={8}>
+              <Text style={[styles.pickerCancel, { color: colors.textMuted }]}>{t('common.cancel')}</Text>
             </TouchableOpacity>
             <Text style={[styles.pickerTitle, { color: colors.text }]}>{title}</Text>
-            <TouchableOpacity onPress={onClose}>
-              <Text style={[styles.pickerDone, { color: colors.text }]}>Done</Text>
+            <TouchableOpacity onPress={onClose} style={styles.pickerHeaderBtn} hitSlop={8}>
+              <Text style={[styles.pickerDone, { color: colors.primary }]}>{t('common.done')}</Text>
             </TouchableOpacity>
           </View>
+          <View style={[styles.pickerDivider, { backgroundColor: colors.border }]} />
           <DateTimePicker
             value={value}
             mode={mode}
@@ -352,7 +339,7 @@ function PickerModal({
             minimumDate={minimumDate}
             style={styles.picker}
           />
-          <View style={{ height: bottomInset }} />
+          <View style={{ height: bottomInset + 8 }} />
         </Pressable>
       </Pressable>
     </Modal>
@@ -368,80 +355,55 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
-  // Header Container (fixed at top)
+  // Header
   headerContainer: {
     paddingHorizontal: 16,
-    paddingBottom: 16,
+    paddingBottom: 12,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 16,
+    height: 44,
   },
   headerButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
+    width: 32,
+    height: 32,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
   headerButtonPlaceholder: {
-    width: 36,
-  },
-  headerCenter: {
-    flex: 1,
-    alignItems: 'center',
+    width: 32,
   },
   headerTitle: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
-    letterSpacing: -0.3,
-  },
-  headerStep: {
-    fontSize: 11,
-    fontWeight: '500',
-    marginTop: 2,
+    letterSpacing: -0.2,
   },
 
-  // Progress indicator
+  // Progress - minimal bar
   progressContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    position: 'relative',
-    paddingHorizontal: 20,
+    gap: 8,
+    marginTop: 8,
   },
-  progressStep: {
-    alignItems: 'center',
-    gap: 6,
-    zIndex: 1,
+  progressTrack: {
+    flex: 1,
+    height: 3,
+    borderRadius: 1.5,
+    overflow: 'hidden',
   },
-  progressDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-  },
-  progressDotActive: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-  },
-  progressStepLabel: {
-    fontSize: 11,
-    letterSpacing: 0.2,
-  },
-  progressLine: {
-    position: 'absolute',
-    left: 40,
-    right: 40,
-    top: 5,
-    height: 2,
-    borderRadius: 1,
-  },
-  progressLineFill: {
+  progressFill: {
     height: '100%',
-    borderRadius: 1,
+    borderRadius: 1.5,
+  },
+  progressText: {
+    fontSize: 11,
+    fontWeight: '600',
+    minWidth: 24,
+    textAlign: 'right',
   },
 
   // ScrollView
@@ -451,6 +413,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
     paddingHorizontal: 20,
+    paddingTop: 8,
   },
 
   // Step Container
@@ -458,17 +421,14 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
-  // Bottom Bar (fixed)
+  // Bottom Bar
   bottomBar: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
     paddingHorizontal: 20,
-  },
-  bottomBarInner: {
-    paddingTop: 12,
-    borderTopWidth: 1,
+    paddingTop: 8,
   },
 
   // Action Button
@@ -476,20 +436,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 10,
-    height: 52,
-    borderRadius: 14,
+    gap: 8,
+    height: 50,
+    borderRadius: 12,
   },
   actionText: {
-    fontSize: 17,
-    fontWeight: '700',
+    fontSize: 16,
+    fontWeight: '600',
     letterSpacing: -0.2,
   },
   footerHint: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '500',
     textAlign: 'center',
-    marginTop: 12,
+    marginBottom: 10,
   },
 
   // Empty State
@@ -503,83 +463,94 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   emptyIcon: {
-    width: 72,
-    height: 72,
-    borderRadius: 20,
+    width: 64,
+    height: 64,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 20,
+    marginBottom: 16,
   },
   emptyTitle: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: '700',
-    marginBottom: 8,
+    letterSpacing: -0.3,
+    marginBottom: 6,
   },
   emptyDesc: {
-    fontSize: 15,
+    fontSize: 14,
     textAlign: 'center',
-    marginBottom: 28,
+    marginBottom: 24,
   },
   emptyActions: {
-    gap: 12,
+    gap: 10,
   },
   emptyBtn: {
-    paddingHorizontal: 28,
-    paddingVertical: 14,
-    borderRadius: 12,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 10,
   },
   emptyBtnText: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '600',
   },
   emptyBtnSecondary: {
-    paddingHorizontal: 28,
-    paddingVertical: 14,
-    borderRadius: 12,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 10,
     borderWidth: 1,
   },
   emptyBtnSecondaryText: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '600',
   },
 
-  // Picker Modals
+  // Picker Modal
   pickerOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'flex-end',
   },
   pickerSheet: {
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingTop: 8,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
   },
-  pickerGrabber: {
-    width: 36,
+  pickerHandle: {
+    width: 32,
     height: 4,
     borderRadius: 2,
     alignSelf: 'center',
-    marginBottom: 8,
+    marginTop: 10,
+    marginBottom: 6,
   },
   pickerHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
+    paddingHorizontal: 16,
+    height: 44,
+  },
+  pickerHeaderBtn: {
+    minWidth: 60,
   },
   pickerCancel: {
-    fontSize: 16,
+    fontSize: 15,
+    fontWeight: '500',
   },
   pickerTitle: {
-    fontSize: 17,
+    fontSize: 15,
     fontWeight: '600',
+    letterSpacing: -0.2,
   },
   pickerDone: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
+    textAlign: 'right',
+  },
+  pickerDivider: {
+    height: 1,
+    marginHorizontal: 16,
   },
   picker: {
-    height: 200,
+    height: 180,
   },
 });

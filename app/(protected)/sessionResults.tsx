@@ -9,15 +9,15 @@
  */
 
 import { WeatherCard } from '@/components/session/WeatherDisplay';
-import { StandardsVerdict } from '@/components/standards';
+import { StandardsVerdict } from '@/components/standards/StandardsVerdict';
 import { useColors } from '@/hooks/ui/useColors';
 import type { GarminSessionData } from '@/services/garminService';
 import { getSessionById } from '@/services/session/queries';
 import { getSessionTargetsWithResults } from '@/services/session/targets';
-import type { SessionTargetWithResults, SessionWithDetails } from '@/services/session/types';
-import type { DecodedWeather } from '@/services/session/watchTypes';
+import type { SessionTargetWithResults, SessionWithDetails } from '@/types/session';
+import type { DecodedWeather } from '@/types/session.watch';
 import { decodeWeather } from '@/services/session/weatherDecoder';
-import { getSessionVerdict, type SessionVerdict } from '@/services/standards';
+import { getSessionVerdict, type SessionVerdict } from '@/services/standards/standardsService';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import {

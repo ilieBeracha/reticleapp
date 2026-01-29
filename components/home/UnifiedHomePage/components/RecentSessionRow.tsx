@@ -5,19 +5,23 @@
  * Shows different stats for grouping vs engagement sessions.
  */
 
+import { DirectionalChevron } from '@/components/shared/DirectionalChevron';
+import type { RecentSessionRowProps } from '@/types/home';
 import { isGroupingGoal } from '@/utils/drillGoal';
-import { ChevronRight, Crosshair, Heart, Target, Users } from 'lucide-react-native';
+import { formatTimeAgo } from '@/utils/unifiedHomePage.helpers';
+import { Crosshair, Heart, Target, Users } from 'lucide-react-native';
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
-import { formatTimeAgo } from '../UnifiedHomePage.helpers';
-import type { RecentSessionRowProps } from '../UnifiedHomePage.types';
 
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
 export function RecentSessionRow({ session, colors, onPress }: RecentSessionRowProps) {
+  const { t } = useTranslation();
   const isTeam = session.origin === 'team';
   const hasWatchData = session.sourceSession?.watch_controlled ?? false;
   const isGrouping = isGroupingGoal(session.drillGoal);
+  const isSquadOrGroup = session.isSquadEngagement || session.isGroupEngagement;
   const scale = useSharedValue(1);
 
   const animStyle = useAnimatedStyle(() => ({
@@ -33,17 +37,19 @@ export function RecentSessionRow({ session, colors, onPress }: RecentSessionRowP
   };
 
   const timeAgo = session.endedAt
-    ? formatTimeAgo(session.endedAt)
+    ? formatTimeAgo(session.endedAt, t)
     : session.startedAt
-      ? formatTimeAgo(session.startedAt)
+      ? formatTimeAgo(session.startedAt, t)
       : '';
 
   const shots = session.stats?.shots || 0;
   const hits = session.stats?.hits || 0;
   const accuracy = session.stats?.accuracy;
   const bestDispersion = session.stats?.bestDispersion;
+  const participantCount = session.stats?.participantCount;
 
-  const iconColor = isTeam ? colors.blue : isGrouping ? colors.orange : colors.indigo;
+  // Icon color: squad/group = blue, grouping = orange, engagement = indigo
+  const iconColor = isSquadOrGroup ? colors.blue : isGrouping ? colors.orange : colors.indigo;
 
   return (
     <AnimatedTouchable
@@ -53,9 +59,9 @@ export function RecentSessionRow({ session, colors, onPress }: RecentSessionRowP
       onPressOut={handlePressOut}
       activeOpacity={1}
     >
-      {/* Icon - different for grouping vs engagement */}
+      {/* Icon - different for squad/group, grouping, and solo engagement */}
       <View style={[s.icon, { backgroundColor: `${iconColor}12` }]}>
-        {isTeam ? (
+        {isSquadOrGroup ? (
           <Users size={15} color={iconColor} />
         ) : isGrouping ? (
           <Target size={15} color={iconColor} />
@@ -68,29 +74,52 @@ export function RecentSessionRow({ session, colors, onPress }: RecentSessionRowP
       <View style={s.content}>
         <View style={s.titleRow}>
           <Text style={[s.title, { color: colors.text }]} numberOfLines={1}>
-            {session.drillName || (isTeam ? 'Team Session' : 'Practice')}
+            {session.drillName || (isTeam ? t('home.teamSession') : t('home.practice'))}
           </Text>
+          {/* Training context (if session came from a scheduled training) */}
+          {session.trainingTitle && (
+            <Text style={[s.trainingTitle, { color: colors.textMuted }]} numberOfLines={1}>
+              {session.trainingTitle}
+            </Text>
+          )}
           {hasWatchData && <Heart size={12} color="#EF4444" fill="#EF4444" style={{ opacity: 0.8 }} />}
         </View>
 
-        {/* Stats row - different for grouping vs engagement */}
+        {/* Stats row - different for squad/group, grouping, and solo engagement */}
         <View style={s.statsRow}>
-          {isGrouping ? (
+          {isSquadOrGroup ? (
+            // SQUAD/GROUP: Show participant count + total shots (NO accuracy)
             <>
-              {shots > 0 && <Text style={[s.stat, { color: colors.textMuted }]}>{shots} shots</Text>}
+              {participantCount !== undefined && participantCount > 0 && (
+                <Text style={[s.stat, { color: colors.blue }]}>{t('home.shooters', { count: participantCount })}</Text>
+              )}
+              {shots > 0 && (
+                <>
+                  <View style={[s.dot, { backgroundColor: colors.textMuted }]} />
+                  <Text style={[s.stat, { color: colors.textMuted }]}>{t('session.shotsCount', { count: shots })}</Text>
+                </>
+              )}
+            </>
+          ) : isGrouping ? (
+            // GROUPING: Show shots + best dispersion (NO accuracy)
+            <>
+              {shots > 0 && (
+                <Text style={[s.stat, { color: colors.textMuted }]}>{t('session.shotsCount', { count: shots })}</Text>
+              )}
               {bestDispersion !== undefined && bestDispersion > 0 && (
                 <>
                   <View style={[s.dot, { backgroundColor: colors.textMuted }]} />
-                  <Text style={[s.stat, { color: colors.orange }]}>{bestDispersion.toFixed(1)}cm</Text>
+                  <Text style={[s.stat, { color: colors.orange }]}>
+                    {t('session.dispersionCm', { value: bestDispersion.toFixed(1) })}
+                  </Text>
                 </>
               )}
             </>
           ) : (
+            // SOLO ENGAGEMENT: Show hits + accuracy
             <>
               {shots > 0 && (
-                <Text style={[s.stat, { color: colors.textMuted }]}>
-                  {hits}/{shots} hits
-                </Text>
+                <Text style={[s.stat, { color: colors.textMuted }]}>{t('session.hitsOfShots', { hits, shots })}</Text>
               )}
               {accuracy !== undefined && accuracy > 0 && (
                 <>
@@ -106,7 +135,7 @@ export function RecentSessionRow({ session, colors, onPress }: RecentSessionRowP
       {/* Right side */}
       <View style={s.right}>
         <Text style={[s.time, { color: colors.textMuted }]}>{timeAgo}</Text>
-        <ChevronRight size={14} color={colors.border} />
+        <DirectionalChevron size={14} color={colors.border} />
       </View>
     </AnimatedTouchable>
   );
@@ -128,17 +157,22 @@ const s = StyleSheet.create({
   },
   content: {
     flex: 1,
+    justifyContent: 'space-between',
   },
   titleRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: 5,
   },
   title: {
     fontSize: 13,
     fontWeight: '600',
     letterSpacing: -0.2,
-    flex: 1,
+  },
+  trainingTitle: {
+    fontSize: 11,
+    fontWeight: '500',
+    marginTop: 2,
   },
   statsRow: {
     flexDirection: 'row',

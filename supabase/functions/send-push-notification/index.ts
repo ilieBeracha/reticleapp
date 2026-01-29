@@ -3,7 +3,16 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send';
 
 interface PushNotificationPayload {
-  type: 'training_created' | 'training_started' | 'training_completed' | 'team_invite' | 'member_joined';
+  type:
+    | 'training_created'
+    | 'training_started'
+    | 'training_completed'
+    | 'team_invite'
+    | 'member_joined'
+    | 'squad_engagement_invite'
+    | 'squad_engagement_joined'
+    | 'squad_engagement_declined'
+    | 'squad_engagement_starting';
   team_id?: string;
   user_ids?: string[]; // Specific users to notify (optional, if not provided uses team_id)
   exclude_user_id?: string; // User to exclude (usually the sender)
@@ -169,6 +178,11 @@ function getChannelId(type: string): string {
     case 'team_invite':
     case 'member_joined':
       return 'teams';
+    case 'squad_engagement_invite':
+    case 'squad_engagement_joined':
+    case 'squad_engagement_declined':
+    case 'squad_engagement_starting':
+      return 'sessions';
     default:
       return 'default';
   }

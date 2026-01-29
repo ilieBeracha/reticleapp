@@ -14,9 +14,10 @@ import { useColors } from '@/hooks/ui/useColors';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { TrendingDown, TrendingUp } from 'lucide-react-native';
+import { useTranslation } from 'react-i18next';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-import type { TotalsMetric } from '../insights.types';
+import type { TotalsMetric } from '@/types/insights';
 
 // ============================================================================
 // CONSTANTS
@@ -155,6 +156,7 @@ function SkeletonCard({ colors }: { colors: ReturnType<typeof useColors> }) {
 // ============================================================================
 
 export function TotalsSection({ metrics, onMetricPress, isLoading, showDeprecated = false }: TotalsSectionProps) {
+  const { t } = useTranslation();
   const colors = useColors();
 
   // Filter out deprecated metrics unless explicitly requested
@@ -173,7 +175,7 @@ export function TotalsSection({ metrics, onMetricPress, isLoading, showDeprecate
     return (
       <View style={styles.container}>
         <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>
-          PERFORMANCE SNAPSHOT
+          {t('insights.totals.title')}
         </Text>
         <ScrollView
           horizontal
@@ -195,7 +197,7 @@ export function TotalsSection({ metrics, onMetricPress, isLoading, showDeprecate
   return (
     <View style={styles.container}>
       <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>
-        PERFORMANCE SNAPSHOT
+        {t('insights.totals.title')}
       </Text>
       <ScrollView
         horizontal

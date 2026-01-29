@@ -6,10 +6,12 @@ import { useColors } from '@/hooks/ui/useColors';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { Plus, UserPlus, Users } from 'lucide-react-native';
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, TouchableOpacity } from 'react-native';
 import Animated, { FadeIn, FadeInUp } from 'react-native-reanimated';
 
 export function NoTeamsEmptyState() {
+  const { t } = useTranslation();
   const colors = useColors();
 
   const handleCreateTeam = () => {
@@ -34,9 +36,9 @@ export function NoTeamsEmptyState() {
 
       {/* Text */}
       <Animated.View entering={FadeInUp.delay(200).duration(400)} style={styles.textContainer}>
-        <Text style={[styles.title, { color: colors.text }]}>You're not in a team yet</Text>
+        <Text style={[styles.title, { color: colors.text }]}>{t('teams.notInTeamYet')}</Text>
         <Text style={[styles.description, { color: colors.textMuted }]}>
-          Create your own team or join an existing one to coordinate training with others.
+          {t('teams.createOrJoinTeamDescription')}
         </Text>
       </Animated.View>
 
@@ -48,7 +50,7 @@ export function NoTeamsEmptyState() {
           activeOpacity={0.8}
         >
           <Plus size={18} color="#fff" />
-          <Text style={styles.primaryBtnText}>Create Team</Text>
+          <Text style={styles.primaryBtnText}>{t('teams.createTeam')}</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -57,7 +59,7 @@ export function NoTeamsEmptyState() {
           activeOpacity={0.8}
         >
           <UserPlus size={18} color={colors.text} />
-          <Text style={[styles.secondaryBtnText, { color: colors.text }]}>Join Team</Text>
+          <Text style={[styles.secondaryBtnText, { color: colors.text }]}>{t('teams.joinTeam')}</Text>
         </TouchableOpacity>
       </Animated.View>
     </Animated.View>

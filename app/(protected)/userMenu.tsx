@@ -1,10 +1,11 @@
 import { BaseAvatar } from '@/components/shared/Avatar';
 import { useAuth } from '@/contexts/AuthContext';
 import { useColors } from '@/hooks/ui/useColors';
-import { useTeamStore } from '@/store/teamStore';
+import { useTeamStore } from '@/stores/teamStore';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { useCallback } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
@@ -15,6 +16,7 @@ import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'rea
  */
 export default function UserMenuSheet() {
   const colors = useColors();
+  const { t } = useTranslation();
   const { user, signOut, profileAvatarUrl, profileFullName } = useAuth();
   const { teams } = useTeamStore();
 
@@ -25,10 +27,10 @@ export default function UserMenuSheet() {
 
   const handleSignOut = useCallback(async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    Alert.alert('Log Out', 'Are you sure you want to log out?', [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('user.logoutTitle'), t('user.logoutConfirm'), [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'Log Out',
+        text: t('user.logout'),
         style: 'destructive',
         onPress: async () => {
           try {
@@ -39,7 +41,7 @@ export default function UserMenuSheet() {
         },
       },
     ]);
-  }, [signOut]);
+  }, [signOut, t]);
 
   const handleProfile = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -61,7 +63,7 @@ export default function UserMenuSheet() {
     >
       {/* Header */}
       <View style={styles.header}>
-        <Text style={[styles.title, { color: colors.text }]}>Account</Text>
+        <Text style={[styles.title, { color: colors.text }]}>{t('user.account')}</Text>
       </View>
 
       {/* Profile Card */}
@@ -91,8 +93,12 @@ export default function UserMenuSheet() {
       <View style={[styles.menuGroup, { backgroundColor: colors.card }]}>
         <MenuItem
           icon="people-outline"
-          label="Your Teams"
-          subtitle={teams.length > 0 ? `${teams.length} team${teams.length !== 1 ? 's' : ''}` : 'None yet'}
+          label={t('user.yourTeams')}
+          subtitle={
+            teams.length > 0
+              ? `${teams.length}${teams.length !== 1 ? t('teams.teamsCount') : t('teams.teamCount')}`
+              : t('user.noneYet')
+          }
           onPress={handleTeams}
           colors={colors}
           showChevron
@@ -101,7 +107,7 @@ export default function UserMenuSheet() {
 
       {/* Logout */}
       <View style={[styles.menuGroup, { backgroundColor: colors.card }]}>
-        <MenuItem icon="log-out-outline" label="Log Out" onPress={handleSignOut} colors={colors} destructive />
+        <MenuItem icon="log-out-outline" label={t('user.logout')} onPress={handleSignOut} colors={colors} destructive />
       </View>
     </ScrollView>
   );

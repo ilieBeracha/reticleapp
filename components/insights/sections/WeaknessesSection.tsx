@@ -14,11 +14,13 @@ import { useColors } from '@/hooks/ui/useColors';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { AlertTriangle, ChevronRight, TrendingDown } from 'lucide-react-native';
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-import { AIExplanationBlock, WhyButton } from '../AIExplanationBlock';
-import { useAIExplanations, type ExplanationParams } from '../AIExplanationProvider';
-import type { WeaknessCard } from '../insights.types';
+import { AIExplanationBlock } from '../AIExplanationBlock';
+import { WhyButton } from '../WhyButton';
+import { useAIExplanations, type ExplanationParams } from '@/hooks/insights/useAIExplanations';
+import type { WeaknessCard } from '@/types/insights';
 
 // ============================================================================
 // PROPS
@@ -56,6 +58,7 @@ interface SeverityIndicatorProps {
 }
 
 function SeverityIndicator({ delta, variance, colors }: SeverityIndicatorProps) {
+  const { t } = useTranslation();
   // Determine severity based on delta and variance
   const isHighSeverity = Math.abs(delta) >= 10 || (variance && variance >= 30);
   const baseColor = isHighSeverity ? colors.red : '#F59E0B'; // Red or Amber
@@ -68,7 +71,7 @@ function SeverityIndicator({ delta, variance, colors }: SeverityIndicatorProps) 
         <TrendingDown size={10} color={baseColor} />
       )}
       <Text style={[styles.severityText, { color: baseColor }]}>
-        {isHighSeverity ? 'High priority' : 'Attention needed'}
+        {isHighSeverity ? t('insights.weaknesses.highPriority') : t('insights.weaknesses.attentionNeeded')}
       </Text>
     </View>
   );
@@ -84,6 +87,7 @@ interface VarianceIndicatorProps {
 }
 
 function VarianceIndicator({ variance, colors }: VarianceIndicatorProps) {
+  const { t } = useTranslation();
   const isHigh = variance >= 30;
   const color = isHigh ? colors.red : '#F59E0B';
 
@@ -91,7 +95,7 @@ function VarianceIndicator({ variance, colors }: VarianceIndicatorProps) {
     <View style={[styles.varianceBadge, { backgroundColor: `${color}10` }]}>
       <Ionicons name="pulse" size={12} color={color} />
       <Text style={[styles.varianceText, { color }]}>
-        {variance}% variance
+        {t('insights.weaknesses.variance', { variance })}
       </Text>
     </View>
   );
@@ -108,6 +112,7 @@ interface WeaknessCardItemProps {
 }
 
 function WeaknessCardItem({ weakness, onPress, colors }: WeaknessCardItemProps) {
+  const { t } = useTranslation();
   const iconName = CATEGORY_ICONS[weakness.category] || 'warning';
   const isHighSeverity = Math.abs(weakness.metric.delta) >= 10 || (weakness.variance && weakness.variance >= 30);
   const accentColor = isHighSeverity ? colors.red : '#F59E0B';
@@ -175,7 +180,7 @@ function WeaknessCardItem({ weakness, onPress, colors }: WeaknessCardItemProps) 
             </Text>
             <Text style={[styles.categoryLabel, { color: colors.textMuted }]}>
               {weakness.category === 'variance'
-                ? 'Consistency Issue'
+                ? t('insights.weaknesses.consistencyIssue')
                 : weakness.category.charAt(0).toUpperCase() + weakness.category.slice(1)}
             </Text>
           </View>
@@ -244,16 +249,17 @@ function WeaknessCardItem({ weakness, onPress, colors }: WeaknessCardItemProps) 
 // ============================================================================
 
 function EmptyState({ colors }: { colors: ReturnType<typeof useColors> }) {
+  const { t } = useTranslation();
   return (
     <View style={[styles.emptyState, { backgroundColor: colors.card }]}>
       <View style={[styles.emptyIconContainer, { backgroundColor: `${colors.green}10` }]}>
         <Ionicons name="checkmark-circle" size={24} color={colors.green} />
       </View>
       <Text style={[styles.emptyTitle, { color: colors.text }]}>
-        No significant weaknesses
+        {t('insights.weaknesses.noSignificantWeaknesses')}
       </Text>
       <Text style={[styles.emptyText, { color: colors.textMuted }]}>
-        Your performance is consistent across all areas
+        {t('insights.weaknesses.consistentPerformance')}
       </Text>
     </View>
   );
@@ -269,6 +275,7 @@ export function WeaknessesSection({
   maxVisible = 5,
   hideHeader = false,
 }: WeaknessesSectionProps) {
+  const { t } = useTranslation();
   const colors = useColors();
   const visibleWeaknesses = weaknesses.slice(0, maxVisible);
 
@@ -281,11 +288,11 @@ export function WeaknessesSection({
               <AlertTriangle size={14} color={colors.red} />
             </View>
             <Text style={[styles.sectionTitle, { color: colors.text }]}>
-              Weaknesses
+              {t('insights.detailedBreakdown.weaknesses')}
             </Text>
           </View>
           <Text style={[styles.sectionSubtitle, { color: colors.textMuted }]}>
-            What's limiting your ceiling
+            {t('insights.weaknesses.limitingCeiling')}
           </Text>
         </View>
       )}
@@ -302,7 +309,7 @@ export function WeaknessesSection({
           ))}
           {weaknesses.length > maxVisible && (
             <Text style={[styles.moreText, { color: colors.textMuted }]}>
-              +{weaknesses.length - maxVisible} more areas to improve
+              {t('insights.weaknesses.moreAreas', { count: weaknesses.length - maxVisible })}
             </Text>
           )}
         </View>

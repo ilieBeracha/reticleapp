@@ -8,11 +8,12 @@
 import { BaseAvatar } from '@/components/shared/Avatar';
 import { useColors } from '@/hooks/ui/useColors';
 import { getTeamMembers, updateTeam, updateTeamMemberRole } from '@/services/teamService';
-import { useTeamStore } from '@/store/teamStore';
+import { useTeamStore } from '@/stores/teamStore';
 import type { TeamMemberWithProfile, TeamRole } from '@/types/workspace';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useLocalSearchParams } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -30,6 +31,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function TeamSquadsScreen() {
+  const { t } = useTranslation();
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { teamId } = useLocalSearchParams<{ teamId: string }>();
@@ -124,12 +126,12 @@ export default function TeamSquadsScreen() {
 
     if (memberCount > 0) {
       Alert.alert(
-        'Squad Has Members',
-        `${squadName} has ${memberCount} member${memberCount !== 1 ? 's' : ''} assigned. They will be unassigned from this squad.`,
+        t('teams.squadHasMembers'),
+        t('teams.squadHasMembersMessage', { squad: squadName, count: memberCount }),
         [
-          { text: 'Cancel', style: 'cancel' },
+          { text: t('common.cancel'), style: 'cancel' },
           {
-            text: 'Remove Anyway',
+            text: t('teams.removeAnyway'),
             style: 'destructive',
             onPress: () => {
               const newSquads = squads.filter((_, i) => i !== index);
@@ -162,7 +164,7 @@ export default function TeamSquadsScreen() {
 
     // Check for duplicates (excluding current)
     if (squads.some((s, i) => s === name && i !== editingIndex)) {
-      Alert.alert('Duplicate', 'A squad with this name already exists.');
+      Alert.alert(t('teams.duplicateSquad'), t('teams.duplicateSquadMessage'));
       return;
     }
 
@@ -183,7 +185,7 @@ export default function TeamSquadsScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (error) {
       console.error('Failed to update squads:', error);
-      Alert.alert('Error', 'Failed to update squads. Please try again.');
+      Alert.alert(t('common.error'), t('teams.failedUpdateSquads'));
     } finally {
       setSaving(false);
     }
@@ -221,7 +223,7 @@ export default function TeamSquadsScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (error) {
       console.error('Failed to assign member:', error);
-      Alert.alert('Error', 'Failed to assign member to squad.');
+      Alert.alert(t('common.error'), t('teams.failedAssignMember'));
     } finally {
       setAssigningMemberId(null);
     }
@@ -229,10 +231,10 @@ export default function TeamSquadsScreen() {
 
   // Remove member from squad
   const handleRemoveFromSquad = async (memberId: string) => {
-    Alert.alert('Remove from Squad', 'Remove this soldier from the squad?', [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('teams.removeFromSquadTitle'), t('teams.removeFromSquadConfirm'), [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'Remove',
+        text: t('common.remove'),
         style: 'destructive',
         onPress: () => handleAssignMember(memberId, null),
       },
@@ -263,15 +265,17 @@ export default function TeamSquadsScreen() {
           <View style={[styles.headerIcon, { backgroundColor: colors.primary + '15' }]}>
             <Ionicons name="git-branch" size={28} color={colors.primary} />
           </View>
-          <Text style={[styles.title, { color: colors.text }]}>Squad Management</Text>
-          <Text style={[styles.subtitle, { color: colors.textMuted }]}>Organize {team?.name} into sub-groups</Text>
+          <Text style={[styles.title, { color: colors.text }]}>{t('teams.squadManagement')}</Text>
+          <Text style={[styles.subtitle, { color: colors.textMuted }]}>
+            {t('teams.organizeIntoSquads', { teamName: team?.name })}
+          </Text>
         </View>
 
         {/* Add New Squad */}
         <View style={[styles.addSection, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <TextInput
             style={[styles.addInput, { color: colors.text }]}
-            placeholder="New squad name..."
+            placeholder={t('teams.newSquadName')}
             placeholderTextColor={colors.textMuted}
             value={newSquadName}
             onChangeText={setNewSquadName}
@@ -295,15 +299,15 @@ export default function TeamSquadsScreen() {
         {squads.length === 0 ? (
           <View style={[styles.emptyState, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Ionicons name="git-branch-outline" size={40} color={colors.textMuted} />
-            <Text style={[styles.emptyTitle, { color: colors.text }]}>No Squads Yet</Text>
+            <Text style={[styles.emptyTitle, { color: colors.text }]}>{t('teams.noSquadsYet')}</Text>
             <Text style={[styles.emptyText, { color: colors.textMuted }]}>
-              Create squads to organize your team into smaller groups
+              {t('teams.createSquadsToOrganize')}
             </Text>
           </View>
         ) : (
           <View style={styles.squadsList}>
             <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>
-              {squads.length} SQUAD{squads.length !== 1 ? 'S' : ''}
+              {t('teams.squadsCount', { count: squads.length })}
             </Text>
             {squads.map((squad, index) => {
               const squadSoldiers = getSoldiersInSquad(squad);
@@ -357,7 +361,7 @@ export default function TeamSquadsScreen() {
                         </TouchableOpacity>
                       )}
                       <Text style={[styles.squadMeta, { color: colors.textMuted }]}>
-                        {memberCount} soldier{memberCount !== 1 ? 's' : ''}
+                        {t('teams.soldiersCount', { count: memberCount })}
                       </Text>
                     </View>
 
@@ -400,7 +404,7 @@ export default function TeamSquadsScreen() {
                             size="sm"
                           />
                           <Text style={[styles.memberName, { color: colors.text }]} numberOfLines={1}>
-                            {soldier.profile?.full_name || 'Unknown'}
+                            {soldier.profile?.full_name || t('common.unknown')}
                           </Text>
                           <TouchableOpacity
                             style={[styles.removeMemberBtn, { backgroundColor: '#EF444410' }]}
@@ -419,7 +423,7 @@ export default function TeamSquadsScreen() {
                     onPress={() => handleOpenAssignModal(squad)}
                   >
                     <Ionicons name="person-add-outline" size={16} color={colors.primary} />
-                    <Text style={[styles.assignBtnText, { color: colors.primary }]}>Assign Soldiers</Text>
+                    <Text style={[styles.assignBtnText, { color: colors.primary }]}>{t('teams.assignSoldiers')}</Text>
                   </TouchableOpacity>
                 </View>
               );
@@ -432,13 +436,13 @@ export default function TeamSquadsScreen() {
           <View style={[styles.unassignedSection, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <View style={styles.unassignedHeader}>
               <Ionicons name="people-outline" size={18} color={colors.textMuted} />
-              <Text style={[styles.unassignedTitle, { color: colors.text }]}>Unassigned Soldiers</Text>
+              <Text style={[styles.unassignedTitle, { color: colors.text }]}>{t('teams.unassignedSoldiers')}</Text>
               <View style={[styles.unassignedCount, { backgroundColor: colors.secondary }]}>
                 <Text style={[styles.unassignedCountText, { color: colors.text }]}>{unassignedSoldiers.length}</Text>
               </View>
             </View>
             <Text style={[styles.unassignedHint, { color: colors.textMuted }]}>
-              Tap "Assign Soldiers" on a squad to add these soldiers
+              {t('teams.unassignedHint')}
             </Text>
           </View>
         )}
@@ -447,8 +451,7 @@ export default function TeamSquadsScreen() {
         <View style={styles.helpSection}>
           <Ionicons name="information-circle-outline" size={16} color={colors.textMuted} />
           <Text style={[styles.helpText, { color: colors.textMuted }]}>
-            Assign soldiers to squads using the button on each squad card. Squad commanders can manage their own squad
-            members.
+            {t('teams.squadHelpText')}
           </Text>
         </View>
       </ScrollView>
@@ -463,9 +466,9 @@ export default function TeamSquadsScreen() {
         <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
           <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
             <TouchableOpacity onPress={() => setAssignModalVisible(false)}>
-              <Text style={[styles.modalCancel, { color: colors.textMuted }]}>Close</Text>
+              <Text style={[styles.modalCancel, { color: colors.textMuted }]}>{t('common.close')}</Text>
             </TouchableOpacity>
-            <Text style={[styles.modalTitle, { color: colors.text }]}>Assign to {selectedSquad}</Text>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>{t('teams.assignToSquad', { squad: selectedSquad })}</Text>
             <View style={{ width: 50 }} />
           </View>
 
@@ -473,7 +476,7 @@ export default function TeamSquadsScreen() {
             {/* Current Squad Members */}
             {selectedSquad && getSoldiersInSquad(selectedSquad).length > 0 && (
               <View style={styles.modalSection}>
-                <Text style={[styles.modalSectionTitle, { color: colors.textMuted }]}>IN THIS SQUAD</Text>
+                <Text style={[styles.modalSectionTitle, { color: colors.textMuted }]}>{t('teams.inThisSquad')}</Text>
                 {getSoldiersInSquad(selectedSquad).map((soldier) => (
                   <View
                     key={soldier.user_id}
@@ -505,12 +508,12 @@ export default function TeamSquadsScreen() {
 
             {/* Available Soldiers */}
             <View style={styles.modalSection}>
-              <Text style={[styles.modalSectionTitle, { color: colors.textMuted }]}>AVAILABLE TO ASSIGN</Text>
+              <Text style={[styles.modalSectionTitle, { color: colors.textMuted }]}>{t('teams.availableToAssign')}</Text>
               {unassignedSoldiers.length === 0 ? (
                 <View style={[styles.modalEmptyState, { backgroundColor: colors.card }]}>
                   <Ionicons name="checkmark-circle" size={24} color={colors.primary} />
                   <Text style={[styles.modalEmptyText, { color: colors.textMuted }]}>
-                    All soldiers are assigned to squads
+                    {t('teams.allSoldiersAssigned')}
                   </Text>
                 </View>
               ) : (
@@ -528,7 +531,7 @@ export default function TeamSquadsScreen() {
                       size="sm"
                     />
                     <Text style={[styles.modalMemberName, { color: colors.text }]} numberOfLines={1}>
-                      {soldier.profile?.full_name || 'Unknown'}
+                      {soldier.profile?.full_name || t('common.unknown')}
                     </Text>
                     {assigningMemberId === soldier.user_id ? (
                       <ActivityIndicator size="small" color={colors.primary} />
@@ -545,7 +548,7 @@ export default function TeamSquadsScreen() {
             {/* Other Squads */}
             {selectedSquad && squads.filter((s) => s !== selectedSquad).length > 0 && (
               <View style={styles.modalSection}>
-                <Text style={[styles.modalSectionTitle, { color: colors.textMuted }]}>FROM OTHER SQUADS</Text>
+                <Text style={[styles.modalSectionTitle, { color: colors.textMuted }]}>{t('teams.fromOtherSquads')}</Text>
                 {squads
                   .filter((s) => s !== selectedSquad)
                   .flatMap((squadName) =>
@@ -569,10 +572,10 @@ export default function TeamSquadsScreen() {
                       />
                       <View style={styles.modalMemberInfo}>
                         <Text style={[styles.modalMemberName, { color: colors.text }]} numberOfLines={1}>
-                          {soldier.profile?.full_name || 'Unknown'}
+                          {soldier.profile?.full_name || t('common.unknown')}
                         </Text>
                         <Text style={[styles.modalMemberSquad, { color: colors.textMuted }]}>
-                          Currently in: {soldier.currentSquad}
+                          {t('teams.currentlyInSquad', { squad: soldier.currentSquad })}
                         </Text>
                       </View>
                       {assigningMemberId === soldier.user_id ? (

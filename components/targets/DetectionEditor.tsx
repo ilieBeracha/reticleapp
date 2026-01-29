@@ -2,12 +2,13 @@ import type { AnalyzeDocumentResponse, AnalyzeResponse } from '@/types/api';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import Svg, { Circle, G, Line } from 'react-native-svg';
 import ViewShot from 'react-native-view-shot';
-import { CANVAS_SIZE, COLORS, EditableDetection, EditMode, MARKER_RADIUS } from './types';
+import { CANVAS_SIZE, COLORS, EditableDetection, EditMode, MARKER_RADIUS } from '@/types/targets';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // DETECTION EDITOR
@@ -51,6 +52,7 @@ export const DetectionEditor = React.memo(function DetectionEditor({
   onModeChange,
   captureRef,
 }: DetectionEditorProps) {
+  const { t } = useTranslation();
   const [imageLoaded, setImageLoaded] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [localDetections, setLocalDetections] = useState<EditableDetection[]>(() => cloneDetections(detections));
@@ -465,31 +467,33 @@ export const DetectionEditor = React.memo(function DetectionEditor({
           onPress={() => onModeChange('remove')}
         >
           <Ionicons name="remove-circle" size={18} color={editMode === 'remove' ? '#000' : COLORS.textMuted} />
-          <Text style={[styles.modeBtnText, editMode === 'remove' && styles.modeBtnTextActive]}>Remove</Text>
+          <Text style={[styles.modeBtnText, editMode === 'remove' && styles.modeBtnTextActive]}>
+            {t('target.editMode.remove')}
+          </Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.modeBtn, editMode === 'add' && styles.modeBtnActive]}
           onPress={() => onModeChange('add')}
         >
           <Ionicons name="add-circle" size={18} color={editMode === 'add' ? '#000' : COLORS.textMuted} />
-          <Text style={[styles.modeBtnText, editMode === 'add' && styles.modeBtnTextActive]}>Add</Text>
+          <Text style={[styles.modeBtnText, editMode === 'add' && styles.modeBtnTextActive]}>{t('target.editMode.add')}</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.modeBtn, editMode === 'move' && styles.modeBtnActive]}
           onPress={() => onModeChange('move')}
         >
           <Ionicons name="hand-left-outline" size={18} color={editMode === 'move' ? '#000' : COLORS.textMuted} />
-          <Text style={[styles.modeBtnText, editMode === 'move' && styles.modeBtnTextActive]}>Move</Text>
+          <Text style={[styles.modeBtnText, editMode === 'move' && styles.modeBtnTextActive]}>{t('target.editMode.move')}</Text>
         </TouchableOpacity>
       </View>
 
       {/* Hint */}
       <Text style={styles.hint}>
         {editMode === 'add'
-          ? 'Tap to add missed bullet holes • Pinch to zoom'
+          ? t('target.editHint.add')
           : editMode === 'remove'
-            ? 'Tap near a marker to remove it • Pinch to zoom'
-            : 'Tap a marker to select, then drag to reposition • Pinch to zoom'}
+            ? t('target.editHint.remove')
+            : t('target.editHint.move')}
       </Text>
 
       {/* Interactive Canvas */}

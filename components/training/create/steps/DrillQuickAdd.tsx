@@ -1,13 +1,16 @@
 /**
- * DrillQuickAdd - Professional drill creation (like mini createSession)
+ * DrillQuickAdd - Quick drill configuration
  *
  * Quick flow:
  * 1. Select goal (grouping/engagement)
  * 2. Set distance, shots, strings, time
  * 3. Done
+ *
+ * NOTE: Configures drill params only. Execution via startEngagement.
  */
 
 import { useColors } from '@/hooks/ui/useColors';
+import { useTranslation } from 'react-i18next';
 import * as Haptics from 'expo-haptics';
 import { Check, Clock, Crosshair, Layers, MapPin, Target, X, Zap } from 'lucide-react-native';
 import { useCallback, useState } from 'react';
@@ -16,7 +19,7 @@ import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { Drill } from '@/types/workspace';
-import type { TrainingDrillItem } from '../createTraining.types';
+import type { TrainingDrillItem } from '@/types/createTraining';
 
 // ============================================================================
 // TYPES
@@ -38,8 +41,8 @@ type DrillGoal = 'grouping' | 'engagement';
 const DISTANCE_PRESETS = [25, 50, 100, 200, 300, 400, 500];
 const SHOTS_PRESETS = [3, 5, 10, 15, 20, 25];
 const STRINGS_PRESETS = [1, 2, 3, 4, 5];
-const TIME_PRESETS = [
-  { value: null, label: 'No limit' },
+const getTimePresets = (t: (key: string) => string) => [
+  { value: null, label: t('session.noLimit') },
   { value: 30, label: '30s' },
   { value: 60, label: '1 min' },
   { value: 90, label: '1:30' },
@@ -48,30 +51,33 @@ const TIME_PRESETS = [
   { value: 300, label: '5 min' },
 ];
 
-const GOAL_CONFIG = {
+const getGoalConfig = (t: (key: string) => string) => ({
   grouping: {
     color: '#10B981',
     icon: Target,
-    label: 'Grouping',
-    shortLabel: 'GRP',
-    description: 'Measure precision & dispersion',
+    label: t('session.grouping'),
+    shortLabel: t('training.groupingType'),
+    description: t('training.groupingDescription'),
   },
   engagement: {
     color: '#F59E0B',
     icon: Crosshair,
-    label: 'Engagement',
-    shortLabel: 'ENG',
-    description: 'Hit targets, track accuracy %',
+    label: t('session.engagement'),
+    shortLabel: t('training.engagementType'),
+    description: t('training.engagementDescription'),
   },
-};
+});
 
 // ============================================================================
 // COMPONENT
 // ============================================================================
 
 export function DrillQuickAdd({ visible, teamDrills, onAdd, onClose }: DrillQuickAddProps) {
+  const { t } = useTranslation();
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const TIME_PRESETS = getTimePresets(t);
+  const GOAL_CONFIG = getGoalConfig(t);
 
   // State
   const [mode, setMode] = useState<'library' | 'create'>('create');
@@ -144,7 +150,7 @@ export function DrillQuickAdd({ visible, teamDrills, onAdd, onClose }: DrillQuic
           <TouchableOpacity style={styles.headerBtn} onPress={handleClose}>
             <X size={22} color={colors.text} />
           </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: colors.text }]}>Add Drill</Text>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>{t('training.addDrill')}</Text>
           <View style={styles.headerBtn} />
         </View>
 
@@ -157,7 +163,7 @@ export function DrillQuickAdd({ visible, teamDrills, onAdd, onClose }: DrillQuic
             >
               <Zap size={14} color={mode === 'create' ? colors.text : colors.textMuted} />
               <Text style={[styles.tabText, { color: mode === 'create' ? colors.text : colors.textMuted }]}>
-                Quick Create
+                {t('training.quickCreate')}
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -166,7 +172,7 @@ export function DrillQuickAdd({ visible, teamDrills, onAdd, onClose }: DrillQuic
             >
               <Layers size={14} color={mode === 'library' ? colors.text : colors.textMuted} />
               <Text style={[styles.tabText, { color: mode === 'library' ? colors.text : colors.textMuted }]}>
-                From Library ({teamDrills.length})
+                {t('training.fromLibrary', { count: teamDrills.length })}
               </Text>
             </TouchableOpacity>
           </View>
@@ -185,13 +191,13 @@ export function DrillQuickAdd({ visible, teamDrills, onAdd, onClose }: DrillQuic
                   <View style={[styles.emptyIcon, { backgroundColor: colors.card }]}>
                     <Layers size={32} color={colors.textMuted} strokeWidth={1.5} />
                   </View>
-                  <Text style={[styles.emptyTitle, { color: colors.text }]}>No saved drills</Text>
-                  <Text style={[styles.emptyText, { color: colors.textMuted }]}>Create drills to reuse them later</Text>
+                  <Text style={[styles.emptyTitle, { color: colors.text }]}>{t('training.noSavedDrills')}</Text>
+                  <Text style={[styles.emptyText, { color: colors.textMuted }]}>{t('training.createDrillsToReuse')}</Text>
                   <TouchableOpacity
                     style={[styles.emptyBtn, { backgroundColor: colors.text }]}
                     onPress={() => setMode('create')}
                   >
-                    <Text style={[styles.emptyBtnText, { color: colors.background }]}>Create Now →</Text>
+                    <Text style={[styles.emptyBtnText, { color: colors.background }]}>{t('training.createNow')}</Text>
                   </TouchableOpacity>
                 </View>
               ) : (
@@ -221,7 +227,7 @@ export function DrillQuickAdd({ visible, teamDrills, onAdd, onClose }: DrillQuic
                               </Text>
                               <View style={[styles.presetDot, { backgroundColor: colors.textMuted }]} />
                               <Text style={[styles.presetMetaText, { color: colors.textMuted }]}>
-                                {drillTotalShots} shots
+                                {t('training.shotsCount', { count: drillTotalShots })}
                               </Text>
                               {drill.time_limit_seconds && (
                                 <>
@@ -250,7 +256,7 @@ export function DrillQuickAdd({ visible, teamDrills, onAdd, onClose }: DrillQuic
             <Animated.View entering={FadeIn.duration(200)} style={styles.form}>
               {/* Goal Selection */}
               <View style={styles.section}>
-                <Text style={[styles.sectionTitle, { color: colors.text }]}>What's the goal?</Text>
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('training.whatsTheGoal')}</Text>
                 <View style={styles.goalCards}>
                   {(['grouping', 'engagement'] as const).map((g) => {
                     const config = GOAL_CONFIG[g];
@@ -302,7 +308,7 @@ export function DrillQuickAdd({ visible, teamDrills, onAdd, onClose }: DrillQuic
               <View style={styles.section}>
                 <View style={styles.sectionHeader}>
                   <MapPin size={16} color={colors.textMuted} />
-                  <Text style={[styles.sectionTitle, { color: colors.text }]}>Distance</Text>
+                  <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('session.distance')}</Text>
                 </View>
                 <View style={styles.chipGrid}>
                   {DISTANCE_PRESETS.map((d) => (
@@ -333,7 +339,7 @@ export function DrillQuickAdd({ visible, teamDrills, onAdd, onClose }: DrillQuic
                 <View style={[styles.section, { flex: 1 }]}>
                   <View style={styles.sectionHeader}>
                     <Target size={16} color={colors.textMuted} />
-                    <Text style={[styles.sectionTitle, { color: colors.text }]}>Shots</Text>
+                    <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('session.shots')}</Text>
                   </View>
                   <View style={styles.chipGrid}>
                     {SHOTS_PRESETS.map((s) => (
@@ -364,7 +370,7 @@ export function DrillQuickAdd({ visible, teamDrills, onAdd, onClose }: DrillQuic
                 <View style={[styles.section, { flex: 0.6 }]}>
                   <View style={styles.sectionHeader}>
                     <Layers size={16} color={colors.textMuted} />
-                    <Text style={[styles.sectionTitle, { color: colors.text }]}>Strings</Text>
+                    <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('training.strings')}</Text>
                   </View>
                   <View style={styles.chipGrid}>
                     {STRINGS_PRESETS.map((s) => (
@@ -391,10 +397,10 @@ export function DrillQuickAdd({ visible, teamDrills, onAdd, onClose }: DrillQuic
 
               {/* Total Shots Indicator */}
               <View style={[styles.totalBar, { backgroundColor: colors.card }]}>
-                <Text style={[styles.totalLabel, { color: colors.textMuted }]}>Total shots per shooter:</Text>
+                <Text style={[styles.totalLabel, { color: colors.textMuted }]}>{t('training.totalShotsPerShooter')}</Text>
                 <Text style={[styles.totalValue, { color: goalConfig.color }]}>{totalShots}</Text>
                 <Text style={[styles.totalCalc, { color: colors.textMuted }]}>
-                  ({shots} × {strings} {strings > 1 ? 'strings' : 'string'})
+                  ({shots} × {strings} {t('training.stringsCount', { count: strings })})
                 </Text>
               </View>
 
@@ -402,29 +408,29 @@ export function DrillQuickAdd({ visible, teamDrills, onAdd, onClose }: DrillQuic
               <View style={styles.section}>
                 <View style={styles.sectionHeader}>
                   <Clock size={16} color={colors.textMuted} />
-                  <Text style={[styles.sectionTitle, { color: colors.text }]}>Time Limit</Text>
-                  <Text style={[styles.sectionOptional, { color: colors.textMuted }]}>(optional)</Text>
+                  <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('session.timeLimit')}</Text>
+                  <Text style={[styles.sectionOptional, { color: colors.textMuted }]}>({t('common.optional')})</Text>
                 </View>
                 <View style={styles.chipGrid}>
-                  {TIME_PRESETS.map((t) => (
+                  {TIME_PRESETS.map((timePreset) => (
                     <TouchableOpacity
-                      key={t.label}
+                      key={timePreset.label}
                       style={[
                         styles.chipTime,
                         {
-                          backgroundColor: timeLimit === t.value ? colors.text : colors.card,
-                          borderColor: timeLimit === t.value ? colors.text : colors.border,
+                          backgroundColor: timeLimit === timePreset.value ? colors.text : colors.card,
+                          borderColor: timeLimit === timePreset.value ? colors.text : colors.border,
                         },
                       ]}
                       onPress={() => {
                         Haptics.selectionAsync();
-                        setTimeLimit(t.value);
+                        setTimeLimit(timePreset.value);
                       }}
                     >
                       <Text
-                        style={[styles.chipText, { color: timeLimit === t.value ? colors.background : colors.text }]}
+                        style={[styles.chipText, { color: timeLimit === timePreset.value ? colors.background : colors.text }]}
                       >
-                        {t.label}
+                        {timePreset.label}
                       </Text>
                     </TouchableOpacity>
                   ))}
@@ -433,7 +439,7 @@ export function DrillQuickAdd({ visible, teamDrills, onAdd, onClose }: DrillQuic
 
               {/* Custom Name */}
               <View style={styles.section}>
-                <Text style={[styles.sectionTitle, { color: colors.text }]}>Name</Text>
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('common.name')}</Text>
                 <TextInput
                   style={[
                     styles.nameInput,
@@ -461,7 +467,7 @@ export function DrillQuickAdd({ visible, teamDrills, onAdd, onClose }: DrillQuic
               activeOpacity={0.85}
             >
               <GoalIcon size={20} color="#fff" />
-              <Text style={styles.addButtonText}>Add {customName.trim() || `${goalConfig.label} ${distance}m`}</Text>
+              <Text style={styles.addButtonText}>{t('training.addDrillName', { name: customName.trim() || `${goalConfig.label} ${distance}m` })}</Text>
             </TouchableOpacity>
           </Animated.View>
         )}

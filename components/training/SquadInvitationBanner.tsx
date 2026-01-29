@@ -1,0 +1,452 @@
+/**
+ * SquadInvitationBanner
+ *
+ * Shows pending squad engagement invitations to soldiers in training detail.
+ * When a commander starts a squad engagement and invites team members,
+ * this banner appears for the invited users showing the invitation.
+ *
+ * Features:
+ * - Loads pending invitations for the current user in this training
+ * - Shows drill info (name, distance, rounds)
+ * - Join/Decline buttons with haptic feedback
+ * - Realtime subscription for invitation changes
+ * - Navigates to activeSession on join
+ */
+
+import { useColors } from '@/hooks/ui/useColors';
+import { useTableSubscription } from '@/hooks/realtime/table/useTableSubscription';
+import { getProfileName } from '@/services/profileService';
+import {
+  getActiveEngagementForTraining,
+  getEngagementSessionDetails,
+  getUserParticipationState,
+  joinEngagement,
+  updateParticipantState,
+} from '@/services/session/participants';
+import * as Haptics from 'expo-haptics';
+import { router } from 'expo-router';
+import { Check, Target, Users, X } from 'lucide-react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import Animated, { FadeInDown, FadeOutUp } from 'react-native-reanimated';
+
+interface ActiveEngagement {
+  engagementId: string;
+  sessionId: string; // Shared session
+  drillName: string;
+  distanceM: number | null;
+  roundsPerShooter: number | null;
+  commanderName: string | null;
+  commanderId: string;
+  hasStarted: boolean; // true if commander has started (started_at is set)
+  engagementMode: 'squad' | 'group';
+  participationState: 'pending' | 'joined' | 'declined' | 'left' | null; // null = not invited
+  isCommander: boolean; // true if current user is the commander
+}
+
+interface SquadInvitationBannerProps {
+  trainingId: string;
+  userId: string;
+  onInvitationChanged?: () => void;
+}
+
+export function SquadInvitationBanner({ trainingId, userId, onInvitationChanged }: SquadInvitationBannerProps) {
+  const { t } = useTranslation();
+  const colors = useColors();
+
+  const [loading, setLoading] = useState(true);
+  const [activeEngagement, setActiveEngagement] = useState<ActiveEngagement | null>(null);
+  const [actionLoading, setActionLoading] = useState<'join' | 'decline' | null>(null);
+
+  // Load active squad/group engagement in this training (visible to ALL team members)
+  const loadActiveEngagement = useCallback(async () => {
+    try {
+      const engagement = await getActiveEngagementForTraining(trainingId);
+
+      console.log('[SquadInvitationBanner] Query result:', engagement ? 1 : 0, 'engagements found');
+
+      if (!engagement) {
+        console.log('[SquadInvitationBanner] No active engagements, hiding banner');
+        setActiveEngagement(null);
+        return;
+      }
+
+      console.log('[SquadInvitationBanner] Found engagement:', engagement.id, 'status:', engagement.status);
+      const isCommander = engagement.shooter_id === userId;
+
+      // Check if user is a participant and get their state
+      const participation = await getUserParticipationState(engagement.id, userId);
+      const participationState = participation?.state as 'pending' | 'joined' | 'declined' | 'left' | null;
+
+      // Don't show banner to commander (they manage from squadLobby or activeSession)
+      if (isCommander) {
+        setActiveEngagement(null);
+        return;
+      }
+
+      // Don't show banner to users who declined or left
+      if (participationState === 'declined' || participationState === 'left') {
+        setActiveEngagement(null);
+        return;
+      }
+
+      // Get session details for drill info
+      const session = await getEngagementSessionDetails(engagement.session_id);
+
+      // Get commander's name
+      const commanderName = await getProfileName(session.user_id);
+
+      const drillConfig = session.custom_drill_config as any;
+      const engagementMode = engagement.engagement_mode as 'squad' | 'group';
+      const isGroup = engagementMode === 'group';
+
+      setActiveEngagement({
+        engagementId: engagement.id,
+        sessionId: engagement.session_id,
+        drillName: drillConfig?.name || (isGroup ? t('training.groupEngagement') : t('training.squadEngagement')),
+        distanceM: drillConfig?.distance_m || null,
+        roundsPerShooter: drillConfig?.rounds_per_shooter || null,
+        commanderName,
+        commanderId: session.user_id,
+        hasStarted: !!engagement.started_at,
+        engagementMode,
+        participationState,
+        isCommander,
+      });
+    } catch (error) {
+      console.error('[SquadInvitationBanner] Failed to load:', error);
+      setActiveEngagement(null);
+    } finally {
+      setLoading(false);
+    }
+  }, [trainingId, userId]);
+
+  useEffect(() => {
+    loadActiveEngagement();
+  }, [loadActiveEngagement]);
+
+  // Debounced reload for realtime updates
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const debouncedLoad = useCallback(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      loadActiveEngagement();
+    }, 300);
+  }, [loadActiveEngagement]);
+
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, []);
+
+  // Realtime subscription for engagement_participants changes
+  useTableSubscription({
+    table: 'engagement_participants',
+    onChange: debouncedLoad,
+    enabled: !!trainingId && !!userId,
+  });
+
+  // Realtime subscription for engagements changes
+  useTableSubscription({
+    table: 'engagements',
+    filter: `training_id=eq.${trainingId}`,
+    onChange: debouncedLoad,
+    enabled: !!trainingId && !!userId,
+  });
+
+  // Handle join/view - navigate based on state
+  const handleJoinOrView = () => {
+    if (!activeEngagement) return;
+
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+    const { hasStarted, participationState, engagementId, sessionId, engagementMode } = activeEngagement;
+    const isPendingInvite = participationState === 'pending';
+    const isJoinedParticipant = participationState === 'joined';
+
+    // Navigate FIRST, then update state in background (prevents banner collapse before navigation)
+    if (hasStarted) {
+      // Session is in progress - go to active session
+      router.push({
+        pathname: '/(protected)/activeSession',
+        params: {
+          sessionId,
+          engagementId,
+          engagementMode,
+          returnTo: 'trainingDetail',
+          returnId: trainingId,
+          viewOnly: !isJoinedParticipant && !isPendingInvite ? 'true' : undefined,
+        },
+      });
+    } else {
+      // Session not started yet - go to lobby
+      router.push({
+        pathname: '/(protected)/squadLobby',
+        params: {
+          engagementId,
+          sessionId,
+          trainingId,
+          engagementMode,
+        },
+      });
+    }
+
+    // Update state in background after navigation starts
+    // If pending invite, accept it (change state to joined)
+    if (isPendingInvite && !hasStarted) {
+      updateParticipantState(engagementId, userId, 'joined').catch((err) => {
+        console.error('[SquadInvitationBanner] Failed to accept invite:', err);
+      });
+    }
+    // If not a participant at all and session hasn't started, self-join
+    else if (!participationState && !hasStarted) {
+      joinEngagement(engagementId, userId).catch((err) => {
+        console.error('[SquadInvitationBanner] Failed to self-join:', err);
+      });
+    }
+
+    onInvitationChanged?.();
+  };
+
+  // Handle decline/leave (for pending or joined participants before session starts)
+  const handleDecline = async () => {
+    if (!activeEngagement || !activeEngagement.participationState) return;
+
+    setActionLoading('decline');
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+    try {
+      // Use 'declined' for pending invites, 'left' for joined participants
+      const newState = activeEngagement.participationState === 'pending' ? 'declined' : 'left';
+      await updateParticipantState(activeEngagement.engagementId, userId, newState);
+      loadActiveEngagement(); // Refresh
+      onInvitationChanged?.();
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (error: any) {
+      console.error('[SquadInvitationBanner] Failed to decline:', error);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  // Don't render anything while loading or if no active engagement
+  if (loading || !activeEngagement) {
+    return null;
+  }
+
+  // Determine UI state
+  const { hasStarted, participationState, engagementMode } = activeEngagement;
+  const isInProgress = hasStarted;
+  const isGroup = engagementMode === 'group';
+  const modeLabel = isGroup ? t('training.groupType') : t('training.squadType');
+  const isPending = participationState === 'pending';
+  const isJoined = participationState === 'joined';
+  const hasParticipation = isPending || isJoined;
+
+  // Button text based on state
+  const getActionText = () => {
+    if (isInProgress) {
+      return isJoined ? t('training.joinSession') : t('training.viewProgress');
+    }
+    if (isPending) return t('training.acceptAndJoin');
+    if (isJoined) return t('training.returnToLobby');
+    return t('training.join');
+  };
+  
+  // Decline button text
+  const getDeclineText = () => {
+    if (isPending) return t('common.decline');
+    return t('training.leave');
+  };
+
+  return (
+    <Animated.View
+      entering={FadeInDown.duration(300)}
+      exiting={FadeOutUp.duration(200)}
+      style={[
+        styles.container,
+        {
+          backgroundColor: isInProgress ? colors.green + '10' : colors.primary + '10',
+          borderColor: isInProgress ? colors.green : colors.primary,
+        },
+      ]}
+    >
+      {/* Header */}
+      <View style={styles.header}>
+        <View
+          style={[
+            styles.iconContainer,
+            { backgroundColor: isInProgress ? colors.green + '20' : colors.primary + '20' },
+          ]}
+        >
+          <Users size={20} color={isInProgress ? colors.green : colors.primary} />
+        </View>
+        <View style={styles.headerText}>
+          <Text style={[styles.title, { color: colors.text }]}>
+            {isInProgress
+              ? t('training.sessionInProgress', { mode: modeLabel })
+              : isPending
+                ? t('training.invitation', { mode: modeLabel })
+                : isJoined
+                  ? t('training.engagementReady', { mode: modeLabel })
+                  : t('training.engagementAvailable', { mode: modeLabel })}
+          </Text>
+          {activeEngagement.commanderName && (
+            <Text style={[styles.subtitle, { color: colors.textMuted }]}>
+              {isInProgress
+                ? t('training.commanderSession', { name: activeEngagement.commanderName })
+                : isPending
+                  ? t('training.commanderInvited', { name: activeEngagement.commanderName })
+                  : t('training.startedBy', { name: activeEngagement.commanderName })}
+            </Text>
+          )}
+        </View>
+      </View>
+
+      {/* Drill Info */}
+      <View style={[styles.drillInfo, { backgroundColor: colors.card }]}>
+        <Target size={16} color={isInProgress ? colors.green : colors.primary} />
+        <Text style={[styles.drillName, { color: colors.text }]}>{activeEngagement.drillName}</Text>
+        {(activeEngagement.distanceM || activeEngagement.roundsPerShooter) && (
+          <Text style={[styles.drillMeta, { color: colors.textMuted }]}>
+            {activeEngagement.distanceM && `${activeEngagement.distanceM}m`}
+            {activeEngagement.distanceM && activeEngagement.roundsPerShooter && ' · '}
+            {activeEngagement.roundsPerShooter && `${activeEngagement.roundsPerShooter} ${t('session.shots')}`}
+          </Text>
+        )}
+      </View>
+
+      {/* Actions */}
+      <View style={styles.actions}>
+        {/* Show decline/leave for pending or joined participants before session starts */}
+        {!isInProgress && hasParticipation && (
+          <TouchableOpacity
+            style={[styles.declineBtn, { borderColor: colors.border }]}
+            onPress={handleDecline}
+            disabled={actionLoading !== null}
+          >
+            {actionLoading === 'decline' ? (
+              <ActivityIndicator size="small" color={colors.textMuted} />
+            ) : (
+              <>
+                <X size={16} color={isPending ? colors.red : colors.textMuted} />
+                <Text style={[styles.declineText, { color: isPending ? colors.red : colors.textMuted }]}>
+                  {getDeclineText()}
+                </Text>
+              </>
+            )}
+          </TouchableOpacity>
+        )}
+
+        <TouchableOpacity
+          style={[
+            styles.joinBtn, 
+            { 
+              backgroundColor: isPending ? colors.green : colors.primary, 
+              flex: (!isInProgress && !hasParticipation) ? 1 : (isInProgress ? 1 : undefined) 
+            }
+          ]}
+          onPress={handleJoinOrView}
+          disabled={actionLoading !== null}
+        >
+          {actionLoading === 'join' ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <>
+              <Check size={16} color="#fff" />
+              <Text style={styles.joinText}>{getActionText()}</Text>
+            </>
+          )}
+        </TouchableOpacity>
+      </View>
+    </Animated.View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 16,
+    marginBottom: 16,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 12,
+  },
+  iconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerText: {
+    flex: 1,
+    gap: 2,
+  },
+  title: {
+    fontSize: 16,
+    fontWeight: '600',
+    letterSpacing: -0.2,
+  },
+  subtitle: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  drillInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 10,
+    marginBottom: 14,
+  },
+  drillName: {
+    fontSize: 14,
+    fontWeight: '600',
+    letterSpacing: -0.2,
+  },
+  drillMeta: {
+    fontSize: 13,
+    fontWeight: '500',
+    marginLeft: 'auto',
+  },
+  actions: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  declineBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  declineText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  joinBtn: {
+    flex: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 12,
+    borderRadius: 10,
+  },
+  joinText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#fff',
+  },
+});

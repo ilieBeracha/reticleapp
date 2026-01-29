@@ -1,11 +1,12 @@
 /**
  * DrillsBuilder - Custom Drill Creator
  *
- * Clean, card-based layout matching createSession style.
+ * Clean, card-based layout for drill configuration.
  * Simplified drill creation with type, position, distance, rounds, time.
  */
 
 import { useColors } from '@/hooks/ui/useColors';
+import { useTranslation } from 'react-i18next';
 import type { Drill } from '@/types/workspace';
 import * as Haptics from 'expo-haptics';
 import { Check, Clock, MapPin, Shield, Target, User } from 'lucide-react-native';
@@ -13,7 +14,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 
-import type { TrainingDrillItem } from '../createTraining.types';
+import type { TrainingDrillItem } from '@/types/createTraining';
 
 // ============================================================================
 // TYPES
@@ -36,10 +37,10 @@ type Position = 'standing' | 'kneeling' | 'prone';
 // CONSTANTS
 // ============================================================================
 
-const POSITIONS: { value: Position; label: string; icon: any }[] = [
-  { value: 'prone', label: 'Prone', icon: User },
-  { value: 'kneeling', label: 'Kneeling', icon: User },
-  { value: 'standing', label: 'Standing', icon: User },
+const getPositions = (t: (key: string) => string): { value: Position; label: string; icon: any }[] => [
+  { value: 'prone', label: t('session.positionOptions.prone'), icon: User },
+  { value: 'kneeling', label: t('session.positionOptions.kneeling'), icon: User },
+  { value: 'standing', label: t('session.positionOptions.standing'), icon: User },
 ];
 
 const DISTANCES: Record<DrillType, number[]> = {
@@ -52,8 +53,8 @@ const ROUNDS: Record<DrillType, number[]> = {
   engagement: [5, 10, 20],
 };
 
-const TIME_OPTIONS: { value: number | null; label: string }[] = [
-  { value: null, label: 'None' },
+const getTimeOptions = (t: (key: string) => string): { value: number | null; label: string }[] => [
+  { value: null, label: t('common.none') },
   { value: 30, label: '30s' },
   { value: 60, label: '1m' },
   { value: 120, label: '2m' },
@@ -118,7 +119,10 @@ export function DrillsBuilder({
   onMoveDrill,
   onDrillIssued,
 }: DrillsBuilderProps) {
+  const { t } = useTranslation();
   const colors = useColors();
+  const POSITIONS = getPositions(t);
+  const TIME_OPTIONS = getTimeOptions(t);
 
   // Order state
   const [drillType, setDrillType] = useState<DrillType>('grouping');
@@ -130,7 +134,7 @@ export function DrillsBuilder({
   // Issue custom drill order
   const handleIssueDrill = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-    const typeLabel = drillType === 'grouping' ? 'Grouping' : 'Engagement';
+    const typeLabel = drillType === 'grouping' ? t('session.grouping') : t('session.engagement');
     const posLabel = POSITIONS.find((p) => p.value === position)?.label || position;
     onAddDrill({
       id: `order-${Date.now()}`,
@@ -177,11 +181,11 @@ export function DrillsBuilder({
 
   // Summary for button
   const orderSummary = useMemo(() => {
-    const typeLabel = drillType === 'grouping' ? 'Grouping' : 'Engagement';
-    let summary = `${typeLabel} · ${distance}m · ${rounds} rounds`;
+    const typeLabel = drillType === 'grouping' ? t('session.grouping') : t('session.engagement');
+    let summary = `${typeLabel} · ${distance}m · ${t('training.roundsCount', { count: rounds })}`;
     if (timeLimit) summary += ` · ${timeLimit}s`;
     return summary;
-  }, [drillType, distance, rounds, timeLimit]);
+  }, [drillType, distance, rounds, timeLimit, t]);
 
   return (
     <ScrollView
@@ -191,19 +195,19 @@ export function DrillsBuilder({
     >
       {/* Header */}
       <Animated.View entering={FadeIn.duration(200)} style={styles.header}>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>Create custom drill</Text>
-        <Text style={[styles.headerSubtitle, { color: colors.textMuted }]}>Configure your drill parameters</Text>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>{t('training.createCustomDrill')}</Text>
+        <Text style={[styles.headerSubtitle, { color: colors.textMuted }]}>{t('training.configureDrillParameters')}</Text>
       </Animated.View>
 
       {/* Drill Type */}
       <Animated.View entering={FadeInDown.delay(50).duration(200)} style={styles.section}>
         <View style={styles.sectionHeader}>
           <Target size={16} color={colors.textMuted} />
-          <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>Type</Text>
+          <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>{t('training.type')}</Text>
         </View>
         <View style={styles.optionsRow}>
           <OptionChip
-            label="Grouping"
+            label={t('session.grouping')}
             active={drillType === 'grouping'}
             onPress={() => {
               setDrillType('grouping');
@@ -214,7 +218,7 @@ export function DrillsBuilder({
             size="large"
           />
           <OptionChip
-            label="Engagement"
+            label={t('session.engagement')}
             active={drillType === 'engagement'}
             onPress={() => {
               setDrillType('engagement');
@@ -231,7 +235,7 @@ export function DrillsBuilder({
       <Animated.View entering={FadeInDown.delay(100).duration(200)} style={styles.section}>
         <View style={styles.sectionHeader}>
           <User size={16} color={colors.textMuted} />
-          <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>Position</Text>
+          <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>{t('session.position')}</Text>
         </View>
         <View style={styles.optionsRow}>
           {POSITIONS.map((p) => (
@@ -250,7 +254,7 @@ export function DrillsBuilder({
       <Animated.View entering={FadeInDown.delay(150).duration(200)} style={styles.section}>
         <View style={styles.sectionHeader}>
           <MapPin size={16} color={colors.textMuted} />
-          <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>Distance</Text>
+          <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>{t('session.distance')}</Text>
         </View>
         <View style={styles.optionsRow}>
           {DISTANCES[drillType].map((d) => (
@@ -269,7 +273,7 @@ export function DrillsBuilder({
       <Animated.View entering={FadeInDown.delay(200).duration(200)} style={styles.section}>
         <View style={styles.sectionHeader}>
           <Target size={16} color={colors.textMuted} />
-          <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>Rounds</Text>
+          <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>{t('training.rounds')}</Text>
         </View>
         <View style={styles.optionsRow}>
           {ROUNDS[drillType].map((r) => (
@@ -282,15 +286,15 @@ export function DrillsBuilder({
       <Animated.View entering={FadeInDown.delay(250).duration(200)} style={styles.section}>
         <View style={styles.sectionHeader}>
           <Clock size={16} color={colors.textMuted} />
-          <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>Time Limit</Text>
+          <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>{t('session.timeLimit')}</Text>
         </View>
         <View style={styles.optionsRow}>
-          {TIME_OPTIONS.map((t) => (
+          {TIME_OPTIONS.map((timeOpt) => (
             <OptionChip
-              key={t.label}
-              label={t.label}
-              active={timeLimit === t.value}
-              onPress={() => setTimeLimit(t.value)}
+              key={timeOpt.label}
+              label={timeOpt.label}
+              active={timeLimit === timeOpt.value}
+              onPress={() => setTimeLimit(timeOpt.value)}
               colors={colors}
             />
           ))}
@@ -312,7 +316,7 @@ export function DrillsBuilder({
           activeOpacity={0.85}
         >
           <Check size={18} color={colors.background} strokeWidth={2.5} />
-          <Text style={[styles.addButtonText, { color: colors.background }]}>Add Drill</Text>
+          <Text style={[styles.addButtonText, { color: colors.background }]}>{t('training.addDrill')}</Text>
         </TouchableOpacity>
       </Animated.View>
 
@@ -321,7 +325,7 @@ export function DrillsBuilder({
         <Animated.View entering={FadeInDown.delay(400).duration(200)} style={styles.teamSection}>
           <View style={styles.divider}>
             <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
-            <Text style={[styles.dividerText, { color: colors.textMuted }]}>or select team drill</Text>
+            <Text style={[styles.dividerText, { color: colors.textMuted }]}>{t('training.orSelectTeamDrill')}</Text>
             <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
           </View>
 

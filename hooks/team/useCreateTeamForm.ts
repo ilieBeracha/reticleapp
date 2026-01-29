@@ -1,4 +1,6 @@
-import { SQUAD_TEMPLATES } from '@/helpers/team/squads';
+import type { TeamSpecialty } from '@/constants/teamSpecialties';
+import { useTeamStore } from '@/stores/teamStore';
+import { SQUAD_TEMPLATES } from '@/utils/team/squads';
 import {
   addSquad,
   isDuplicateSquadName,
@@ -7,25 +9,25 @@ import {
   normalizeTeamDescription,
   normalizeTeamName,
   removeSquad,
-} from '@/helpers/team/validation';
-import { useTeamStore } from '@/store/teamStore';
+} from '@/utils/team/validation';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { Alert, Keyboard } from 'react-native';
 
-/** Form step: basics, squads, success (weapon policy removed - weapons assigned directly) */
-type FormStep = 'basics' | 'squads' | 'success';
+/** Form step: basics, specialty, squads, success */
+type FormStep = 'basics' | 'specialty' | 'squads' | 'success';
 type CreatedTeamSummary = { id: string; name: string };
 
 /** Total number of form steps (excluding success) */
-const TOTAL_STEPS = 2;
+const TOTAL_STEPS = 3;
 
 export function useCreateTeamForm() {
   const { createTeam, setActiveTeam } = useTeamStore();
 
   const [teamName, setTeamName] = useState('');
   const [teamDescription, setTeamDescription] = useState('');
+  const [specialty, setSpecialty] = useState<TeamSpecialty | null>(null);
   const [squads, setSquads] = useState<string[]>([]);
   const [newSquadName, setNewSquadName] = useState('');
   const [showSquadSection, setShowSquadSection] = useState(false);
@@ -34,21 +36,15 @@ export function useCreateTeamForm() {
   const [submitting, setSubmitting] = useState(false);
 
   const trimmedTeamName = useMemo(() => normalizeTeamName(teamName), [teamName]);
-  
+
   /** Can proceed from step 1 (basics) to step 2 (squads) */
-  const canProceedToSquads = useMemo(
-    () => isTeamNamePresent(trimmedTeamName),
-    [trimmedTeamName]
-  );
-  
+  const canProceedToSquads = useMemo(() => isTeamNamePresent(trimmedTeamName), [trimmedTeamName]);
+
   /** Can submit form (on step 3) */
-  const canSubmit = useMemo(
-    () => isTeamNamePresent(trimmedTeamName) && !submitting,
-    [trimmedTeamName, submitting]
-  );
-  
+  const canSubmit = useMemo(() => isTeamNamePresent(trimmedTeamName) && !submitting, [trimmedTeamName, submitting]);
+
   /** Current step number (1-indexed for display) */
-  const currentStepNumber = formStep === 'basics' ? 1 : formStep === 'squads' ? 2 : 2;
+  const currentStepNumber = formStep === 'basics' ? 1 : formStep === 'specialty' ? 2 : formStep === 'squads' ? 3 : 3;
 
   const toggleSquadSection = useCallback(() => {
     setShowSquadSection((v) => !v);
@@ -57,7 +53,7 @@ export function useCreateTeamForm() {
   /** Go to next step */
   const goToNextStep = useCallback(() => {
     Keyboard.dismiss();
-    
+
     if (formStep === 'basics') {
       if (!canProceedToSquads) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
@@ -65,16 +61,21 @@ export function useCreateTeamForm() {
         return;
       }
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      setFormStep('specialty');
+    } else if (formStep === 'specialty') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       setFormStep('squads');
     }
-    // From squads, user clicks "Create Team" button directly (no policy step)
+    // From squads, user clicks "Create Team" button directly
   }, [formStep, canProceedToSquads]);
 
   /** Go to previous step */
   const goToPreviousStep = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    
+
     if (formStep === 'squads') {
+      setFormStep('specialty');
+    } else if (formStep === 'specialty') {
       setFormStep('basics');
     }
   }, [formStep]);
@@ -94,6 +95,7 @@ export function useCreateTeamForm() {
       const team = await createTeam({
         name: trimmedTeamName,
         description: normalizeTeamDescription(teamDescription) || undefined,
+        specialty: specialty || undefined,
         squads: squads.length > 0 ? squads : undefined,
       });
 
@@ -106,7 +108,7 @@ export function useCreateTeamForm() {
     } finally {
       setSubmitting(false);
     }
-  }, [trimmedTeamName, teamDescription, squads, createTeam]);
+  }, [trimmedTeamName, teamDescription, specialty, squads, createTeam]);
 
   const handleOpenTeam = useCallback(() => {
     if (!createdTeam) return;
@@ -153,6 +155,7 @@ export function useCreateTeamForm() {
     // State
     teamName,
     teamDescription,
+    specialty,
     squads,
     newSquadName,
     showSquadSection,
@@ -171,6 +174,7 @@ export function useCreateTeamForm() {
     // Setters
     setTeamName,
     setTeamDescription,
+    setSpecialty,
     setNewSquadName,
     setShowSquadSection,
 
@@ -186,12 +190,3 @@ export function useCreateTeamForm() {
     clearAllSquads,
   };
 }
-
-
-
-
-
-
-
-
-

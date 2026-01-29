@@ -1,5 +1,5 @@
 import type { TeamInvitation, TeamInvitationWithDetails, TeamRole } from '@/types/workspace';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/services/supabase';
 import { notifyInviteAccepted } from './notifications';
 
 /**

@@ -1,22 +1,24 @@
 import { useOpenWeather } from '@/hooks/useOpenWeather';
 import {
-  shouldSubmitForTraining,
-  submitTrainingData,
-  TrainingDataPayload,
-  uploadScannedTargetImage,
+    shouldSubmitForTraining,
+    submitTrainingData,
+    TrainingDataPayload,
+    uploadScannedTargetImage,
 } from '@/services/detectionService';
-import { addTargetWithPaperResult, endSession, PaperType } from '@/services/sessionService';
-import { useDetectionStore } from '@/store/detectionStore';
+import { addTargetWithPaperResult, endSession } from '@/services/session/mutations';
+import type { PaperType } from '@/types/session';
+import { useDetectionStore } from '@/stores/detectionStore';
 import { finiteShotsOrNull, INFINITE_SHOTS_SENTINEL } from '@/utils/drillShots';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Alert, StyleSheet, View } from 'react-native';
 import { CameraFlow } from './CameraFlow';
 import { ResultCard } from './ResultCard';
-import { COLORS, EditableDetection, Step, TargetType } from './types';
+import { COLORS, EditableDetection, Step, TargetType } from '@/types/targets';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // PAPER TARGET FLOW
@@ -32,6 +34,8 @@ interface PaperTargetFlowProps {
   lockDistance?: boolean;
   paperType?: PaperType; // grouping (dispersion) or achievement (hit %)
   autoFinishSession?: boolean;
+  /** For squad sessions: associates target with specific participant */
+  participantId?: string;
   onComplete?: () => void;
   onCancel?: () => void;
 }
@@ -43,9 +47,11 @@ export function PaperTargetFlow({
   lockDistance = false,
   paperType: propPaperType = 'grouping',
   autoFinishSession = false,
+  participantId,
   onComplete,
   onCancel,
 }: PaperTargetFlowProps) {
+  const { t } = useTranslation();
   // Camera
   const [permission, requestPermission] = useCameraPermissions();
   const cameraRef = useRef<CameraView>(null);
@@ -76,8 +82,8 @@ export function PaperTargetFlow({
       if (!permission?.granted) {
         const { granted } = await requestPermission();
         if (!granted) {
-          Alert.alert('Camera Permission', 'Camera access is required to scan paper targets.', [
-            { text: 'OK', onPress: handleClose },
+          Alert.alert(t('target.cameraPermissionTitle'), t('target.cameraPermissionMessage'), [
+            { text: t('common.ok'), onPress: handleClose },
           ]);
           return;
         }
@@ -131,10 +137,10 @@ export function PaperTargetFlow({
     } catch (err: any) {
       console.error('Capture failed:', err);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      setError(err.message || 'Failed to capture photo');
-      Alert.alert('Error', 'Failed to capture photo');
+      setError(err.message || t('target.failedToCapturePhoto'));
+      Alert.alert(t('common.error'), t('target.failedToCapturePhoto'));
     }
-  }, [setImage, setError]);
+  }, [setImage, setError, t]);
 
   const handleSubmitPhoto = useCallback(async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -154,12 +160,12 @@ export function PaperTargetFlow({
       setStep('results');
     } else {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      Alert.alert('Analysis Failed', 'Could not analyze the image. Please try again.', [
-        { text: 'Retake', onPress: () => setStep('camera') },
-        { text: 'Cancel', onPress: handleClose },
+      Alert.alert(t('target.analysisFailedTitle'), t('target.analysisFailedMessage'), [
+        { text: t('target.retake'), onPress: () => setStep('camera') },
+        { text: t('common.cancel'), onPress: handleClose },
       ]);
     }
-  }, [analyze, handleClose]);
+  }, [analyze, handleClose, t]);
 
   const handleRetake = useCallback(() => {
     setCapturedUri(null);
@@ -172,7 +178,7 @@ export function PaperTargetFlow({
   const savePaperTarget = useCallback(
     async (finalDetections: EditableDetection[], editedImageBase64?: string, actualShotsDeclared?: number | null) => {
       if (!sessionId) {
-        Alert.alert('Error', 'Session ID missing');
+        Alert.alert(t('common.error'), t('target.sessionIdMissing'));
         return;
       }
 
@@ -223,6 +229,7 @@ export function PaperTargetFlow({
         // - hits_total = detected holes (all detected are hits on paper)
         // - planned_shots = drill's max shots cap for tracking (null = infinite)
         // - actual_shots_declared = optional user input for accurate accuracy %
+        // - participant_id = for squad sessions, links to specific participant
         await addTargetWithPaperResult({
           session_id: sessionId,
           distance_m: distance,
@@ -230,6 +237,7 @@ export function PaperTargetFlow({
           planned_shots: finiteShotsOrNull(maxShots),
           notes: paperNotes || null,
           target_data: null,
+          participant_id: participantId, // For squad sessions
           paper_type: paperType,
           bullets_fired: detectionCount, // Scan determines actual shots
           hits_total: detectionCount, // All detected holes are hits
@@ -266,11 +274,11 @@ export function PaperTargetFlow({
       } catch (error: any) {
         console.error('Failed to add paper target:', error);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-        Alert.alert('Error', error.message || 'Failed to add target');
+        Alert.alert(t('common.error'), error.message || t('target.failedToAddTarget'));
         setSaving(false);
       }
     },
-    [sessionId, distance, maxShots, result, paperType, paperNotes, resetDetection, onComplete]
+    [sessionId, distance, maxShots, result, paperType, paperNotes, resetDetection, onComplete, t]
   );
 
   // Results view

@@ -5,7 +5,7 @@
  * Use these utilities instead of spreading string comparisons everywhere.
  */
 
-import type { DrillGoal } from '@/types/workspace';
+import type { DrillGoal } from '@/types/drillGoal';
 
 // Import and re-export constants from centralized location
 import { DRILL_GOAL } from '@/constants/drill';
@@ -39,6 +39,24 @@ export function isGroupingGoal(goal: DrillGoal | string | null | undefined): boo
  */
 export function isEngagementGoal(goal: DrillGoal | string | null | undefined): boolean {
   return goal === DRILL_GOAL.ENGAGEMENT;
+}
+
+// ============================================================================
+// SIMPLE TYPE GUARDS (from shared/types/drillGoal.types.ts)
+// ============================================================================
+
+/**
+ * Check if a drill goal is grouping
+ */
+export function isGrouping(goal: DrillGoal | null | undefined): boolean {
+  return goal === 'grouping';
+}
+
+/**
+ * Check if a drill goal is engagement
+ */
+export function isEngagement(goal: DrillGoal | null | undefined): boolean {
+  return goal === 'engagement';
 }
 
 // ============================================================================

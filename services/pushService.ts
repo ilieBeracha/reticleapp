@@ -1,11 +1,15 @@
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/services/supabase';
 
 export type PushNotificationType =
   | 'training_created'
   | 'training_started'
   | 'training_completed'
   | 'team_invite'
-  | 'member_joined';
+  | 'member_joined'
+  | 'squad_engagement_invite'
+  | 'squad_engagement_joined'
+  | 'squad_engagement_declined'
+  | 'squad_engagement_starting';
 
 interface SendPushOptions {
   type: PushNotificationType;
@@ -123,12 +127,7 @@ export async function notifyTeamTrainingCompleted(
 /**
  * Notify a user about a team invite
  */
-export async function notifyUserTeamInvite(
-  userId: string,
-  teamId: string,
-  teamName: string,
-  inviterName: string
-) {
+export async function notifyUserTeamInvite(userId: string, teamId: string, teamName: string, inviterName: string) {
   return sendPushNotification({
     type: 'team_invite',
     user_ids: [userId],
@@ -159,6 +158,104 @@ export async function notifyTeamMemberJoined(
     data: {
       screen: 'team',
       id: teamId,
+    },
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SQUAD ENGAGEMENTS
+//
+// Engagement is the atomic execution unit.
+// Squad logic MUST live here.
+// All notifications anchor on engagementId, not sessionId.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Notify invited participants about a squad engagement.
+ * Anchored on engagementId (NOT sessionId).
+ */
+export async function notifySquadEngagementInvites(
+  userIds: string[],
+  engagementId: string,
+  trainingId: string | null,
+  drillName: string,
+  commanderName: string,
+  teamName?: string
+) {
+  const bodyText = teamName
+    ? `${commanderName} invited you to join "${drillName}" with ${teamName}`
+    : `${commanderName} invited you to join "${drillName}"`;
+
+  return sendPushNotification({
+    type: 'squad_engagement_invite',
+    user_ids: userIds,
+    title: 'Squad Engagement Invite',
+    body: bodyText,
+    data: {
+      screen: 'squadLobby',
+      engagementId,
+      trainingId, // optional context
+    },
+  });
+}
+
+/**
+ * Notify commander that a participant joined.
+ * Anchored on engagementId (NOT sessionId).
+ */
+export async function notifySquadParticipantJoined(
+  commanderId: string,
+  engagementId: string,
+  participantName: string,
+  drillName: string
+) {
+  return sendPushNotification({
+    type: 'squad_engagement_joined',
+    user_ids: [commanderId],
+    title: 'Participant Joined',
+    body: `${participantName} joined the squad engagement "${drillName}"`,
+    data: {
+      screen: 'squadLobby',
+      engagementId,
+    },
+  });
+}
+
+/**
+ * Notify commander that a participant declined.
+ * Anchored on engagementId (NOT sessionId).
+ */
+export async function notifySquadParticipantDeclined(
+  commanderId: string,
+  engagementId: string,
+  participantName: string,
+  drillName: string
+) {
+  return sendPushNotification({
+    type: 'squad_engagement_declined',
+    user_ids: [commanderId],
+    title: 'Participant Declined',
+    body: `${participantName} declined the squad engagement "${drillName}"`,
+    data: {
+      screen: 'squadLobby',
+      engagementId,
+    },
+  });
+}
+
+/**
+ * Notify all joined participants that squad engagement is starting.
+ * Anchored on engagementId (NOT sessionId).
+ */
+export async function notifySquadEngagementStarting(userIds: string[], engagementId: string, drillName: string) {
+  return sendPushNotification({
+    type: 'squad_engagement_starting',
+    user_ids: userIds,
+    title: 'Squad Engagement Starting',
+    body: `"${drillName}" is starting now! Join your squad.`,
+    data: {
+      screen: 'engagementExecution',
+      engagementId,
     },
   });
 }

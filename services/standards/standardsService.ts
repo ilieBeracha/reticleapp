@@ -5,7 +5,7 @@
  * This is the data layer - no business logic here.
  */
 
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/services/supabase';
 
 // ============================================================================
 // TYPES

@@ -1,20 +1,22 @@
 import { LoadingScreen } from '@/components/shared/LoadingScreen';
 import { GluestackUIProvider } from '@/components/shared/ui/gluestack-ui-provider';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
+import { LanguageProvider } from '@/contexts/LanguageContext';
 import { ModalProvider } from '@/contexts/ModalContext';
 import { ThemeProvider, useTheme } from '@/contexts/ThemeContext';
+import i18n, { initI18n } from '@/services/i18n';
 import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
 import * as Sentry from '@sentry/react-native';
 import { useFonts } from 'expo-font';
 import { Slot } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { I18nextProvider } from 'react-i18next';
 import { LogBox, Platform } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import '../global.css';
-
 // Suppress non-critical warnings on Android
 // SF Symbols warning: Tab icons fall back to default on Android - proper icons should be added later
 // ExpoUI warning: Swift UI components are iOS-only, fallback components are used on Android
@@ -48,21 +50,41 @@ Sentry.init({
 SplashScreen.preventAutoHideAsync();
 
 export default Sentry.wrap(function RootLayout() {
-  const [loaded] = useFonts({
+  const [fontsLoaded] = useFonts({
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
   });
+  const [i18nReady, setI18nReady] = useState(false);
 
   useEffect(() => {
-    if (loaded) {
+    initI18n()
+      .then(() => setI18nReady(true))
+      .catch((error) => {
+        console.error('Failed to initialize i18n:', error);
+        setI18nReady(true); // Continue with fallback
+      });
+  }, []);
+
+  useEffect(() => {
+    if (fontsLoaded && i18nReady) {
       SplashScreen.hideAsync();
     }
-  }, [loaded]);
+  }, [fontsLoaded, i18nReady]);
+
+  // Wait for both fonts and i18n to be ready
+  if (!fontsLoaded || !i18nReady) {
+    return null;
+  }
 
   // ThemeProvider must wrap everything that uses useTheme/useColors
+  // I18nextProvider and LanguageProvider handle translations and RTL
   return (
-    <ThemeProvider>
-      <RootLayoutInner />
-    </ThemeProvider>
+    <I18nextProvider i18n={i18n}>
+      <ThemeProvider>
+        <LanguageProvider>
+          <RootLayoutInner />
+        </LanguageProvider>
+      </ThemeProvider>
+    </I18nextProvider>
   );
 });
 

@@ -1,15 +1,18 @@
 /**
  * TimelineStrip Component
  *
- * Horizontal 7-day timeline showing team-colored dots for upcoming trainings.
+ * Horizontal 7-day timeline showing training dots for upcoming trainings.
  * Tapping a day expands to show training details.
  */
 
+import { DirectionalChevron } from '@/components/shared/DirectionalChevron';
+import type { Colors } from '@/types/home';
 import type { TrainingWithDetails } from '@/types/workspace';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
-import { ChevronRight } from 'lucide-react-native';
+import { Calendar } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, {
   Easing,
@@ -21,7 +24,6 @@ import Animated, {
   withSpring,
   withTiming,
 } from 'react-native-reanimated';
-import type { Colors } from '../UnifiedHomePage.types';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // TYPES
@@ -44,54 +46,48 @@ interface DayData {
 // HELPERS
 // ═══════════════════════════════════════════════════════════════════════════
 
-const TEAM_COLORS = [
-  '#3B82F6', // blue
-  '#10B981', // green
-  '#F97316', // orange
-  '#EF4444', // red
-  '#EAB308', // yellow
-  '#8B5CF6', // purple
-  '#14B8A6', // teal
-  '#6366F1', // indigo
-  '#EC4899', // pink
+const getDayNames = (t: ReturnType<typeof useTranslation>['t']) => [
+  t('time.dayNames.sun'),
+  t('time.dayNames.mon'),
+  t('time.dayNames.tue'),
+  t('time.dayNames.wed'),
+  t('time.dayNames.thu'),
+  t('time.dayNames.fri'),
+  t('time.dayNames.sat'),
 ];
 
-function getTeamColor(teamId: string | undefined): string {
-  if (!teamId) return TEAM_COLORS[0];
-  let hash = 0;
-  for (let i = 0; i < teamId.length; i++) {
-    hash = (hash * 31 + teamId.charCodeAt(i)) | 0;
-  }
-  return TEAM_COLORS[Math.abs(hash) % TEAM_COLORS.length];
-}
-
-const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-
-function buildDayData(trainings: TrainingWithDetails[]): DayData[] {
+function buildDayData(trainings: TrainingWithDetails[], t: ReturnType<typeof useTranslation>['t']): DayData[] {
+  const DAY_NAMES = getDayNames(t);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
   const days: DayData[] = [];
 
-  for (let i = 0; i < 7; i++) {
+  // Show 2 days before, today, and 4 days after (7 total)
+  const DAYS_BEFORE = 0;
+  const TOTAL_DAYS = 7;
+
+  for (let i = -DAYS_BEFORE; i < TOTAL_DAYS - DAYS_BEFORE; i++) {
     const date = new Date(today);
     date.setDate(today.getDate() + i);
 
     const nextDay = new Date(date);
     nextDay.setDate(date.getDate() + 1);
 
+    const isToday = i === 0;
+
     const dayTrainings = trainings.filter((t) => {
-      if (t.status === 'ongoing' && i === 0) return true;
-      if (t.status === 'ongoing' && i !== 0) return false;
+      if (t.status === 'ongoing' && isToday) return true;
+      if (t.status === 'ongoing' && !isToday) return false;
       const trainingDate = new Date(t.scheduled_at || t.created_at);
       return trainingDate >= date && trainingDate < nextDay;
     });
 
     days.push({
       date,
-      dayName: i === 0 ? 'Today' : DAY_NAMES[date.getDay()],
+      dayName: isToday ? t('time.today') : DAY_NAMES[date.getDay()],
       dayNumber: date.getDate(),
-      isToday: i === 0,
+      isToday,
       trainings: dayTrainings,
     });
   }
@@ -99,8 +95,8 @@ function buildDayData(trainings: TrainingWithDetails[]): DayData[] {
   return days;
 }
 
-function formatTrainingTime(training: TrainingWithDetails): string {
-  if (training.status === 'ongoing') return 'LIVE';
+function formatTrainingTime(training: TrainingWithDetails, t: ReturnType<typeof useTranslation>['t']): string {
+  if (training.status === 'ongoing') return t('training.live');
   const dateString = training.scheduled_at;
   if (!dateString) return '';
   const date = new Date(dateString);
@@ -114,7 +110,7 @@ function formatTrainingTime(training: TrainingWithDetails): string {
 const MAX_DOTS = 3;
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
-function TeamDot({ color, isPulsing, size = 9 }: { color: string; isPulsing: boolean; size?: number }) {
+function TrainingDot({ isPulsing, color }: { isPulsing: boolean; color: string }) {
   const opacity = useSharedValue(1);
 
   useEffect(() => {
@@ -134,9 +130,7 @@ function TeamDot({ color, isPulsing, size = 9 }: { color: string; isPulsing: boo
     opacity: opacity.value,
   }));
 
-  return (
-    <Animated.View style={[{ width: size, height: size, borderRadius: size / 2, backgroundColor: color }, animStyle]} />
-  );
+  return <Animated.View style={[s.trainingDot, { backgroundColor: color }, animStyle]} />;
 }
 
 function DayColumn({
@@ -186,14 +180,7 @@ function DayColumn({
 
   return (
     <AnimatedTouchable
-      style={[
-        s.dayColumn,
-        isSelected && [
-          s.dayColumnSelected,
-          { backgroundColor: `${colors.primary}12`, borderColor: `${colors.primary}30` },
-        ],
-        animStyle,
-      ]}
+      style={[s.dayColumn, isSelected && { backgroundColor: `${colors.primary}08` }, animStyle]}
       onPress={handlePress}
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
@@ -230,14 +217,22 @@ function DayColumn({
         </Text>
       </View>
 
-      {/* Dot stack */}
+      {/* Training indicator */}
       <View style={s.dotStack}>
         {hasTrainings ? (
           <>
             {uniqueTeams.slice(0, MAX_DOTS).map((t) => (
-              <TeamDot key={t.id} color={getTeamColor(t.team?.id)} isPulsing={t.status === 'ongoing'} />
+              <TrainingDot
+                key={t.id}
+                isPulsing={t.status === 'ongoing'}
+                color={t.status === 'ongoing' ? colors.green : colors.textMuted}
+              />
             ))}
-            {overflow > 0 && <Text style={[s.overflowText, { color: colors.textMuted }]}>+{overflow}</Text>}
+            {overflow > 0 && (
+              <View style={[s.overflowBadge, { backgroundColor: `${colors.textMuted}15` }]}>
+                <Text style={[s.overflowText, { color: colors.textMuted }]}>+{overflow}</Text>
+              </View>
+            )}
           </>
         ) : (
           <View style={s.dotPlaceholder} />
@@ -248,9 +243,9 @@ function DayColumn({
 }
 
 function ExpandedTrainingItem({ training, colors }: { training: TrainingWithDetails; colors: Colors }) {
-  const teamColor = getTeamColor(training.team?.id);
+  const { t } = useTranslation();
   const isLive = training.status === 'ongoing';
-  const timeStr = formatTrainingTime(training);
+  const timeStr = formatTrainingTime(training, t);
 
   const handlePress = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -259,36 +254,34 @@ function ExpandedTrainingItem({ training, colors }: { training: TrainingWithDeta
 
   return (
     <TouchableOpacity
-      style={[s.expandedItem, { backgroundColor: `${teamColor}08` }]}
+      style={[s.expandedItem, { backgroundColor: colors.secondary }]}
       onPress={handlePress}
       activeOpacity={0.7}
     >
-      {/* Color bar */}
-      <View style={[s.expandedColorBar, { backgroundColor: teamColor }]} />
-
-      <View style={s.expandedContent}>
-        <View style={s.expandedInfo}>
-          <Text style={[s.expandedTitle, { color: colors.text }]} numberOfLines={1}>
-            {training.title}
+      <View style={[s.expandedIcon, { backgroundColor: `${colors.primary}10` }]}>
+        <Calendar size={16} color={colors.primary} />
+      </View>
+      <View style={s.expandedInfo}>
+        <Text style={[s.expandedTitle, { color: colors.text }]} numberOfLines={1}>
+          {training.title}
+        </Text>
+        {training.team?.name && (
+          <Text style={[s.expandedTeam, { color: colors.textMuted }]} numberOfLines={1}>
+            {training.team.name}
           </Text>
-          {training.team?.name && (
-            <Text style={[s.expandedTeam, { color: colors.textMuted }]} numberOfLines={1}>
-              {training.team.name}
-            </Text>
-          )}
-        </View>
+        )}
+      </View>
 
-        <View style={s.expandedRight}>
-          {isLive ? (
-            <View style={[s.liveBadge, { backgroundColor: `${colors.orange}20` }]}>
-              <View style={[s.liveBadgeDot, { backgroundColor: colors.orange }]} />
-              <Text style={[s.liveBadgeText, { color: colors.orange }]}>LIVE</Text>
-            </View>
-          ) : timeStr ? (
-            <Text style={[s.expandedTime, { color: colors.textMuted }]}>{timeStr}</Text>
-          ) : null}
-          <ChevronRight size={14} color={colors.textMuted} />
-        </View>
+      <View style={s.expandedRight}>
+        {isLive ? (
+          <View style={[s.liveBadge, { backgroundColor: `${colors.green}12` }]}>
+            <View style={[s.liveBadgeDot, { backgroundColor: colors.green }]} />
+            <Text style={[s.liveBadgeText, { color: colors.green }]}>{t('training.live')}</Text>
+          </View>
+        ) : timeStr ? (
+          <Text style={[s.expandedTime, { color: colors.textMuted }]}>{timeStr}</Text>
+        ) : null}
+        <DirectionalChevron size={14} color={colors.textMuted} />
       </View>
     </TouchableOpacity>
   );
@@ -299,14 +292,12 @@ function ExpandedTrainingItem({ training, colors }: { training: TrainingWithDeta
 // ═══════════════════════════════════════════════════════════════════════════
 
 export function TimelineStrip({ colors, trainings }: TimelineStripProps) {
-  const days = useMemo(() => buildDayData(trainings), [trainings]);
+  const { t } = useTranslation();
+  const days = useMemo(() => buildDayData(trainings, t), [trainings, t]);
 
   // Auto-expand today if there's a live training
-  const liveDayIndex = useMemo(
-    () => days.findIndex((d) => d.trainings.some((t) => t.status === 'ongoing')),
-    [days]
-  );
-  const [selectedDayIndex, setSelectedDayIndex] = useState<number | null>(liveDayIndex >= 0 ? liveDayIndex : null);
+  // const liveDayIndex = useMemo(() => days.findIndex((d) => d.trainings.some((t) => t.status === 'ongoing')), [days]);
+  const [selectedDayIndex, setSelectedDayIndex] = useState<number | null>(null);
 
   const handleDayPress = useCallback((index: number) => {
     setSelectedDayIndex((prev) => (prev === index ? null : index));
@@ -329,10 +320,10 @@ export function TimelineStrip({ colors, trainings }: TimelineStripProps) {
     >
       {/* Header */}
       <View style={s.header}>
-        <Text style={[s.headerTitle, { color: colors.textMuted }]}>SCHEDULE</Text>
+        <Text style={[s.headerTitle, { color: colors.textMuted }]}>{t('home.schedule')}</Text>
         <TouchableOpacity onPress={handleGoToTeam} activeOpacity={0.7} style={s.headerLink}>
-          <Text style={[s.headerLinkText, { color: colors.primary }]}>Team</Text>
-          <ChevronRight size={12} color={colors.primary} />
+          <Text style={[s.headerLinkText, { color: colors.primary }]}>{t('teams.team')}</Text>
+          <DirectionalChevron size={12} color={colors.primary} />
         </TouchableOpacity>
       </View>
 
@@ -379,8 +370,8 @@ const s = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 14,
-    paddingTop: 10,
-    paddingBottom: 4,
+    paddingTop: 12,
+    paddingBottom: 6,
   },
   headerTitle: {
     fontSize: 10,
@@ -400,8 +391,8 @@ const s = StyleSheet.create({
   // Day Row
   dayRow: {
     flexDirection: 'row',
-    paddingHorizontal: 8,
-    paddingVertical: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 6,
   },
   dayColumn: {
     flex: 1,
@@ -410,18 +401,15 @@ const s = StyleSheet.create({
     borderRadius: 10,
     gap: 4,
   },
-  dayColumnSelected: {
-    borderWidth: 1,
-  },
   dayName: {
-    fontSize: 11,
-    fontWeight: '600',
+    fontSize: 10,
+    fontWeight: '500',
     letterSpacing: -0.2,
   },
   dateCircle: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -436,11 +424,21 @@ const s = StyleSheet.create({
   dotStack: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 3,
+    gap: 4,
     minHeight: 10,
+  },
+  trainingDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
   },
   dotPlaceholder: {
     height: 10,
+  },
+  overflowBadge: {
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    borderRadius: 6,
   },
   overflowText: {
     fontSize: 9,
@@ -449,9 +447,9 @@ const s = StyleSheet.create({
 
   // Expanded Panel
   expandedPanel: {
-    borderTopWidth: 1,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     gap: 6,
   },
   expandedItem: {
@@ -459,21 +457,20 @@ const s = StyleSheet.create({
     alignItems: 'center',
     borderRadius: 10,
     overflow: 'hidden',
-  },
-  expandedColorBar: {
-    width: 4,
-    alignSelf: 'stretch',
-  },
-  expandedContent: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
     paddingVertical: 10,
     paddingHorizontal: 12,
-    gap: 8,
+    gap: 10,
+  },
+  expandedIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   expandedInfo: {
     flex: 1,
+    alignItems: 'flex-start',
     gap: 2,
   },
   expandedTitle: {
@@ -508,7 +505,7 @@ const s = StyleSheet.create({
   },
   liveBadgeText: {
     fontSize: 9,
-    fontWeight: '800',
+    fontWeight: '700',
     letterSpacing: 0.3,
   },
 });

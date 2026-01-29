@@ -11,6 +11,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { formatDistanceToNow } from 'date-fns';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -27,14 +28,14 @@ import Animated, { FadeIn, FadeInDown, Layout } from 'react-native-reanimated';
 // ═══════════════════════════════════════════════════════════════════════════
 // TYPE CONFIG
 // ═══════════════════════════════════════════════════════════════════════════
-const TYPE_CONFIG: Record<string, { icon: string; color: string; label: string }> = {
-  training: { icon: 'fitness', color: '#22C55E', label: 'Training' },
-  session: { icon: 'timer', color: '#3B82F6', label: 'Session' },
-  team: { icon: 'people', color: '#8B5CF6', label: 'Team' },
-  reminder: { icon: 'alarm', color: '#F59E0B', label: 'Reminder' },
-  achievement: { icon: 'trophy', color: '#EF4444', label: 'Achievement' },
-  default: { icon: 'notifications', color: '#71717A', label: 'Update' },
-};
+const getTypeConfig = (t: ReturnType<typeof useTranslation>['t']) => ({
+  training: { icon: 'fitness', color: '#22C55E', label: t('notifications.types.training') },
+  session: { icon: 'timer', color: '#3B82F6', label: t('notifications.types.session') },
+  team: { icon: 'people', color: '#8B5CF6', label: t('notifications.types.team') },
+  reminder: { icon: 'alarm', color: '#F59E0B', label: t('notifications.types.reminder') },
+  achievement: { icon: 'trophy', color: '#EF4444', label: t('notifications.types.achievement') },
+  default: { icon: 'notifications', color: '#71717A', label: t('notifications.types.update') },
+});
 
 /**
  * NOTIFICATIONS CENTER
@@ -42,9 +43,11 @@ const TYPE_CONFIG: Record<string, { icon: string; color: string; label: string }
  */
 export default function NotificationsSheet() {
   const colors = useColors();
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [notifications, setNotifications] = useState<NotificationHistoryItem[]>([]);
+  const TYPE_CONFIG = getTypeConfig(t);
 
   const loadNotifications = useCallback(async () => {
     try {
@@ -81,10 +84,10 @@ export default function NotificationsSheet() {
   const handleClearAll = useCallback(() => {
     if (notifications.length === 0) return;
 
-    Alert.alert('Clear All Notifications', 'This will delete your entire notification history.', [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('notifications.clearAllTitle'), t('notifications.clearAllMessage'), [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'Clear All',
+        text: t('notifications.clearAll'),
         style: 'destructive',
         onPress: async () => {
           try {
@@ -97,7 +100,7 @@ export default function NotificationsSheet() {
         },
       },
     ]);
-  }, [notifications.length]);
+  }, [notifications.length, t]);
 
   const handleMarkAllRead = useCallback(async () => {
     await markAllNotificationsRead();
@@ -172,10 +175,10 @@ export default function NotificationsSheet() {
       {/* Header Row */}
       <Animated.View entering={FadeInDown.delay(50)} style={styles.headerRow}>
         <View>
-          <Text style={[styles.title, { color: colors.text }]}>Notifications</Text>
+          <Text style={[styles.title, { color: colors.text }]}>{t('notifications.title')}</Text>
           {notifications.length > 0 && (
             <Text style={[styles.subtitle, { color: colors.textMuted }]}>
-              {unreadCount > 0 ? `${unreadCount} unread` : 'All caught up'}
+              {unreadCount > 0 ? `${unreadCount}${t('notifications.unread')}` : t('notifications.allCaughtUp')}
             </Text>
           )}
         </View>
@@ -265,9 +268,9 @@ export default function NotificationsSheet() {
           <View style={[styles.emptyIcon, { backgroundColor: colors.secondary }]}>
             <Ionicons name="notifications-outline" size={36} color={colors.textMuted} />
           </View>
-          <Text style={[styles.emptyTitle, { color: colors.text }]}>No notifications</Text>
+          <Text style={[styles.emptyTitle, { color: colors.text }]}>{t('notifications.noNotifications')}</Text>
           <Text style={[styles.emptySubtitle, { color: colors.textMuted }]}>
-            You'll see updates about trainings, weapon assignments, and team activity here.
+            {t('notifications.notificationsHint')}
           </Text>
         </Animated.View>
       )}

@@ -22,6 +22,7 @@ import {
   TrendingUp,
   Minus,
 } from 'lucide-react-native';
+import { useTranslation } from 'react-i18next';
 import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
@@ -34,8 +35,8 @@ import {
   View,
 } from 'react-native';
 
-import type { ContextProfile, ContextQuadrant } from '../insights.types';
-import { useAIExplanations, type ExplanationParams } from '../AIExplanationProvider';
+import type { ContextProfile, ContextQuadrant } from '@/types/insights';
+import { useAIExplanations, type ExplanationParams } from '@/hooks/insights/useAIExplanations';
 import { AIExplanationBlock } from '../AIExplanationBlock';
 import { ContextQuadrantGlyph } from './ContextQuadrantGlyph';
 
@@ -57,15 +58,15 @@ interface ContextProfileRowProps {
 // QUADRANT LABELS
 // ============================================================================
 
-const QUADRANT_LABELS: Record<ContextQuadrant, string> = {
-  strong_both: 'Accurate & tight groups',
-  hits_loose: 'Hitting, but groups are loose',
-  tight_misses: 'Tight groups, but missing',
-  struggling: 'Needs work on both',
-  engagement_only: 'Accuracy data only',
-  grouping_only: 'Grouping data only',
-  insufficient_data: 'Not enough data yet',
-};
+const getQuadrantLabels = (t: ReturnType<typeof useTranslation>['t']): Record<ContextQuadrant, string> => ({
+  strong_both: t('insights.context.quadrants.strongBoth'),
+  hits_loose: t('insights.context.quadrants.hitsLoose'),
+  tight_misses: t('insights.context.quadrants.tightMisses'),
+  struggling: t('insights.context.quadrants.struggling'),
+  engagement_only: t('insights.context.quadrants.engagementOnly'),
+  grouping_only: t('insights.context.quadrants.groupingOnly'),
+  insufficient_data: t('insights.context.quadrants.insufficientData'),
+});
 
 const QUADRANT_LABEL_COLOR: Record<ContextQuadrant, 'green' | 'yellow' | 'red' | 'muted'> = {
   strong_both: 'green',
@@ -81,8 +82,8 @@ const QUADRANT_LABEL_COLOR: Record<ContextQuadrant, 'green' | 'yellow' | 'red' |
 // HELPERS
 // ============================================================================
 
-function formatPosition(position: string | null): string {
-  if (!position) return 'General';
+function formatPosition(position: string | null, t: ReturnType<typeof useTranslation>['t']): string {
+  if (!position) return t('insights.context.general');
   return position.charAt(0).toUpperCase() + position.slice(1);
 }
 
@@ -176,6 +177,7 @@ interface BaselineCardProps {
 }
 
 function BaselineCard({ label, current, baseline, unit, isGrouping = false, colors }: BaselineCardProps) {
+  const { t } = useTranslation();
   const delta = current - baseline;
   const isAbove = delta > 0;
   const isBelow = delta < 0;
@@ -194,10 +196,10 @@ function BaselineCard({ label, current, baseline, unit, isGrouping = false, colo
 
   const formatValue = (val: number) => isGrouping ? val.toFixed(1) : Math.round(val).toString();
   const directionText = isNeutral
-    ? 'at baseline'
+    ? t('insights.context.atBaseline')
     : isAbove
-    ? 'above baseline'
-    : 'below baseline';
+    ? t('insights.context.aboveBaseline')
+    : t('insights.context.belowBaseline');
 
   return (
     <View style={[styles.baselineCard, { backgroundColor: `${colors.textMuted}06` }]}>
@@ -235,6 +237,7 @@ interface ExpandedDetailsProps {
 }
 
 function ExpandedDetails({ profile, onViewEvidence, colors }: ExpandedDetailsProps) {
+  const { t } = useTranslation();
   const { getExplanation, isLoading, getError, requestExplanation } = useAIExplanations();
 
   const insightId = `context-${profile.keyString}`;
@@ -290,12 +293,12 @@ function ExpandedDetails({ profile, onViewEvidence, colors }: ExpandedDetailsPro
       {/* Baseline comparison */}
       <View style={styles.baselineSection}>
         <Text style={[styles.baselineSectionTitle, { color: colors.textMuted }]}>
-          COMPARED TO BASELINE
+          {t('insights.context.comparedToBaseline')}
         </Text>
         <View style={styles.baselineGrid}>
           {profile.engagement && (
             <BaselineCard
-              label="Accuracy"
+              label={t('session.accuracy')}
               current={profile.engagement.accuracy}
               baseline={profile.engagement.baselineAccuracy}
               unit="%"
@@ -304,7 +307,7 @@ function ExpandedDetails({ profile, onViewEvidence, colors }: ExpandedDetailsPro
           )}
           {profile.grouping && (
             <BaselineCard
-              label="Best Group"
+              label={t('session.bestGroup')}
               current={profile.grouping.medianBestGroup}
               baseline={profile.grouping.baselineMedianBestGroup}
               unit="cm"
@@ -327,7 +330,7 @@ function ExpandedDetails({ profile, onViewEvidence, colors }: ExpandedDetailsPro
             activeOpacity={0.8}
           >
             <Eye size={14} color="#fff" strokeWidth={2} />
-            <Text style={styles.evidenceButtonText}>Evidence</Text>
+            <Text style={styles.evidenceButtonText}>{t('insights.evidence.title')}</Text>
           </TouchableOpacity>
         )}
         <TouchableOpacity
@@ -341,7 +344,7 @@ function ExpandedDetails({ profile, onViewEvidence, colors }: ExpandedDetailsPro
           ) : (
             <>
               <HelpCircle size={14} color={colors.textMuted} strokeWidth={2} />
-              <Text style={[styles.whyButtonText, { color: colors.textMuted }]}>Why?</Text>
+              <Text style={[styles.whyButtonText, { color: colors.textMuted }]}>{t('insights.why')}</Text>
             </>
           )}
         </TouchableOpacity>
@@ -372,8 +375,11 @@ export function ContextProfileRow({
   onViewEvidence,
   initialExpanded = false,
 }: ContextProfileRowProps) {
+  const { t } = useTranslation();
   const colors = useColors();
   const [isExpanded, setIsExpanded] = useState(initialExpanded);
+  
+  const QUADRANT_LABELS = getQuadrantLabels(t);
 
   const handleToggle = useCallback(() => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -381,7 +387,7 @@ export function ContextProfileRow({
     setIsExpanded((prev) => !prev);
   }, []);
 
-  const position = formatPosition(profile.key.position);
+  const position = formatPosition(profile.key.position, t);
   const distance = formatDistanceBucket(profile.key.distanceBucket);
   const weapon = formatWeaponCategory(profile.key.weaponCategory);
   
@@ -431,7 +437,7 @@ export function ContextProfileRow({
             )}
             {profile.isPreliminary && (
               <View style={[styles.badge, { backgroundColor: `${colors.textMuted}15` }]}>
-                <Text style={[styles.badgeText, { color: colors.textMuted }]}>Est.</Text>
+                <Text style={[styles.badgeText, { color: colors.textMuted }]}>{t('insights.context.estimated')}</Text>
               </View>
             )}
           </View>
@@ -454,7 +460,7 @@ export function ContextProfileRow({
           <View style={styles.metricsStack}>
             {profile.engagement && (
               <CompactMetric
-                label="Acc"
+                label={t('insights.context.acc')}
                 value={profile.engagement.accuracy}
                 delta={profile.engagement.delta}
                 unit="%"
@@ -463,7 +469,7 @@ export function ContextProfileRow({
             )}
             {profile.grouping && (
               <CompactMetric
-                label="Grp"
+                label={t('insights.context.grp')}
                 value={profile.grouping.medianBestGroup}
                 delta={profile.grouping.delta}
                 unit="cm"

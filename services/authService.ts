@@ -9,8 +9,8 @@
  * - Consistent error handling using custom error classes
  */
 
-import { supabase } from '@/lib/supabase';
-import { AuthenticationError } from '@/lib/errors';
+import { supabase } from '@/services/supabase';
+import { AuthenticationError } from '@/utils/errors';
 import type { User } from '@supabase/supabase-js';
 
 // ============================================================================
@@ -160,6 +160,46 @@ export async function verifyOtp(
     email: email.trim(),
     token: token.trim(),
     type,
+  });
+
+  if (error) {
+    throw new AuthenticationError(error.message, error);
+  }
+}
+
+// ============================================================================
+// PASSWORD AUTHENTICATION
+// ============================================================================
+
+/**
+ * Sign in with email and password.
+ *
+ * @param email - The user's email address
+ * @param password - The user's password
+ * @throws {AuthenticationError} If sign in fails (invalid credentials)
+ */
+export async function signInWithPassword(email: string, password: string): Promise<void> {
+  const { error } = await supabase.auth.signInWithPassword({
+    email: email.trim(),
+    password,
+  });
+
+  if (error) {
+    throw new AuthenticationError(error.message, error);
+  }
+}
+
+/**
+ * Sign up with email and password.
+ *
+ * @param email - The user's email address
+ * @param password - The user's password
+ * @throws {AuthenticationError} If sign up fails
+ */
+export async function signUpWithPassword(email: string, password: string): Promise<void> {
+  const { error } = await supabase.auth.signUp({
+    email: email.trim(),
+    password,
   });
 
   if (error) {

@@ -1,4 +1,4 @@
-import type { SessionDrillConfig, SessionWeatherData, SessionWithDetails } from './types';
+import type { SessionDrillConfig, SessionWeatherData, SessionWithDetails } from '@/types/session';
 
 export function mapSession(row: any): SessionWithDetails {
   if (!row) {
@@ -15,23 +15,27 @@ export function mapSession(row: any): SessionWithDetails {
   const userWeapon = row.user_weapons ?? {};
   const customConfig = row.custom_drill_config;
 
-  // Build drill config from training_drills, drill_templates, drills, OR custom_drill_config
+  // ═══════════════════════════════════════════════════════════════════════════
+  // DRILL CONFIG: Source of truth is FK join (training_drills > drill_templates)
+  // custom_drill_config is DEPRECATED - only used for solo quick practice
+  // ═══════════════════════════════════════════════════════════════════════════
   let drillConfig: SessionDrillConfig | null = null;
 
-  // Priority: training_drills > drills (via drill_id) > drill_templates > custom_drill_config
-  // training_drills contains INSTANCE config (distance, shots, time)
-  // drills contains STATIC config (name, goal, scoring rules) - merged if drill_id is set
+  // Priority: training_drills > drill_templates > linkedDrill > custom_drill_config
   const drillSource = drills.id ? drills : drillTemplate.id ? drillTemplate : linkedDrill.id ? linkedDrill : null;
 
   if (drillSource) {
+    // Commander's rules come from the FK-joined drill
     drillConfig = {
       id: drillSource.id,
       name: drillSource.name,
       drill_goal: drillSource.drill_goal ?? 'engagement',
       target_type: drillSource.target_type,
-      input_method: drillSource.input_method ?? null, // Commander's choice
-      distance_m: drillSource.distance_m,
-      rounds_per_shooter: drillSource.rounds_per_shooter,
+      input_method: drillSource.input_method ?? null,
+      // Commander's constraints (NULL means soldier chooses)
+      distance_m: drillSource.distance_m ?? null,
+      distance_category: drillSource.distance_category ?? null,
+      rounds_per_shooter: drillSource.rounds_per_shooter ?? null,
       time_limit_seconds: drillSource.time_limit_seconds ?? null,
       par_time_seconds: drillSource.par_time_seconds ?? null,
       scoring_mode: drillSource.scoring_mode ?? null,
@@ -53,19 +57,20 @@ export function mapSession(row: any): SessionWithDetails {
       category: drillSource.category ?? null,
       instructions: drillSource.instructions ?? null,
       safety_notes: drillSource.safety_notes ?? null,
-      // Include custom detection sensitivity if overridden by user
       detection_sensitivity: customConfig?.detection_sensitivity ?? null,
+      execution_policy: drillSource.execution_policy ?? null,
     };
   } else if (customConfig) {
-    // Use custom drill config (inline, no template)
+    // DEPRECATED: Solo quick practice only (no FK drill reference)
     drillConfig = {
       id: 'custom',
       name: customConfig.name ?? 'Quick Practice',
       drill_goal: customConfig.drill_goal ?? 'grouping',
       target_type: customConfig.target_type ?? 'paper',
-      input_method: customConfig.input_method ?? null, // User's choice
-      distance_m: customConfig.distance_m ?? 25,
-      rounds_per_shooter: customConfig.rounds_per_shooter ?? 5,
+      input_method: customConfig.input_method ?? null,
+      distance_m: customConfig.distance_m ?? null,
+      distance_category: customConfig.distance_category ?? null,
+      rounds_per_shooter: customConfig.rounds_per_shooter ?? null,
       time_limit_seconds: customConfig.time_limit_seconds ?? null,
       par_time_seconds: null,
       scoring_mode: null,
@@ -88,11 +93,39 @@ export function mapSession(row: any): SessionWithDetails {
       instructions: null,
       safety_notes: null,
       detection_sensitivity: customConfig.detection_sensitivity ?? null,
+      execution_policy: customConfig.execution_policy ?? null,
     };
   }
 
   // Determine drill name: prefer training_drills > drill_templates > custom
   const drillName = drills.name ?? drillTemplate.name ?? customConfig?.name ?? null;
+
+  // Map engagement if present (for squad/group sessions)
+  // Note: engagement is a one-to-many relation, so it comes as an array from Supabase
+  const engagementData = row.engagement;
+  const rawEngagement = Array.isArray(engagementData) ? engagementData[0] : engagementData;
+
+  // Map engagement with participants
+  const engagement = rawEngagement
+    ? {
+        ...rawEngagement,
+        engagement_participants:
+          rawEngagement.engagement_participants?.map((p: any) => ({
+            id: p.id,
+            engagement_id: rawEngagement.id,
+            user_id: p.user_id,
+            state: p.state,
+            role: p.role,
+            shots_fired: p.shots_fired ?? null,
+            hits: p.hits ?? null,
+            joined_at: p.joined_at ?? null,
+            created_at: p.created_at,
+            // Note: user_full_name needs to be fetched separately (no FK relation to profiles)
+            user_full_name: null,
+            user_avatar_url: null,
+          })) ?? [],
+      }
+    : null;
 
   return {
     id: row.id,
@@ -116,8 +149,11 @@ export function mapSession(row: any): SessionWithDetails {
     ended_at: row.ended_at ?? null,
     created_at: row.created_at,
     updated_at: row.updated_at ?? row.created_at,
-    weather: row.weather as SessionWeatherData | null ?? null,
+    weather: (row.weather as SessionWeatherData | null) ?? null,
+    engagement: engagement ?? null,
+    // Soldier choices (when commander allows flexibility)
+    soldier_distance_m: row.soldier_distance_m ?? null,
+    soldier_bullets: row.soldier_bullets ?? null,
+    soldier_position: row.soldier_position ?? null,
   };
 }
-
-

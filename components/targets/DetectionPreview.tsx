@@ -2,7 +2,7 @@ import type { AnalyzeDocumentResponse, AnalyzeResponse } from '@/types/api';
 import React, { useMemo } from 'react';
 import { Image, StyleSheet, View } from 'react-native';
 import Svg, { Circle, G, Line } from 'react-native-svg';
-import { CANVAS_SIZE, COLORS, EditableDetection, MARKER_RADIUS } from './types';
+import { CANVAS_SIZE, COLORS, EditableDetection, MARKER_RADIUS } from '@/types/targets';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // DETECTION PREVIEW

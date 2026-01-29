@@ -8,7 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { styles } from '../UnifiedHomePage.styles';
-import type { RecentActivitySectionProps } from '../UnifiedHomePage.types';
+import type { RecentActivitySectionProps } from '@/types/home';
 import { RecentSessionRow } from './RecentSessionRow';
 
 export function RecentActivitySection({ sessions, colors, onSessionPress }: RecentActivitySectionProps) {
@@ -56,7 +56,7 @@ const localStyles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  emptyContent: { flex: 1, gap: 2 },
+  emptyContent: { gap: 2 },
   emptyTitle: { fontSize: 13, fontWeight: '600' },
   emptyText: { fontSize: 11 },
 });

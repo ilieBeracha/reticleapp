@@ -18,9 +18,9 @@ const getAndroidPackage = () => {
 };
 
 const getScheme = () => {
-  if (IS_DEV) return 'retic-dev';
-  if (IS_PREVIEW) return 'retic-preview';
-  return 'retic';
+  if (IS_DEV) return 'retic';
+  if (IS_PREVIEW) return 'retic';
+  return 'reticle';
 };
 
 const getSlug = () => {
@@ -53,7 +53,6 @@ export default ({ config }) => {
       },
     },
     android: {
-      versionCode: 5,
       adaptiveIcon: {
         backgroundColor: '#E6F4FE',
         foregroundImage: './assets/images/ios.png',
@@ -71,10 +70,12 @@ export default ({ config }) => {
       ],
     },
     plugins: [
+      './plugins/strip-bitcode',
       './plugins/withGarminUrlHandler',
       'expo-build-properties',
       'expo-secure-store',
       'expo-web-browser',
+      'expo-localization',
       [
         'expo-local-authentication',
         {

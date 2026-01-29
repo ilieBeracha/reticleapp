@@ -5,14 +5,17 @@
  * Features subtle animations and press feedback.
  */
 
-import { Calendar, ChevronRight, Users } from 'lucide-react-native';
+import { DirectionalChevron } from '@/components/shared/DirectionalChevron';
+import { Calendar, Users } from 'lucide-react-native';
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
-import type { TeamTrainingCardProps } from '../UnifiedHomePage.types';
+import type { TeamTrainingCardProps } from '@/types/home';
 
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
 export function TeamTrainingCard({ training, colors, onPress }: TeamTrainingCardProps) {
+  const { t } = useTranslation();
   const isLive = training.status === 'ongoing';
   const drillCount = training.drill_count || 0;
   const scale = useSharedValue(1);
@@ -46,7 +49,7 @@ export function TeamTrainingCard({ training, colors, onPress }: TeamTrainingCard
           {isLive && (
             <View style={s.liveBadge}>
               <View style={s.liveDot} />
-              <Text style={s.liveText}>LIVE</Text>
+              <Text style={s.liveText}>{t('training.live')}</Text>
             </View>
           )}
           <Text style={[s.title, { color: colors.text }]} numberOfLines={1}>
@@ -54,19 +57,21 @@ export function TeamTrainingCard({ training, colors, onPress }: TeamTrainingCard
           </Text>
         </View>
         <View style={s.meta}>
-          <Text style={[s.teamName, { color: colors.textMuted }]}>{training.team?.name || 'Team Training'}</Text>
+          <Text style={[s.teamName, { color: colors.textMuted }]}>
+            {training.team?.name || t('training.teamTraining')}
+          </Text>
           {drillCount > 0 && (
             <>
               <View style={[s.dot, { backgroundColor: colors.textMuted }]} />
               <Text style={[s.drillCount, { color: colors.textMuted }]}>
-                {drillCount} drill{drillCount !== 1 ? 's' : ''}
+                {t('training.drillsCount', { count: drillCount })}
               </Text>
             </>
           )}
         </View>
       </View>
 
-      <ChevronRight size={18} color={colors.textMuted} style={{ opacity: 0.6 }} />
+      <DirectionalChevron size={18} color={colors.textMuted} style={{ opacity: 0.6 }} />
     </AnimatedTouchable>
   );
 }

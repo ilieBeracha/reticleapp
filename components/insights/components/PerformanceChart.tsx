@@ -5,6 +5,7 @@
  */
 
 import { useColors } from '@/hooks/ui/useColors';
+import { useTranslation } from 'react-i18next';
 import { useMemo } from 'react';
 import { Dimensions, StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle, Defs, G, Line, LinearGradient, Path, Stop, Text as SvgText } from 'react-native-svg';
@@ -90,6 +91,7 @@ function generateAreaPath(
 const screenWidth = Dimensions.get('window').width;
 
 export function PerformanceChart({ data, height = 180 }: PerformanceChartProps) {
+  const { t } = useTranslation();
   const colors = useColors();
   // Parent ScrollView paddingHorizontal: 14, container padding: 14
   // Total: 14 + 14 = 28px each side = 56px total
@@ -129,7 +131,7 @@ export function PerformanceChart({ data, height = 180 }: PerformanceChartProps) 
     return (
       <View style={[styles.container, { backgroundColor: colors.card }]}>
         <Text style={[styles.noData, { color: colors.textMuted }]}>
-          Need more sessions for chart
+          {t('insights.charts.needMoreSessions')}
         </Text>
       </View>
     );
@@ -141,13 +143,13 @@ export function PerformanceChart({ data, height = 180 }: PerformanceChartProps) 
       <View style={styles.legend}>
         <View style={styles.legendItem}>
           <View style={[styles.legendDot, { backgroundColor: colors.primary }]} />
-          <Text style={[styles.legendLabel, { color: colors.textMuted }]}>Accuracy</Text>
+          <Text style={[styles.legendLabel, { color: colors.textMuted }]}>{t('session.accuracy')}</Text>
           <Text style={[styles.legendValue, { color: colors.text }]}>{currentAccuracy.toFixed(0)}%</Text>
         </View>
         {groupingValues.length > 0 && (
           <View style={styles.legendItem}>
             <View style={[styles.legendDot, { backgroundColor: colors.orange || '#F59E0B' }]} />
-            <Text style={[styles.legendLabel, { color: colors.textMuted }]}>Grouping</Text>
+            <Text style={[styles.legendLabel, { color: colors.textMuted }]}>{t('session.grouping')}</Text>
             <Text style={[styles.legendValue, { color: colors.text }]}>{currentGrouping.toFixed(1)}cm</Text>
           </View>
         )}

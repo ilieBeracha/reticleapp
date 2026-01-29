@@ -13,7 +13,7 @@ import {
   getTeamStandards,
   type StandardModifier,
   type TeamStandard,
-} from '@/services/standards';
+} from '@/services/standards/standardsService';
 import * as Haptics from 'expo-haptics';
 import {
   Clock,

@@ -11,7 +11,7 @@ import type {
     FetchWeatherResponse,
     OpenWeatherConfig,
     OpenWeatherResponse,
-} from './types';
+} from '@/types/weather';
 
 // ============================================================================
 // CONSTANTS

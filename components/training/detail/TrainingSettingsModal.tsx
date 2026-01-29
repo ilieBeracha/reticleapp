@@ -7,6 +7,7 @@ import { updateTraining } from '@/services/trainingService';
 import * as Haptics from 'expo-haptics';
 import { Timer, XCircle } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
   Alert,
@@ -19,9 +20,10 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import type { TrainingSettingsModalProps } from './types';
+import type { TrainingSettingsModalProps } from '@/types/trainingDetail';
 
 export function TrainingSettingsModal({ visible, onClose, training, onUpdate, colors }: TrainingSettingsModalProps) {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const [saving, setSaving] = useState(false);
   const [autoCloseEnabled, setAutoCloseEnabled] = useState(!!training?.auto_close_at);
@@ -65,7 +67,7 @@ export function TrainingSettingsModal({ visible, onClose, training, onUpdate, co
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       onClose();
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to update settings');
+      Alert.alert(t('common.error'), error.message || t('training.failedUpdateSettings'));
     } finally {
       setSaving(false);
     }
@@ -75,7 +77,7 @@ export function TrainingSettingsModal({ visible, onClose, training, onUpdate, co
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <View style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top }]}>
         <View style={styles.header}>
-          <Text style={[styles.title, { color: colors.text }]}>Settings</Text>
+          <Text style={[styles.title, { color: colors.text }]}>{t('navigation.settings')}</Text>
           <TouchableOpacity onPress={onClose}>
             <XCircle size={24} color={colors.textMuted} />
           </TouchableOpacity>
@@ -87,8 +89,8 @@ export function TrainingSettingsModal({ visible, onClose, training, onUpdate, co
               <View style={styles.settingInfo}>
                 <Timer size={20} color={colors.text} />
                 <View style={styles.settingTextWrap}>
-                  <Text style={[styles.settingTitle, { color: colors.text }]}>Auto-close</Text>
-                  <Text style={[styles.settingDesc, { color: colors.textMuted }]}>Automatically finish training</Text>
+                  <Text style={[styles.settingTitle, { color: colors.text }]}>{t('training.autoClose')}</Text>
+                  <Text style={[styles.settingDesc, { color: colors.textMuted }]}>{t('training.autoCloseDescription')}</Text>
                 </View>
               </View>
               <TouchableOpacity
@@ -109,7 +111,7 @@ export function TrainingSettingsModal({ visible, onClose, training, onUpdate, co
 
             {autoCloseEnabled && (
               <View style={styles.timeInputRow}>
-                <Text style={[styles.timeInputLabel, { color: colors.textMuted }]}>Close in:</Text>
+                <Text style={[styles.timeInputLabel, { color: colors.textMuted }]}>{t('training.closeIn')}</Text>
                 <View style={styles.timeInputs}>
                   <View style={[styles.timeInputWrap, { backgroundColor: colors.secondary }]}>
                     <TextInput
@@ -146,7 +148,7 @@ export function TrainingSettingsModal({ visible, onClose, training, onUpdate, co
             {saving ? (
               <ActivityIndicator color={colors.background} />
             ) : (
-              <Text style={[styles.saveBtnText, { color: colors.background }]}>Save Changes</Text>
+              <Text style={[styles.saveBtnText, { color: colors.background }]}>{t('common.save')}</Text>
             )}
           </TouchableOpacity>
         </View>

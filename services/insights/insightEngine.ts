@@ -11,7 +11,7 @@ import type {
   InsightGenerationInput,
   SessionFeatures,
   UserBaseline,
-} from './types';
+} from '@/types/insights.pipeline';
 
 // ============================================================================
 // UTILITY FUNCTIONS

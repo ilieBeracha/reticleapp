@@ -2,8 +2,9 @@ import { useColors } from '@/hooks/ui/useColors';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { DISTANCE_QUICK_PICKS } from './types';
+import { DISTANCE_QUICK_PICKS } from '@/types/targets';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // DISTANCE INPUT
@@ -22,12 +23,13 @@ export const DistanceInput = React.memo(function DistanceInput({
   disabled = false,
 }: DistanceInputProps) {
   const colors = useColors();
+  const { t } = useTranslation();
 
   return (
     <View style={[styles.container, { backgroundColor: colors.primary + '10', borderColor: colors.primary + '25' }]}>
       <View style={styles.header}>
         <Ionicons name={disabled ? 'lock-closed-outline' : 'locate-outline'} size={18} color={colors.primary} />
-        <Text style={[styles.title, { color: colors.text }]}>Distance to Target</Text>
+        <Text style={[styles.title, { color: colors.text }]}>{t('target.distanceToTarget')}</Text>
       </View>
 
       <View style={styles.inputRow}>
@@ -46,7 +48,7 @@ export const DistanceInput = React.memo(function DistanceInput({
           selectTextOnFocus={!disabled}
           editable={!disabled}
         />
-        <Text style={[styles.unit, { color: colors.textMuted }]}>meters</Text>
+        <Text style={[styles.unit, { color: colors.textMuted }]}>{t('target.meters')}</Text>
       </View>
 
       <View style={styles.quickPicks}>

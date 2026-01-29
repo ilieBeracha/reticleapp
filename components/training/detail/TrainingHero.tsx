@@ -4,13 +4,15 @@
  */
 
 import { CheckCircle2, Clock, XCircle, Zap } from 'lucide-react-native';
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeInDown, FadeInRight } from 'react-native-reanimated';
-import { LiveDot } from './AnimatedComponents';
+import { LiveDot } from './LiveDot';
 import { AutoCloseCountdown } from './AutoCloseCountdown';
-import type { TrainingHeroProps } from './types';
+import type { TrainingHeroProps } from '@/types/trainingDetail';
 
 export function TrainingHero({ training, colors, onAutoCloseExpired }: TrainingHeroProps) {
+  const { t } = useTranslation();
   const isOngoing = training.status === 'ongoing';
   const isFinished = training.status === 'finished';
   const isCancelled = training.status === 'cancelled';
@@ -19,7 +21,7 @@ export function TrainingHero({ training, colors, onAutoCloseExpired }: TrainingH
     if (isOngoing) {
       return {
         accentColor: colors.green,
-        label: 'LIVE',
+        label: t('training.live'),
         Icon: Zap,
         showDot: true,
       };
@@ -27,7 +29,7 @@ export function TrainingHero({ training, colors, onAutoCloseExpired }: TrainingH
     if (isFinished) {
       return {
         accentColor: colors.primary,
-        label: 'COMPLETE',
+        label: t('training.completed').toUpperCase(),
         Icon: CheckCircle2,
         showDot: false,
       };
@@ -35,14 +37,14 @@ export function TrainingHero({ training, colors, onAutoCloseExpired }: TrainingH
     if (isCancelled) {
       return {
         accentColor: colors.red,
-        label: 'CANCELLED',
+        label: t('training.cancelled').toUpperCase(),
         Icon: XCircle,
         showDot: false,
       };
     }
     return {
       accentColor: colors.textMuted,
-      label: 'SCHEDULED',
+      label: t('training.planned').toUpperCase(),
       Icon: Clock,
       showDot: false,
     };

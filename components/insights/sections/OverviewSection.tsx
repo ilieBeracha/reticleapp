@@ -28,13 +28,14 @@ import {
   TrendingUp,
   Zap,
 } from 'lucide-react-native';
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import type {
   ConfidenceLevel,
   OverviewStatus,
   TrendSummary,
-} from '../insights.types';
+} from '@/types/insights';
 
 // ============================================================================
 // PROPS
@@ -75,6 +76,7 @@ interface MetricCardProps {
 }
 
 function MetricCard({ summary, label, isGrouping, onPress, colors }: MetricCardProps) {
+  const { t } = useTranslation();
   const isImproving = summary.direction === 'improving';
   const isDeclining = summary.direction === 'declining';
   const isStable = summary.direction === 'stable';
@@ -116,7 +118,7 @@ function MetricCard({ summary, label, isGrouping, onPress, colors }: MetricCardP
         <View style={[styles.deltaChip, { backgroundColor: `${statusColor}12` }]}>
           <Icon size={10} color={statusColor} />
           <Text style={[styles.deltaText, { color: statusColor }]}>
-            {isStable ? 'Stable' : deltaText}
+            {isStable ? t('insights.stable') : deltaText}
           </Text>
         </View>
       </View>
@@ -137,6 +139,7 @@ interface InsightRowProps {
 }
 
 function InsightRow({ type, label, detail, onPress, colors }: InsightRowProps) {
+  const { t } = useTranslation();
   const isFocus = type === 'focus';
   const accentColor = isFocus ? colors.orange || '#F59E0B' : colors.green;
   const Icon = isFocus ? AlertCircle : CheckCircle2;
@@ -154,7 +157,7 @@ function InsightRow({ type, label, detail, onPress, colors }: InsightRowProps) {
       disabled={!onPress}
     >
       <Icon size={13} color={accentColor} />
-      <Text style={[styles.insightLabel, { color: accentColor }]}>{isFocus ? 'Focus:' : 'Strong:'}</Text>
+      <Text style={[styles.insightLabel, { color: accentColor }]}>{isFocus ? t('insights.focus') : t('insights.strong')}</Text>
       <Text style={[styles.insightText, { color: colors.text }]} numberOfLines={1}>
         {label}
       </Text>
@@ -173,6 +176,7 @@ interface LowDataStateProps {
 }
 
 function LowDataState({ sessionCount, sessionsNeeded, colors }: LowDataStateProps) {
+  const { t } = useTranslation();
   const totalNeeded = sessionCount + sessionsNeeded;
   const progress = sessionCount / totalNeeded;
 
@@ -181,7 +185,7 @@ function LowDataState({ sessionCount, sessionsNeeded, colors }: LowDataStateProp
       <View style={[styles.lowDataHeader, { backgroundColor: `${colors.primary}10` }]}>
         <Clock size={13} color={colors.primary} />
         <Text style={[styles.lowDataTitle, { color: colors.text }]}>
-          Building baseline
+          {t('insights.buildingBaseline')}
         </Text>
       </View>
       <View style={[styles.progressBar, { backgroundColor: colors.background }]}>
@@ -193,7 +197,7 @@ function LowDataState({ sessionCount, sessionsNeeded, colors }: LowDataStateProp
         />
       </View>
       <Text style={[styles.progressText, { color: colors.textMuted }]}>
-        {sessionsNeeded} more session{sessionsNeeded !== 1 ? 's' : ''} for insights
+        {t('insights.moreSessionsForInsights', { count: sessionsNeeded })}
       </Text>
     </View>
   );
@@ -210,6 +214,7 @@ export function OverviewSection({
   onFocusPress,
   onTrustPress,
 }: OverviewSectionProps) {
+  const { t } = useTranslation();
   const colors = useColors();
 
   return (
@@ -222,13 +227,13 @@ export function OverviewSection({
             <View style={styles.statItem}>
               <Target size={12} color={colors.textMuted} />
               <Text style={[styles.statValue, { color: colors.text }]}>{status.sessionCount}</Text>
-              <Text style={[styles.statLabel, { color: colors.textMuted }]}>sessions</Text>
+              <Text style={[styles.statLabel, { color: colors.textMuted }]}>{t('session.sessions')}</Text>
             </View>
             <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
             <View style={styles.statItem}>
               <Zap size={12} color={colors.textMuted} />
               <Text style={[styles.statValue, { color: colors.text }]}>{status.shotCount.toLocaleString()}</Text>
-              <Text style={[styles.statLabel, { color: colors.textMuted }]}>rounds</Text>
+              <Text style={[styles.statLabel, { color: colors.textMuted }]}>{t('weapons.rounds')}</Text>
             </View>
           </View>
 
@@ -237,7 +242,7 @@ export function OverviewSection({
             {status.accuracy && (
               <MetricCard
                 summary={status.accuracy}
-                label="Accuracy"
+                label={t('session.accuracy')}
                 onPress={onAccuracyPress}
                 colors={colors}
               />
@@ -245,7 +250,7 @@ export function OverviewSection({
             {status.grouping && (
               <MetricCard
                 summary={status.grouping}
-                label="Grouping"
+                label={t('session.grouping')}
                 isGrouping
                 onPress={onGroupingPress}
                 colors={colors}

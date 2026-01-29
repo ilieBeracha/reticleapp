@@ -6,7 +6,7 @@
  */
 
 import { useColors } from '@/hooks/ui/useColors';
-import type { DecodedWeather } from '@/services/session/watchTypes';
+import type { DecodedWeather } from '@/types/session.watch';
 import {
   formatConditionName,
   formatWeatherDisplay,

@@ -11,13 +11,10 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import type { DecodedWeather } from '@/services/session/watchTypes';
-import type { OpenWeatherResponse } from '@/services/weather';
-import {
-    decodeOpenWeather,
-    fetchCurrentWeather,
-    isConfigured,
-} from '@/services/weather';
+import type { DecodedWeather } from '@/types/session.watch';
+import type { OpenWeatherResponse } from '@/types/weather';
+import { decodeOpenWeather } from '@/services/weather/openWeatherDecoder';
+import { fetchCurrentWeather, isConfigured } from '@/services/weather/openWeatherService';
 
 // ============================================================================
 // TYPES

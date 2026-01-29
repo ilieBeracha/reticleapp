@@ -8,7 +8,7 @@
 import { Sparkles } from 'lucide-react-native';
 import { StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import type { CoachMessageProps } from '../UnifiedHomePage.types';
+import type { CoachMessageProps } from '@/types/home';
 
 export function CoachMessage({ message, colors }: CoachMessageProps) {
   return (
@@ -39,16 +39,14 @@ const s = StyleSheet.create({
     opacity: 0.4,
   },
   content: {
-    flex: 1,
     flexDirection: 'row',
-    alignItems: 'flex-start',
     gap: 6,
   },
   iconWrapper: {
     marginTop: 1,
   },
   message: {
-    flex: 1,
+    // flex: 1,
     fontSize: 13,
     fontWeight: '500',
     lineHeight: 18,

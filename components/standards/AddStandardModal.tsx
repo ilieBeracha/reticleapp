@@ -6,7 +6,7 @@
  */
 
 import { useColors } from '@/hooks/ui/useColors';
-import { createStandard, updateStandard, type CreateStandardInput, type TeamStandard } from '@/services/standards';
+import { createStandard, updateStandard, type CreateStandardInput, type TeamStandard } from '@/services/standards/standardsService';
 import * as Haptics from 'expo-haptics';
 import { Check, Crosshair, Target, X } from 'lucide-react-native';
 import { useEffect, useState } from 'react';

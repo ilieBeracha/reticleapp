@@ -1,0 +1,456 @@
+# i18n audit
+
+Generated: 2026-01-28T19:14:16.076Z
+
+## Summary
+- Scanned files: 371
+- Translation keys used: 1295
+- Missing keys in en: 0
+- Missing keys in he: 0
+- Likely hard-coded user-facing strings: 656
+
+## Missing translation keys
+
+### Missing in en
+- (none)
+
+### Missing in he
+- (none)
+
+## Hard-coded user-facing strings (top files)
+
+- `app/(protected)/startEngagement.tsx`: 39
+- `components/weapons/WeaponAssignmentManager.tsx`: 39
+- `app/(protected)/sessionResults.tsx`: 32
+- `components/weapons/CreateWeaponFlow.tsx`: 31
+- `components/standards/AddStandardModal.tsx`: 28
+- `components/training/create/steps/DrillCreator.tsx`: 28
+- `app/(protected)/weaponDetail.tsx`: 26
+- `app/(protected)/watchSessionResult.tsx`: 25
+- `app/(protected)/squadLobby.tsx`: 22
+- `components/weapons/WeaponManagement.tsx`: 22
+- `components/weapons/ApproveRequestModal.tsx`: 21
+- `components/shared/drills/PresetForm.tsx`: 20
+- `components/insights/sections/ContextProfilesSection.tsx`: 19
+- `components/session/activeSession/useActiveSession.ts`: 19
+- `components/standards/AddModifierModal.tsx`: 18
+- `components/standards/StandardsManager.tsx`: 18
+- `components/training/create/steps/DrillConfigSheet.tsx`: 17
+- `components/training/create/useCreateTraining.ts`: 16
+- `components/training/create/useCreateTrainingV2.ts`: 14
+- `app/(protected)/profileSheet.tsx`: 13
+- `app/(protected)/teamArmory.tsx`: 9
+- `components/training/create/steps/DrillAdjustModal.tsx`: 9
+- `components/standards/StandardsVerdict.tsx`: 8
+- `components/weapons/ShareWeaponWithTeam.tsx`: 8
+- `components/session/WeatherDisplay.tsx`: 7
+- `hooks/team/useCreateTeamForm.ts`: 7
+- `components/home/UnifiedHomePage/components/TeamSection.tsx`: 5
+- `components/insights/components/TrendChart.tsx`: 5
+- `components/session/activeSession/SessionPrepView.tsx`: 5
+- `components/shared/drills/DrillPresetPicker.tsx`: 5
+
+## Examples (first 200 findings)
+
+This section is intentionally capped. See `docs/i18n-audit.json` for the full list.
+
+- `app/(protected)/(tabs)/team.tsx:328` **jsx:text** → "drill"
+  - `{training.drill_count} drill{training.drill_count !== 1 ? 's' : ''}`
+- `app/(protected)/acceptInvite.tsx:163` **call:Alert.alert** → "Error"
+  - `Alert.alert('Error', error.message || 'Failed to join team');`
+- `app/(protected)/acceptInvite.tsx:352` **jsx:attr:placeholder** → "e.g. ABC123XY"
+  - `placeholder="e.g. ABC123XY"`
+- `app/(protected)/acceptInvite.tsx:366` **jsx:text** → "8 characters • letters and numbers"
+  - `<Text style={[styles.inputHint, { color: colors.textMuted }]}>8 characters • letters and numbers</Text>`
+- `app/(protected)/integrations.tsx:85` **jsx:text** → "G"
+  - `<Text style={styles.iconText}>G</Text>`
+- `app/(protected)/profileSheet.tsx:53` **call:Alert.alert** → "Notifications Disabled"
+  - `Alert.alert('Notifications Disabled', 'Please enable notifications in your device settings.', [{ text: 'OK' }]);`
+- `app/(protected)/profileSheet.tsx:53` **call:Alert.alert** → "Please enable notifications in your device settings."
+  - `Alert.alert('Notifications Disabled', 'Please enable notifications in your device settings.', [{ text: 'OK' }]);`
+- `app/(protected)/profileSheet.tsx:59` **call:Alert.alert** → "Notification Scheduled"
+  - `Alert.alert('Notification Scheduled', 'You will receive a test notification in 3 seconds.');`
+- `app/(protected)/profileSheet.tsx:59` **call:Alert.alert** → "You will receive a test notification in 3 seconds."
+  - `Alert.alert('Notification Scheduled', 'You will receive a test notification in 3 seconds.');`
+- `app/(protected)/profileSheet.tsx:64` **call:Alert.alert** → "Sign Out"
+  - `Alert.alert('Sign Out', 'Are you sure you want to sign out?', [`
+- `app/(protected)/profileSheet.tsx:64` **call:Alert.alert** → "Are you sure you want to sign out?"
+  - `Alert.alert('Sign Out', 'Are you sure you want to sign out?', [`
+- `app/(protected)/profileSheet.tsx:147` **call:Alert.alert** → "Disable Notifications"
+  - `Alert.alert(`
+- `app/(protected)/profileSheet.tsx:147` **call:Alert.alert** → "To disable notifications, go to your device Settings > Reticle > Notifications."
+  - `Alert.alert(`
+- `app/(protected)/profileSheet.tsx:166` **jsx:text** → "Test Notification"
+  - `<Text style={[styles.menuItemText, { color: colors.text }]}>Test Notification</Text>`
+- `app/(protected)/profileSheet.tsx:290` **jsx:text** → "Integrations"
+  - `<Text style={[styles.menuItemText, { color: colors.text }]}>Integrations</Text>`
+- `app/(protected)/profileSheet.tsx:291` **jsx:text** → "Garmin, Apple Watch"
+  - `<Text style={[styles.menuItemSubtitle, { color: colors.textMuted }]}>Garmin, Apple Watch</Text>`
+- `app/(protected)/profileSheet.tsx:303` **jsx:text** → "Help & Support"
+  - `<Text style={[styles.menuItemText, { color: colors.text }]}>Help & Support</Text>`
+- `app/(protected)/profileSheet.tsx:324` **jsx:text** → "Reticle v1.0.0"
+  - `<Text style={[styles.versionText, { color: colors.textMuted }]}>Reticle v1.0.0</Text>`
+- `app/(protected)/sessionDetail.tsx:986` **jsx:text** → "Session Insight"
+  - `<Text style={[styles.sectionTitle, { color: colors.text, marginBottom: 0 }]}>Session Insight</Text>`
+- `app/(protected)/sessionDetail.tsx:1414` **jsx:text** → "m"
+  - `<Text style={[styles.distanceText, { color: colors.textMuted }]}>{target.distance_m}m</Text>`
+- `app/(protected)/sessionDetail.tsx:1427` **jsx:text** → "cm"
+  - `{dispersion.toFixed(1)}cm`
+- `app/(protected)/sessionDetail.tsx:1442` **jsx:text** → "holes"
+  - `<Text style={[styles.timelineStatLabel, { color: colors.textMuted }]}>holes</Text>`
+- `app/(protected)/sessionResults.tsx:269` **jsx:text** → "Session Complete"
+  - `<Text style={[styles.headerTitle, { color: colors.text }]}>Session Complete</Text>`
+- `app/(protected)/sessionResults.tsx:282` **jsx:text** → "Session recorded successfully"
+  - `<Text style={[styles.successSubtitle, { color: colors.textMuted }]}>Session recorded successfully</Text>`
+- `app/(protected)/sessionResults.tsx:299` **jsx:attr:label** → "Accuracy"
+  - `label="Accuracy"`
+- `app/(protected)/sessionResults.tsx:312` **jsx:attr:label** → "Hits"
+  - `label="Hits"`
+- `app/(protected)/sessionResults.tsx:322` **jsx:attr:label** → "Holes"
+  - `label="Holes"`
+- `app/(protected)/sessionResults.tsx:329` **jsx:attr:label** → "Accuracy"
+  - `label="Accuracy"`
+- `app/(protected)/sessionResults.tsx:340` **jsx:attr:label** → "Best Group"
+  - `label="Best Group"`
+- `app/(protected)/sessionResults.tsx:347` **jsx:attr:label** → "Groups"
+  - `label="Groups"`
+- `app/(protected)/sessionResults.tsx:357` **jsx:attr:label** → "Shots"
+  - `label="Shots"`
+- `app/(protected)/sessionResults.tsx:363` **jsx:attr:label** → "Avg Split"
+  - `label="Avg Split"`
+- `app/(protected)/sessionResults.tsx:372` **jsx:attr:label** → "Targets"
+  - `label="Targets"`
+- `app/(protected)/sessionResults.tsx:381` **jsx:attr:label** → "Distance"
+  - `label="Distance"`
+- `app/(protected)/sessionResults.tsx:382` **jsx:expr** → "${…}m"
+  - `value={`${watchData?.distance || drill?.distance_m || '-'}m`}`
+- `app/(protected)/sessionResults.tsx:388` **jsx:attr:label** → "Duration"
+  - `label="Duration"`
+- `app/(protected)/sessionResults.tsx:395` **jsx:attr:label** → "Targets"
+  - `label="Targets"`
+- `app/(protected)/sessionResults.tsx:416` **jsx:text** → "Manual entry • Accuracy calculated"
+  - `Manual entry • Accuracy calculated`
+- `app/(protected)/sessionResults.tsx:423` **jsx:text** → "Scanned • Accuracy unavailable (shots unknown)"
+  - `Scanned • Accuracy unavailable (shots unknown)`
+- `app/(protected)/sessionResults.tsx:429` **jsx:text** → "Grouping • Measuring consistency"
+  - `<Text style={[styles.entryTypeBadgeText, { color: '#22C55E' }]}>Grouping • Measuring consistency</Text>`
+- `app/(protected)/sessionResults.tsx:440` **jsx:text** → "Weapon"
+  - `<Text style={[styles.infoCardLabel, { color: colors.textMuted }]}>Weapon</Text>`
+- `app/(protected)/sessionResults.tsx:450` **jsx:text** → "Data synced from watch"
+  - `<Text style={[styles.watchBadgeText, { color: colors.green }]}>Data synced from watch</Text>`
+- `app/(protected)/sessionResults.tsx:459` **jsx:text** → "Split Times"
+  - `<Text style={[styles.chartTitle, { color: colors.text }]}>Split Times</Text>`
+- `app/(protected)/sessionResults.tsx:461` **jsx:text** → "Time between shots (ms)"
+  - `<Text style={[styles.chartSubtitle, { color: colors.textMuted }]}>Time between shots (ms)</Text>`
+- `app/(protected)/sessionResults.tsx:487` **jsx:text** → "Fastest"
+  - `<Text style={[styles.splitStatLabel, { color: colors.textMuted }]}>Fastest</Text>`
+- `app/(protected)/sessionResults.tsx:492` **jsx:text** → "Average"
+  - `<Text style={[styles.splitStatLabel, { color: colors.textMuted }]}>Average</Text>`
+- `app/(protected)/sessionResults.tsx:497` **jsx:text** → "Slowest"
+  - `<Text style={[styles.splitStatLabel, { color: colors.textMuted }]}>Slowest</Text>`
+- `app/(protected)/sessionResults.tsx:509` **jsx:text** → "Shot Timeline"
+  - `<Text style={[styles.chartTitle, { color: colors.text }]}>Shot Timeline</Text>`
+- `app/(protected)/sessionResults.tsx:511` **jsx:text** → "When each shot was fired (seconds)"
+  - `<Text style={[styles.chartSubtitle, { color: colors.textMuted }]}>When each shot was fired (seconds)</Text>`
+- `app/(protected)/sessionResults.tsx:541` **jsx:text** → "Heart Rate"
+  - `<Text style={[styles.chartTitle, { color: colors.text }]}>Heart Rate</Text>`
+- `app/(protected)/sessionResults.tsx:547` **jsx:text** → "Avg BPM"
+  - `<Text style={[styles.hrStatLabel, { color: colors.textMuted }]}>Avg BPM</Text>`
+- `app/(protected)/sessionResults.tsx:552` **jsx:text** → "Max BPM"
+  - `<Text style={[styles.hrStatLabel, { color: colors.textMuted }]}>Max BPM</Text>`
+- `app/(protected)/sessionResults.tsx:557` **jsx:text** → "Min BPM"
+  - `<Text style={[styles.hrStatLabel, { color: colors.textMuted }]}>Min BPM</Text>`
+- `app/(protected)/sessionResults.tsx:569` **jsx:text** → "Raw Shot Timestamps (ms)"
+  - `<Text style={[styles.rawDataTitle, { color: colors.textMuted }]}>Raw Shot Timestamps (ms)</Text>`
+- `app/(protected)/squadLobby.tsx:119` **call:Alert.alert** → "Error"
+  - `Alert.alert('Error', 'Engagement not found');`
+- `app/(protected)/squadLobby.tsx:119` **call:Alert.alert** → "Engagement not found"
+  - `Alert.alert('Error', 'Engagement not found');`
+- `app/(protected)/squadLobby.tsx:140` **call:Alert.alert** → "Error"
+  - `Alert.alert('Error', 'Failed to load engagement data');`
+- `app/(protected)/squadLobby.tsx:140` **call:Alert.alert** → "Failed to load engagement data"
+  - `Alert.alert('Error', 'Failed to load engagement data');`
+- `app/(protected)/squadLobby.tsx:222` **call:Alert.alert** → "Error"
+  - `Alert.alert('Error', error.message || 'Failed to update role');`
+- `app/(protected)/squadLobby.tsx:238` **call:Alert.alert** → "Error"
+  - `Alert.alert('Error', error.message || 'Failed to accept invite');`
+- `app/(protected)/squadLobby.tsx:248` **call:Alert.alert** → "Decline Invitation?"
+  - `Alert.alert('Decline Invitation?', 'You will be removed from this squad engagement.', [`
+- `app/(protected)/squadLobby.tsx:248` **call:Alert.alert** → "You will be removed from this squad engagement."
+  - `Alert.alert('Decline Invitation?', 'You will be removed from this squad engagement.', [`
+- `app/(protected)/squadLobby.tsx:270` **call:Alert.alert** → "Error"
+  - `Alert.alert('Error', error.message || 'Failed to decline invite');`
+- `app/(protected)/squadLobby.tsx:405` **call:Alert.alert** → "Error"
+  - `Alert.alert('Error', error.message || 'Failed to start engagement');`
+- `app/(protected)/squadLobby.tsx:427` **call:Alert.alert** → "Cancel Squad Engagement?"
+  - `Alert.alert('Cancel Squad Engagement?', 'This will cancel the engagement and notify invited participants.', [`
+- `app/(protected)/squadLobby.tsx:427` **call:Alert.alert** → "This will cancel the engagement and notify invited participants."
+  - `Alert.alert('Cancel Squad Engagement?', 'This will cancel the engagement and notify invited participants.', [`
+- `app/(protected)/squadLobby.tsx:511` **call:Alert.alert** → "Error"
+  - `Alert.alert('Error', error.message || 'Failed to invite participants');`
+- `app/(protected)/squadLobby.tsx:598` **jsx:text** → "PARTICIPANTS"
+  - `<Text style={[styles.sectionLabel, { color: colors.textMuted }]}>PARTICIPANTS</Text>`
+- `app/(protected)/squadLobby.tsx:678` **jsx:text** → "No participants invited"
+  - `<Text style={[styles.emptyText, { color: colors.textMuted }]}>No participants invited</Text>`
+- `app/(protected)/squadLobby.tsx:747` **jsx:text** → "Decline"
+  - `<Text style={[styles.bottomDeclineText, { color: colors.red || colors.textMuted }]}>Decline</Text>`
+- `app/(protected)/squadLobby.tsx:761` **jsx:text** → "Accept Invite"
+  - `<Text style={styles.bottomAcceptText}>Accept Invite</Text>`
+- `app/(protected)/squadLobby.tsx:775` **jsx:text** → "Waiting for commander to start..."
+  - `<Text style={[styles.waitingText, { color: colors.text }]}>Waiting for commander to start...</Text>`
+- `app/(protected)/squadLobby.tsx:802` **jsx:text** → "Invite Squad Members"
+  - `<Text style={[styles.inviteModalTitle, { color: colors.text }]}>Invite Squad Members</Text>`
+- `app/(protected)/squadLobby.tsx:804` **jsx:text** → "Select team members to join"
+  - `Select team members to join`
+- `app/(protected)/squadLobby.tsx:831` **jsx:text** → "No team context available"
+  - `No team context available`
+- `app/(protected)/squadLobby.tsx:844` **jsx:text** → "Cancel"
+  - `<Text style={[styles.inviteModalCancelText, { color: colors.textMuted }]}>Cancel</Text>`
+- `app/(protected)/startEngagement.tsx:290` **call:Alert.alert** → "Active Session"
+  - `Alert.alert('Active Session', 'You have an active session. Continue or start fresh?', [`
+- `app/(protected)/startEngagement.tsx:290` **call:Alert.alert** → "You have an active session. Continue or start fresh?"
+  - `Alert.alert('Active Session', 'You have an active session. Continue or start fresh?', [`
+- `app/(protected)/startEngagement.tsx:308` **call:Alert.alert** → "Error"
+  - `Alert.alert('Error', 'Failed to delete session');`
+- `app/(protected)/startEngagement.tsx:308` **call:Alert.alert** → "Failed to delete session"
+  - `Alert.alert('Error', 'Failed to delete session');`
+- `app/(protected)/startEngagement.tsx:373` **call:Alert.alert** → "Active Squad Engagement"
+  - `Alert.alert(`
+- `app/(protected)/startEngagement.tsx:373` **call:Alert.alert** → "There's already an active squad/group engagement for this training. You'll be redirected to it."
+  - `Alert.alert(`
+- `app/(protected)/startEngagement.tsx:493` **call:Alert.alert** → "Error"
+  - `Alert.alert('Error', error.message || 'Failed to start');`
+- `app/(protected)/startEngagement.tsx:639` **jsx:text** → "Configuration locked by commander"
+  - `Configuration locked by commander`
+- `app/(protected)/startEngagement.tsx:649` **jsx:text** → "Goal"
+  - `<Text style={[styles.overviewLabel, { color: colors.textMuted }]}>Goal</Text>`
+- `app/(protected)/startEngagement.tsx:665` **jsx:text** → "Mode"
+  - `<Text style={[styles.overviewLabel, { color: colors.textMuted }]}>Mode</Text>`
+- `app/(protected)/startEngagement.tsx:674` **jsx:text** → "Distance"
+  - `<Text style={[styles.overviewLabel, { color: colors.textMuted }]}>Distance</Text>`
+- `app/(protected)/startEngagement.tsx:675` **jsx:text** → "m"
+  - `<Text style={[styles.overviewValue, { color: colors.text }]}>{distance}m</Text>`
+- `app/(protected)/startEngagement.tsx:681` **jsx:text** → "Rounds"
+  - `<Text style={[styles.overviewLabel, { color: colors.textMuted }]}>Rounds</Text>`
+- `app/(protected)/startEngagement.tsx:682` **jsx:text** → "rds"
+  - `<Text style={[styles.overviewValue, { color: colors.text }]}>{rounds} rds</Text>`
+- `app/(protected)/startEngagement.tsx:688` **jsx:text** → "Position"
+  - `<Text style={[styles.overviewLabel, { color: colors.textMuted }]}>Position</Text>`
+- `app/(protected)/startEngagement.tsx:697` **jsx:text** → "Time Limit"
+  - `<Text style={[styles.overviewLabel, { color: colors.textMuted }]}>Time Limit</Text>`
+- `app/(protected)/startEngagement.tsx:698` **jsx:text** → "s"
+  - `<Text style={[styles.overviewValue, { color: colors.text }]}>{timeLimit}s</Text>`
+- `app/(protected)/startEngagement.tsx:706` **jsx:text** → "SELECT YOUR WEAPON"
+  - `<Text style={[styles.sectionLabel, { color: colors.textMuted }]}>SELECT YOUR WEAPON</Text>`
+- `app/(protected)/startEngagement.tsx:710` **jsx:text** → "Loading..."
+  - `<Text style={[styles.weaponLoadingText, { color: colors.textMuted }]}>Loading...</Text>`
+- `app/(protected)/startEngagement.tsx:722` **jsx:text** → "Tap to change"
+  - `<Text style={[styles.weaponHint, { color: colors.textMuted }]}>Tap to change</Text>`
+- `app/(protected)/startEngagement.tsx:735` **jsx:text** → "Select Weapon"
+  - `<Text style={[styles.weaponName, { color: colors.text }]}>Select Weapon</Text>`
+- `app/(protected)/startEngagement.tsx:736` **jsx:text** → "Required to start"
+  - `<Text style={[styles.weaponHint, { color: colors.textMuted }]}>Required to start</Text>`
+- `app/(protected)/startEngagement.tsx:760` **jsx:text** → "Guided drill — you may adjust settings"
+  - `Guided drill — you may adjust settings`
+- `app/(protected)/startEngagement.tsx:768` **jsx:text** → "GOAL"
+  - `<Text style={[styles.sectionLabel, { color: colors.textMuted }]}>GOAL</Text>`
+- `app/(protected)/startEngagement.tsx:783` **jsx:text** → "Grouping"
+  - `Grouping`
+- `app/(protected)/startEngagement.tsx:794` **jsx:text** → "Engagement"
+  - `Engagement`
+- `app/(protected)/startEngagement.tsx:799` **jsx:text** → "Drill type set by commander"
+  - `<Text style={[styles.lockedHint, { color: colors.textMuted }]}>Drill type set by commander</Text>`
+- `app/(protected)/startEngagement.tsx:805` **jsx:text** → "WEAPON"
+  - `<Text style={[styles.sectionLabel, { color: colors.textMuted }]}>WEAPON</Text>`
+- `app/(protected)/startEngagement.tsx:809` **jsx:text** → "Loading..."
+  - `<Text style={[styles.weaponLoadingText, { color: colors.textMuted }]}>Loading...</Text>`
+- `app/(protected)/startEngagement.tsx:821` **jsx:text** → "Tap to change"
+  - `<Text style={[styles.weaponHint, { color: colors.textMuted }]}>Tap to change</Text>`
+- `app/(protected)/startEngagement.tsx:834` **jsx:text** → "Select Weapon"
+  - `<Text style={[styles.weaponName, { color: colors.text }]}>Select Weapon</Text>`
+- `app/(protected)/startEngagement.tsx:835` **jsx:text** → "Required"
+  - `<Text style={[styles.weaponHint, { color: colors.textMuted }]}>Required</Text>`
+- `app/(protected)/startEngagement.tsx:853` **jsx:text** → "DISTANCE (meters)"
+  - `<Text style={[styles.sectionLabel, { color: colors.textMuted }]}>DISTANCE (meters)</Text>`
+- `app/(protected)/startEngagement.tsx:868` **jsx:text** → "m"
+  - `<Text style={[styles.counterUnit, { color: colors.textMuted }]}>m</Text>`
+- `app/(protected)/startEngagement.tsx:898` **jsx:text** → "ROUNDS"
+  - `<Text style={[styles.sectionLabel, { color: colors.textMuted }]}>ROUNDS</Text>`
+- `app/(protected)/startEngagement.tsx:913` **jsx:text** → "rds"
+  - `<Text style={[styles.counterUnit, { color: colors.textMuted }]}>rds</Text>`
+- `app/(protected)/startEngagement.tsx:926` **jsx:text** → "POSITION"
+  - `<Text style={[styles.sectionLabel, { color: colors.textMuted }]}>POSITION</Text>`
+- `app/(protected)/startEngagement.tsx:956` **jsx:text** → "RECORDING"
+  - `<Text style={[styles.sectionLabel, { color: colors.textMuted }]}>RECORDING</Text>`
+- `app/(protected)/startEngagement.tsx:971` **jsx:text** → "Select a weapon to continue"
+  - `{!weapon && <Text style={[styles.hint, { color: colors.orange }]}>Select a weapon to continue</Text>}`
+- `app/(protected)/teamArmory.tsx:720` **jsx:text** → "weapon"
+  - `{filteredCatalog.length} weapon{filteredCatalog.length !== 1 ? 's' : ''} found`
+- `app/(protected)/teamArmory.tsx:720` **jsx:text** → "found"
+  - `{filteredCatalog.length} weapon{filteredCatalog.length !== 1 ? 's' : ''} found`
+- `app/(protected)/teamArmory.tsx:728` **jsx:text** → "Loading catalog..."
+  - `<Text style={[styles.catalogLoadingText, { color: colors.textMuted }]}>Loading catalog...</Text>`
+- `app/(protected)/teamArmory.tsx:748` **jsx:text** → "Create Custom Weapon"
+  - `<Text style={styles.catalogEmptyBtnText}>Create Custom Weapon</Text>`
+- `app/(protected)/teamArmory.tsx:1336` **jsx:attr:title** → "Pool Weapons"
+  - `title="Pool Weapons"`
+- `app/(protected)/teamArmory.tsx:1342` **jsx:text** → "Available for all team members to use"
+  - `Available for all team members to use`
+- `app/(protected)/teamArmory.tsx:1445` **jsx:attr:title** → "Armed"
+  - `title="Armed"`
+- `app/(protected)/teamArmory.tsx:1478` **jsx:text** → "No Team Members"
+  - `<Text style={[styles.emptyTitle, { color: colors.text }]}>No Team Members</Text>`
+- `app/(protected)/teamArmory.tsx:1480` **jsx:text** → "Invite members to your team first"
+  - `Invite members to your team first`
+- `app/(protected)/teamSquads.tsx:113` **call:Alert.alert** → "Duplicate"
+  - `Alert.alert('Duplicate', 'A squad with this name already exists.');`
+- `app/(protected)/teamSquads.tsx:113` **call:Alert.alert** → "A squad with this name already exists."
+  - `Alert.alert('Duplicate', 'A squad with this name already exists.');`
+- `app/(protected)/trainingDetail.tsx:404` **jsx:text** → "cm"
+  - `<Text style={[styles.sessionResult, { color: colors.orange }]}>{groupSize.toFixed(1)}cm</Text>`
+- `app/(protected)/trainingReport.tsx:576` **jsx:text** → "cm /"
+  - `{verdict.actual_grouping_cm}cm / {verdict.effective_grouping_cm}cm`
+- `app/(protected)/trainingReport.tsx:576` **jsx:text** → "cm"
+  - `{verdict.actual_grouping_cm}cm / {verdict.effective_grouping_cm}cm`
+- `app/(protected)/watchSessionResult.tsx:251` **call:Alert.alert** → "Error"
+  - `Alert.alert('Error', error.message || 'Failed to save session data');`
+- `app/(protected)/watchSessionResult.tsx:280` **jsx:text** → "Missing session data"
+  - `<Text style={[styles.emptyText, { color: colors.textMuted }]}>Missing session data</Text>`
+- `app/(protected)/watchSessionResult.tsx:298` **jsx:text** → "Watch"
+  - `<Text style={[styles.badgeText, { color: colors.green }]}>Watch</Text>`
+- `app/(protected)/watchSessionResult.tsx:303` **jsx:text** → "Done"
+  - `<Text style={[styles.badgeText, { color: colors.green }]}>Done</Text>`
+- `app/(protected)/watchSessionResult.tsx:307` **jsx:text** → "Session Complete"
+  - `<Text style={[styles.title, { color: colors.text }]}>Session Complete</Text>`
+- `app/(protected)/watchSessionResult.tsx:320` **jsx:text** → "Shots"
+  - `<Text style={[styles.quickStatLabel, { color: colors.textMuted }]}>Shots</Text>`
+- `app/(protected)/watchSessionResult.tsx:325` **jsx:text** → "Duration"
+  - `<Text style={[styles.quickStatLabel, { color: colors.textMuted }]}>Duration</Text>`
+- `app/(protected)/watchSessionResult.tsx:329` **jsx:text** → "m"
+  - `<Text style={[styles.quickStatValue, { color: colors.text }]}>{distanceM}m</Text>`
+- `app/(protected)/watchSessionResult.tsx:330` **jsx:text** → "Distance"
+  - `<Text style={[styles.quickStatLabel, { color: colors.textMuted }]}>Distance</Text>`
+- `app/(protected)/watchSessionResult.tsx:340` **jsx:text** → "Group Size (cm)"
+  - `<Text style={[styles.inputCardTitle, { color: colors.text }]}>Group Size (cm)</Text>`
+- `app/(protected)/watchSessionResult.tsx:344` **jsx:attr:placeholder** → "Optional — measure widest spread"
+  - `placeholder="Optional — measure widest spread"`
+- `app/(protected)/watchSessionResult.tsx:365` **jsx:text** → "Hits on Target"
+  - `<Text style={[styles.inputCardTitle, { color: colors.text }]}>Hits on Target</Text>`
+- `app/(protected)/watchSessionResult.tsx:387` **jsx:text** → "Leave empty to assume all hit"
+  - `Leave empty to assume all hit`
+- `app/(protected)/watchSessionResult.tsx:402` **jsx:text** → "Avg Split Time"
+  - `<Text style={[styles.metricLabel, { color: colors.textMuted }]}>Avg Split Time</Text>`
+- `app/(protected)/watchSessionResult.tsx:411` **jsx:text** → "Split Times"
+  - `<Text style={[styles.sectionTitle, { color: colors.text }]}>Split Times</Text>`
+- `app/(protected)/watchSessionResult.tsx:416` **jsx:text** → "Fastest"
+  - `<Text style={[styles.splitLabel, { color: colors.green }]}>Fastest</Text>`
+- `app/(protected)/watchSessionResult.tsx:421` **jsx:text** → "Average"
+  - `<Text style={[styles.splitLabel, { color: colors.primary }]}>Average</Text>`
+- `app/(protected)/watchSessionResult.tsx:426` **jsx:text** → "Slowest"
+  - `<Text style={[styles.splitLabel, { color: colors.orange }]}>Slowest</Text>`
+- `app/(protected)/watchSessionResult.tsx:446` **jsx:text** → "Steadiness"
+  - `<Text style={[styles.metricLabel, { color: colors.textMuted }]}>Steadiness</Text>`
+- `app/(protected)/watchSessionResult.tsx:450` **jsx:text** → "flinch"
+  - `<Text style={[styles.flinchText, { color: colors.red }]}>{steadiness.flinchCount} flinch</Text>`
+- `app/(protected)/watchSessionResult.tsx:466` **jsx:text** → "bpm"
+  - `{biometrics.summary.avgBreathRate} <Text style={styles.metricUnit}>bpm</Text>`
+- `app/(protected)/watchSessionResult.tsx:468` **jsx:text** → "Breathing Rate"
+  - `<Text style={[styles.metricLabel, { color: colors.textMuted }]}>Breathing Rate</Text>`
+- `app/(protected)/watchSessionResult.tsx:477` **jsx:text** → "Conditions"
+  - `<Text style={[styles.sectionTitle, { color: colors.text }]}>Conditions</Text>`
+- `app/(protected)/watchSessionResult.tsx:493` **jsx:text** → "Data saved automatically"
+  - `<Text style={[styles.autoSavedText, { color: colors.green }]}>Data saved automatically</Text>`
+- `app/(protected)/watchSessionResult.tsx:530` **jsx:text** → "Cancel"
+  - `<Text style={[styles.secondaryBtnText, { color: colors.textMuted }]}>Cancel</Text>`
+- `app/(protected)/weaponDetail.tsx:296` **call:Alert.alert** → "Delete Weapon"
+  - `Alert.alert('Delete Weapon', `Are you sure you want to delete "${weapon.name}"? This action cannot be undone.`, [`
+- `app/(protected)/weaponDetail.tsx:296` **call:Alert.alert** → "Are you sure you want to delete "${…}"? This action cannot be undone."
+  - `Alert.alert('Delete Weapon', `Are you sure you want to delete "${weapon.name}"? This action cannot be undone.`, [`
+- `app/(protected)/weaponDetail.tsx:308` **call:Alert.alert** → "Error"
+  - `Alert.alert('Error', 'Failed to delete weapon');`
+- `app/(protected)/weaponDetail.tsx:308` **call:Alert.alert** → "Failed to delete weapon"
+  - `Alert.alert('Error', 'Failed to delete weapon');`
+- `app/(protected)/weaponDetail.tsx:341` **jsx:text** → "Weapon not found"
+  - `<Text style={[s.errorText, { color: colors.textMuted }]}>Weapon not found</Text>`
+- `app/(protected)/weaponDetail.tsx:414` **jsx:text** → "Team"
+  - `<Text style={[s.teamBadgeText, { color: '#3B82F6' }]}>Team</Text>`
+- `app/(protected)/weaponDetail.tsx:419` **jsx:text** → "Default"
+  - `<Text style={s.defaultText}>Default</Text>`
+- `app/(protected)/weaponDetail.tsx:428` **jsx:text** → "Sessions"
+  - `<Text style={[s.statLabel, { color: colors.textMuted }]}>Sessions</Text>`
+- `app/(protected)/weaponDetail.tsx:433` **jsx:text** → "Rounds"
+  - `<Text style={[s.statLabel, { color: colors.textMuted }]}>Rounds</Text>`
+- `app/(protected)/weaponDetail.tsx:440` **jsx:text** → "Accuracy"
+  - `<Text style={[s.statLabel, { color: colors.textMuted }]}>Accuracy</Text>`
+- `app/(protected)/weaponDetail.tsx:447` **jsx:text** → "Best Group"
+  - `<Text style={[s.statLabel, { color: colors.textMuted }]}>Best Group</Text>`
+- `app/(protected)/weaponDetail.tsx:453` **jsx:text** → "Details"
+  - `<Text style={[s.sectionTitle, { color: colors.text }]}>Details</Text>`
+- `app/(protected)/weaponDetail.tsx:459` **jsx:text** → "Zero Distance"
+  - `<Text style={[s.detailLabel, { color: colors.textMuted }]}>Zero Distance</Text>`
+- `app/(protected)/weaponDetail.tsx:472` **jsx:text** → "Source"
+  - `<Text style={[s.detailLabel, { color: colors.textMuted }]}>Source</Text>`
+- `app/(protected)/weaponDetail.tsx:483` **jsx:text** → "Last Used"
+  - `<Text style={[s.detailLabel, { color: colors.textMuted }]}>Last Used</Text>`
+- `app/(protected)/weaponDetail.tsx:492` **jsx:text** → "Added"
+  - `<Text style={[s.detailLabel, { color: colors.textMuted }]}>Added</Text>`
+- `app/(protected)/weaponDetail.tsx:503` **jsx:text** → "Notes"
+  - `<Text style={[s.sectionTitle, { color: colors.text }]}>Notes</Text>`
+- `app/(protected)/weaponDetail.tsx:517` **jsx:attr:placeholder** → "Add notes about this weapon..."
+  - `placeholder="Add notes about this weapon..."`
+- `app/(protected)/weaponDetail.tsx:531` **jsx:text** → "Cancel"
+  - `<Text style={[s.notesCancelText, { color: colors.textMuted }]}>Cancel</Text>`
+- `app/(protected)/weaponDetail.tsx:537` **jsx:text** → "Save"
+  - `<Text style={s.notesSaveText}>Save</Text>`
+- `app/(protected)/weaponDetail.tsx:552` **jsx:text** → "Recent Sessions"
+  - `<Text style={[s.sectionTitle, { color: colors.text }]}>Recent Sessions</Text>`
+- `app/(protected)/weaponDetail.tsx:585` **jsx:text** → "Actions"
+  - `<Text style={[s.sectionTitle, { color: colors.text }]}>Actions</Text>`
+- `app/(protected)/weaponDetail.tsx:610` **jsx:text** → "Active"
+  - `<Text style={[s.actionBadgeText, { color: '#f59e0b' }]}>Active</Text>`
+- `app/(protected)/weaponDetail.tsx:621` **jsx:text** → "Delete Weapon"
+  - `<Text style={[s.actionTitle, { color: '#ef4444' }]}>Delete Weapon</Text>`
+- `app/(protected)/weaponDetail.tsx:622` **jsx:text** → "Remove from your loadout"
+  - `<Text style={[s.actionSubtitle, { color: colors.textMuted }]}>Remove from your loadout</Text>`
+- `app/(protected)/weaponDetail.tsx:636` **jsx:text** → "Team Managed"
+  - `<Text style={[s.teamInfoTitle, { color: colors.text }]}>Team Managed</Text>`
+- `components/auth/EmailOTPSheet.tsx:135` **jsx:attr:placeholder** → "your@email.com"
+  - `placeholder="your@email.com"`
+- `components/home/UnifiedHomePage/components/ActiveSessionCard.tsx:76` **jsx:text** → "LIVE SESSION"
+  - `<Text style={s.liveLabel}>LIVE SESSION</Text>`
+- `components/home/UnifiedHomePage/components/ActiveSessionCard.tsx:83` **jsx:text** → "shots ·"
+  - `{session.stats.shots} shots · {session.stats.accuracy || 0}% accuracy`
+- `components/home/UnifiedHomePage/components/ActiveSessionCard.tsx:83` **jsx:text** → "% accuracy"
+  - `{session.stats.shots} shots · {session.stats.accuracy || 0}% accuracy`
+- `components/home/UnifiedHomePage/components/DailyTip.tsx:234` **jsx:text** → "AI"
+  - `<Text style={[s.aiBadgeText, { color: colors.primary }]}>AI</Text>`
+- `components/home/UnifiedHomePage/components/DailyTip.tsx:243` **jsx:text** → "Based on:"
+  - `<Text style={[s.basedOn, { color: colors.textMuted }]}>Based on: {currentTip.based_on}</Text>`
+- `components/home/UnifiedHomePage/components/HeroActions.tsx:219` **jsx:text** → "Active Session"
+  - `Active Session`
+- `components/home/UnifiedHomePage/components/HeroActions.tsx:234` **jsx:text** → "Start Session"
+  - `<Text style={s.idleText}>Start Session</Text>`
+- `components/home/UnifiedHomePage/components/HeroActions.tsx:248` **jsx:text** → "Solo"
+  - `<Text style={s.sideLabel}>Solo</Text>`
+- `components/home/UnifiedHomePage/components/RecentActivitySection.tsx:32` **jsx:text** → "No sessions yet"
+  - `<Text style={[localStyles.emptyTitle, { color: colors.text }]}>No sessions yet</Text>`
+- `components/home/UnifiedHomePage/components/RecentActivitySection.tsx:34` **jsx:text** → "Start your first practice to see activity here"
+  - `Start your first practice to see activity here`
+- `components/home/UnifiedHomePage/components/StartPracticeCard.tsx:51` **jsx:text** → "Start Practice"
+  - `<Text style={s.title}>Start Practice</Text>`
+- `components/home/UnifiedHomePage/components/TeamSection.tsx:20` **jsx:text** → "Team Training"
+  - `<Text style={[styles.sectionTitle, { color: colors.textMuted }]}>Team Training</Text>`
+- `components/home/UnifiedHomePage/components/TeamSection.tsx:37` **jsx:text** → "No trainings scheduled"
+  - `<Text style={[styles.emptyTeamText, { color: colors.textMuted }]}>No trainings scheduled</Text>`
+- `components/home/UnifiedHomePage/components/TeamSection.tsx:39` **jsx:text** → "Schedule"
+  - `<Text style={[styles.viewScheduleText, { color: colors.primary }]}>Schedule</Text>`
+- `components/home/UnifiedHomePage/components/TeamSection.tsx:53` **jsx:text** → "Join a team"
+  - `<Text style={[localStyles.joinTeamTitle, { color: colors.text }]}>Join a team</Text>`
+- `components/home/UnifiedHomePage/components/TeamSection.tsx:54` **jsx:text** → "Train together with your unit"
+  - `<Text style={[localStyles.joinTeamText, { color: colors.textMuted }]}>Train together with your unit</Text>`
+- `components/home/UnifiedHomePage/components/WeeklyActivityChart.tsx:123` **jsx:text** → "This Week"
+  - `<Text style={[s.title, { color: colors.text }]}>This Week</Text>`
+- `components/home/UnifiedHomePage/components/WeeklyActivityChart.tsx:126` **jsx:text** → "shots"
+  - `<Text style={[s.statLabel, { color: colors.textMuted }]}>shots</Text>`
+- `components/home/UnifiedHomePage/components/WeeklyActivityChart.tsx:129` **jsx:text** → "days"
+  - `<Text style={[s.statLabel, { color: colors.textMuted }]}>days</Text>`

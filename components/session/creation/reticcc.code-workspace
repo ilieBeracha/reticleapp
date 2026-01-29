@@ -1,20 +1,20 @@
 {
-	"folders": [
-		{
-			"path": "../../../../../garmin/reticcc"
-		},
-		{
-			"path": "../../.."
-		},
-		{
-			"path": "../../../../scopes-project/ml-trained-bullet-detector"
-		},
-		{
-			"path": "../../../../reticleWOS"
-		}
-	],
-	"settings": {
-		"lldb.library": "/Applications/Xcode.app/Contents/SharedFrameworks/LLDB.framework/Versions/A/LLDB",
-		"lldb.launch.expressions": "native"
-	}
+  "folders": [
+    {
+      "path": "../../../../../garmin/reticcc",
+    },
+    {
+      "path": "../../..",
+    },
+    {
+      "path": "../../../../scopes-project/ml-trained-bullet-detector",
+    },
+    {
+      "path": "../../../../reticleWOS",
+    },
+  ],
+  "settings": {
+    "lldb.library": "/Applications/Xcode.app/Contents/SharedFrameworks/LLDB.framework/Versions/A/LLDB",
+    "lldb.launch.expressions": "native",
+  },
 }
