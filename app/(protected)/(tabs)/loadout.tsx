@@ -64,7 +64,7 @@ function getSourceFilterConfig(t: (key: string) => string): Record<SourceFilter,
 // ============================================================================
 
 function getCategoryIcon(category: WeaponCategory | null, color: string) {
-  const size = 14;
+  const size = 15;
   switch (category) {
     case 'precision_rifle':
       return <Crosshair size={size} color={color} />;
@@ -87,14 +87,14 @@ function getSourceIcon(source: WeaponSource, color: string, size = 10) {
   }
 }
 
-function getSourceConfig(source: WeaponSource, t: (key: string) => string) {
+function getSourceConfig(source: WeaponSource, t: (key: string) => string, colors: ReturnType<typeof useColors>) {
   switch (source) {
     case 'personal':
-      return { label: t('loadout.filters.personal'), color: '#10B981', bg: '#10B98115' };
+      return { label: t('loadout.filters.personal'), color: colors.green, bg: `${colors.green}15` };
     case 'team_assigned':
-      return { label: t('loadout.filters.assigned'), color: '#3B82F6', bg: '#3B82F615' };
+      return { label: t('loadout.filters.assigned'), color: colors.primary, bg: `${colors.primary}12` };
     case 'team_pool':
-      return { label: t('loadout.filters.pool'), color: '#8B5CF6', bg: '#8B5CF615' };
+      return { label: t('loadout.filters.pool'), color: colors.primary, bg: `${colors.primary}12` };
   }
 }
 
@@ -176,7 +176,7 @@ interface StatsOverviewProps {
 function StatsOverview({ weaponCount, totalSessions, totalRounds, colors }: StatsOverviewProps) {
   const { t } = useTranslation();
   return (
-    <View style={[s.statsRow, { backgroundColor: colors.card }]}>
+    <View style={[s.statsRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
       <View style={s.statItem}>
         <Text style={[s.statValue, { color: colors.text }]}>{weaponCount}</Text>
         <Text style={[s.statLabel, { color: colors.textMuted }]}>{t('weapons.weapons')}</Text>
@@ -211,37 +211,38 @@ interface WeaponCardProps {
 function WeaponCard({ weapon, stats, isDefault, onPress, onSetDefault, colors }: WeaponCardProps) {
   const { t } = useTranslation();
   const categoryConfig = weapon.category ? getCategoryConfig(weapon.category) : null;
-  const sourceConfig = getSourceConfig(weapon.source, t);
+  const sourceConfig = getSourceConfig(weapon.source, t, colors);
   const isTeamWeapon = weapon.source !== 'personal';
 
-  // Use blue accent for team weapons, primary for personal
-  const iconAccent = isTeamWeapon ? '#3B82F6' : colors.primary;
-  const iconBg = isTeamWeapon ? '#3B82F615' : `${colors.primary}12`;
+  const iconAccent = sourceConfig.color;
+  const iconBg = sourceConfig.bg;
+
+  const statsText = `${stats?.total_sessions ?? 0} ${t('loadout.sess')} · ${formatNumber(stats?.total_rounds_fired ?? 0)} ${t('loadout.rds')}`;
+  const detailText = weapon.teamName ? `${weapon.teamName} · ${statsText}` : statsText;
 
   return (
     <TouchableOpacity
-      style={[s.card, { backgroundColor: colors.card, borderColor: isDefault ? '#f59e0b40' : colors.border }]}
+      style={[s.card, { backgroundColor: colors.card, borderColor: isDefault ? `${colors.primary}40` : colors.border }]}
       onPress={onPress}
       activeOpacity={0.7}
     >
       <View style={s.cardMain}>
-        {/* Category Icon - blue accent for team weapons */}
+        {/* Category Icon */}
         <View style={[s.cardIcon, { backgroundColor: iconBg }]}>{getCategoryIcon(weapon.category, iconAccent)}</View>
 
-        {/* Info */}
+        {/* Info — 3 lines: name, meta, detail */}
         <View style={s.cardInfo}>
           <View style={s.cardNameRow}>
             <Text style={[s.cardName, { color: colors.text }]} numberOfLines={1}>
               {weapon.name}
             </Text>
             {isDefault && (
-              <View style={s.defaultBadge}>
-                <Star size={10} color="#f59e0b" fill="#f59e0b" />
+              <View style={[s.defaultBadge, { backgroundColor: `${colors.primary}15` }]}>
+                <Star size={10} color={colors.primary} fill={colors.primary} />
               </View>
             )}
           </View>
           <View style={s.cardMetaRow}>
-            {/* Source badge - only show for team weapons to reduce noise */}
             {isTeamWeapon && (
               <View style={[s.sourceBadge, { backgroundColor: sourceConfig.bg }]}>
                 {getSourceIcon(weapon.source, sourceConfig.color)}
@@ -253,25 +254,15 @@ function WeaponCard({ weapon, stats, isDefault, onPress, onSetDefault, colors }:
               {weapon.caliber ? ` · ${weapon.caliber}` : ''}
             </Text>
           </View>
-          {/* Team name for team weapons */}
-          {weapon.teamName && (
-            <Text style={[s.teamNameText, { color: sourceConfig.color }]} numberOfLines={1}>
-              {weapon.teamName}
-            </Text>
-          )}
-        </View>
-
-        {/* Stats inline */}
-        <View style={s.cardStats}>
-          <Text style={[s.cardStatText, { color: colors.textMuted }]}>
-            {stats?.total_sessions ?? 0} {t('loadout.sess')} · {formatNumber(stats?.total_rounds_fired ?? 0)} {t('loadout.rds')}
+          <Text style={[s.cardDetail, { color: colors.textMuted }]} numberOfLines={1}>
+            {detailText}
           </Text>
         </View>
 
-        {/* Actions - only show star for personal weapons */}
+        {/* Action */}
         {weapon.source === 'personal' ? (
           <TouchableOpacity
-            style={[s.starBtn, { backgroundColor: isDefault ? '#f59e0b15' : 'transparent' }]}
+            style={[s.starBtn, { backgroundColor: isDefault ? `${colors.primary}15` : 'transparent' }]}
             onPress={(e) => {
               e.stopPropagation();
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -279,10 +270,9 @@ function WeaponCard({ weapon, stats, isDefault, onPress, onSetDefault, colors }:
             }}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
-            <Star size={14} color={isDefault ? '#f59e0b' : colors.textMuted} fill={isDefault ? '#f59e0b' : 'none'} />
+            <Star size={14} color={isDefault ? colors.primary : colors.textMuted} fill={isDefault ? colors.primary : 'none'} />
           </TouchableOpacity>
         ) : (
-          /* Team indicator icon for team weapons */
           <View style={[s.teamIndicator, { backgroundColor: sourceConfig.bg }]}>
             <Users size={12} color={sourceConfig.color} />
           </View>
@@ -626,16 +616,16 @@ const s = StyleSheet.create({
   // Filter Pills
   filterRow: {
     flexDirection: 'row',
-    gap: 8,
-    marginBottom: 16,
+    gap: 6,
+    marginBottom: 12,
   },
   filterPill: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 16,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 14,
   },
   filterPillText: {
     fontSize: 12,
@@ -660,6 +650,7 @@ const s = StyleSheet.create({
     paddingVertical: 14,
     paddingHorizontal: 16,
     borderRadius: 12,
+    borderWidth: 1,
     marginBottom: 12,
   },
   statItem: {
@@ -686,7 +677,7 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 10,
+    marginBottom: 8,
   },
   sectionTitle: {
     fontSize: 14,
@@ -700,7 +691,7 @@ const s = StyleSheet.create({
 
   // Card List
   cardList: {
-    gap: 8,
+    gap: 6,
   },
 
   // Card
@@ -712,36 +703,38 @@ const s = StyleSheet.create({
   cardMain: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-    gap: 10,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    gap: 12,
   },
   cardIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
+    width: 34,
+    height: 34,
+    borderRadius: 9,
     alignItems: 'center',
     justifyContent: 'center',
   },
   cardInfo: {
     flex: 1,
-    gap: 2,
+    gap: 3,
+    minWidth: 0,
   },
   cardNameRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
+    minWidth: 0,
   },
   cardName: {
     fontSize: 14,
     fontWeight: '600',
     letterSpacing: -0.2,
+    flexShrink: 1,
   },
   defaultBadge: {
     width: 16,
     height: 16,
     borderRadius: 8,
-    backgroundColor: '#f59e0b15',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -749,6 +742,7 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
+    minWidth: 0,
   },
   sourceBadge: {
     flexDirection: 'row',
@@ -767,16 +761,9 @@ const s = StyleSheet.create({
   cardMeta: {
     fontSize: 11,
     fontWeight: '400',
+    flexShrink: 1,
   },
-  teamNameText: {
-    fontSize: 10,
-    fontWeight: '400',
-    marginTop: 1,
-  },
-  cardStats: {
-    paddingHorizontal: 8,
-  },
-  cardStatText: {
+  cardDetail: {
     fontSize: 10,
     fontWeight: '500',
   },

@@ -162,9 +162,9 @@ export function HeroActions({
       <Animated.View
         style={[
           s.splitContainer,
-          heroMode === 'team-live' && (isTrainingCommander ? s.splitCommander : s.splitTeamLive),
-          heroMode === 'solo-active' && s.splitSoloActive,
-          heroMode === 'idle' && s.splitIdle,
+          heroMode === 'team-live' && { backgroundColor: `${colors.primary}15`, borderColor: `${colors.primary}30` },
+          heroMode === 'solo-active' && { backgroundColor: `${colors.green}15`, borderColor: `${colors.green}30` },
+          heroMode === 'idle' && { backgroundColor: colors.card, borderColor: colors.border },
           mainAnimStyle,
         ]}
       >
@@ -185,40 +185,40 @@ export function HeroActions({
             <>
               <View style={s.liveIconContainer}>
                 <Animated.View
-                  style={[s.livePulse, isTrainingCommander ? s.livePulseIndigo : s.livePulseOrange, pulseStyle]}
+                  style={[s.livePulse, { backgroundColor: `${colors.primary}40` }, pulseStyle]}
                 />
-                <View style={[s.liveIconBadge, isTrainingCommander && s.liveIconBadgeCommander]}>
-                  <Radio size={11} color="#fff" />
+                <View style={[s.liveIconBadge, { backgroundColor: `${colors.primary}40` }]}>
+                  <Radio size={11} color={colors.primary} />
                 </View>
               </View>
               <View style={s.mainTextContainer}>
-                <Text style={s.mainLabel} numberOfLines={1}>
+                <Text style={[s.mainLabel, { color: colors.textMuted }]} numberOfLines={1}>
                   {isTrainingCommander ? 'Your Training' : (activeTeamTraining.team?.name ?? 'Team')}
                 </Text>
-                <Text style={s.mainTitle} numberOfLines={1}>
+                <Text style={[s.mainTitle, { color: colors.text }]} numberOfLines={1}>
                   {activeTeamTraining.title || 'Live Training'}
                 </Text>
               </View>
-              <View style={[s.badge, isTrainingCommander ? s.badgeCommander : s.badgeLive]}>
-                <Text style={s.badgeText}>{isTrainingCommander ? 'MANAGE' : 'JOIN'}</Text>
+              <View style={[s.badge, { backgroundColor: colors.primary }]}>
+                <Text style={[s.badgeText, { color: '#fff' }]}>{isTrainingCommander ? 'MANAGE' : 'JOIN'}</Text>
               </View>
-              <ChevronRight size={14} color="rgba(255,255,255,0.5)" />
+              <ChevronRight size={14} color={colors.textMuted} />
             </>
           )}
 
           {heroMode === 'solo-active' && (
             <>
               <View style={s.liveIconContainer}>
-                <Animated.View style={[s.livePulse, s.livePulseGreen, pulseStyle]} />
-                <View style={s.soloIconLive}>
-                  <Play size={11} color="#fff" fill="#fff" />
+                <Animated.View style={[s.livePulse, { backgroundColor: `${colors.green}40` }, pulseStyle]} />
+                <View style={[s.soloIconLive, { backgroundColor: `${colors.green}40` }]}>
+                  <Play size={11} color={colors.green} fill={colors.green} />
                 </View>
               </View>
               <View style={s.mainTextContainer}>
-                <Text style={s.mainLabel} numberOfLines={1}>
+                <Text style={[s.mainLabel, { color: colors.textMuted }]} numberOfLines={1}>
                   Active Session
                 </Text>
-                <Text style={s.mainTitle} numberOfLines={1}>
+                <Text style={[s.mainTitle, { color: colors.text }]} numberOfLines={1}>
                   {activeSession?.drillName || 'Solo Practice'}
                 </Text>
               </View>
@@ -227,10 +227,10 @@ export function HeroActions({
 
           {heroMode === 'idle' && (
             <>
-              <View style={s.soloIconDefault}>
-                <Target size={13} color="rgba(255,255,255,0.9)" strokeWidth={2} />
+              <View style={[s.soloIconDefault, { backgroundColor: `${colors.textMuted}20` }]}>
+                <Target size={13} color={colors.text} strokeWidth={2} />
               </View>
-              <Text style={s.idleText}>Start Session</Text>
+              <Text style={[s.idleText, { color: colors.text }]}>Start Session</Text>
             </>
           )}
         </TouchableOpacity>
@@ -238,12 +238,12 @@ export function HeroActions({
         {/* Solo side — attached, separated by divider (only when team-live) */}
         {heroMode === 'team-live' && (
           <>
-            <View style={[s.divider, isTrainingCommander ? s.dividerCommander : s.dividerOrange]} />
+            <View style={[s.divider, { backgroundColor: `${colors.primary}25` }]} />
             <TouchableOpacity style={s.sideArea} onPress={handleSoloSidePress} activeOpacity={0.7}>
-              <View style={s.sideIcon}>
-                <Target size={14} color="rgba(255,255,255,0.85)" strokeWidth={2} />
+              <View style={[s.sideIcon, { backgroundColor: `${colors.textMuted}10` }]}>
+                <Target size={14} color={colors.textMuted} strokeWidth={2} />
               </View>
-              <Text style={s.sideLabel}>Solo</Text>
+              <Text style={[s.sideLabel, { color: colors.textMuted }]}>Solo</Text>
             </TouchableOpacity>
           </>
         )}
@@ -269,22 +269,6 @@ const s = StyleSheet.create({
     borderWidth: 1,
     overflow: 'hidden',
   },
-  splitTeamLive: {
-    backgroundColor: '#3d1f00',
-    borderColor: 'rgba(245,158,11,0.35)',
-  },
-  splitCommander: {
-    backgroundColor: '#1a1a3d',
-    borderColor: 'rgba(99,102,241,0.35)',
-  },
-  splitSoloActive: {
-    backgroundColor: '#0d5c2e',
-    borderColor: 'rgba(16,185,129,0.3)',
-  },
-  splitIdle: {
-    backgroundColor: '#1a1a1a',
-    borderColor: 'rgba(255,255,255,0.08)',
-  },
 
   // Main tappable area (flex: 1)
   mainArea: {
@@ -301,13 +285,11 @@ const s = StyleSheet.create({
   mainLabel: {
     fontSize: 10,
     fontWeight: '500',
-    color: 'rgba(255,255,255,0.6)',
     letterSpacing: 0.2,
   },
   mainTitle: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#fff',
     letterSpacing: -0.3,
     marginTop: 1,
   },
@@ -315,7 +297,6 @@ const s = StyleSheet.create({
     flex: 1,
     fontSize: 13,
     fontWeight: '600',
-    color: 'rgba(255,255,255,0.85)',
     letterSpacing: -0.2,
   },
 
@@ -323,12 +304,6 @@ const s = StyleSheet.create({
   divider: {
     width: 1,
     marginVertical: 8,
-  },
-  dividerOrange: {
-    backgroundColor: 'rgba(245,158,11,0.3)',
-  },
-  dividerCommander: {
-    backgroundColor: 'rgba(99,102,241,0.3)',
   },
 
   // Solo side area (fixed width, attached)
@@ -344,12 +319,10 @@ const s = StyleSheet.create({
     borderRadius: 6,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.08)',
   },
   sideLabel: {
     fontSize: 9,
     fontWeight: '600',
-    color: 'rgba(255,255,255,0.7)',
     letterSpacing: 0.2,
   },
 
@@ -364,25 +337,12 @@ const s = StyleSheet.create({
     height: 28,
     borderRadius: 14,
   },
-  livePulseOrange: {
-    backgroundColor: 'rgba(245,158,11,0.35)',
-  },
-  livePulseIndigo: {
-    backgroundColor: 'rgba(99,102,241,0.35)',
-  },
-  livePulseGreen: {
-    backgroundColor: 'rgba(16,185,129,0.4)',
-  },
   liveIconBadge: {
     width: 22,
     height: 22,
     borderRadius: 6,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(245,158,11,0.6)',
-  },
-  liveIconBadgeCommander: {
-    backgroundColor: 'rgba(99,102,241,0.6)',
   },
   soloIconLive: {
     width: 22,
@@ -390,7 +350,6 @@ const s = StyleSheet.create({
     borderRadius: 6,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.2)',
   },
   soloIconDefault: {
     width: 26,
@@ -398,7 +357,6 @@ const s = StyleSheet.create({
     borderRadius: 7,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.1)',
   },
 
   // Badges
@@ -407,16 +365,9 @@ const s = StyleSheet.create({
     paddingVertical: 2,
     borderRadius: 4,
   },
-  badgeLive: {
-    backgroundColor: 'rgba(245,158,11,0.8)',
-  },
-  badgeCommander: {
-    backgroundColor: 'rgba(99,102,241,0.8)',
-  },
   badgeText: {
     fontSize: 9,
     fontWeight: '800',
-    color: '#fff',
     letterSpacing: 0.5,
   },
 
