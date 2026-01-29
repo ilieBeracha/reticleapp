@@ -14,12 +14,19 @@
  */
 
 import { useColors } from '@/hooks/ui/useColors';
-import { supabase } from '@/lib/supabase';
-import { updateParticipantState } from '@/services/session/participants';
+import { useTableSubscription } from '@/hooks/realtime/table/useTableSubscription';
+import { getProfileName } from '@/services/profileService';
+import {
+  getActiveEngagementForTraining,
+  getEngagementSessionDetails,
+  getUserParticipationState,
+  joinEngagement,
+  updateParticipantState,
+} from '@/services/session/participants';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { Check, Target, Users, X } from 'lucide-react-native';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeInDown, FadeOutUp } from 'react-native-reanimated';
@@ -55,47 +62,21 @@ export function SquadInvitationBanner({ trainingId, userId, onInvitationChanged 
   // Load active squad/group engagement in this training (visible to ALL team members)
   const loadActiveEngagement = useCallback(async () => {
     try {
-      // Query for ANY active squad/group engagement in this training
-      // This shows the banner to ALL team members, not just participants
-      const { data: engagements, error: engError } = await supabase
-        .from('engagements')
-        .select(`
-          id,
-          session_id,
-          training_id,
-          engagement_mode,
-          status,
-          shooter_id,
-          started_at
-        `)
-        .eq('training_id', trainingId)
-        .in('engagement_mode', ['squad', 'group'])
-        .in('status', ['pending', 'active'])
-        .order('created_at', { ascending: false })
-        .limit(1);
+      const engagement = await getActiveEngagementForTraining(trainingId);
 
-      if (engError) throw engError;
-      
-      console.log('[SquadInvitationBanner] Query result:', engagements?.length || 0, 'engagements found');
-      
-      if (!engagements?.length) {
+      console.log('[SquadInvitationBanner] Query result:', engagement ? 1 : 0, 'engagements found');
+
+      if (!engagement) {
         console.log('[SquadInvitationBanner] No active engagements, hiding banner');
         setActiveEngagement(null);
         return;
       }
 
-      const engagement = engagements[0];
       console.log('[SquadInvitationBanner] Found engagement:', engagement.id, 'status:', engagement.status);
       const isCommander = engagement.shooter_id === userId;
 
       // Check if user is a participant and get their state
-      const { data: participation } = await supabase
-        .from('engagement_participants')
-        .select('id, state')
-        .eq('engagement_id', engagement.id)
-        .eq('user_id', userId)
-        .maybeSingle();
-
+      const participation = await getUserParticipationState(engagement.id, userId);
       const participationState = participation?.state as 'pending' | 'joined' | 'declined' | 'left' | null;
 
       // Don't show banner to commander (they manage from squadLobby or activeSession)
@@ -103,7 +84,7 @@ export function SquadInvitationBanner({ trainingId, userId, onInvitationChanged 
         setActiveEngagement(null);
         return;
       }
-      
+
       // Don't show banner to users who declined or left
       if (participationState === 'declined' || participationState === 'left') {
         setActiveEngagement(null);
@@ -111,20 +92,10 @@ export function SquadInvitationBanner({ trainingId, userId, onInvitationChanged 
       }
 
       // Get session details for drill info
-      const { data: session, error: sessionError } = await supabase
-        .from('sessions')
-        .select('id, custom_drill_config, user_id')
-        .eq('id', engagement.session_id)
-        .single();
-
-      if (sessionError) throw sessionError;
+      const session = await getEngagementSessionDetails(engagement.session_id);
 
       // Get commander's name
-      const { data: commanderProfile } = await supabase
-        .from('profiles')
-        .select('full_name')
-        .eq('id', session.user_id)
-        .single();
+      const commanderName = await getProfileName(session.user_id);
 
       const drillConfig = session.custom_drill_config as any;
       const engagementMode = engagement.engagement_mode as 'squad' | 'group';
@@ -136,7 +107,7 @@ export function SquadInvitationBanner({ trainingId, userId, onInvitationChanged 
         drillName: drillConfig?.name || (isGroup ? t('training.groupEngagement') : t('training.squadEngagement')),
         distanceM: drillConfig?.distance_m || null,
         roundsPerShooter: drillConfig?.rounds_per_shooter || null,
-        commanderName: commanderProfile?.full_name || null,
+        commanderName,
         commanderId: session.user_id,
         hasStarted: !!engagement.started_at,
         engagementMode,
@@ -155,48 +126,35 @@ export function SquadInvitationBanner({ trainingId, userId, onInvitationChanged 
     loadActiveEngagement();
   }, [loadActiveEngagement]);
 
-  // Realtime subscription for engagement changes (visible to all team members)
-  // Uses debouncing to prevent rapid re-queries on burst updates
+  // Debounced reload for realtime updates
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const debouncedLoad = useCallback(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      loadActiveEngagement();
+    }, 300);
+  }, [loadActiveEngagement]);
+
   useEffect(() => {
-    if (!trainingId || !userId) return;
-
-    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
-    const debouncedLoad = () => {
-      if (debounceTimer) clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(() => {
-        loadActiveEngagement();
-      }, 300); // 300ms debounce
-    };
-
-    const channelName = `squad-invite-${trainingId}-${userId}`;
-    const channel = supabase
-      .channel(channelName)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'engagement_participants',
-        },
-        debouncedLoad
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'engagements',
-          filter: `training_id=eq.${trainingId}`,
-        },
-        debouncedLoad
-      )
-      .subscribe();
-
     return () => {
-      if (debounceTimer) clearTimeout(debounceTimer);
-      supabase.removeChannel(channel);
+      if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [trainingId, userId, loadActiveEngagement]);
+  }, []);
+
+  // Realtime subscription for engagement_participants changes
+  useTableSubscription({
+    table: 'engagement_participants',
+    onChange: debouncedLoad,
+    enabled: !!trainingId && !!userId,
+  });
+
+  // Realtime subscription for engagements changes
+  useTableSubscription({
+    table: 'engagements',
+    filter: `training_id=eq.${trainingId}`,
+    onChange: debouncedLoad,
+    enabled: !!trainingId && !!userId,
+  });
 
   // Handle join/view - navigate based on state
   const handleJoinOrView = () => {
@@ -244,20 +202,9 @@ export function SquadInvitationBanner({ trainingId, userId, onInvitationChanged 
     }
     // If not a participant at all and session hasn't started, self-join
     else if (!participationState && !hasStarted) {
-      supabase
-        .from('engagement_participants')
-        .insert({
-          engagement_id: engagementId,
-          user_id: userId,
-          state: 'joined',
-          role: 'shooter',
-          joined_at: new Date().toISOString(),
-        })
-        .then(({ error }) => {
-          if (error && !error.message?.includes('duplicate')) {
-            console.error('[SquadInvitationBanner] Failed to self-join:', error);
-          }
-        });
+      joinEngagement(engagementId, userId).catch((err) => {
+        console.error('[SquadInvitationBanner] Failed to self-join:', err);
+      });
     }
 
     onInvitationChanged?.();

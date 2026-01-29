@@ -9,7 +9,7 @@
  * "Drills are verbs. Presets are shortcuts. Standards are judgment."
  */
 
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/services/supabase';
 
 // ============================================================================
 // TYPES

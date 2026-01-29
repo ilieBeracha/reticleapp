@@ -1,5 +1,5 @@
 import { useColors } from "@/hooks/ui/useColors";
-import { SignIn } from "@/modules/auth/SignIn";
+import { SignIn } from "@/components/auth/SignIn";
 import { View } from "react-native";
 
 export default function SignInPage() {

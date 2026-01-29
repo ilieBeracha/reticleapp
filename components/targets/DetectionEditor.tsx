@@ -8,7 +8,7 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import Svg, { Circle, G, Line } from 'react-native-svg';
 import ViewShot from 'react-native-view-shot';
-import { CANVAS_SIZE, COLORS, EditableDetection, EditMode, MARKER_RADIUS } from './types';
+import { CANVAS_SIZE, COLORS, EditableDetection, EditMode, MARKER_RADIUS } from '@/types/targets';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // DETECTION EDITOR

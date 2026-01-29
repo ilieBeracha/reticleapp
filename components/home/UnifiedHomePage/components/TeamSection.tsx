@@ -6,13 +6,13 @@
 
 import { DirectionalChevron } from '@/components/shared/DirectionalChevron';
 import { SpecialtyBadge } from '@/components/teams/SpecialtyBadge';
-import { useTeamStore } from '@/store/teamStore';
+import { useTeamStore } from '@/stores/teamStore';
 import { router } from 'expo-router';
 import { Calendar, Users } from 'lucide-react-native';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeInUp } from 'react-native-reanimated';
 import { styles } from '../UnifiedHomePage.styles';
-import type { TeamSectionProps } from '../UnifiedHomePage.types';
+import type { TeamSectionProps } from '@/types/home';
 import { TeamTrainingCard } from './TeamTrainingCard';
 
 export function TeamSection({ trainings, hasTeams, colors, onTrainingPress }: TeamSectionProps) {

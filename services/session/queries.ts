@@ -1,7 +1,8 @@
-import type { DashboardFeature } from '@/components/insights/insights.types';
 import { SESSION_STATUS } from '@/constants/session';
-import { supabase } from '@/lib/supabase';
 import { withQueryTiming } from '@/services/_shared/instrumentation';
+import { supabase } from '@/services/supabase';
+import type { DashboardFeature } from '@/types/insights';
+import type { SessionAggregatedStats, SessionWithDetails } from '@/types/session';
 import { mapSession } from './mappers';
 import {
   SESSION_SELECT_MINIMAL,
@@ -9,7 +10,131 @@ import {
   SESSION_SELECT_WITH_WEAPON,
   TARGET_STATS_SELECT,
 } from './selectClauses';
-import type { SessionAggregatedStats, SessionWithDetails } from './types';
+
+// ============================================================================
+// DRILL QUERIES
+// ============================================================================
+
+export interface TrainingDrillData {
+  id: string;
+  name: string;
+  drill_goal: string;
+  target_type: string;
+  execution_policy: string | null;
+  engagement_mode: string | null;
+  distance_m: number | null;
+  distance_category: string | null;
+  rounds_per_shooter: number | null;
+  position: string | null;
+  time_limit_seconds: number | null;
+  max_executions: number | null;
+}
+
+/**
+ * Get a training drill by ID
+ */
+export async function getTrainingDrill(drillId: string): Promise<TrainingDrillData | null> {
+  const { data, error } = await supabase
+    .from('training_drills')
+    .select(
+      'id, name, drill_goal, target_type, execution_policy, engagement_mode, distance_m, distance_category, rounds_per_shooter, position, time_limit_seconds, max_executions'
+    )
+    .eq('id', drillId)
+    .single();
+
+  if (error) {
+    console.error('[getTrainingDrill] Failed to fetch drill:', error);
+    return null;
+  }
+  return data;
+}
+
+// ============================================================================
+// ENGAGEMENT QUERIES
+// ============================================================================
+
+export interface ActiveEngagement {
+  id: string;
+  session_id: string;
+  status: string;
+  engagement_mode: string;
+  started_at: string | null;
+  shooter_id: string;
+}
+
+/**
+ * Get active squad/group engagement for a training
+ */
+export async function getActiveSquadEngagement(trainingId: string): Promise<ActiveEngagement | null> {
+  const { data, error } = await supabase
+    .from('engagements')
+    .select('id, session_id, status, engagement_mode, started_at, shooter_id')
+    .eq('training_id', trainingId)
+    .in('engagement_mode', ['squad', 'group'])
+    .not('status', 'in', '("completed","cancelled")')
+    .order('created_at', { ascending: false })
+    .limit(1);
+
+  if (error) {
+    console.error('[getActiveSquadEngagement] Error:', error);
+    return null;
+  }
+
+  return data && data.length > 0 ? data[0] : null;
+}
+
+/**
+ * Check if user is a participant in an engagement
+ */
+export async function checkUserParticipation(
+  engagementId: string,
+  userId: string
+): Promise<{ isParticipant: boolean; state: string | null }> {
+  const { data, error } = await supabase
+    .from('engagement_participants')
+    .select('id, state')
+    .eq('engagement_id', engagementId)
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  if (error) {
+    console.error('[checkUserParticipation] Error:', error);
+    return { isParticipant: false, state: null };
+  }
+
+  return {
+    isParticipant: !!data && data.state === 'joined',
+    state: data?.state ?? null,
+  };
+}
+
+// ============================================================================
+// WEAPON QUERIES
+// ============================================================================
+
+/**
+ * Get user's most recently used weapon ID
+ */
+export async function getUserDefaultWeaponId(): Promise<string | null> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const { data, error } = await supabase
+    .from('user_weapons')
+    .select('id')
+    .eq('user_id', user.id)
+    .order('updated_at', { ascending: false })
+    .limit(1);
+
+  if (error) {
+    console.error('[getUserDefaultWeaponId] Error:', error);
+    return null;
+  }
+
+  return data && data.length > 0 ? data[0].id : null;
+}
 
 /**
  * Get user's active session for a specific training (if any)
@@ -26,7 +151,7 @@ export async function getMyActiveSessionForTraining(trainingId: string): Promise
   const { data, error } = await supabase
     .from('sessions')
     .select(SESSION_SELECT_WITH_WEAPON)
-    
+
     .eq('training_id', trainingId)
     .eq('user_id', user.id)
     .eq('status', SESSION_STATUS.ACTIVE)
@@ -149,7 +274,7 @@ export const AUTO_CANCEL_THRESHOLD_HOURS = 24;
 export function isSessionStale(session: SessionWithDetails): boolean {
   const lastActivity = session.started_at;
   if (!lastActivity) return false;
-  
+
   const hoursElapsed = (Date.now() - new Date(lastActivity).getTime()) / (1000 * 60 * 60);
   return hoursElapsed > STALE_SESSION_THRESHOLD_HOURS;
 }
@@ -160,7 +285,7 @@ export function isSessionStale(session: SessionWithDetails): boolean {
 export function shouldAutoCancelSession(session: SessionWithDetails): boolean {
   const startedAt = session.started_at;
   if (!startedAt) return false;
-  
+
   const hoursElapsed = (Date.now() - new Date(startedAt).getTime()) / (1000 * 60 * 60);
   return hoursElapsed > AUTO_CANCEL_THRESHOLD_HOURS;
 }
@@ -171,12 +296,12 @@ export function shouldAutoCancelSession(session: SessionWithDetails): boolean {
 export function getSessionAge(session: SessionWithDetails): string {
   const startedAt = session.started_at;
   if (!startedAt) return 'unknown';
-  
+
   const ms = Date.now() - new Date(startedAt).getTime();
   const minutes = Math.floor(ms / (1000 * 60));
   const hours = Math.floor(minutes / 60);
   const days = Math.floor(hours / 24);
-  
+
   if (days > 0) return `${days}d ${hours % 24}h`;
   if (hours > 0) return `${hours}h ${minutes % 60}m`;
   return `${minutes}m`;
@@ -187,10 +312,7 @@ export function getSessionAge(session: SessionWithDetails): string {
  * Includes both personal sessions and team sessions
  */
 export async function getSessions(teamId?: string | null): Promise<SessionWithDetails[]> {
-  let query = supabase
-    .from('sessions')
-    .select(SESSION_SELECT_WITH_WEAPON)
-    .order('started_at', { ascending: false });
+  let query = supabase.from('sessions').select(SESSION_SELECT_WITH_WEAPON).order('started_at', { ascending: false });
 
   // Filter by team if provided
   if (teamId !== undefined) {
@@ -218,11 +340,13 @@ export async function getSessions(teamId?: string | null): Promise<SessionWithDe
  * @param options.limit - Page size (default: 50)
  * @param options.offset - Offset (default: 0)
  */
-export async function getSessionsPage(options: {
-  teamId?: string | null;
-  limit?: number;
-  offset?: number;
-} = {}): Promise<SessionWithDetails[]> {
+export async function getSessionsPage(
+  options: {
+    teamId?: string | null;
+    limit?: number;
+    offset?: number;
+  } = {}
+): Promise<SessionWithDetails[]> {
   return withQueryTiming('sessions.getSessionsPage', async () => {
     const { teamId, limit = 50, offset = 0 } = options;
 
@@ -522,15 +646,15 @@ export async function getRecentSessionsWithStats(
     // Attach stats to sessions
     return sessions.map((session) => {
       const rawStats = statsMap.get(session.id);
-      
+
       // For squad/group engagements, calculate stats from participants
       const engagement = session.engagement;
       const isSquadOrGroup = engagement?.engagement_mode === 'squad' || engagement?.engagement_mode === 'group';
-      
+
       if (isSquadOrGroup && engagement?.engagement_participants) {
         const participants = engagement.engagement_participants;
         const joinedParticipants = participants.filter((p: any) => p.state === 'joined');
-        
+
         // Aggregate participant stats
         let totalShots = 0;
         let totalHits = 0;
@@ -538,7 +662,7 @@ export async function getRecentSessionsWithStats(
           totalShots += p.shots_fired ?? 0;
           totalHits += p.hits ?? 0;
         });
-        
+
         return {
           ...session,
           stats: {
@@ -553,7 +677,7 @@ export async function getRecentSessionsWithStats(
           } as any,
         };
       }
-      
+
       return {
         ...session,
         stats: rawStats
@@ -868,10 +992,12 @@ export async function getSessionSummary(sessionId: string): Promise<{
  * NOTE: We intentionally keep this as a 2-step query (sessions -> targets) for safety,
  * because it doesn't require relying on PostgREST join syntax/foreign key naming.
  */
-export async function getMyRecentPaperScans(options: {
-  sessionLimit?: number;
-  targetLimit?: number;
-} = {}): Promise<
+export async function getMyRecentPaperScans(
+  options: {
+    sessionLimit?: number;
+    targetLimit?: number;
+  } = {}
+): Promise<
   Array<{
     id: string;
     session_id: string;
@@ -887,31 +1013,31 @@ export async function getMyRecentPaperScans(options: {
   return withQueryTiming('sessions.getMyRecentPaperScans', async () => {
     const { sessionLimit = 200, targetLimit = 100 } = options;
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
-  if (!user) return [];
+    if (!user) return [];
 
-  // Step 1: only fetch a bounded number of recent sessions for this user.
-  // (This prevents a huge `.in(session_id, ...)` list.)
-  const { data: sessions, error: sessionsError } = await supabase
-    .from('sessions')
-    .select('id')
-    .eq('user_id', user.id)
-    .order('started_at', { ascending: false })
-    .limit(sessionLimit);
+    // Step 1: only fetch a bounded number of recent sessions for this user.
+    // (This prevents a huge `.in(session_id, ...)` list.)
+    const { data: sessions, error: sessionsError } = await supabase
+      .from('sessions')
+      .select('id')
+      .eq('user_id', user.id)
+      .order('started_at', { ascending: false })
+      .limit(sessionLimit);
 
-  if (sessionsError) throw sessionsError;
-  if (!sessions || sessions.length === 0) return [];
+    if (sessionsError) throw sessionsError;
+    if (!sessions || sessions.length === 0) return [];
 
-  const sessionIds = sessions.map((s: any) => s.id);
+    const sessionIds = sessions.map((s: any) => s.id);
 
-  // Step 2: fetch paper targets + paper result summary fields (bounded).
-  const { data: targets, error: targetsError } = await supabase
-    .from('session_targets')
-    .select(
-      `
+    // Step 2: fetch paper targets + paper result summary fields (bounded).
+    const { data: targets, error: targetsError } = await supabase
+      .from('session_targets')
+      .select(
+        `
       id,
       session_id,
       target_type,
@@ -925,13 +1051,13 @@ export async function getMyRecentPaperScans(options: {
         dispersion_cm
       )
     `
-    )
-    .in('session_id', sessionIds)
-    .eq('target_type', 'paper')
-    .order('created_at', { ascending: false })
-    .limit(targetLimit);
+      )
+      .in('session_id', sessionIds)
+      .eq('target_type', 'paper')
+      .order('created_at', { ascending: false })
+      .limit(targetLimit);
 
-  if (targetsError) throw targetsError;
+    if (targetsError) throw targetsError;
 
     return (targets ?? []).map((t: any) => {
       const paperResult = Array.isArray(t.paper_target_results) ? t.paper_target_results[0] : t.paper_target_results;
@@ -950,4 +1076,314 @@ export async function getMyRecentPaperScans(options: {
   });
 }
 
+// ============================================================================
+// DRILL EXECUTION QUERIES
+// ============================================================================
 
+/**
+ * Count how many times a user has completed a specific drill in a training.
+ */
+export async function getCompletedDrillExecutionCount(
+  userId: string,
+  drillId: string,
+  trainingId: string
+): Promise<number> {
+  const { count, error } = await supabase
+    .from('sessions')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', userId)
+    .eq('drill_id', drillId)
+    .eq('training_id', trainingId)
+    .eq('status', 'completed');
+
+  if (error) {
+    console.error('[queries] getCompletedDrillExecutionCount error:', error);
+    throw error;
+  }
+
+  return count ?? 0;
+}
+
+/**
+ * Count total targets in a session.
+ */
+export async function getSessionTargetCount(sessionId: string): Promise<number> {
+  const { count, error } = await supabase
+    .from('session_targets')
+    .select('id', { count: 'exact', head: true })
+    .eq('session_id', sessionId);
+
+  if (error) {
+    console.error('[queries] getSessionTargetCount error:', error);
+    throw error;
+  }
+
+  return count ?? 0;
+}
+
+// ============================================================================
+// TRAINING REPORT DATA
+// ============================================================================
+
+/**
+ * Biometrics summary extracted from watch data
+ */
+export interface BiometricsSummary {
+  avgHR: number;
+  minHR: number;
+  maxHR: number;
+  avgBreathRate: number;
+  avgStress?: number;
+  steadinessAvg?: number;
+  flinchCount?: number;
+}
+
+/**
+ * Per-participant biometrics data
+ */
+export interface ParticipantBiometrics {
+  userId: string;
+  userName: string | null;
+  sessionId: string;
+  biometrics: BiometricsSummary;
+}
+
+/**
+ * Aggregated weather data for training report
+ */
+export interface TrainingWeatherSummary {
+  /** Average temperature across sessions */
+  avgTemperatureC: number | null;
+  /** Min/max temperature range */
+  tempRangeC: { min: number; max: number } | null;
+  /** Average humidity */
+  avgHumidity: number | null;
+  /** Average wind speed */
+  avgWindSpeedMps: number | null;
+  /** Dominant wind direction */
+  dominantWindDirection: string | null;
+  /** Dominant condition */
+  dominantCondition: string | null;
+  /** Most severe wind impact */
+  maxWindImpact: 'calm' | 'light' | 'moderate' | 'strong' | null;
+  /** Most severe condition */
+  maxConditionSeverity: 'ideal' | 'good' | 'challenging' | 'difficult' | 'extreme' | null;
+  /** Number of sessions with weather data */
+  sessionsWithWeather: number;
+}
+
+/**
+ * Aggregated biometrics data for training report
+ */
+export interface TrainingBiometricsSummary {
+  /** Team-wide average HR */
+  teamAvgHR: number | null;
+  /** Team-wide HR range */
+  teamHRRange: { min: number; max: number } | null;
+  /** Team-wide average breath rate */
+  teamAvgBreathRate: number | null;
+  /** Team-wide average stress */
+  teamAvgStress: number | null;
+  /** Team-wide average steadiness */
+  teamAvgSteadiness: number | null;
+  /** Total flinches across team */
+  totalFlinches: number;
+  /** Per-participant biometrics */
+  participants: ParticipantBiometrics[];
+  /** Number of sessions with biometrics data */
+  sessionsWithBiometrics: number;
+}
+
+/**
+ * Fetch biometrics data from session_targets for training report.
+ * Extracts watch data from target_data field.
+ */
+export async function getTrainingBiometrics(sessionIds: string[]): Promise<TrainingBiometricsSummary> {
+  if (sessionIds.length === 0) {
+    return {
+      teamAvgHR: null,
+      teamHRRange: null,
+      teamAvgBreathRate: null,
+      teamAvgStress: null,
+      teamAvgSteadiness: null,
+      totalFlinches: 0,
+      participants: [],
+      sessionsWithBiometrics: 0,
+    };
+  }
+
+  const { data, error } = await supabase
+    .from('session_targets')
+    .select(
+      `
+      session_id,
+      target_data,
+      sessions!inner(
+        id,
+        user_id,
+        profiles:user_id(full_name)
+      )
+    `
+    )
+    .in('session_id', sessionIds)
+    .not('target_data', 'is', null);
+
+  if (error) {
+    console.error('[queries] getTrainingBiometrics error:', error);
+    return {
+      teamAvgHR: null,
+      teamHRRange: null,
+      teamAvgBreathRate: null,
+      teamAvgStress: null,
+      teamAvgSteadiness: null,
+      totalFlinches: 0,
+      participants: [],
+      sessionsWithBiometrics: 0,
+    };
+  }
+
+  const participantMap = new Map<string, ParticipantBiometrics>();
+  const allHRs: number[] = [];
+  const allBreathRates: number[] = [];
+  const allStress: number[] = [];
+  const allSteadiness: number[] = [];
+  let totalFlinches = 0;
+
+  for (const target of data ?? []) {
+    const targetData = target.target_data as Record<string, any> | null;
+    if (!targetData?.biometrics?.summary) continue;
+
+    const bio = targetData.biometrics.summary;
+    const steady = targetData.steadiness;
+    const session = target.sessions as any;
+    const userId = session?.user_id;
+    const userName = session?.profiles?.full_name || null;
+
+    if (!userId) continue;
+
+    // Extract biometrics
+    const avgHR = bio.avgHR ?? bio.hrAvg;
+    const minHR = bio.minHR ?? bio.hrMin;
+    const maxHR = bio.maxHR ?? bio.hrMax;
+    const avgBreathRate = bio.avgBreathRate ?? bio.brAvg;
+    const avgStress = bio.avgStress;
+    const steadinessAvg = steady?.avgScore;
+    const flinchCount = steady?.flinchCount ?? 0;
+
+    if (avgHR) allHRs.push(avgHR);
+    if (avgBreathRate) allBreathRates.push(avgBreathRate);
+    if (avgStress) allStress.push(avgStress);
+    if (steadinessAvg) allSteadiness.push(steadinessAvg);
+    totalFlinches += flinchCount;
+
+    // Track per-participant (use first valid biometrics per user)
+    if (!participantMap.has(userId) && avgHR) {
+      participantMap.set(userId, {
+        userId,
+        userName,
+        sessionId: session.id,
+        biometrics: {
+          avgHR: avgHR || 0,
+          minHR: minHR || 0,
+          maxHR: maxHR || 0,
+          avgBreathRate: avgBreathRate || 0,
+          avgStress,
+          steadinessAvg,
+          flinchCount,
+        },
+      });
+    }
+  }
+
+  const avg = (arr: number[]) => (arr.length > 0 ? arr.reduce((a, b) => a + b, 0) / arr.length : null);
+
+  return {
+    teamAvgHR: avg(allHRs) ? Math.round(avg(allHRs)!) : null,
+    teamHRRange: allHRs.length > 0 ? { min: Math.min(...allHRs), max: Math.max(...allHRs) } : null,
+    teamAvgBreathRate: avg(allBreathRates) ? Math.round(avg(allBreathRates)! * 10) / 10 : null,
+    teamAvgStress: avg(allStress) ? Math.round(avg(allStress)!) : null,
+    teamAvgSteadiness: avg(allSteadiness) ? Math.round(avg(allSteadiness)!) : null,
+    totalFlinches,
+    participants: Array.from(participantMap.values()),
+    sessionsWithBiometrics: participantMap.size,
+  };
+}
+
+/**
+ * Aggregate weather data from sessions for training report.
+ */
+export function aggregateTrainingWeather(sessions: SessionWithDetails[]): TrainingWeatherSummary {
+  const weatherSessions = sessions.filter((s) => s.weather && s.weather.temperature_c != null);
+
+  if (weatherSessions.length === 0) {
+    return {
+      avgTemperatureC: null,
+      tempRangeC: null,
+      avgHumidity: null,
+      avgWindSpeedMps: null,
+      dominantWindDirection: null,
+      dominantCondition: null,
+      maxWindImpact: null,
+      maxConditionSeverity: null,
+      sessionsWithWeather: 0,
+    };
+  }
+
+  const temps: number[] = [];
+  const humidities: number[] = [];
+  const windSpeeds: number[] = [];
+  const windDirections: string[] = [];
+  const conditions: string[] = [];
+  const windImpacts: Array<'calm' | 'light' | 'moderate' | 'strong'> = [];
+  const severities: Array<'ideal' | 'good' | 'challenging' | 'difficult' | 'extreme'> = [];
+
+  for (const session of weatherSessions) {
+    const w = session.weather!;
+    if (w.temperature_c != null) temps.push(w.temperature_c);
+    if (w.humidity != null) humidities.push(w.humidity);
+    if (w.wind_speed_mps != null) windSpeeds.push(w.wind_speed_mps);
+    if (w.wind_direction) windDirections.push(w.wind_direction);
+    if (w.condition) conditions.push(w.condition);
+    if (w.wind_impact) windImpacts.push(w.wind_impact);
+    if (w.condition_severity) severities.push(w.condition_severity);
+  }
+
+  const avg = (arr: number[]) => (arr.length > 0 ? arr.reduce((a, b) => a + b, 0) / arr.length : null);
+  const mode = (arr: string[]) => {
+    if (arr.length === 0) return null;
+    const counts = arr.reduce(
+      (acc, val) => {
+        acc[val] = (acc[val] || 0) + 1;
+        return acc;
+      },
+      {} as Record<string, number>
+    );
+    return Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0];
+  };
+
+  // Get max severity
+  const windImpactOrder = ['calm', 'light', 'moderate', 'strong'] as const;
+  const severityOrder = ['ideal', 'good', 'challenging', 'difficult', 'extreme'] as const;
+
+  const maxWindImpact =
+    windImpacts.length > 0
+      ? windImpacts.reduce((max, curr) => (windImpactOrder.indexOf(curr) > windImpactOrder.indexOf(max) ? curr : max))
+      : null;
+
+  const maxConditionSeverity =
+    severities.length > 0
+      ? severities.reduce((max, curr) => (severityOrder.indexOf(curr) > severityOrder.indexOf(max) ? curr : max))
+      : null;
+
+  return {
+    avgTemperatureC: avg(temps) ? Math.round(avg(temps)! * 10) / 10 : null,
+    tempRangeC: temps.length > 0 ? { min: Math.min(...temps), max: Math.max(...temps) } : null,
+    avgHumidity: avg(humidities) ? Math.round(avg(humidities)!) : null,
+    avgWindSpeedMps: avg(windSpeeds) ? Math.round(avg(windSpeeds)! * 10) / 10 : null,
+    dominantWindDirection: mode(windDirections),
+    dominantCondition: mode(conditions),
+    maxWindImpact,
+    maxConditionSeverity,
+    sessionsWithWeather: weatherSessions.length,
+  };
+}

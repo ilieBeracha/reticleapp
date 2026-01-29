@@ -15,15 +15,14 @@ import { useTranslation } from 'react-i18next';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-import {
-  DEFAULT_FILTERS,
-  DISTANCE_BUCKETS,
+import type {
   DistanceFilter,
   DrillTypeFilter,
   InsightsFilters,
   PositionFilter,
   TimeFilter,
-} from './insights.types';
+} from '@/types/insights';
+import { DEFAULT_FILTERS, DISTANCE_BUCKETS } from '@/constants/insights';
 
 // ============================================================================
 // CONSTANTS

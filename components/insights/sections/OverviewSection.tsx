@@ -35,7 +35,7 @@ import type {
   ConfidenceLevel,
   OverviewStatus,
   TrendSummary,
-} from '../insights.types';
+} from '@/types/insights';
 
 // ============================================================================
 // PROPS

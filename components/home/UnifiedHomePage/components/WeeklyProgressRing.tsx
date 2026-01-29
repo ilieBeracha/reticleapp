@@ -22,7 +22,7 @@ import Animated, {
     withTiming,
 } from 'react-native-reanimated';
 import Svg, { Circle } from 'react-native-svg';
-import type { Colors, WeeklyStats } from '../UnifiedHomePage.types';
+import type { Colors, WeeklyStats } from '@/types/home';
 
 interface WeeklyProgressRingProps {
   stats: WeeklyStats;

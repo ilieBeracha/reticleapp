@@ -8,7 +8,7 @@ import { DirectionalChevron } from '@/components/shared/DirectionalChevron';
 import { AlertTriangle, Award, Clock, Sparkles, Target, TrendingUp, Zap } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import type { Colors, WeeklyStats } from '../UnifiedHomePage.types';
+import type { Colors, WeeklyStats } from '@/types/home';
 
 interface InsightsCardProps {
   stats: WeeklyStats;

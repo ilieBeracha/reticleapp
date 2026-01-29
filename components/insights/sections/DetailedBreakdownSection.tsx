@@ -38,7 +38,7 @@ import {
   View,
 } from 'react-native';
 
-import type { StrengthCard, TrendData, WeaknessCard } from '../insights.types';
+import type { StrengthCard, TrendData, WeaknessCard } from '@/types/insights';
 import { StrengthsSection } from './StrengthsSection';
 import { TrendsSection } from './TrendsSection';
 import { WeaknessesSection } from './WeaknessesSection';

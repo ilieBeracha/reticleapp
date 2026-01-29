@@ -8,7 +8,7 @@ import { useTeamRealtime } from '@/hooks/realtime/team/useTeamRealtime';
 import { useColors } from '@/hooks/ui/useColors';
 import { usePermissions } from '@/hooks/usePermissions';
 import { getTeamMembers, updateTeamMemberRole } from '@/services/teamService';
-import { useTeamRoleFlags, useTeamStore } from '@/store/teamStore';
+import { useTeamRoleFlags, useTeamStore } from '@/stores/teamStore';
 import type { TeamMemberWithProfile, TeamRole } from '@/types/workspace';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';

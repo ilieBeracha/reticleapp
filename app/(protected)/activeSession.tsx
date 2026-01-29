@@ -18,7 +18,7 @@
 import { PAPER_TYPE } from '@/constants/drill';
 import { useColors } from '@/hooks/ui/useColors';
 import { useOpenWeather } from '@/hooks/useOpenWeather';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/services/supabase';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
@@ -32,7 +32,7 @@ import { SoloSessionView } from '@/components/session/activeSession/SoloSessionV
 import { SquadSessionView } from '@/components/session/activeSession/SquadSessionView';
 import { TeamTrainingView } from '@/components/session/activeSession/TeamTrainingView';
 import { styles } from '@/components/session/activeSession/activeSession.styles';
-import { useActiveSession } from '@/components/session/activeSession/useActiveSession';
+import { useActiveSession } from '@/hooks/session/useActiveSession';
 import { WatchFailedView } from '@/components/session/activeSession/watch/WatchFailedView';
 import { WatchPreviewView } from '@/components/session/activeSession/watch/WatchPreviewView';
 import { WatchStartingView } from '@/components/session/activeSession/watch/WatchStartingView';

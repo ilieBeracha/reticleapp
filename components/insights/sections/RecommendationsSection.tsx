@@ -17,7 +17,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-import type { Recommendation, RecommendationPriority } from '../insights.types';
+import type { Recommendation, RecommendationPriority } from '@/types/insights';
 
 // ============================================================================
 // PROPS

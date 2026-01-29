@@ -7,12 +7,13 @@
  */
 
 import { useColors } from '@/hooks/ui/useColors';
-import { supabase } from '@/lib/supabase';
-import type { EngagementParticipant } from '@/services/session/types';
-import { useTranslation } from 'react-i18next';
+import { getCurrentUserId } from '@/services/authService';
+import { getProfilesByIds } from '@/services/profileService';
+import type { EngagementParticipant } from '@/types/session';
 import * as Haptics from 'expo-haptics';
 import { Check, ChevronDown, Crown, Target, User, Users } from 'lucide-react-native';
 import { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
@@ -52,8 +53,8 @@ export function SquadParticipantsCard({
 
   // Get current user
   useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user) setCurrentUserId(user.id);
+    getCurrentUserId().then((id) => {
+      if (id) setCurrentUserId(id);
     });
   }, []);
 
@@ -62,9 +63,7 @@ export function SquadParticipantsCard({
     try {
       // Get all participant profiles + commander
       const userIds = [...new Set([...participants.map((p) => p.user_id), sessionOwnerId])];
-      const { data: profiles } = await supabase.from('profiles').select('id, full_name, avatar_url').in('id', userIds);
-
-      const profileMap = new Map(profiles?.map((p) => [p.id, p]) || []);
+      const profileMap = await getProfilesByIds(userIds);
       const stats: ParticipantStats[] = [];
 
       // Process each user (commander + participants)

@@ -21,7 +21,7 @@ import * as Haptics from 'expo-haptics';
 import { User, Users, UsersRound } from 'lucide-react-native';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-import type { EngagementMode } from '../shared/types/engagementMode.types';
+import type { EngagementMode } from '@/types/engagementMode';
 
 interface EngagementModeToggleProps {
   /** Current mode */

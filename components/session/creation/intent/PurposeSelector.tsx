@@ -15,7 +15,7 @@ import * as Haptics from 'expo-haptics';
 import { Crosshair, Trophy } from 'lucide-react-native';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-import type { DrillGoal } from '../../shared/types/drillGoal.types';
+import type { DrillGoal } from '@/types/drillGoal';
 
 interface PurposeSelectorProps {
   /** Currently selected purpose */

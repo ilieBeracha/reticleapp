@@ -10,7 +10,7 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { useColors } from '@/hooks/ui/useColors';
 import { useAppContext } from '@/hooks/useAppContext';
 import { useNotifications } from '@/hooks/useNotifications';
-import { Language } from '@/lib/i18n';
+import { Language } from '@/services/i18n';
 import { sendTestNotification } from '@/services/notifications';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';

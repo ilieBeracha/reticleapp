@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Crosshair, Play, Target } from 'lucide-react-native';
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeInRight } from 'react-native-reanimated';
-import type { ThemeColors, TrainingDrill, TrainingStatus } from './types';
+import type { ThemeColors, TrainingDrill, TrainingStatus } from '@/types/training.viewmodel';
 
 interface DrillCardProps {
   drill: TrainingDrill;

@@ -4,7 +4,7 @@ import { useColors } from '@/hooks/ui/useColors';
 import { createInvitation } from '@/services/invitationService';
 import { updateTeam } from '@/services/teamService';
 import { getTeamWeapons, type TeamWeapon } from '@/services/weaponService';
-import { useTeamRoleFlags, useTeamStore } from '@/store/teamStore';
+import { useTeamRoleFlags, useTeamStore } from '@/stores/teamStore';
 import type { TeamRole } from '@/types/workspace';
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';

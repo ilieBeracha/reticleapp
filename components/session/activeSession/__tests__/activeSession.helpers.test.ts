@@ -20,8 +20,8 @@ import {
   formatTime,
   getAccuracyColor,
   isDrillLimitReached,
-} from '../activeSession.helpers';
-import type { DrillProgress } from '../activeSession.types';
+} from '@/utils/activeSession.helpers';
+import type { DrillProgress } from '@/types/activeSession';
 
 // ============================================================================
 // TIME FORMATTING TESTS

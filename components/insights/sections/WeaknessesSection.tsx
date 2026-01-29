@@ -17,9 +17,10 @@ import { AlertTriangle, ChevronRight, TrendingDown } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-import { AIExplanationBlock, WhyButton } from '../AIExplanationBlock';
-import { useAIExplanations, type ExplanationParams } from '../AIExplanationProvider';
-import type { WeaknessCard } from '../insights.types';
+import { AIExplanationBlock } from '../AIExplanationBlock';
+import { WhyButton } from '../WhyButton';
+import { useAIExplanations, type ExplanationParams } from '@/hooks/insights/useAIExplanations';
+import type { WeaknessCard } from '@/types/insights';
 
 // ============================================================================
 // PROPS

@@ -2,7 +2,7 @@ import { Header } from '@/components/shared/Header';
 import { useColors } from '@/hooks/ui/useColors';
 import { useOrphanedSessionCheck } from '@/hooks/useOrphanedSessionCheck';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
-import { useGarminInitialize } from '@/store/garminStore';
+import { useGarminInitialize } from '@/stores/garminStore';
 import { router, Stack } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 

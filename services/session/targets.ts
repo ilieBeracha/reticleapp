@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/services/supabase';
 import type {
     CreatePaperResultParams,
     CreateTacticalResultParams,
@@ -7,7 +7,7 @@ import type {
     SessionTarget,
     SessionTargetWithResults,
     TacticalTargetResult,
-} from './types';
+} from '@/types/session';
 
 /**
  * Get all targets for a session

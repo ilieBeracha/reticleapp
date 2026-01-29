@@ -1,5 +1,5 @@
 import { useColors } from '@/hooks/ui/useColors';
-import { BUTTON_GRADIENT, BUTTON_GRADIENT_DISABLED } from '@/theme/colors';
+import { BUTTON_GRADIENT, BUTTON_GRADIENT_DISABLED } from '@/constants/Colors';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ArrowLeft, Check, Crosshair, Minus, Plus, Target, Timer } from 'lucide-react-native';
@@ -15,7 +15,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { COLORS } from './types';
+import { COLORS } from '@/types/targets';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // CIRCULAR STEPPER COMPONENT

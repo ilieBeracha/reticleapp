@@ -94,6 +94,10 @@ export interface TeamInvitationWithDetails extends TeamInvitation {
 
 export type TrainingStatus = 'planned' | 'ongoing' | 'finished' | 'cancelled';
 
+// =====================================================
+// TRAINING REPORT TYPES (Hebrew Military Format)
+// =====================================================
+
 /** @deprecated Use DrillGoal for primary classification */
 export type TargetType = 'paper' | 'tactical';
 
@@ -164,6 +168,10 @@ export interface Training {
   created_by: string;
   created_at: string;
   updated_at: string;
+
+  // === PARTICIPANTS (set during creation) ===
+  invite_all?: boolean | null; // true = entire team, false = selected members only
+  invited_member_ids?: string[] | null; // user_ids when invite_all is false
 }
 
 /**
@@ -270,6 +278,10 @@ export interface CreateTrainingInput {
   scheduled_at: string;
   manual_start?: boolean; // If true, commander starts training manually (no auto-start)
   drills?: CreateTrainingDrillInput[];
+
+  // === PARTICIPANTS ===
+  invite_all?: boolean; // true = entire team (default), false = selected members only
+  invited_member_ids?: string[]; // user_ids when invite_all is false
 }
 
 /**
@@ -362,6 +374,8 @@ export interface UpdateTrainingInput {
   scheduled_at?: string;
   status?: TrainingStatus;
   auto_close_at?: string | null;
+  invite_all?: boolean;
+  invited_member_ids?: string[];
 }
 
 // =====================================================

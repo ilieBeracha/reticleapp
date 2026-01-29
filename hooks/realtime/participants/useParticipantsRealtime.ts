@@ -24,9 +24,9 @@
 
 import { useCallback, useMemo } from 'react';
 import { useRealtimeChannel } from '../core/channel';
-import type { ChangePayload } from '../table/table.types';
+import type { ChangePayload } from '@/types/realtime.table';
 import type { ParticipantRecord } from '../records/participant';
-import type { UseParticipantsRealtimeOptions, UseParticipantsRealtimeReturn } from './participants.types';
+import type { UseParticipantsRealtimeOptions, UseParticipantsRealtimeReturn } from '@/types/realtime.participants';
 
 export function useParticipantsRealtime(options: UseParticipantsRealtimeOptions): UseParticipantsRealtimeReturn {
   const {

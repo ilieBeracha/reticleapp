@@ -1,4 +1,4 @@
-import type { SessionDrillConfig, SessionWeatherData, SessionWithDetails } from './types';
+import type { SessionDrillConfig, SessionWeatherData, SessionWithDetails } from '@/types/session';
 
 export function mapSession(row: any): SessionWithDetails {
   if (!row) {

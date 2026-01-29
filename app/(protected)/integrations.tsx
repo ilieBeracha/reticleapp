@@ -1,5 +1,5 @@
 import { useColors } from '@/hooks/ui/useColors';
-import { useGarminStore, useWatchEnabled } from '@/store/garminStore';
+import { useGarminStore, useWatchEnabled } from '@/stores/garminStore';
 import { Ionicons } from '@expo/vector-icons';
 import { Stack } from 'expo-router';
 import { useTranslation } from 'react-i18next';

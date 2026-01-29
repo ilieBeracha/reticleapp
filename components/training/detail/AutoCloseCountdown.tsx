@@ -7,7 +7,7 @@ import { useTranslation } from 'react-i18next';
 import { Timer } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import type { AutoCloseCountdownProps } from './types';
+import type { AutoCloseCountdownProps } from '@/types/trainingDetail';
 
 export function AutoCloseCountdown({ autoCloseAt, colors, onExpired }: AutoCloseCountdownProps) {
   const { t } = useTranslation();

@@ -19,9 +19,9 @@
 
 import { useAuth } from '@/contexts/AuthContext';
 import { useColors } from '@/hooks/ui/useColors';
-import { supabase } from '@/lib/supabase';
-import { getDashboardFeatures } from '@/services/sessionService';
-import type { SessionWithDetails } from '@/services/sessionService';
+import { supabase } from '@/services/supabase';
+import { getDashboardFeatures } from '@/services/session/queries';
+import type { SessionWithDetails } from '@/types/session';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
@@ -40,17 +40,16 @@ import {
 } from 'react-native';
 import Animated, { FadeInDown, FadeOut } from 'react-native-reanimated';
 
-import { AIExplanationProvider } from './AIExplanationProvider';
-import { featuresToSessions } from './insights.adapter';
+import { AIExplanationProvider } from '@/contexts/AIExplanationContext';
+import { featuresToSessions } from '@/services/insights/insightsAdapter';
 import { ActivityChart, type ActivityDataPoint } from './components/ActivityChart';
 import { PerformanceChart, type ChartDataPoint } from './components/PerformanceChart';
 import { EvidenceSheet } from './EvidenceSheet';
-import { applyFilters, computeContextProfiles, computeInsights, computeOverviewStatus } from './insights.engine';
-import {
+import { applyFilters, computeContextProfiles, computeInsights, computeOverviewStatus } from '@/services/insights/dashboardEngine';
+import type {
   ComputedContextProfiles,
   ComputedInsights,
   ContextProfile,
-  DEFAULT_FILTERS,
   EvidenceContext,
   InsightsFilters,
   OverviewStatus,
@@ -59,7 +58,8 @@ import {
   TotalsMetric,
   TrendData,
   WeaknessCard,
-} from './insights.types';
+} from '@/types/insights';
+import { DEFAULT_FILTERS } from '@/constants/insights';
 import { InsightsFilterBar } from './InsightsFilterBar';
 import { ContextSummarySection } from './sections/ContextSummarySection';
 import { DetailedBreakdownSection } from './sections/DetailedBreakdownSection';

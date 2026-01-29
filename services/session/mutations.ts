@@ -1,30 +1,30 @@
 import { TARGET_TYPE } from '@/constants/drill';
 import { SESSION_STATUS } from '@/constants/session';
-import { supabase } from '@/lib/supabase';
 import { buildSessionContext, evaluateAndStoreVerdict } from '@/services/standards/standardsEngine';
+import { supabase } from '@/services/supabase';
 import { markWeaponUsed } from '@/services/weaponService';
+import type {
+    BaseSessionConfig,
+    CreateSessionParams,
+    PaperType,
+    SessionStats,
+    SessionTargetWithResults,
+    SessionWithDetails,
+    TargetType,
+} from '@/types/session';
+import type { TransformedWatchData, WatchDetailsPayload } from '@/types/session.watch';
 import { getDrillRequirements } from './drillContract';
 import { mapSession } from './mappers';
 import {
-  getMyActiveSessionForTraining,
-  getMyActiveSessionsAll,
-  getSessionById,
-  shouldAutoCancelSession,
+    getMyActiveSessionForTraining,
+    getMyActiveSessionsAll,
+    getSessionById,
+    shouldAutoCancelSession,
 } from './queries';
 import { SESSION_SELECT_AFTER_CREATE, SESSION_SELECT_AFTER_UPDATE } from './selectClauses';
 import { calculateSessionStats } from './stats';
 import { addSessionTarget, getSessionTargets, savePaperTargetResult, saveTacticalTargetResult } from './targets';
-import type {
-  BaseSessionConfig,
-  CreateSessionParams,
-  PaperType,
-  SessionStats,
-  SessionTargetWithResults,
-  SessionWithDetails,
-  TargetType,
-} from './types';
 import { buildDetailsMergePayload, buildTargetData } from './watchDataTransformer';
-import type { TransformedWatchData, WatchDetailsPayload } from './watchTypes';
 
 /**
  * Convert legacy CreateSessionParams to BaseSessionConfig
@@ -701,18 +701,24 @@ async function recordDrillCompletion(params: {
   } = await supabase.auth.getUser();
   if (!user) return;
 
-  // Insert completion record
-  const { error } = await supabase.from('user_drill_completions').insert({
-    user_id: user.id,
-    training_id: params.trainingId,
-    drill_id: params.drillId,
-    session_id: params.sessionId,
-    completed_at: new Date().toISOString(),
-    shots_fired: params.stats.totalShotsFired,
-    hits: params.stats.totalHits,
-    accuracy_pct: params.stats.accuracyPct,
-    time_seconds: params.stats.avgEngagementTimeSec,
-  });
+  // Upsert completion record (update if already completed this drill)
+  const { error } = await supabase.from('user_drill_completions').upsert(
+    {
+      user_id: user.id,
+      training_id: params.trainingId,
+      drill_id: params.drillId,
+      session_id: params.sessionId,
+      completed_at: new Date().toISOString(),
+      shots_fired: params.stats.totalShotsFired,
+      hits: params.stats.totalHits,
+      accuracy_pct: params.stats.accuracyPct,
+      time_seconds: params.stats.avgEngagementTimeSec,
+    },
+    {
+      onConflict: 'user_id,training_id,drill_id',
+      ignoreDuplicates: false, // Update with latest stats
+    }
+  );
 
   if (error) {
     console.error('Failed to record drill completion:', error);

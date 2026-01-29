@@ -148,3 +148,48 @@ export const RANGE_CATEGORIES: { value: RangeCategory; min: number; max: number 
   { value: 'medium', min: 300, max: 600 },
   { value: 'long', min: 600, max: null },
 ];
+
+// =============================================================================
+// POSITIONS
+// =============================================================================
+
+export const POSITIONS = [
+  { value: 'standing', label: 'Standing' },
+  { value: 'kneeling', label: 'Kneeling' },
+  { value: 'prone', label: 'Prone' },
+  { value: 'sitting', label: 'Sitting' },
+] as const;
+
+// =============================================================================
+// QUICK DISTANCES & RANGE LABELS
+// =============================================================================
+
+export const QUICK_DISTANCES: Record<RangeCategory, number[]> = {
+  short: [25, 50, 100, 150, 200, 250],
+  medium: [300, 350, 400, 450, 500, 550],
+  long: [600, 700, 800, 900, 1000],
+};
+
+export const RANGE_LABELS: Record<RangeCategory, string> = {
+  short: 'Short Range (0-300m)',
+  medium: 'Medium Range (300-600m)',
+  long: 'Long Range (600m+)',
+};
+
+// =============================================================================
+// TRAINING PRESETS
+// =============================================================================
+
+export const TRAINING_DISTANCE_PRESETS = [25, 50, 100, 200, 300];
+export const TRAINING_SHOTS_PRESETS = [3, 5, 10, 15, 20];
+export const TRAINING_TIME_PRESETS: (number | null)[] = [null, 30, 60, 90, 120, 180];
+export const TRAINING_STRINGS_PRESETS = [1, 2, 3, 5];
+
+// =============================================================================
+// GOAL COLORS
+// =============================================================================
+
+export const GOAL_COLORS: Record<string, string> = {
+  grouping: '#10B981',
+  engagement: '#F59E0B',
+};

@@ -11,7 +11,8 @@
  */
 
 import { useColors } from '@/hooks/ui/useColors';
-import { supabase } from '@/lib/supabase';
+import { getCurrentUserId } from '@/services/authService';
+import { getTeamMembers } from '@/services/teamService';
 import { useTranslation } from 'react-i18next';
 import * as Haptics from 'expo-haptics';
 import { Check, UserMinus, UserPlus, Users } from 'lucide-react-native';
@@ -48,48 +49,24 @@ export function InviteParticipantsPanel({ teamId, invitedUserIds, onInvitedChang
   const loadTeamMembers = useCallback(async () => {
     try {
       // Get current user
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (user) setCurrentUserId(user.id);
+      const userId = await getCurrentUserId();
+      if (userId) setCurrentUserId(userId);
 
-      // Get team members
-      const { data: members, error } = await supabase
-        .from('team_members')
-        .select('user_id, role')
-        .eq('team_id', teamId);
-
-      if (error) throw error;
-      if (!members?.length) {
-        setTeamMembers([]);
-        return;
-      }
+      // Get team members with profiles already joined
+      const members = await getTeamMembers(teamId);
 
       // Filter out current user (commander) and any excluded users (already invited)
       const filteredMembers = members.filter(
-        (m) => m.user_id !== user?.id && !excludeUserIds.includes(m.user_id)
+        (m) => m.user_id !== userId && !excludeUserIds.includes(m.user_id)
       );
-      if (!filteredMembers.length) {
-        setTeamMembers([]);
-        return;
-      }
 
-      // Get profiles
-      const userIds = filteredMembers.map((m) => m.user_id);
-      const { data: profiles } = await supabase.from('profiles').select('id, full_name, avatar_url').in('id', userIds);
-
-      const profileMap = new Map((profiles || []).map((p) => [p.id, p]));
-
-      // Map to team members with profiles
-      const eligibleMembers = filteredMembers.map((m) => {
-        const profile = profileMap.get(m.user_id);
-        return {
-          user_id: m.user_id,
-          full_name: profile?.full_name || null,
-          avatar_url: profile?.avatar_url || null,
-          role: m.role,
-        };
-      });
+      // Map to local TeamMember shape
+      const eligibleMembers = filteredMembers.map((m) => ({
+        user_id: m.user_id,
+        full_name: m.profile?.full_name || null,
+        avatar_url: m.profile?.avatar_url || null,
+        role: typeof m.role === 'string' ? m.role : (m.role as any)?.role ?? 'member',
+      }));
 
       setTeamMembers(eligibleMembers);
     } catch (error) {

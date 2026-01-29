@@ -4,26 +4,22 @@
  * Shows session summary, stats, and image previews.
  * Opens as a formSheet modal above tabs.
  */
-import { useSessionTimeline } from '@/components/session/useSessionTimeline';
 import { WeatherStrip } from '@/components/session/WeatherDisplay';
 import { isEngagementPaper, isGroupingPaper, isPaperTarget } from '@/constants/drill';
 import { useAuth } from '@/contexts/AuthContext';
+import { useSessionTimeline } from '@/hooks/session/useSessionTimeline';
 import { useColors } from '@/hooks/ui/useColors';
-import { getSessionInsights, triggerInsightGeneration, type SessionInsight } from '@/services/insights/insightService';
+import { getSessionInsights, triggerInsightGeneration } from '@/services/insights/insightService';
+import { getSessionById } from '@/services/session/queries';
+import { calculateSessionStats } from '@/services/session/stats';
+import { getSessionTargetsWithResults } from '@/services/session/targets';
 import type { ShotDetail } from '@/services/session/timelineService';
-import type { DecodedWeather } from '@/services/session/watchTypes';
-import {
-  calculateSessionStats,
-  getSessionById,
-  getSessionTargetsWithResults,
-  type SessionStats,
-  type SessionTargetWithResults,
-  type SessionWithDetails,
-} from '@/services/sessionService';
+import type { SessionInsight } from '@/types/insights.pipeline';
+import type { SessionStats, SessionTargetWithResults, SessionWithDetails } from '@/types/session';
+import type { DecodedWeather } from '@/types/session.watch';
 import { isGroupingSession } from '@/utils/drillGoal';
 import { format, intervalToDuration } from 'date-fns';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useTranslation } from 'react-i18next';
 import {
   Activity,
   Crosshair as AimIcon,
@@ -52,6 +48,7 @@ import {
   Zap,
 } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -602,7 +599,9 @@ export default function SessionDetailScreen() {
             >
               <Users size={14} color={colors.green} />
               <View style={styles.trainingContextContent}>
-                <Text style={[styles.trainingContextLabel, { color: colors.green }]}>{t('session.partOfTeamTraining')}</Text>
+                <Text style={[styles.trainingContextLabel, { color: colors.green }]}>
+                  {t('session.partOfTeamTraining')}
+                </Text>
                 <Text style={[styles.trainingContextTitle, { color: colors.text }]} numberOfLines={1}>
                   {session.training_title}
                 </Text>
@@ -703,7 +702,9 @@ export default function SessionDetailScreen() {
                     {stats.totalHits}/{stats.totalShotsFired}
                   </Text>
                   <Text style={[styles.statLabel, { color: colors.textMuted }]}>
-                    {hasScannedWithoutDeclaration ? t('session.holesDetected', { count: stats.totalHits }) : t('session.hits')}
+                    {hasScannedWithoutDeclaration
+                      ? t('session.holesDetected', { count: stats.totalHits })
+                      : t('session.hits')}
                   </Text>
                 </View>
 
@@ -742,7 +743,9 @@ export default function SessionDetailScreen() {
               .map((participant, idx, arr) => {
                 const isSelf = participant.user_id === user?.id;
                 const shots = participant.shots_fired ?? 0;
-                const displayName = isSelf ? t('common.you') : participant.user_full_name || `${t('squads.shooter')} ${idx + 1}`;
+                const displayName = isSelf
+                  ? t('common.you')
+                  : participant.user_full_name || `${t('squads.shooter')} ${idx + 1}`;
                 const initial = isSelf ? 'Y' : (participant.user_full_name?.charAt(0) || `${idx + 1}`).toUpperCase();
                 return (
                   <View
@@ -1153,7 +1156,9 @@ export default function SessionDetailScreen() {
 
           {/* Shot-by-Shot Performance Bars */}
           <View style={[styles.shotBarsCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Text style={[styles.shotBarsTitle, { color: colors.textMuted }]}>{t('session.shotByShotPerformance')}</Text>
+            <Text style={[styles.shotBarsTitle, { color: colors.textMuted }]}>
+              {t('session.shotByShotPerformance')}
+            </Text>
             <View style={styles.shotBarsContainer}>
               {timelineInsights.shots.slice(0, 25).map((shot: any, idx: number) => {
                 const score = timelineInsights.scores[idx] as number;
@@ -1212,7 +1217,8 @@ export default function SessionDetailScreen() {
                     {t('session.shot')} #{timelineInsights.bestShot}
                   </Text>
                   <Text style={[styles.bestWorstScore, { color: colors.green }]}>
-                    {timelineInsights.bestScore}% {timelineInsights.usingStress ? t('biometrics.calm') : t('biometrics.steady')}
+                    {timelineInsights.bestScore}%{' '}
+                    {timelineInsights.usingStress ? t('biometrics.calm') : t('biometrics.steady')}
                   </Text>
                 </View>
               </View>
@@ -1228,7 +1234,8 @@ export default function SessionDetailScreen() {
                     {t('session.shot')} #{timelineInsights.worstShot}
                   </Text>
                   <Text style={[styles.bestWorstScore, { color: colors.red }]}>
-                    {timelineInsights.worstScore}% {timelineInsights.usingStress ? t('biometrics.calm') : t('biometrics.steady')}
+                    {timelineInsights.worstScore}%{' '}
+                    {timelineInsights.usingStress ? t('biometrics.calm') : t('biometrics.steady')}
                   </Text>
                 </View>
               </View>
@@ -1237,7 +1244,9 @@ export default function SessionDetailScreen() {
 
           {/* Breath Discipline Breakdown */}
           <View style={[styles.breathBreakdownCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Text style={[styles.breathBreakdownTitle, { color: colors.text }]}>{t('biometrics.breathDiscipline')}</Text>
+            <Text style={[styles.breathBreakdownTitle, { color: colors.text }]}>
+              {t('biometrics.breathDiscipline')}
+            </Text>
             <View style={styles.breathBar}>
               {timelineInsights.pausePct > 0 && (
                 <View
@@ -1268,7 +1277,9 @@ export default function SessionDetailScreen() {
             <View style={styles.breathBreakdownLegend}>
               <View style={styles.breathLegendItem}>
                 <View style={[styles.breathLegendDot, { backgroundColor: colors.green }]} />
-                <Text style={[styles.breathLegendText, { color: colors.textMuted }]}>{t('biometrics.pauseOptimal')}</Text>
+                <Text style={[styles.breathLegendText, { color: colors.textMuted }]}>
+                  {t('biometrics.pauseOptimal')}
+                </Text>
               </View>
               <View style={styles.breathLegendItem}>
                 <View style={[styles.breathLegendDot, { backgroundColor: colors.orange }]} />
@@ -1293,7 +1304,9 @@ export default function SessionDetailScreen() {
             ]}
           >
             <ActivityIndicator size="small" color={colors.primary} />
-            <Text style={[styles.loadingInsightsText, { color: colors.textMuted }]}>{t('biometrics.loadingBiometrics')}</Text>
+            <Text style={[styles.loadingInsightsText, { color: colors.textMuted }]}>
+              {t('biometrics.loadingBiometrics')}
+            </Text>
           </View>
         </Animated.View>
       )}
@@ -1393,7 +1406,11 @@ export default function SessionDetailScreen() {
                               { color: isGroupingTarget ? colors.green : isPaper ? colors.indigo : colors.orange },
                             ]}
                           >
-                            {isGroupingTarget ? t('session.grouping') : isPaper ? t('session.achievement') : t('session.tactical')}
+                            {isGroupingTarget
+                              ? t('session.grouping')
+                              : isPaper
+                                ? t('session.achievement')
+                                : t('session.tactical')}
                           </Text>
                         </View>
                         {/* Entry method badge for paper targets */}
@@ -1426,12 +1443,16 @@ export default function SessionDetailScreen() {
                                 <Text style={[styles.timelineStatValue, { color: colors.green }]}>
                                   {dispersion.toFixed(1)}cm
                                 </Text>
-                                <Text style={[styles.timelineStatLabel, { color: colors.textMuted }]}>{t('session.grouping')}</Text>
+                                <Text style={[styles.timelineStatLabel, { color: colors.textMuted }]}>
+                                  {t('session.grouping')}
+                                </Text>
                               </View>
                             )}
                             <View style={styles.timelineStat}>
                               <Text style={[styles.timelineStatValue, { color: colors.text }]}>{shots}</Text>
-                              <Text style={[styles.timelineStatLabel, { color: colors.textMuted }]}>{t('session.shots')}</Text>
+                              <Text style={[styles.timelineStatLabel, { color: colors.textMuted }]}>
+                                {t('session.shots')}
+                              </Text>
                             </View>
                           </>
                         ) : isScanned ? (
@@ -1447,7 +1468,9 @@ export default function SessionDetailScreen() {
                                   <Text style={[styles.timelineStatValue, { color: colors.text }]}>
                                     {actualShotsDeclared}
                                   </Text>
-                                  <Text style={[styles.timelineStatLabel, { color: colors.textMuted }]}>{t('session.fired')}</Text>
+                                  <Text style={[styles.timelineStatLabel, { color: colors.textMuted }]}>
+                                    {t('session.fired')}
+                                  </Text>
                                 </View>
                                 <View style={styles.timelineStat}>
                                   <Text
@@ -1461,7 +1484,9 @@ export default function SessionDetailScreen() {
                                   >
                                     {accuracy}%
                                   </Text>
-                                  <Text style={[styles.timelineStatLabel, { color: colors.textMuted }]}>{t('session.accuracy')}</Text>
+                                  <Text style={[styles.timelineStatLabel, { color: colors.textMuted }]}>
+                                    {t('session.accuracy')}
+                                  </Text>
                                 </View>
                               </>
                             )}
@@ -1471,11 +1496,15 @@ export default function SessionDetailScreen() {
                           <>
                             <View style={styles.timelineStat}>
                               <Text style={[styles.timelineStatValue, { color: colors.text }]}>{shots}</Text>
-                              <Text style={[styles.timelineStatLabel, { color: colors.textMuted }]}>{t('session.shots')}</Text>
+                              <Text style={[styles.timelineStatLabel, { color: colors.textMuted }]}>
+                                {t('session.shots')}
+                              </Text>
                             </View>
                             <View style={styles.timelineStat}>
                               <Text style={[styles.timelineStatValue, { color: colors.text }]}>{hits}</Text>
-                              <Text style={[styles.timelineStatLabel, { color: colors.textMuted }]}>{t('session.hits')}</Text>
+                              <Text style={[styles.timelineStatLabel, { color: colors.textMuted }]}>
+                                {t('session.hits')}
+                              </Text>
                             </View>
                             {accuracy !== null && (
                               <View style={styles.timelineStat}>
@@ -1490,7 +1519,9 @@ export default function SessionDetailScreen() {
                                 >
                                   {accuracy}%
                                 </Text>
-                                <Text style={[styles.timelineStatLabel, { color: colors.textMuted }]}>{t('session.accuracy')}</Text>
+                                <Text style={[styles.timelineStatLabel, { color: colors.textMuted }]}>
+                                  {t('session.accuracy')}
+                                </Text>
                               </View>
                             )}
                           </>
@@ -1713,7 +1744,7 @@ const styles = StyleSheet.create({
   },
   entryBreakdown: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: 16,
     paddingVertical: 8,
     paddingHorizontal: 12,

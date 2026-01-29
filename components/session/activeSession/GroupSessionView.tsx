@@ -9,28 +9,20 @@
  */
 
 import { useColors } from '@/hooks/ui/useColors';
-import { useTranslation } from 'react-i18next';
-import { supabase } from '@/lib/supabase';
+import { useParticipantsRealtime } from '@/hooks/realtime/participants/useParticipantsRealtime';
+import { getCurrentUserId } from '@/services/authService';
 import {
   calculateGroupTotals,
   getEngagementParticipants,
   updateParticipantResults,
 } from '@/services/session/participants';
-import type { EngagementParticipant } from '@/services/session/types';
+import type { EngagementParticipant } from '@/types/session';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { Check, ChevronLeft, Minus, Plus, Send, User, Users, X } from 'lucide-react-native';
 import { useCallback, useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  Image,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { useTranslation } from 'react-i18next';
+import { ActivityIndicator, Alert, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -79,12 +71,12 @@ export function GroupSessionView({
 
   // Get current user - only initialize local state ONCE
   useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user) {
-        setCurrentUserId(user.id);
+    getCurrentUserId().then((id) => {
+      if (id) {
+        setCurrentUserId(id);
         // Only initialize local state if not already done
         if (!localStateInitialized) {
-          const myData = participants.find((p) => p.user_id === user.id);
+          const myData = participants.find((p) => p.user_id === id);
           if (myData?.shots_fired != null && myData.shots_fired > 0) {
             setShotsFired(myData.shots_fired);
             setHits(myData.hits ?? null);
@@ -96,35 +88,21 @@ export function GroupSessionView({
   }, [participants, localStateInitialized]);
 
   // Subscribe to realtime updates on engagement_participants
-  useEffect(() => {
-    if (!engagementId) return;
-
-    const channel = supabase
-      .channel(`group-participants-${engagementId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'engagement_participants',
-          filter: `engagement_id=eq.${engagementId}`,
-        },
-        async () => {
-          // Reload participants on any change
-          try {
-            const updated = await getEngagementParticipants(engagementId);
-            setParticipants(updated);
-          } catch (error) {
-            console.error('[GroupSessionView] Realtime reload error:', error);
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
+  const reloadParticipants = useCallback(async () => {
+    try {
+      const updated = await getEngagementParticipants(engagementId);
+      setParticipants(updated);
+    } catch (error) {
+      console.error('[GroupSessionView] Realtime reload error:', error);
+    }
   }, [engagementId]);
+
+  useParticipantsRealtime({
+    engagementId,
+    onParticipantAdded: reloadParticipants,
+    onParticipantChanged: reloadParticipants,
+    onParticipantRemoved: reloadParticipants,
+  });
 
   // Calculate group totals
   const totals = calculateGroupTotals(participants);
@@ -171,18 +149,14 @@ export function GroupSessionView({
 
   // Handle end session
   const handleEndSessionPress = () => {
-    Alert.alert(
-      t('session.endGroupSession'),
-      t('session.endGroupSessionMessage'),
-      [
-        { text: t('common.cancel'), style: 'cancel' },
-        {
-          text: t('session.endSession'),
-          style: 'destructive',
-          onPress: onEndSession,
-        },
-      ]
-    );
+    Alert.alert(t('session.endGroupSession'), t('session.endGroupSessionMessage'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      {
+        text: t('session.endSession'),
+        style: 'destructive',
+        onPress: onEndSession,
+      },
+    ]);
   };
 
   // Stepper handlers for shots
@@ -247,9 +221,7 @@ export function GroupSessionView({
         {isViewOnly && (
           <View style={[styles.viewOnlyBanner, { backgroundColor: colors.orange + '15', borderColor: colors.orange }]}>
             <Users size={16} color={colors.orange} />
-            <Text style={[styles.viewOnlyText, { color: colors.orange }]}>
-              {t('session.viewingProgress')}
-            </Text>
+            <Text style={[styles.viewOnlyText, { color: colors.orange }]}>{t('session.viewingProgress')}</Text>
           </View>
         )}
 
@@ -363,10 +335,7 @@ export function GroupSessionView({
 
                 {/* Submit Button */}
                 <TouchableOpacity
-                  style={[
-                    styles.submitBtn,
-                    { backgroundColor: shotsFired > 0 ? colors.primary : colors.secondary },
-                  ]}
+                  style={[styles.submitBtn, { backgroundColor: shotsFired > 0 ? colors.primary : colors.secondary }]}
                   onPress={handleSubmitEntry}
                   disabled={saving || shotsFired === 0}
                 >

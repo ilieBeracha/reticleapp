@@ -5,15 +5,15 @@
  * Team-first architecture: Trainings belong to teams directly
  */
 
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/services/supabase';
 import type {
-    CreateTrainingDrillInput,
-    CreateTrainingInput,
-    Training,
-    TrainingDrill,
-    TrainingStatus,
-    TrainingWithDetails,
-    UpdateTrainingInput,
+  CreateTrainingDrillInput,
+  CreateTrainingInput,
+  Training,
+  TrainingDrill,
+  TrainingStatus,
+  TrainingWithDetails,
+  UpdateTrainingInput,
 } from '@/types/workspace';
 import { scheduleTrainingReminder } from './notifications';
 import { notifyTeamNewTraining, notifyTeamTrainingStarted } from './pushService';
@@ -101,6 +101,11 @@ export async function createTraining(input: CreateTrainingInput): Promise<Traini
       manual_start: input.manual_start ?? false,
       status: 'planned',
       created_by: user.id,
+      // Participant restrictions — only include when explicitly restricting
+      // (omitting lets the DB default of invite_all=true apply)
+      ...(input.invite_all === false
+        ? { invite_all: false, invited_member_ids: input.invited_member_ids || null }
+        : {}),
     })
     .select(
       `
@@ -276,7 +281,7 @@ export async function getTrainingById(trainingId: string): Promise<TrainingWithD
     .select(
       `
       *,
-      team:teams(id, name, team_type, description, squads),
+      team:teams(id, name, team_type, description, squads, specialty),
       creator:profiles!trainings_created_by_fkey(id, full_name, avatar_url),
       training_drills(*)
     `
@@ -321,6 +326,10 @@ export async function updateTraining(trainingId: string, updates: UpdateTraining
   if (updates.scheduled_at !== undefined) updatePayload.scheduled_at = updates.scheduled_at;
   if (updates.status !== undefined) updatePayload.status = updates.status;
   if (updates.auto_close_at !== undefined) updatePayload.auto_close_at = updates.auto_close_at;
+
+  // Participant restrictions
+  if (updates.invite_all !== undefined) updatePayload.invite_all = updates.invite_all;
+  if (updates.invited_member_ids !== undefined) updatePayload.invited_member_ids = updates.invited_member_ids || [];
 
   const { data, error } = await supabase
     .from('trainings')

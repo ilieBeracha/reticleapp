@@ -6,13 +6,13 @@
  */
 
 import { DirectionalChevron } from '@/components/shared/DirectionalChevron';
+import type { RecentSessionRowProps } from '@/types/home';
 import { isGroupingGoal } from '@/utils/drillGoal';
+import { formatTimeAgo } from '@/utils/unifiedHomePage.helpers';
 import { Crosshair, Heart, Target, Users } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
-import { formatTimeAgo } from '../UnifiedHomePage.helpers';
-import type { RecentSessionRowProps } from '../UnifiedHomePage.types';
 
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 

@@ -10,7 +10,7 @@
  *   - Cannot manage members outside their squad
  */
 
-import { useTeamRoleFlags, useTeamStore } from '@/store/teamStore';
+import { useTeamRoleFlags, useTeamStore } from '@/stores/teamStore';
 import { useMemo } from 'react';
 import type { TeamRole } from '@/services/roleService';
 import { canManageMember, canViewMemberProgress, type TeamMemberInfo } from '@/services/roleService';

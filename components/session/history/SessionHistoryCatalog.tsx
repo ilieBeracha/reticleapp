@@ -1,5 +1,5 @@
 import { useColors } from '@/hooks/ui/useColors';
-import type { SessionWithDetails } from '@/services/session/types';
+import type { SessionWithDetails } from '@/types/session';
 import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -16,11 +16,11 @@ import {
   View,
 } from 'react-native';
 
-import { countActiveFilters } from './SessionHistory.helpers';
-import type { SessionHistoryCatalogProps } from './SessionHistory.types';
+import { countActiveFilters } from '@/utils/sessionHistory.helpers';
+import type { SessionHistoryCatalogProps } from '@/types/sessionHistory';
 import { FilterSheet } from './FilterSheet';
 import { SessionCard } from './SessionCard';
-import { useSessionHistory } from './useSessionHistory';
+import { useSessionHistory } from '@/hooks/session/useSessionHistory';
 
 /**
  * SessionHistoryCatalog - Full session history with search, filters, and sorting

@@ -24,7 +24,7 @@ import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 
 import Animated, { FadeIn, FadeInDown, Layout } from 'react-native-reanimated';
 
 import type { Drill } from '@/types/workspace';
-import type { TrainingDrillItem } from '../createTraining.types';
+import type { TrainingDrillItem } from '@/types/createTraining';
 
 interface TrainingDrillsStepProps {
   drills: TrainingDrillItem[];

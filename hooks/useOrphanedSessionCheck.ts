@@ -8,15 +8,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { Alert } from 'react-native';
 import { router } from 'expo-router';
+import { deleteSession, endSession } from '@/services/session/mutations';
 import {
-  deleteSession,
-  endSession,
   getMyActiveSessionsAll,
   getSessionAge,
   isSessionStale,
   shouldAutoCancelSession,
-  type SessionWithDetails,
-} from '@/services/sessionService';
+} from '@/services/session/queries';
+import type { SessionWithDetails } from '@/types/session';
 
 interface OrphanCheckResult {
   /** Whether the check is currently running */

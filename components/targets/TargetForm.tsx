@@ -1,5 +1,5 @@
 import { useColors } from '@/hooks/ui/useColors';
-import { BUTTON_GRADIENT, BUTTON_GRADIENT_DISABLED } from '@/theme/colors';
+import { BUTTON_GRADIENT, BUTTON_GRADIENT_DISABLED } from '@/constants/Colors';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -7,7 +7,7 @@ import { Camera, Edit3, Focus, Target, Trophy, X } from 'lucide-react-native';
 import React, { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { COLORS, InputMethod, TargetType } from './types';
+import { COLORS, InputMethod, TargetType } from '@/types/targets';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // TARGET FORM

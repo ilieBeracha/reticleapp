@@ -5,8 +5,9 @@ import {
     TrainingDataPayload,
     uploadScannedTargetImage,
 } from '@/services/detectionService';
-import { addTargetWithPaperResult, endSession, PaperType } from '@/services/sessionService';
-import { useDetectionStore } from '@/store/detectionStore';
+import { addTargetWithPaperResult, endSession } from '@/services/session/mutations';
+import type { PaperType } from '@/types/session';
+import { useDetectionStore } from '@/stores/detectionStore';
 import { finiteShotsOrNull, INFINITE_SHOTS_SENTINEL } from '@/utils/drillShots';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as Haptics from 'expo-haptics';
@@ -17,7 +18,7 @@ import { useTranslation } from 'react-i18next';
 import { Alert, StyleSheet, View } from 'react-native';
 import { CameraFlow } from './CameraFlow';
 import { ResultCard } from './ResultCard';
-import { COLORS, EditableDetection, Step, TargetType } from './types';
+import { COLORS, EditableDetection, Step, TargetType } from '@/types/targets';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // PAPER TARGET FLOW

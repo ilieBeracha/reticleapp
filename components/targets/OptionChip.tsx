@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity } from 'react-native';
-import { COLORS } from './types';
+import { COLORS } from '@/types/targets';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // OPTION CHIP

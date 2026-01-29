@@ -20,7 +20,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import type { TrainingSettingsModalProps } from './types';
+import type { TrainingSettingsModalProps } from '@/types/trainingDetail';
 
 export function TrainingSettingsModal({ visible, onClose, training, onUpdate, colors }: TrainingSettingsModalProps) {
   const { t } = useTranslation();

@@ -25,7 +25,7 @@ import type {
   ConfidenceLevel,
   ContextProfile,
   ContextQuadrant,
-} from '../insights.types';
+} from '@/types/insights';
 import { ContextProfileRow } from '../components/ContextProfileRow';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {

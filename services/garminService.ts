@@ -65,7 +65,7 @@ import type {
   ShotSteadiness,
   StartWatchSessionPayload,
   WatchDetectionConfig,
-} from './garmin/garmin.types';
+} from '@/types/garmin';
 
 // Re-export all types for backward compatibility
 export type {

@@ -9,8 +9,8 @@
  * - Consistent error handling using custom error classes
  */
 
-import { supabase } from '@/lib/supabase';
-import { AuthenticationError } from '@/lib/errors';
+import { supabase } from '@/services/supabase';
+import { AuthenticationError } from '@/utils/errors';
 import type { User } from '@supabase/supabase-js';
 
 // ============================================================================

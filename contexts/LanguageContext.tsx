@@ -1,4 +1,10 @@
-import i18n, { getDeviceLanguage, getStoredLanguage, isRTLLanguage, Language, setStoredLanguage } from '@/lib/i18n';
+import i18n, {
+  getDeviceLanguage,
+  getStoredLanguage,
+  isRTLLanguage,
+  Language,
+  setStoredLanguage,
+} from '@/services/i18n';
 import * as Updates from 'expo-updates';
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';

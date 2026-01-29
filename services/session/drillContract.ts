@@ -1,4 +1,4 @@
-import type { SessionDrillConfig, TargetType } from './types';
+import type { SessionDrillConfig, TargetType } from '@/types/session';
 
 /**
  * Drill contract helpers.

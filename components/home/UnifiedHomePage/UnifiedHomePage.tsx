@@ -30,7 +30,7 @@ import { HeroActions } from './components/HeroActions';
 import { HomeHeader } from './components/HomeHeader';
 import { RecentActivitySection } from './components/RecentActivitySection';
 import { WeeklyStatsCard } from './components/WeeklyStatsCard';
-import { useUnifiedHomePage } from './useUnifiedHomePage';
+import { useUnifiedHomePage } from '@/hooks/home/useUnifiedHomePage';
 
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 

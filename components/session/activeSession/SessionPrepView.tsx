@@ -1,43 +1,43 @@
 import { isGroupingGoal } from '@/constants/drill';
 import { useColors } from '@/hooks/ui/useColors';
-import type { SessionWithDetails } from '@/services/session/types';
-import { activateSession, updateSession } from '@/services/sessionService';
+import { activateSession, updateSession } from '@/services/session/mutations';
 import { getUserWeapon, type UserWeapon } from '@/services/weaponService';
-import { useGarminStore, useIsGarminConnected } from '@/store/garminStore';
+import { useGarminStore, useIsGarminConnected } from '@/stores/garminStore';
+import type { SessionWithDetails } from '@/types/session';
+import { formatDistanceDisplay } from '@/utils/activeSession.helpers';
 import { deriveDetectionConfig } from '@/utils/detectionSensitivity';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import {
-    ChevronDown,
-    ChevronLeft,
-    ChevronUp,
-    Clock,
-    Crosshair,
-    MapPin,
-    Phone,
-    RefreshCw,
-    Settings,
-    Target,
-    Trophy,
-    Users,
-    Watch,
-    X,
-    Zap,
+  ChevronDown,
+  ChevronLeft,
+  ChevronUp,
+  Clock,
+  Crosshair,
+  MapPin,
+  Phone,
+  RefreshCw,
+  Settings,
+  Target,
+  Trophy,
+  Users,
+  Watch,
+  X,
+  Zap,
 } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, {
-    Easing,
-    FadeIn,
-    FadeInDown,
-    useAnimatedStyle,
-    useSharedValue,
-    withRepeat,
-    withSequence,
-    withTiming,
+  Easing,
+  FadeIn,
+  FadeInDown,
+  useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withSequence,
+  withTiming,
 } from 'react-native-reanimated';
-import { formatDistanceDisplay } from './activeSession.helpers';
 
 interface SessionPrepViewProps {
   session: SessionWithDetails;

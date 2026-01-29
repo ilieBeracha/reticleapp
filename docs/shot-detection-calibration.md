@@ -248,7 +248,7 @@ function SessionSetupScreen({ weapon }) {
 ### Building Watch Payload with Weapon Info
 
 ```tsx
-import { buildWatchSessionPayload } from '@/components/session/activeSession/activeSession.helpers';
+import { buildWatchSessionPayload } from '@/utils/activeSession.helpers';
 
 // New way - weapon-aware
 const payload = buildWatchSessionPayload(session, {

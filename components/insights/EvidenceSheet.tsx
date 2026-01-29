@@ -7,7 +7,7 @@
 
 import { useColors } from '@/hooks/ui/useColors';
 import { getSessionById } from '@/services/session/queries';
-import type { SessionWithDetails } from '@/services/session/types';
+import type { SessionWithDetails } from '@/types/session';
 import { Ionicons } from '@expo/vector-icons';
 import { format } from 'date-fns';
 import * as Haptics from 'expo-haptics';
@@ -32,7 +32,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import type { EvidenceContext } from './insights.types';
+import type { EvidenceContext } from '@/types/insights';
 
 // ============================================================================
 // PROPS

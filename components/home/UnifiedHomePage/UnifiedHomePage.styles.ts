@@ -5,7 +5,7 @@
  */
 
 import { StyleSheet } from 'react-native';
-import { CARD_RADIUS, SMALL_RADIUS } from './UnifiedHomePage.constants';
+import { CARD_RADIUS, SMALL_RADIUS } from '@/constants/unifiedHomePage';
 
 export const styles = StyleSheet.create({
   // ═══════════════════════════════════════════════════════════════════════════

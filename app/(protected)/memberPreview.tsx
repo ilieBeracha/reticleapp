@@ -3,7 +3,7 @@ import { useColors } from '@/hooks/ui/useColors';
 import { usePermissions } from '@/hooks/usePermissions';
 import { getCurrentUserId } from '@/services/authService';
 import { removeTeamMember, updateTeamMemberRole } from '@/services/teamService';
-import { useMyTeamRole, useTeamRoleFlags, useTeamStore } from '@/store/teamStore';
+import { useMyTeamRole, useTeamRoleFlags, useTeamStore } from '@/stores/teamStore';
 import type { TeamRole } from '@/types/workspace';
 import { Ionicons } from '@expo/vector-icons';
 import { formatDistanceToNow } from 'date-fns';

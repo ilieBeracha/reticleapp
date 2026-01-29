@@ -2,16 +2,14 @@
  * RequestWeaponModal - Soldier requests a weapon from commander
  *
  * Features:
- * - Friendly guided flow
  * - Category preference selector (chips)
  * - Optional notes field
- * - Clear "what happens next" guidance
  */
 
 import { useColors } from '@/hooks/ui/useColors';
 import { createWeaponRequest, WEAPON_CATEGORIES, type WeaponCategory } from '@/services/weaponService';
 import * as Haptics from 'expo-haptics';
-import { ArrowRight, CheckCircle2, Clock, Send, Shield, X } from 'lucide-react-native';
+import { ArrowRight, X } from 'lucide-react-native';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -27,7 +25,6 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
 
 interface RequestWeaponModalProps {
   visible: boolean;
@@ -92,47 +89,6 @@ export function RequestWeaponModal({ visible, teamId, onClose, onSuccess }: Requ
           contentContainerStyle={styles.contentInner}
           keyboardShouldPersistTaps="handled"
         >
-          {/* Hero Section */}
-          <Animated.View
-            entering={FadeInDown.duration(300).delay(100)}
-            style={[styles.heroSection, { backgroundColor: colors.card }]}
-          >
-            <View style={[styles.heroIcon, { backgroundColor: colors.primary + '15' }]}>
-              <Shield size={28} color={colors.primary} />
-            </View>
-            <Text style={[styles.heroTitle, { color: colors.text }]}>Get Ready for Training</Text>
-            <Text style={[styles.heroSubtitle, { color: colors.textMuted }]}>
-              Request a weapon assignment from your commander to start participating in drills.
-            </Text>
-          </Animated.View>
-
-          {/* What Happens Next */}
-          <Animated.View entering={FadeInDown.duration(300).delay(200)} style={styles.stepsContainer}>
-            <Text style={[styles.stepsTitle, { color: colors.textMuted }]}>{t('weapons.whatHappensNext')}</Text>
-            <View style={styles.stepsList}>
-              <View style={styles.stepItem}>
-                <View style={[styles.stepIcon, { backgroundColor: colors.primary + '15' }]}>
-                  <Send size={14} color={colors.primary} />
-                </View>
-                <Text style={[styles.stepText, { color: colors.text }]}>{t('weapons.step1')}</Text>
-              </View>
-              <View style={[styles.stepConnector, { backgroundColor: colors.border }]} />
-              <View style={styles.stepItem}>
-                <View style={[styles.stepIcon, { backgroundColor: colors.yellow + '15' }]}>
-                  <Clock size={14} color={colors.yellow} />
-                </View>
-                <Text style={[styles.stepText, { color: colors.text }]}>{t('weapons.step2')}</Text>
-              </View>
-              <View style={[styles.stepConnector, { backgroundColor: colors.border }]} />
-              <View style={styles.stepItem}>
-                <View style={[styles.stepIcon, { backgroundColor: colors.green + '15' }]}>
-                  <CheckCircle2 size={14} color={colors.green} />
-                </View>
-                <Text style={[styles.stepText, { color: colors.text }]}>{t('weapons.step3')}</Text>
-              </View>
-            </View>
-          </Animated.View>
-
           {/* Category Selection */}
           <View style={styles.section}>
             <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>{t('weapons.preferredCategory')}</Text>
@@ -234,65 +190,6 @@ const styles = StyleSheet.create({
   contentInner: {
     padding: 20,
     gap: 24,
-  },
-  heroSection: {
-    alignItems: 'center',
-    padding: 24,
-    borderRadius: 16,
-    gap: 12,
-  },
-  heroIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 4,
-  },
-  heroTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    textAlign: 'center',
-  },
-  heroSubtitle: {
-    fontSize: 14,
-    lineHeight: 20,
-    textAlign: 'center',
-  },
-  stepsContainer: {
-    gap: 12,
-  },
-  stepsTitle: {
-    fontSize: 12,
-    fontWeight: '600',
-    letterSpacing: 0.5,
-    marginLeft: 4,
-  },
-  stepsList: {
-    gap: 0,
-  },
-  stepItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingVertical: 8,
-  },
-  stepIcon: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  stepText: {
-    fontSize: 14,
-    flex: 1,
-  },
-  stepConnector: {
-    width: 2,
-    height: 12,
-    marginLeft: 13,
-    borderRadius: 1,
   },
   section: {
     gap: 12,

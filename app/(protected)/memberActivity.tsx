@@ -1,6 +1,6 @@
 import { useColors } from '@/hooks/ui/useColors';
 import { useAppContext } from '@/hooks/useAppContext';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/services/supabase';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';

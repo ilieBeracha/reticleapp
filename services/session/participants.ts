@@ -14,7 +14,7 @@
  * Participants must be from the same team as the session owner.
  */
 
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/services/supabase';
 import type { DrillGoal } from '@/types/workspace';
 import type {
   Engagement,
@@ -23,8 +23,8 @@ import type {
   EngagementRole,
   EngagementStatus,
   ParticipantState,
-} from './types';
-import { enforceEngagementMode } from './types';
+} from '@/types/session';
+import { enforceEngagementMode } from '@/utils/engagementMode';
 
 // ============================================================================
 // ENGAGEMENT QUERIES
@@ -590,4 +590,133 @@ export function calculateGroupTotals(participants: EngagementParticipant[]): {
     submittedCount,
     totalCount: participants.length,
   };
+}
+
+// ============================================================================
+// BANNER / LOBBY QUERIES
+// ============================================================================
+
+/**
+ * Find the most recent active squad/group engagement in a training.
+ */
+export async function getActiveEngagementForTraining(trainingId: string) {
+  const { data, error } = await supabase
+    .from('engagements')
+    .select(`
+      id,
+      session_id,
+      training_id,
+      engagement_mode,
+      status,
+      shooter_id,
+      started_at
+    `)
+    .eq('training_id', trainingId)
+    .in('engagement_mode', ['squad', 'group'])
+    .in('status', ['pending', 'active'])
+    .order('created_at', { ascending: false })
+    .limit(1);
+
+  if (error) {
+    console.error('[participants] getActiveEngagementForTraining error:', error);
+    throw error;
+  }
+
+  return data?.[0] ?? null;
+}
+
+/**
+ * Get a user's participation state in an engagement.
+ */
+export async function getUserParticipationState(
+  engagementId: string,
+  userId: string
+): Promise<{ id: string; state: string } | null> {
+  const { data, error } = await supabase
+    .from('engagement_participants')
+    .select('id, state')
+    .eq('engagement_id', engagementId)
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  if (error) {
+    console.error('[participants] getUserParticipationState error:', error);
+    throw error;
+  }
+
+  return data;
+}
+
+/**
+ * Self-join an engagement. Silently handles duplicate key errors.
+ */
+export async function joinEngagement(engagementId: string, userId: string): Promise<void> {
+  const { error } = await supabase
+    .from('engagement_participants')
+    .insert({
+      engagement_id: engagementId,
+      user_id: userId,
+      state: 'joined',
+      role: 'shooter',
+      joined_at: new Date().toISOString(),
+    });
+
+  if (error && !error.message?.includes('duplicate')) {
+    console.error('[participants] joinEngagement error:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get the commander's active lobby for a training (engagement with inner-joined session).
+ */
+export async function getCommanderActiveLobby(trainingId: string, userId: string) {
+  const { data, error } = await supabase
+    .from('engagements')
+    .select(`
+      id,
+      session_id,
+      engagement_mode,
+      status,
+      created_at,
+      started_at,
+      sessions!inner (
+        id,
+        custom_drill_config,
+        training_id,
+        user_id,
+        status
+      )
+    `)
+    .eq('sessions.training_id', trainingId)
+    .eq('sessions.user_id', userId)
+    .in('engagement_mode', ['squad', 'group'])
+    .in('status', ['pending', 'active'])
+    .order('created_at', { ascending: false })
+    .limit(1);
+
+  if (error) {
+    console.error('[participants] getCommanderActiveLobby error:', error);
+    throw error;
+  }
+
+  return data?.[0] ?? null;
+}
+
+/**
+ * Get session details for an engagement (drill info + commander).
+ */
+export async function getEngagementSessionDetails(sessionId: string) {
+  const { data, error } = await supabase
+    .from('sessions')
+    .select('id, custom_drill_config, user_id')
+    .eq('id', sessionId)
+    .single();
+
+  if (error) {
+    console.error('[participants] getEngagementSessionDetails error:', error);
+    throw error;
+  }
+
+  return data;
 }

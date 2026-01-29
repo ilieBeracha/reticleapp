@@ -21,7 +21,7 @@ import type {
   WatchShotData,
   WatchSummaryPayload,
   WatchTimelineChunkPayload,
-} from './watchTypes';
+} from '@/types/session.watch';
 import { decodeWeather } from './weatherDecoder';
 
 /**

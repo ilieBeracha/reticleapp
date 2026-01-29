@@ -2,8 +2,8 @@ import {
   NetworkError,
   ValidationError,
   handleServiceError,
-} from "@/lib/errors";
-import { supabase } from "@/lib/supabase";
+} from "@/utils/errors";
+import { supabase } from "@/services/supabase";
 import {
   AnalyzeDocumentResponse,
   AnalyzeResponse,

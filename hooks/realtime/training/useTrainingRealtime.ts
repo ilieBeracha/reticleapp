@@ -24,10 +24,10 @@
 
 import { useCallback, useMemo } from 'react';
 import { useRealtimeChannel } from '../core/channel';
-import type { ChangePayload } from '../table/table.types';
+import type { ChangePayload } from '@/types/realtime.table';
 import type { SessionRecord, SessionTargetRecord } from '../records/session';
 import type { TrainingRecord } from '../records/training';
-import type { UseTrainingRealtimeOptions, UseTrainingRealtimeReturn } from './training.types';
+import type { UseTrainingRealtimeOptions, UseTrainingRealtimeReturn } from '@/types/realtime.training';
 
 export function useTrainingRealtime(options: UseTrainingRealtimeOptions): UseTrainingRealtimeReturn {
   const { trainingId, onTrainingUpdate, onSessionChange, onSessionCreate, onSessionUpdate, onNewTarget, enabled = true } = options;

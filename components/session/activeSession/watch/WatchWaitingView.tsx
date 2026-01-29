@@ -6,12 +6,12 @@
  */
 
 import { useColors } from '@/hooks/ui/useColors';
-import type { SessionDrillConfig, SessionWithDetails } from '@/services/session/types';
+import type { SessionDrillConfig, SessionWithDetails } from '@/types/session';
 import { MapPin, Target, Watch, X } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { EdgeInsets } from 'react-native-safe-area-context';
-import { formatDistanceDisplay } from '../activeSession.helpers';
+import { formatDistanceDisplay } from '@/utils/activeSession.helpers';
 import { styles as sharedStyles } from '../activeSession.styles';
 
 interface WatchWaitingViewProps {
