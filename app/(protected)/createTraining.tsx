@@ -19,14 +19,14 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { ArrowRight, ChevronLeft, Play, Users } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import {
-    ActivityIndicator,
-    Modal,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -52,15 +52,6 @@ export default function CreateTrainingScreen() {
     manualStart,
     setManualStart,
     drills,
-    // Feature flags
-    isSniperOriented,
-    // Hebrew military format fields (only for sniper-oriented teams)
-    location,
-    setLocation,
-    trainingType,
-    setTrainingType,
-    subTypes,
-    setSubTypes,
     showDatePicker,
     setShowDatePicker,
     showTimePicker,
@@ -69,6 +60,13 @@ export default function CreateTrainingScreen() {
     currentStep,
     step1Complete,
     canCreate,
+    // Participants
+    participantMode,
+    selectedMemberIds,
+    members,
+    loadingMembers,
+    requiredMemberIds,
+    currentUserId,
     // Actions
     handleSelectTeam,
     handleRemoveDrill,
@@ -77,6 +75,8 @@ export default function CreateTrainingScreen() {
     handleNextStep,
     handleBackStep,
     handleCreate,
+    handleSetParticipantMode,
+    handleToggleMember,
   } = useCreateTrainingV2({ teamIdParam });
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -184,18 +184,19 @@ export default function CreateTrainingScreen() {
               title={title}
               scheduledDate={scheduledDate}
               manualStart={manualStart}
-              isSniperOriented={isSniperOriented}
-              location={location}
-              trainingType={trainingType}
-              subTypes={subTypes}
+              participantMode={participantMode}
+              selectedMemberIds={selectedMemberIds}
+              members={members}
+              loadingMembers={loadingMembers}
+              requiredMemberIds={requiredMemberIds}
+              currentUserId={currentUserId}
               onSelectTeam={handleSelectTeam}
               onTitleChange={setTitle}
               onOpenDatePicker={() => setShowDatePicker(true)}
               onOpenTimePicker={() => setShowTimePicker(true)}
               onToggleManualStart={() => setManualStart(!manualStart)}
-              onLocationChange={setLocation}
-              onTrainingTypeChange={setTrainingType}
-              onSubTypesChange={setSubTypes}
+              onSetParticipantMode={handleSetParticipantMode}
+              onToggleMember={handleToggleMember}
             />
           </Animated.View>
         )}

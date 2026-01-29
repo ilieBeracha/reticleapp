@@ -1,4 +1,5 @@
 import type { TeamSpecialty } from '@/constants/teamSpecialties';
+import { useTeamStore } from '@/stores/teamStore';
 import { SQUAD_TEMPLATES } from '@/utils/team/squads';
 import {
   addSquad,
@@ -9,7 +10,6 @@ import {
   normalizeTeamName,
   removeSquad,
 } from '@/utils/team/validation';
-import { useTeamStore } from '@/stores/teamStore';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';

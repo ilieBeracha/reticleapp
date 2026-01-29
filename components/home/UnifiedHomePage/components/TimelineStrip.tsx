@@ -6,6 +6,7 @@
  */
 
 import { DirectionalChevron } from '@/components/shared/DirectionalChevron';
+import type { Colors } from '@/types/home';
 import type { TrainingWithDetails } from '@/types/workspace';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
@@ -23,7 +24,6 @@ import Animated, {
   withSpring,
   withTiming,
 } from 'react-native-reanimated';
-import type { Colors } from '@/types/home';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // TYPES
@@ -64,7 +64,7 @@ function buildDayData(trainings: TrainingWithDetails[], t: ReturnType<typeof use
   const days: DayData[] = [];
 
   // Show 2 days before, today, and 4 days after (7 total)
-  const DAYS_BEFORE = 2;
+  const DAYS_BEFORE = 0;
   const TOTAL_DAYS = 7;
 
   for (let i = -DAYS_BEFORE; i < TOTAL_DAYS - DAYS_BEFORE; i++) {
@@ -180,11 +180,7 @@ function DayColumn({
 
   return (
     <AnimatedTouchable
-      style={[
-        s.dayColumn,
-        isSelected && { backgroundColor: `${colors.primary}08` },
-        animStyle,
-      ]}
+      style={[s.dayColumn, isSelected && { backgroundColor: `${colors.primary}08` }, animStyle]}
       onPress={handlePress}
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
@@ -300,8 +296,8 @@ export function TimelineStrip({ colors, trainings }: TimelineStripProps) {
   const days = useMemo(() => buildDayData(trainings, t), [trainings, t]);
 
   // Auto-expand today if there's a live training
-  const liveDayIndex = useMemo(() => days.findIndex((d) => d.trainings.some((t) => t.status === 'ongoing')), [days]);
-  const [selectedDayIndex, setSelectedDayIndex] = useState<number | null>(liveDayIndex >= 0 ? liveDayIndex : null);
+  // const liveDayIndex = useMemo(() => days.findIndex((d) => d.trainings.some((t) => t.status === 'ongoing')), [days]);
+  const [selectedDayIndex, setSelectedDayIndex] = useState<number | null>(null);
 
   const handleDayPress = useCallback((index: number) => {
     setSelectedDayIndex((prev) => (prev === index ? null : index));

@@ -9,9 +9,11 @@ import { PresetForm } from '@/components/shared/drills/PresetForm';
 import type { DrillType } from '@/constants/categoryDrills';
 import { type CategoryDrill, getDrillById } from '@/constants/categoryDrills';
 import { RANGE_CATEGORIES } from '@/constants/drill';
+import { DISTANCE_PRESETS, POSITION_OPTIONS, SHOTS_PRESETS, TIME_PRESETS } from '@/constants/sessionCreation';
 import { getCategoryConfig, getCategoryDistances } from '@/constants/weaponCategories';
 import { useColors } from '@/hooks/ui/useColors';
 import type { DrillGoal, DrillPreset } from '@/services/presetService';
+import type { Position, RangeCategory, SessionContextState, SessionPurpose } from '@/types/sessionCreation';
 import type { WeaponCategory } from '@/types/workspace';
 import * as Haptics from 'expo-haptics';
 import { Bookmark, ChevronDown, ChevronRight, ChevronUp, Edit3, X } from 'lucide-react-native';
@@ -19,8 +21,6 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, Modal, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { CategoryDrillPicker } from '../CategoryDrillPicker';
-import { DISTANCE_PRESETS, POSITION_OPTIONS, SHOTS_PRESETS, TIME_PRESETS } from '@/constants/sessionCreation';
-import type { Position, RangeCategory, SessionContextState, SessionPurpose } from '@/types/sessionCreation';
 
 // ============================================================================
 // TYPES
@@ -261,6 +261,7 @@ export function SessionContextStep({
   const { t } = useTranslation();
   const colors = useColors();
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [useRangeMode, setUseRangeMode] = useState(false);
   const [showDrillPicker, setShowDrillPicker] = useState(false);
   const [showPresetForm, setShowPresetForm] = useState(false);
   const [isEditingDrill, setIsEditingDrill] = useState(false);
@@ -492,12 +493,45 @@ export function SessionContextStep({
       {!selectedDrill && (
         <>
           <View style={styles.paramRow}>
-            <Text style={[styles.paramLabel, { color: colors.textMuted }]}>{t('session.distance')}</Text>
-
-            {/* Range category selection - only shown when prop is true (no exact option) */}
+            {/* Tappable label to toggle between exact/range - only when showRangeCategory */}
             {showRangeCategory ? (
+              <TouchableOpacity
+                style={styles.distanceLabelRow}
+                onPress={() => {
+                  Haptics.selectionAsync();
+                  setUseRangeMode(!useRangeMode);
+                  // Clear selection when switching
+                  onUpdateContext({ distance: 0, distanceCategory: null });
+                }}
+              >
+                <Text style={[styles.paramLabel, { color: colors.textMuted, marginBottom: 0 }]}>
+                  {useRangeMode ? t('training.distanceRange') : t('session.distance')}
+                </Text>
+                <View style={[styles.distanceModeBadge, { backgroundColor: colors.card }]}>
+                  <Text style={[styles.distanceModeBadgeText, { color: colors.textMuted }]}>
+                    {useRangeMode ? t('training.tapForExact') : t('training.tapForRange')}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            ) : (
+              <Text style={[styles.paramLabel, { color: colors.textMuted }]}>{t('session.distance')}</Text>
+            )}
+
+            {/* Exact distance picker */}
+            {!useRangeMode && (
+              <PillPicker
+                options={distancePresets.slice(0, 4)}
+                selected={context.distance}
+                onSelect={(d) => onUpdateContext({ distance: d, distanceCategory: null })}
+                allowCustom
+                customSuffix="m"
+              />
+            )}
+
+            {/* Range category picker */}
+            {useRangeMode && showRangeCategory && (
               <>
-                <View style={[styles.rangeModeRow, { marginBottom: 8 }]}>
+                <View style={styles.rangeModeRow}>
                   {RANGE_CATEGORIES.map((cat) => {
                     const isSelected = context.distanceCategory === cat.value;
                     const label =
@@ -533,17 +567,6 @@ export function SessionContextStep({
                   </Text>
                 )}
               </>
-            ) : null}
-
-            {/* Exact distance picker - only shown when NOT using range categories */}
-            {!showRangeCategory && (
-              <PillPicker
-                options={distancePresets.slice(0, 4)}
-                selected={context.distance}
-                onSelect={(d) => onUpdateContext({ distance: d })}
-                allowCustom
-                customSuffix="m"
-              />
             )}
           </View>
 
@@ -732,7 +755,7 @@ const styles = StyleSheet.create({
 
   // Params
   paramRow: { paddingVertical: 14 },
-  paramLabel: { fontSize: 13, marginBottom: 10 },
+  paramLabel: { fontSize: 13, marginBottom: 10, alignSelf: 'flex-start' },
 
   // Drill row
   drillRow: {
@@ -770,11 +793,23 @@ const styles = StyleSheet.create({
   pillInputText: { fontSize: 14, fontWeight: '600', minWidth: 32, textAlign: 'center', paddingVertical: 0 },
   pillInputSuffix: { fontSize: 13, fontWeight: '500' },
 
-  // Range category mode toggle
+  // Range category mode
   rangeModeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   rangeModeBtn: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8 },
   rangeModeBtnText: { fontSize: 13, fontWeight: '600' },
-  rangeHint: { fontSize: 12, marginBottom: 8 },
+  rangeHint: { fontSize: 12, marginTop: 8 },
+  distanceLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  distanceModeBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  distanceModeBadgeText: { fontSize: 11 },
 
   // Advanced
   advancedToggle: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: 12 },

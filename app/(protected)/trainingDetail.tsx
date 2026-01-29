@@ -39,6 +39,7 @@ import {
   Lock,
   Play,
   Settings,
+  ShieldAlert,
   Sparkles,
   Target,
   Trophy,
@@ -421,15 +422,17 @@ function PlannedDrillsList({
   training,
   colors,
   onStartDrill,
+  disabled = false,
 }: {
   training: any;
   colors: any;
   onStartDrill: (drill: TrainingDrill) => void;
+  disabled?: boolean;
 }) {
   const { t } = useTranslation();
   if (!training.drills || training.drills.length === 0) return null;
 
-  const canStart = training.status === 'ongoing';
+  const canStart = training.status === 'ongoing' && !disabled;
 
   return (
     <View style={styles.section}>
@@ -583,6 +586,7 @@ function TrainingSummaryContent({
   insets,
   completedSessions,
   canManageTraining,
+  isInvited,
   onBack,
   onOpenSettings,
   onStartTraining,
@@ -597,6 +601,7 @@ function TrainingSummaryContent({
   insets: any;
   completedSessions: SessionWithDetails[];
   canManageTraining: boolean;
+  isInvited: boolean;
   onBack: () => void;
   onOpenSettings: () => void;
   onStartTraining: () => void;
@@ -657,8 +662,23 @@ function TrainingSummaryContent({
       <View style={styles.contentContainer}>
         {activeTab === 'drills' ? (
           <>
-            {/* Squad/Group Session Banners */}
-            {training.id && currentUserId && (
+            {/* Not Invited Banner */}
+            {!isInvited && (
+              <View style={[styles.notInvitedBanner, { backgroundColor: `${colors.orange}10`, borderColor: `${colors.orange}25` }]}>
+                <ShieldAlert size={18} color={colors.orange} strokeWidth={1.5} />
+                <View style={styles.notInvitedInfo}>
+                  <Text style={[styles.notInvitedTitle, { color: colors.text }]}>
+                    {t('training.notInvited', 'Not Invited')}
+                  </Text>
+                  <Text style={[styles.notInvitedText, { color: colors.textMuted }]}>
+                    {t('training.notInvitedDesc', 'You were not selected for this training. Contact your commander for access.')}
+                  </Text>
+                </View>
+              </View>
+            )}
+
+            {/* Squad/Group Session Banners — only for invited participants */}
+            {isInvited && training.id && currentUserId && (
               <>
                 {/* Commander: Return to your lobby */}
                 <SquadLobbyBanner trainingId={training.id} userId={currentUserId} onLobbyChanged={onRefresh} />
@@ -671,8 +691,13 @@ function TrainingSummaryContent({
               </>
             )}
 
-            {/* Planned Drills - What you can do */}
-            <PlannedDrillsList training={training} colors={colors} onStartDrill={onStartDrill} />
+            {/* Planned Drills - What you can do (read-only if not invited) */}
+            <PlannedDrillsList
+              training={training}
+              colors={colors}
+              onStartDrill={onStartDrill}
+              disabled={!isInvited}
+            />
 
             {/* Empty State for drills */}
             <EmptyState training={training} completedSessions={completedSessions} colors={colors} />
@@ -747,6 +772,15 @@ export default function TrainingDetailScreen() {
   const isCreator = training?.creator?.id === session?.user?.id;
   const activeTeamMatchesTraining = !training?.team_id || training?.team_id === activeTeamId;
   const canManageTraining = isCreator || (canManageByRole && activeTeamMatchesTraining);
+
+  // Invitation check — commanders/creators always have access
+  const isInvited = (() => {
+    if (!training || !session?.user?.id) return true; // loading or no user
+    if (canManageTraining) return true; // commanders/creators always invited
+    if (training.invite_all !== false) return true; // default: everyone invited
+    if (!training.invited_member_ids?.length) return true; // no restriction list
+    return training.invited_member_ids.includes(session.user.id);
+  })();
 
   // ─────────────────────────────────────────────────────────────────────────────
   // Load Completed Sessions
@@ -878,12 +912,12 @@ export default function TrainingDetailScreen() {
   // ─────────────────────────────────────────────────────────────────────────────
   const handleStartDrill = useCallback(
     (drill: TrainingDrill) => {
-      if (!training?.id) return;
+      if (!training?.id || !isInvited) return;
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       setSelectedDrill(drill);
       setShowStartDrillSheet(true);
     },
-    [training?.id]
+    [training?.id, isInvited]
   );
 
   const handleCloseStartDrillSheet = useCallback(() => {
@@ -940,6 +974,7 @@ export default function TrainingDetailScreen() {
         insets={insets}
         completedSessions={completedSessions}
         canManageTraining={canManageTraining}
+        isInvited={isInvited}
         onBack={handleBack}
         onOpenSettings={handleOpenSettings}
         onStartTraining={handleStartTraining}
@@ -958,14 +993,16 @@ export default function TrainingDetailScreen() {
         colors={colors}
       />
 
-      {/* Run Drill Sheet - soldier picks values and runs drill */}
-      <RunDrillSheet
-        visible={showStartDrillSheet}
-        onClose={handleCloseStartDrillSheet}
-        drill={selectedDrill}
-        trainingId={training.id}
-        teamId={training.team_id || ''}
-      />
+      {/* Run Drill Sheet - soldier picks values and runs drill (only for invited participants) */}
+      {isInvited && (
+        <RunDrillSheet
+          visible={showStartDrillSheet}
+          onClose={handleCloseStartDrillSheet}
+          drill={selectedDrill}
+          trainingId={training.id}
+          teamId={training.team_id || ''}
+        />
+      )}
     </View>
   );
 }
@@ -980,6 +1017,29 @@ const styles = StyleSheet.create({
   scroll: { flex: 1 },
   scrollContent: { flexGrow: 1 },
   contentContainer: { paddingHorizontal: 16, gap: 16, marginTop: 16 },
+
+  // Not Invited Banner
+  notInvitedBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  notInvitedInfo: {
+    flex: 1,
+    gap: 2,
+  },
+  notInvitedTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  notInvitedText: {
+    fontSize: 12,
+    lineHeight: 16,
+  },
 
   // Loading & Error States
   loadingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center' },

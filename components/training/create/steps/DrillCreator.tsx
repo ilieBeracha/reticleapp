@@ -41,7 +41,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import type { NewDrillInstanceConfig, TrainingDrillItem } from '@/types/createTraining';
+import type { DrillConfig, TrainingDrillItem } from '@/types/createTraining';
 
 // ============================================================================
 // TYPES
@@ -52,7 +52,7 @@ interface DrillCreatorProps {
   teamDrills: Drill[];
   canSaveToLibrary: boolean;
   onAddToTraining: (drill: TrainingDrillItem) => void;
-  onSaveAndAdd: (drillData: DrillSaveData, config: NewDrillInstanceConfig) => Promise<void>;
+  onSaveAndAdd: (drillData: DrillSaveData, config: DrillConfig) => Promise<void>;
   onClose: () => void;
 }
 
@@ -189,7 +189,7 @@ export function DrillCreator({
   const handleConfirm = useCallback(async () => {
     const inputMethod = drillGoal === 'grouping' ? 'scan' : 'manual';
 
-    const config: NewDrillInstanceConfig = {
+    const config: DrillConfig = {
       distance_m: distanceCategory ? 0 : distance,
       distance_category: distanceCategory,
       rounds_per_shooter: shots,

@@ -13,13 +13,13 @@
 
 import { RANGE_CATEGORIES, type RangeCategory } from '@/constants/drill';
 import { useColors } from '@/hooks/ui/useColors';
-import { supabase } from '@/services/supabase';
 import { getOrCreateSetupSession } from '@/services/session/mutations';
+import { supabase } from '@/services/supabase';
 import { getUserWeapon, type UserWeapon } from '@/services/weaponService';
 import type { TrainingDrill } from '@/types/workspace';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
-import { Lock, MapPin, Minus, Plus, Target, X, Zap } from 'lucide-react-native';
+import { Lock, MapPin, Minus, Play, Plus, Target, X, Zap } from 'lucide-react-native';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Modal, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
@@ -68,8 +68,17 @@ export function RunDrillSheet({ visible, onClose, drill, trainingId, teamId }: R
   const [weapon, setWeapon] = useState<UserWeapon | null>(null);
   const [loadingWeapon, setLoadingWeapon] = useState(true);
 
+  // Execution tracking
+  const [completedExecutions, setCompletedExecutions] = useState(0);
+  const [loadingExecutions, setLoadingExecutions] = useState(true);
+
   // Submit state
   const [isStarting, setIsStarting] = useState(false);
+
+  // Drill execution = 1 session completion (strings_count is strings WITHIN the session, not separate runs)
+  // hasReachedLimit = true if soldier already completed this drill once
+  const maxExecutions = 1;
+  const hasReachedLimit = completedExecutions >= maxExecutions;
 
   // ═══════════════════════════════════════════════════════════════════════════
   // DERIVED VALUES FROM DRILL
@@ -119,6 +128,48 @@ export function RunDrillSheet({ visible, onClose, drill, trainingId, teamId }: R
       setPosition('standing');
     }
   }, [drill, distanceCategory]);
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // LOAD COMPLETED EXECUTIONS COUNT
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  useEffect(() => {
+    async function loadCompletedExecutions() {
+      if (!drill?.id || !trainingId) return;
+
+      try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        if (!user) return;
+
+        // Count completed sessions for this user + drill + training
+        const { count, error } = await supabase
+          .from('sessions')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', user.id)
+          .eq('drill_id', drill.id)
+          .eq('training_id', trainingId)
+          .eq('status', 'completed');
+
+        if (error) {
+          console.error('[RunDrillSheet] Failed to count executions:', error);
+          return;
+        }
+
+        setCompletedExecutions(count ?? 0);
+      } catch (err) {
+        console.error('[RunDrillSheet] Failed to load executions:', err);
+      } finally {
+        setLoadingExecutions(false);
+      }
+    }
+
+    if (visible && drill?.id) {
+      setLoadingExecutions(true);
+      loadCompletedExecutions();
+    }
+  }, [visible, drill?.id, trainingId]);
 
   // ═══════════════════════════════════════════════════════════════════════════
   // LOAD DEFAULT WEAPON
@@ -219,7 +270,8 @@ export function RunDrillSheet({ visible, onClose, drill, trainingId, teamId }: R
 
   if (!drill) return null;
 
-  const canStart = weapon != null && !loadingWeapon;
+  // Allow starting even if already completed (for practice) - badge shows completion status
+  const canStart = weapon != null && !loadingWeapon && !loadingExecutions;
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
@@ -237,6 +289,24 @@ export function RunDrillSheet({ visible, onClose, drill, trainingId, teamId }: R
 
           {/* Drill Name */}
           <Text style={[styles.drillName, { color: colors.text }]}>{drill.name}</Text>
+
+          {/* Completion Status */}
+          {!loadingExecutions && hasReachedLimit && (
+            <View
+              style={[
+                styles.executionProgress,
+                {
+                  backgroundColor: `${colors.green}15`,
+                  borderColor: colors.green,
+                },
+              ]}
+            >
+              <Zap size={14} color={colors.green} />
+              <Text style={[styles.executionProgressText, { color: colors.green }]}>
+                {t('training.alreadyCompleted')}
+              </Text>
+            </View>
+          )}
 
           {/* Weapon */}
           <View style={[styles.weaponRow, { backgroundColor: colors.secondary }]}>
@@ -311,33 +381,35 @@ export function RunDrillSheet({ visible, onClose, drill, trainingId, teamId }: R
             )}
           </View>
 
-          {/* Bullets */}
-          <View style={styles.configSection}>
-            <View style={styles.configHeader}>
-              <Zap size={16} color={colors.textMuted} />
-              <Text style={[styles.configLabel, { color: colors.text }]}>Bullets</Text>
-              {isBulletsLocked && <Lock size={14} color={colors.textMuted} />}
-            </View>
-
-            {isBulletsLocked ? (
-              <Text style={[styles.lockedValue, { color: colors.text }]}>{drill.rounds_per_shooter}</Text>
-            ) : (
-              <View style={styles.bulletPicker}>
-                {[5, 10, 15, 20].map((n) => (
-                  <TouchableOpacity
-                    key={n}
-                    style={[
-                      styles.bulletOption,
-                      { backgroundColor: bullets === n ? colors.primary : colors.secondary },
-                    ]}
-                    onPress={() => setBullets(n)}
-                  >
-                    <Text style={[styles.bulletText, { color: bullets === n ? '#fff' : colors.text }]}>{n}</Text>
-                  </TouchableOpacity>
-                ))}
+          {/* Bullets - hide for grouping drills (bullet count determined by actual shots) */}
+          {drill.drill_goal !== 'grouping' && (
+            <View style={styles.configSection}>
+              <View style={styles.configHeader}>
+                <Zap size={16} color={colors.textMuted} />
+                <Text style={[styles.configLabel, { color: colors.text }]}>Bullets</Text>
+                {isBulletsLocked && <Lock size={14} color={colors.textMuted} />}
               </View>
-            )}
-          </View>
+
+              {isBulletsLocked ? (
+                <Text style={[styles.lockedValue, { color: colors.text }]}>{drill.rounds_per_shooter}</Text>
+              ) : (
+                <View style={styles.bulletPicker}>
+                  {[5, 10, 15, 20].map((n) => (
+                    <TouchableOpacity
+                      key={n}
+                      style={[
+                        styles.bulletOption,
+                        { backgroundColor: bullets === n ? colors.primary : colors.secondary },
+                      ]}
+                      onPress={() => setBullets(n)}
+                    >
+                      <Text style={[styles.bulletText, { color: bullets === n ? '#fff' : colors.text }]}>{n}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+            </View>
+          )}
 
           {/* Position */}
           <View style={styles.configSection}>
@@ -372,7 +444,13 @@ export function RunDrillSheet({ visible, onClose, drill, trainingId, teamId }: R
 
           {/* Start Button */}
           <TouchableOpacity
-            style={[styles.startBtn, { backgroundColor: colors.primary, opacity: canStart ? 1 : 0.5 }]}
+            style={[
+              styles.startBtn,
+              {
+                backgroundColor: colors.primary,
+                opacity: canStart ? 1 : 0.5,
+              },
+            ]}
             onPress={handleStart}
             disabled={!canStart || isStarting}
           >
@@ -380,8 +458,8 @@ export function RunDrillSheet({ visible, onClose, drill, trainingId, teamId }: R
               <ActivityIndicator color="#fff" />
             ) : (
               <>
-                <Target size={20} color="#fff" />
-                <Text style={styles.startBtnText}>Run Drill</Text>
+                <Play size={20} color="#fff" fill="#fff" />
+                <Text style={styles.startBtnText}>{t('training.startDrill')}</Text>
               </>
             )}
           </TouchableOpacity>
@@ -432,6 +510,21 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     marginBottom: 16,
     textAlign: 'center',
+  },
+  executionProgress: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    marginBottom: 16,
+    alignSelf: 'center',
+  },
+  executionProgressText: {
+    fontSize: 13,
+    fontWeight: '600',
   },
   weaponRow: {
     flexDirection: 'row',

@@ -6,13 +6,13 @@
 
 import { supabase } from '@/services/supabase';
 import type {
-  Team,
-  TeamInvitation,
-  TeamMember,
-  TeamMemberWithProfile,
-  TeamRole,
-  TeamWithMembers,
-  TeamWithRole,
+    Team,
+    TeamInvitation,
+    TeamMember,
+    TeamMemberWithProfile,
+    TeamRole,
+    TeamWithMembers,
+    TeamWithRole,
 } from '@/types/workspace';
 
 function normalizeTeamInvitation(row: any): TeamInvitation {

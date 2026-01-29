@@ -14,10 +14,11 @@
 
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, Keyboard } from 'react-native';
 
-import { isSniperOrientedTeam } from '@/constants/teamSpecialties';
+import { useAuth } from '@/contexts/AuthContext';
+
 import {
   createTeamPreset,
   getDrillsGroupedByCategory,
@@ -29,9 +30,11 @@ import {
   type TrainingDrillItem,
 } from '@/services/drills/drillService';
 import { createTraining } from '@/services/trainingService';
+import { getTeamMembers } from '@/services/teamService';
 import { useTeamStore } from '@/stores/teamStore';
 import { useTrainingStore } from '@/stores/trainingStore';
-import type { SubType, TeamWithRole, TrainingType } from '@/types/workspace';
+import type { ParticipantMode } from '@/types/createTraining';
+import type { TeamMemberWithProfile, TeamWithRole } from '@/types/workspace';
 
 import { createDefaultScheduledDate, isStep1Complete } from '@/utils/createTraining.helpers';
 
@@ -53,9 +56,6 @@ export interface UseCreateTrainingV2Return {
   isTeamLocked: boolean;
   canCreatePresets: boolean;
 
-  // Feature flags
-  isSniperOriented: boolean; // Hebrew military format enabled
-
   // Form state
   title: string;
   setTitle: (title: string) => void;
@@ -64,14 +64,6 @@ export interface UseCreateTrainingV2Return {
   manualStart: boolean;
   setManualStart: (manual: boolean) => void;
   drills: TrainingDrillItem[];
-
-  // Hebrew military format fields
-  location: string;
-  setLocation: (location: string) => void;
-  trainingType: TrainingType | null;
-  setTrainingType: (type: TrainingType | null) => void;
-  subTypes: SubType[];
-  setSubTypes: (subTypes: SubType[]) => void;
 
   // UI state
   showDatePicker: boolean;
@@ -85,6 +77,14 @@ export interface UseCreateTrainingV2Return {
   // Drill data
   canonicalDrills: Record<DrillCategory, CanonicalDrill[]>;
   teamPresets: TeamDrillPreset[];
+
+  // Participants
+  participantMode: ParticipantMode;
+  selectedMemberIds: string[];
+  members: TeamMemberWithProfile[];
+  loadingMembers: boolean;
+  requiredMemberIds: string[];
+  currentUserId: string | undefined;
 
   // Adjust modal
   adjustingDrill: TrainingDrillItem | null;
@@ -107,6 +107,8 @@ export interface UseCreateTrainingV2Return {
   handleCloseAdjustModal: () => void;
   handleUpdateDrill: (updated: TrainingDrillItem) => void;
   handleSavePreset: (drillId: string, config: DrillConfig, label?: string) => Promise<void>;
+  handleSetParticipantMode: (mode: ParticipantMode) => void;
+  handleToggleMember: (userId: string) => void;
 }
 
 // ============================================================================
@@ -116,6 +118,8 @@ export interface UseCreateTrainingV2Return {
 export function useCreateTrainingV2({ teamIdParam }: UseCreateTrainingV2Params): UseCreateTrainingV2Return {
   const { teams } = useTeamStore();
   const { loadTeamTrainings, loadMyUpcomingTrainings } = useTrainingStore();
+  const { session } = useAuth();
+  const currentUserId = session?.user?.id;
 
   // Determine if team is locked (came from teamWorkspace with specific team)
   const isTeamLocked = !!teamIdParam;
@@ -126,11 +130,6 @@ export function useCreateTrainingV2({ teamIdParam }: UseCreateTrainingV2Params):
   const [scheduledDate, setScheduledDate] = useState(createDefaultScheduledDate);
   const [manualStart, setManualStart] = useState(true);
   const [drills, setDrills] = useState<TrainingDrillItem[]>([]);
-
-  // Hebrew military format fields
-  const [location, setLocation] = useState('');
-  const [trainingType, setTrainingType] = useState<TrainingType | null>(null);
-  const [subTypes, setSubTypes] = useState<SubType[]>([]);
 
   // UI state
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -151,6 +150,12 @@ export function useCreateTrainingV2({ teamIdParam }: UseCreateTrainingV2Params):
   // Adjust modal
   const [adjustingDrill, setAdjustingDrill] = useState<TrainingDrillItem | null>(null);
   const [adjustModalVisible, setAdjustModalVisible] = useState(false);
+
+  // Participants
+  const [participantMode, setParticipantMode] = useState<ParticipantMode>('all');
+  const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
+  const [members, setMembers] = useState<TeamMemberWithProfile[]>([]);
+  const [loadingMembers, setLoadingMembers] = useState(false);
 
   // ============================================================================
   // TEAM SYNC
@@ -177,12 +182,23 @@ export function useCreateTrainingV2({ teamIdParam }: UseCreateTrainingV2Params):
   const selectedTeam = teams.find((t) => t.id === selectedTeamId);
   const canCreatePresets = selectedTeam?.my_role === 'owner' || selectedTeam?.my_role === 'commander';
 
-  // Feature flag: Hebrew military format for sniper-oriented teams
-  const isSniperOriented = isSniperOrientedTeam(selectedTeam?.specialty);
-
   const step1Complete = isStep1Complete(selectedTeamId, title);
   const step2Complete = drills.length > 0;
   const canCreate = step1Complete && step2Complete && !submitting;
+
+  // Compute required members (current user + commanders/owners)
+  const requiredMemberIds = useMemo(() => {
+    const required = new Set<string>();
+    // Always include the current user (training creator)
+    if (currentUserId) required.add(currentUserId);
+    // Include all commanders and owners
+    members.forEach((m) => {
+      if (m.role?.role === 'owner' || m.role?.role === 'commander') {
+        required.add(m.user_id);
+      }
+    });
+    return Array.from(required);
+  }, [currentUserId, members]);
 
   // ============================================================================
   // LOAD CANONICAL DRILLS + TEAM PRESETS
@@ -206,6 +222,19 @@ export function useCreateTrainingV2({ teamIdParam }: UseCreateTrainingV2Params):
     }
   }, [selectedTeamId]);
 
+  // Load team members when team changes (for participant selection)
+  useEffect(() => {
+    if (selectedTeamId) {
+      setLoadingMembers(true);
+      getTeamMembers(selectedTeamId)
+        .then(setMembers)
+        .catch(console.error)
+        .finally(() => setLoadingMembers(false));
+    } else {
+      setMembers([]);
+    }
+  }, [selectedTeamId]);
+
   // ============================================================================
   // HANDLERS
   // ============================================================================
@@ -215,6 +244,8 @@ export function useCreateTrainingV2({ teamIdParam }: UseCreateTrainingV2Params):
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       if (teamId !== selectedTeamId) {
         setDrills([]); // Clear drills when switching teams
+        setParticipantMode('all'); // Reset participant selection
+        setSelectedMemberIds([]);
       }
       setSelectedTeamId(teamId);
     },
@@ -287,6 +318,38 @@ export function useCreateTrainingV2({ teamIdParam }: UseCreateTrainingV2Params):
     setAdjustModalVisible(false);
     setAdjustingDrill(null);
   }, []);
+
+  // ============================================================================
+  // PARTICIPANT HANDLERS
+  // ============================================================================
+
+  const handleSetParticipantMode = useCallback(
+    (mode: ParticipantMode) => {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      setParticipantMode(mode);
+      if (mode === 'all') {
+        setSelectedMemberIds([]);
+      } else if (mode === 'select') {
+        // Auto-select required members (creator + commanders/owners)
+        setSelectedMemberIds(requiredMemberIds);
+      }
+    },
+    [requiredMemberIds]
+  );
+
+  const handleToggleMember = useCallback(
+    (userId: string) => {
+      // Prevent removing required members (creator + commanders/owners)
+      if (requiredMemberIds.includes(userId)) {
+        return; // Can't toggle required members
+      }
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      setSelectedMemberIds((prev) =>
+        prev.includes(userId) ? prev.filter((id) => id !== userId) : [...prev, userId]
+      );
+    },
+    [requiredMemberIds]
+  );
 
   // ============================================================================
   // SAVE PRESET
@@ -391,12 +454,8 @@ export function useCreateTrainingV2({ teamIdParam }: UseCreateTrainingV2Params):
         scheduled_at: finalDate.toISOString(),
         manual_start: manualStart,
         drills: drillsPayload,
-        // Military debrief format fields (only for sniper-oriented teams)
-        ...(isSniperOriented && {
-          location: location.trim() || undefined,
-          training_type: trainingType || undefined,
-          sub_type: subTypes.length > 0 ? subTypes : undefined,
-        }),
+        invite_all: participantMode === 'all',
+        invited_member_ids: participantMode === 'select' ? selectedMemberIds : undefined,
       });
 
       console.log('[CreateTrainingV2] Training created successfully:', created.id);
@@ -420,19 +479,7 @@ export function useCreateTrainingV2({ teamIdParam }: UseCreateTrainingV2Params):
     } finally {
       setSubmitting(false);
     }
-  }, [
-    selectedTeamId,
-    title,
-    scheduledDate,
-    manualStart,
-    drills,
-    isSniperOriented,
-    location,
-    trainingType,
-    subTypes,
-    loadTeamTrainings,
-    loadMyUpcomingTrainings,
-  ]);
+  }, [selectedTeamId, title, scheduledDate, manualStart, drills, participantMode, selectedMemberIds, loadTeamTrainings, loadMyUpcomingTrainings]);
 
   // ============================================================================
   // RETURN
@@ -446,9 +493,6 @@ export function useCreateTrainingV2({ teamIdParam }: UseCreateTrainingV2Params):
     isTeamLocked,
     canCreatePresets,
 
-    // Feature flags
-    isSniperOriented,
-
     // Form state
     title,
     setTitle,
@@ -457,14 +501,6 @@ export function useCreateTrainingV2({ teamIdParam }: UseCreateTrainingV2Params):
     manualStart,
     setManualStart,
     drills,
-
-    // Hebrew military format fields (only for sniper-oriented teams)
-    location,
-    setLocation,
-    trainingType,
-    setTrainingType,
-    subTypes,
-    setSubTypes,
 
     // UI state
     showDatePicker,
@@ -478,6 +514,14 @@ export function useCreateTrainingV2({ teamIdParam }: UseCreateTrainingV2Params):
     // Drill data
     canonicalDrills,
     teamPresets,
+
+    // Participants
+    participantMode,
+    selectedMemberIds,
+    members,
+    loadingMembers,
+    requiredMemberIds,
+    currentUserId,
 
     // Adjust modal
     adjustingDrill,
@@ -500,5 +544,7 @@ export function useCreateTrainingV2({ teamIdParam }: UseCreateTrainingV2Params):
     handleCloseAdjustModal,
     handleUpdateDrill,
     handleSavePreset,
+    handleSetParticipantMode,
+    handleToggleMember,
   };
 }

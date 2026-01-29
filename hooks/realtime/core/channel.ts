@@ -8,13 +8,13 @@
  */
 
 import { supabase } from '@/services/supabase';
-import { useCallback, useEffect, useRef, useState } from 'react';
 import type {
-  ChannelChangePayload,
-  ChannelConfig,
-  ChannelStatus,
-  UseRealtimeChannelReturn,
+    ChannelChangePayload,
+    ChannelConfig,
+    ChannelStatus,
+    UseRealtimeChannelReturn,
 } from '@/types/realtime.channel';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 const RECONNECT_DELAY_MS = 3000;
 const MAX_RECONNECT_ATTEMPTS = 5;
@@ -49,9 +49,14 @@ export function useRealtimeChannel(config: ChannelConfig): UseRealtimeChannelRet
   );
 
   const handleError = useCallback(
-    (err: Error) => {
+    (err: Error, isFatal = false) => {
       if (!isMountedRef.current) return;
-      console.error(`[Realtime:${name}] Error:`, err.message);
+      // Use warn for transient errors (will reconnect), error only for fatal
+      if (isFatal) {
+        console.error(`[Realtime:${name}] Error:`, err.message);
+      } else {
+        console.warn(`[Realtime:${name}] Reconnecting after:`, err.message);
+      }
       setError(err);
       onError?.(err);
     },
@@ -65,8 +70,7 @@ export function useRealtimeChannel(config: ChannelConfig): UseRealtimeChannelRet
   const scheduleReconnect = useCallback(() => {
     if (!isMountedRef.current) return;
     if (reconnectAttempts.current >= MAX_RECONNECT_ATTEMPTS) {
-      console.error(`[Realtime:${name}] Max reconnect attempts reached`);
-      handleError(new Error('Max reconnection attempts reached'));
+      handleError(new Error('Max reconnection attempts reached'), true);
       return;
     }
 
@@ -154,9 +158,9 @@ export function useRealtimeChannel(config: ChannelConfig): UseRealtimeChannelRet
         console.log(`[Realtime:${name}] Channel closed`);
         updateStatus('CLOSED');
       } else if (subscribeStatus === 'CHANNEL_ERROR') {
-        console.error(`[Realtime:${name}] ✕ Channel error:`, err);
+        console.warn(`[Realtime:${name}] Channel error, will reconnect:`, err?.message || 'unknown');
         updateStatus('CHANNEL_ERROR');
-        handleError(new Error(err?.message || 'Channel error'));
+        handleError(new Error(err?.message || 'Channel error'), false);
         scheduleReconnect();
       }
     });

@@ -7,14 +7,13 @@
 
 import { supabase } from '@/services/supabase';
 import type {
-    CreateTrainingDrillInput,
-    CreateTrainingInput,
-    Training,
-    TrainingDrill,
-    TrainingStatus,
-    TrainingWithDetails,
-    UpdateTrainingDebriefInput,
-    UpdateTrainingInput,
+  CreateTrainingDrillInput,
+  CreateTrainingInput,
+  Training,
+  TrainingDrill,
+  TrainingStatus,
+  TrainingWithDetails,
+  UpdateTrainingInput,
 } from '@/types/workspace';
 import { scheduleTrainingReminder } from './notifications';
 import { notifyTeamNewTraining, notifyTeamTrainingStarted } from './pushService';
@@ -102,10 +101,11 @@ export async function createTraining(input: CreateTrainingInput): Promise<Traini
       manual_start: input.manual_start ?? false,
       status: 'planned',
       created_by: user.id,
-      // Training metadata (Hebrew military format)
-      location: input.location || null,
-      training_type: input.training_type || null,
-      sub_type: input.sub_type || null,
+      // Participant restrictions — only include when explicitly restricting
+      // (omitting lets the DB default of invite_all=true apply)
+      ...(input.invite_all === false
+        ? { invite_all: false, invited_member_ids: input.invited_member_ids || null }
+        : {}),
     })
     .select(
       `
@@ -327,17 +327,9 @@ export async function updateTraining(trainingId: string, updates: UpdateTraining
   if (updates.status !== undefined) updatePayload.status = updates.status;
   if (updates.auto_close_at !== undefined) updatePayload.auto_close_at = updates.auto_close_at;
 
-  // Training metadata fields
-  if (updates.location !== undefined) updatePayload.location = updates.location;
-  if (updates.training_type !== undefined) updatePayload.training_type = updates.training_type;
-  if (updates.sub_type !== undefined) updatePayload.sub_type = updates.sub_type;
-
-  // Debrief fields
-  if (updates.training_flow_notes !== undefined) updatePayload.training_flow_notes = updates.training_flow_notes;
-  if (updates.improvement_points !== undefined) updatePayload.improvement_points = updates.improvement_points;
-  if (updates.preservation_points !== undefined) updatePayload.preservation_points = updates.preservation_points;
-  if (updates.lessons_learned !== undefined) updatePayload.lessons_learned = updates.lessons_learned;
-  if (updates.next_training_focus !== undefined) updatePayload.next_training_focus = updates.next_training_focus;
+  // Participant restrictions
+  if (updates.invite_all !== undefined) updatePayload.invite_all = updates.invite_all;
+  if (updates.invited_member_ids !== undefined) updatePayload.invited_member_ids = updates.invited_member_ids || [];
 
   const { data, error } = await supabase
     .from('trainings')
@@ -349,55 +341,6 @@ export async function updateTraining(trainingId: string, updates: UpdateTraining
   if (error) {
     console.error('Failed to update training:', error);
     throw new Error(error.message || 'Failed to update training');
-  }
-
-  return data as Training;
-}
-
-/**
- * Update training debrief notes (Hebrew military format)
- *
- * Used after training completion to fill in:
- * - מהלך האימון ומקצים (training flow)
- * - דגשים מקצועיים לשיפור (improvement points)
- * - דגשים מקצועיים לשימור (preservation points)
- * - לקחים מהאימון (lessons learned)
- * - על מה לעבוד באימון הבא (next training focus)
- */
-export async function updateTrainingDebrief(
-  trainingId: string,
-  debrief: UpdateTrainingDebriefInput
-): Promise<Training | null> {
-  const updatePayload: Record<string, any> = {
-    updated_at: new Date().toISOString(),
-  };
-
-  if (debrief.training_flow_notes !== undefined) {
-    updatePayload.training_flow_notes = debrief.training_flow_notes;
-  }
-  if (debrief.improvement_points !== undefined) {
-    updatePayload.improvement_points = debrief.improvement_points;
-  }
-  if (debrief.preservation_points !== undefined) {
-    updatePayload.preservation_points = debrief.preservation_points;
-  }
-  if (debrief.lessons_learned !== undefined) {
-    updatePayload.lessons_learned = debrief.lessons_learned;
-  }
-  if (debrief.next_training_focus !== undefined) {
-    updatePayload.next_training_focus = debrief.next_training_focus;
-  }
-
-  const { data, error } = await supabase
-    .from('trainings')
-    .update(updatePayload)
-    .eq('id', trainingId)
-    .select()
-    .maybeSingle();
-
-  if (error) {
-    console.error('Failed to update training debrief:', error);
-    throw new Error(error.message || 'Failed to update training debrief');
   }
 
   return data as Training;

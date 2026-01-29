@@ -377,11 +377,11 @@ function UnifiedTeamTab({
   const getRoleBadge = (role: string) => {
     switch (role) {
       case 'owner':
-        return { label: 'Owner', color: '#F59E0B', bg: '#F59E0B20' };
+        return { label: 'Owner', color: colors.purple, bg: colors.purple + '20' };
       case 'commander':
-        return { label: 'Commander', color: '#3B82F6', bg: '#3B82F620' };
+        return { label: 'Commander', color: colors.blue, bg: colors.blue + '20' };
       case 'squad_commander':
-        return { label: 'Squad Cmdr', color: '#8B5CF6', bg: '#8B5CF620' };
+        return { label: 'Squad Cmdr', color: colors.indigo, bg: colors.indigo + '20' };
       default:
         return { label: 'Soldier', color: colors.textMuted, bg: colors.secondary };
     }
@@ -615,19 +615,19 @@ function UnifiedTeamTab({
 
           <View style={unifiedStyles.statsRow}>
             <View style={[unifiedStyles.statCard, { backgroundColor: colors.card }]}>
-              <Activity size={16} color="#3B82F6" />
+              <Activity size={16} color={colors.blue} />
               <Text style={[unifiedStyles.statCardValue, { color: colors.text }]}>{teamStats.sessionsThisWeek}</Text>
               <Text style={[unifiedStyles.statCardLabel, { color: colors.textMuted }]}>{t('session.sessions')}</Text>
             </View>
             <View style={[unifiedStyles.statCard, { backgroundColor: colors.card }]}>
-              <Zap size={16} color="#F59E0B" />
+              <Zap size={16} color={colors.textMuted} />
               <Text style={[unifiedStyles.statCardValue, { color: colors.text }]}>
                 {teamStats.totalShots >= 1000 ? `${(teamStats.totalShots / 1000).toFixed(1)}k` : teamStats.totalShots}
               </Text>
               <Text style={[unifiedStyles.statCardLabel, { color: colors.textMuted }]}>{t('session.shots')}</Text>
             </View>
             <View style={[unifiedStyles.statCard, { backgroundColor: colors.card }]}>
-              <Target size={16} color="#10B981" />
+              <Target size={16} color={colors.green} />
               <Text style={[unifiedStyles.statCardValue, { color: colors.text }]}>{teamStats.avgAccuracy}%</Text>
               <Text style={[unifiedStyles.statCardLabel, { color: colors.textMuted }]}>{t('session.accuracy')}</Text>
             </View>
@@ -708,7 +708,7 @@ function UnifiedTeamTab({
                   style={[
                     unifiedStyles.stackedAvatar,
                     {
-                      backgroundColor: ['#3B82F6', '#10B981', '#F59E0B', '#8B5CF6'][i % 4],
+                      backgroundColor: [colors.blue, colors.green, colors.indigo, colors.purple][i % 4],
                       marginLeft: i > 0 ? -10 : 0,
                       zIndex: 4 - i,
                     },
@@ -1517,11 +1517,11 @@ function TeamMembersTab({ colors, members, activeTeam }: TeamMembersTabProps) {
   const getRoleBadge = (role: string) => {
     switch (role) {
       case 'owner':
-        return { label: 'Owner', color: '#F59E0B', bg: '#F59E0B20' };
+        return { label: 'Owner', color: colors.purple, bg: colors.purple + '20' };
       case 'commander':
-        return { label: 'Commander', color: '#3B82F6', bg: '#3B82F620' };
+        return { label: 'Commander', color: colors.blue, bg: colors.blue + '20' };
       case 'squad_commander':
-        return { label: 'Squad Cmdr', color: '#8B5CF6', bg: '#8B5CF620' };
+        return { label: 'Squad Cmdr', color: colors.indigo, bg: colors.indigo + '20' };
       default:
         return { label: 'Soldier', color: colors.textMuted, bg: colors.secondary };
     }

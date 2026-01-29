@@ -17,11 +17,11 @@ const DEFAULT_WEAPON_KEY = '@reticle:default_weapon_id';
 
 // Re-export for convenience - SINGLE SOURCE OF TRUTH for weapon categories
 export {
-  CATEGORY_CONFIGS,
-  getCategoryConfig,
-  getCategoryDistances,
-  getCategoryLabel,
-  WEAPON_CATEGORIES
+    CATEGORY_CONFIGS,
+    getCategoryConfig,
+    getCategoryDistances,
+    getCategoryLabel,
+    WEAPON_CATEGORIES
 } from '@/constants/weaponCategories';
 export type { WeaponCategory } from '@/types/workspace';
 
@@ -508,7 +508,7 @@ export async function getDefaultWeapon(options?: { personalOnly?: boolean }): Pr
   // 1. First check for stored default weapon
   const storedDefaultId = await getDefaultWeaponId();
   if (storedDefaultId) {
-    const { data: storedDefault } = await buildQuery().eq('id', storedDefaultId).single();
+    const { data: storedDefault } = await buildQuery().eq('id', storedDefaultId).maybeSingle();
 
     if (storedDefault) return storedDefault;
     // If stored default no longer exists, clear it
@@ -516,7 +516,7 @@ export async function getDefaultWeapon(options?: { personalOnly?: boolean }): Pr
   }
 
   // 2. Try to get a favorite
-  const { data: favorite } = await buildQuery().eq('is_favorite', true).limit(1).single();
+  const { data: favorite } = await buildQuery().eq('is_favorite', true).limit(1).maybeSingle();
 
   if (favorite) return favorite;
 
@@ -525,12 +525,12 @@ export async function getDefaultWeapon(options?: { personalOnly?: boolean }): Pr
     .not('last_used_at', 'is', null)
     .order('last_used_at', { ascending: false })
     .limit(1)
-    .single();
+    .maybeSingle();
 
   if (recent) return recent;
 
   // 4. Fall back to first weapon
-  const { data: first } = await buildQuery().order('created_at', { ascending: false }).limit(1).single();
+  const { data: first } = await buildQuery().order('created_at', { ascending: false }).limit(1).maybeSingle();
 
   return first || null;
 }

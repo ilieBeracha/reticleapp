@@ -14,13 +14,13 @@ import { useCallback, useState } from 'react';
 import { Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import type { DrillConfig } from '@/types/createTraining';
 import type { Drill } from '@/types/workspace';
-import type { NewDrillInstanceConfig } from '@/types/createTraining';
 
 interface DrillConfigSheetProps {
   visible: boolean;
   drill: Drill | null;
-  onConfirm: (config: NewDrillInstanceConfig) => void;
+  onConfirm: (config: DrillConfig) => void;
   onClose: () => void;
 }
 

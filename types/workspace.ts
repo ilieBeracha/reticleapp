@@ -98,20 +98,6 @@ export type TrainingStatus = 'planned' | 'ongoing' | 'finished' | 'cancelled';
 // TRAINING REPORT TYPES (Hebrew Military Format)
 // =====================================================
 
-/**
- * Training types for Hebrew military debrief (סוג אימון)
- */
-export const TRAINING_TYPES = ['M4', 'צלף בודד', 'צלף מאתר', 'יבש', 'רוגר', 'atk'] as const;
-
-export type TrainingType = (typeof TRAINING_TYPES)[number];
-
-/**
- * Sub-types for training classification (תת סוג)
- */
-export const SUB_TYPES = ['קלעים', 'טרור', 'סריקה', 'מרחק', 'מהירות', 'לחץ'] as const;
-
-export type SubType = (typeof SUB_TYPES)[number];
-
 /** @deprecated Use DrillGoal for primary classification */
 export type TargetType = 'paper' | 'tactical';
 
@@ -183,17 +169,9 @@ export interface Training {
   created_at: string;
   updated_at: string;
 
-  // === TRAINING METADATA (set during creation) ===
-  location?: string | null; // מיקום
-  training_type?: TrainingType | null; // סוג אימון
-  sub_type?: SubType[] | null; // תת סוג
-
-  // === DEBRIEF FIELDS (filled after training) ===
-  training_flow_notes?: string | null; // מהלך האימון ומקצים
-  improvement_points?: string | null; // דגשים מקצועיים לשיפור
-  preservation_points?: string | null; // דגשים מקצועיים לשימור
-  lessons_learned?: string | null; // לקחים מהאימון
-  next_training_focus?: string | null; // על מה לעבוד באימון הבא
+  // === PARTICIPANTS (set during creation) ===
+  invite_all?: boolean | null; // true = entire team, false = selected members only
+  invited_member_ids?: string[] | null; // user_ids when invite_all is false
 }
 
 /**
@@ -301,10 +279,9 @@ export interface CreateTrainingInput {
   manual_start?: boolean; // If true, commander starts training manually (no auto-start)
   drills?: CreateTrainingDrillInput[];
 
-  // === TRAINING METADATA ===
-  location?: string; // מיקום
-  training_type?: TrainingType; // סוג אימון
-  sub_type?: SubType[]; // תת סוג
+  // === PARTICIPANTS ===
+  invite_all?: boolean; // true = entire team (default), false = selected members only
+  invited_member_ids?: string[]; // user_ids when invite_all is false
 }
 
 /**
@@ -397,29 +374,8 @@ export interface UpdateTrainingInput {
   scheduled_at?: string;
   status?: TrainingStatus;
   auto_close_at?: string | null;
-
-  // === TRAINING METADATA ===
-  location?: string;
-  training_type?: TrainingType;
-  sub_type?: SubType[];
-
-  // === DEBRIEF FIELDS ===
-  training_flow_notes?: string;
-  improvement_points?: string;
-  preservation_points?: string;
-  lessons_learned?: string;
-  next_training_focus?: string;
-}
-
-/**
- * Input specifically for updating training debrief (post-training notes)
- */
-export interface UpdateTrainingDebriefInput {
-  training_flow_notes?: string;
-  improvement_points?: string;
-  preservation_points?: string;
-  lessons_learned?: string;
-  next_training_focus?: string;
+  invite_all?: boolean;
+  invited_member_ids?: string[];
 }
 
 // =====================================================
