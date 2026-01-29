@@ -8,7 +8,7 @@
 import { BaseAvatar } from '@/components/shared/Avatar';
 import { useColors } from '@/hooks/ui/useColors';
 import { getTeamMembers, updateTeam, updateTeamMemberRole } from '@/services/teamService';
-import { useTeamStore } from '@/store/teamStore';
+import { useTeamStore } from '@/stores/teamStore';
 import type { TeamMemberWithProfile, TeamRole } from '@/types/workspace';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';

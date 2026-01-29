@@ -25,8 +25,8 @@ import {
     SessionWithDetails,
     updateSession,
 } from '@/services/sessionService';
-import { useGarminStore, useIsGarminConnected, useSessionStartStatus } from '@/store/garminStore';
-import { useSessionStore } from '@/store/sessionStore';
+import { useGarminStore, useIsGarminConnected, useSessionStartStatus } from '@/stores/garminStore';
+import { useSessionStore } from '@/stores/sessionStore';
 import { isGroupingDrill } from '@/utils/drillGoal';
 import { isInfiniteShots } from '@/utils/drillShots';
 

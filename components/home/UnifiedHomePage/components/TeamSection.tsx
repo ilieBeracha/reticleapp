@@ -6,7 +6,7 @@
 
 import { DirectionalChevron } from '@/components/shared/DirectionalChevron';
 import { SpecialtyBadge } from '@/components/teams/SpecialtyBadge';
-import { useTeamStore } from '@/store/teamStore';
+import { useTeamStore } from '@/stores/teamStore';
 import { router } from 'expo-router';
 import { Calendar, Users } from 'lucide-react-native';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';

@@ -3,7 +3,7 @@ import { useColors } from '@/hooks/ui/useColors';
 import type { SessionWithDetails } from '@/services/session/types';
 import { activateSession, updateSession } from '@/services/sessionService';
 import { getUserWeapon, type UserWeapon } from '@/services/weaponService';
-import { useGarminStore, useIsGarminConnected } from '@/store/garminStore';
+import { useGarminStore, useIsGarminConnected } from '@/stores/garminStore';
 import { deriveDetectionConfig } from '@/utils/detectionSensitivity';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';

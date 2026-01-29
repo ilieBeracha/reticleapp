@@ -24,7 +24,7 @@ import { useColors } from '@/hooks/ui/useColors';
 import { usePermissions } from '@/hooks/usePermissions';
 import { getTrainingSessionsWithStats, SessionWithDetails } from '@/services/sessionService';
 import { finishTraining, startTraining } from '@/services/trainingService';
-import { useTeamStore } from '@/store/teamStore';
+import { useTeamStore } from '@/stores/teamStore';
 import type { TrainingDrill } from '@/types/workspace';
 import { format, formatDistanceToNow } from 'date-fns';
 import * as Haptics from 'expo-haptics';

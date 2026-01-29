@@ -1,7 +1,7 @@
 import { BaseAvatar } from '@/components/shared/Avatar';
 import { useAuth } from '@/contexts/AuthContext';
 import { useColors } from '@/hooks/ui/useColors';
-import { useTeamStore } from '@/store/teamStore';
+import { useTeamStore } from '@/stores/teamStore';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';

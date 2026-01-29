@@ -14,7 +14,7 @@
 
 import type { BaseSessionConfig, DrillConfig } from '@/services/session/types';
 import { getDefaultWeapon } from '@/services/weaponService';
-import { useIsGarminConnected } from '@/store/garminStore';
+import { useIsGarminConnected } from '@/stores/garminStore';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { getPurposeOption, purposeToDrillGoal } from './sessionCreation.constants';
 import {

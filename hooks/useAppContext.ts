@@ -6,7 +6,7 @@
  */
 
 import { useAuth } from "@/contexts/AuthContext";
-import { useTeamStore } from "@/store/teamStore";
+import { useTeamStore } from "@/stores/teamStore";
 
 export interface AppContext {
   // User info

@@ -317,7 +317,7 @@ export const useGarminStore = create<GarminState>((set, get) => ({
  *
  * @example
  * ```tsx
- * import { useGarminInitialize } from '@/store/garminStore';
+ * import { useGarminInitialize } from '@/stores/garminStore';
  *
  * export default function RootLayout() {
  *   useGarminInitialize();

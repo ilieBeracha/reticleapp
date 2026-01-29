@@ -1,4 +1,4 @@
-import { useGarminStore } from '@/store/garminStore';
+import { useGarminStore } from '@/stores/garminStore';
 import { Redirect } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';

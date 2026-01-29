@@ -1,5 +1,5 @@
 import { createSession, CreateSessionParams, getSessionsPage, getTeamSessionsPage, SessionWithDetails } from "@/services/sessionService";
-import { defaultAsyncState, shouldShowInitialLoading } from "@/store/_shared/asyncState";
+import { defaultAsyncState, shouldShowInitialLoading } from "@/stores/_shared/asyncState";
 import { create } from "zustand";
 import { useTeamStore } from "./teamStore";
 

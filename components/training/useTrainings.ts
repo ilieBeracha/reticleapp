@@ -13,8 +13,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTeamRealtime } from '@/hooks/realtime/team/useTeamRealtime';
 import { getRecentSessionsWithStats } from '@/services/session/queries';
 import { getTeamMembers } from '@/services/teamService';
-import { useTeamContext, useTeamPermissions, useTeamStore } from '@/store/teamStore';
-import { useTrainingStore } from '@/store/trainingStore';
+import { useTeamContext, useTeamPermissions, useTeamStore } from '@/stores/teamStore';
+import { useTrainingStore } from '@/stores/trainingStore';
 import type { TeamMemberWithProfile, TrainingWithDetails } from '@/types/workspace';
 
 import {

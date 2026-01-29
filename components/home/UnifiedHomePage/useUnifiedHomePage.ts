@@ -21,10 +21,10 @@ import {
   type SessionWithDetails,
 } from '@/services/sessionService';
 import { getDefaultWeapon, getWeaponStats, type UserWeapon, type WeaponStats } from '@/services/weaponService';
-import { useGarminStore } from '@/store/garminStore';
-import { useSessionStore } from '@/store/sessionStore';
-import { useTeamStore } from '@/store/teamStore';
-import { useTrainingStore } from '@/store/trainingStore';
+import { useGarminStore } from '@/stores/garminStore';
+import { useSessionStore } from '@/stores/sessionStore';
+import { useTeamStore } from '@/stores/teamStore';
+import { useTrainingStore } from '@/stores/trainingStore';
 import { mapSessionToHomeSession, type HomeSession } from '../types';
 import { useHomeState } from '../useHomeState';
 import { RECENT_SESSIONS_LIMIT, SESSION_FETCH_DAYS, SESSION_FETCH_LIMIT } from './UnifiedHomePage.constants';

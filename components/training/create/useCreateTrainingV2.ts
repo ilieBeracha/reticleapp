@@ -28,8 +28,8 @@ import {
     type TrainingDrillItem,
 } from '@/services/drills/drillService';
 import { createTraining } from '@/services/trainingService';
-import { useTeamStore } from '@/store/teamStore';
-import { useTrainingStore } from '@/store/trainingStore';
+import { useTeamStore } from '@/stores/teamStore';
+import { useTrainingStore } from '@/stores/trainingStore';
 import type { TeamWithRole } from '@/types/workspace';
 
 import { createDefaultScheduledDate, isStep1Complete } from './createTraining.helpers';

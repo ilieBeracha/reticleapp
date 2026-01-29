@@ -9,7 +9,7 @@ import {
   normalizeTeamName,
   removeSquad,
 } from '@/helpers/team/validation';
-import { useTeamStore } from '@/store/teamStore';
+import { useTeamStore } from '@/stores/teamStore';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';

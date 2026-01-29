@@ -5,7 +5,7 @@ import {
     getTeamTrainings,
 } from "@/services/trainingService";
 import type { TrainingWithDetails } from "@/types/workspace";
-import { shouldShowInitialLoading } from "@/store/_shared/asyncState";
+import { shouldShowInitialLoading } from "@/stores/_shared/asyncState";
 import { create } from "zustand";
 import { useTeamStore } from "./teamStore";
 

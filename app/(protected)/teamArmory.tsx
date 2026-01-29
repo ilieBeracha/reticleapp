@@ -31,7 +31,7 @@ import {
   type UserWeapon,
   type WeaponRequest,
 } from '@/services/weaponService';
-import { useTeamStore } from '@/store/teamStore';
+import { useTeamStore } from '@/stores/teamStore';
 import type { WeaponCategory } from '@/types/workspace';
 import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from 'expo-router';

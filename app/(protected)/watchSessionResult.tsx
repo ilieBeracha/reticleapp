@@ -11,7 +11,7 @@ import type { GarminBiometrics } from '@/services/garminService';
 import type { DecodedWeather } from '@/services/session/watchTypes';
 import { decodeWeather } from '@/services/session/weatherDecoder';
 import { endSession, saveWatchSessionData, updateSessionHits } from '@/services/sessionService';
-import { useSessionStore } from '@/store/sessionStore';
+import { useSessionStore } from '@/stores/sessionStore';
 import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Activity, CheckCircle, Clock, Crosshair, MapPin, Target, Timer, Watch, Wind, Zap } from 'lucide-react-native';

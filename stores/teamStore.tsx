@@ -12,7 +12,7 @@ import {
   type CreateTeamInput,
   type UpdateTeamInput,
 } from '@/services/teamService';
-import { shouldShowInitialLoading } from '@/store/_shared/asyncState';
+import { shouldShowInitialLoading } from '@/stores/_shared/asyncState';
 import type {
   TeamMemberWithProfile,
   TeamRole,

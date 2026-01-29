@@ -6,7 +6,7 @@ import {
     uploadScannedTargetImage,
 } from '@/services/detectionService';
 import { addTargetWithPaperResult, endSession, PaperType } from '@/services/sessionService';
-import { useDetectionStore } from '@/store/detectionStore';
+import { useDetectionStore } from '@/stores/detectionStore';
 import { finiteShotsOrNull, INFINITE_SHOTS_SENTINEL } from '@/utils/drillShots';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as Haptics from 'expo-haptics';

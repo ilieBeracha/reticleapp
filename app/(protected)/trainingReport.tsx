@@ -16,7 +16,7 @@ import { getEngagementParticipants } from '@/services/session/participants';
 import { getTrainingSessionsWithStats, SessionWithDetails } from '@/services/sessionService';
 import { getSessionVerdict, type SessionVerdict } from '@/services/standards/standardsService';
 import { getTrainingById } from '@/services/trainingService';
-import { useTeamStore } from '@/store/teamStore';
+import { useTeamStore } from '@/stores/teamStore';
 import { format, formatDistanceToNow } from 'date-fns';
 import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from 'expo-router';
