@@ -8,25 +8,25 @@
  * Execution happens via startEngagement when soldiers actually shoot.
  */
 
-import { useCreateTrainingV2 } from '@/hooks/training/useCreateTrainingV2';
 import { AddDrillStep } from '@/components/training/create/steps/AddDrillStep';
 import { TrainingDetailsStep } from '@/components/training/create/steps/TrainingDetailsStep';
+import { useCreateTrainingV2 } from '@/hooks/training/useCreateTrainingV2';
 import { useColors } from '@/hooks/ui/useColors';
-import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from 'expo-router';
 import { ArrowRight, ChevronLeft, Play, Users } from 'lucide-react-native';
+import { useTranslation } from 'react-i18next';
 import {
-  ActivityIndicator,
-  Modal,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Modal,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -52,6 +52,15 @@ export default function CreateTrainingScreen() {
     manualStart,
     setManualStart,
     drills,
+    // Feature flags
+    isSniperOriented,
+    // Hebrew military format fields (only for sniper-oriented teams)
+    location,
+    setLocation,
+    trainingType,
+    setTrainingType,
+    subTypes,
+    setSubTypes,
     showDatePicker,
     setShowDatePicker,
     showTimePicker,
@@ -82,9 +91,7 @@ export default function CreateTrainingScreen() {
             <Users size={32} color={colors.textMuted} strokeWidth={1.5} />
           </View>
           <Text style={[styles.emptyTitle, { color: colors.text }]}>{t('training.noTeamsYet')}</Text>
-          <Text style={[styles.emptyDesc, { color: colors.textMuted }]}>
-            {t('training.createOrJoinTeam')}
-          </Text>
+          <Text style={[styles.emptyDesc, { color: colors.textMuted }]}>{t('training.createOrJoinTeam')}</Text>
           <View style={styles.emptyActions}>
             <TouchableOpacity
               style={[styles.emptyBtn, { backgroundColor: colors.text }]}
@@ -177,11 +184,18 @@ export default function CreateTrainingScreen() {
               title={title}
               scheduledDate={scheduledDate}
               manualStart={manualStart}
+              isSniperOriented={isSniperOriented}
+              location={location}
+              trainingType={trainingType}
+              subTypes={subTypes}
               onSelectTeam={handleSelectTeam}
               onTitleChange={setTitle}
               onOpenDatePicker={() => setShowDatePicker(true)}
               onOpenTimePicker={() => setShowTimePicker(true)}
               onToggleManualStart={() => setManualStart(!manualStart)}
+              onLocationChange={setLocation}
+              onTrainingTypeChange={setTrainingType}
+              onSubTypesChange={setSubTypes}
             />
           </Animated.View>
         )}
@@ -202,9 +216,7 @@ export default function CreateTrainingScreen() {
       {/* Fixed Bottom Button */}
       <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 12, backgroundColor: colors.background }]}>
         {currentStep === 2 && drills.length > 0 && (
-          <Text style={[styles.footerHint, { color: colors.textMuted }]}>
-            {t('training.teamWillBeNotified')}
-          </Text>
+          <Text style={[styles.footerHint, { color: colors.textMuted }]}>{t('training.teamWillBeNotified')}</Text>
         )}
         {currentStep === 1 ? (
           <TouchableOpacity
@@ -306,10 +318,7 @@ function PickerModal({
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={styles.pickerOverlay} onPress={onClose}>
-        <Pressable
-          style={[styles.pickerSheet, { backgroundColor: colors.card }]}
-          onPress={(e) => e.stopPropagation()}
-        >
+        <Pressable style={[styles.pickerSheet, { backgroundColor: colors.card }]} onPress={(e) => e.stopPropagation()}>
           <View style={[styles.pickerHandle, { backgroundColor: colors.border }]} />
           <View style={styles.pickerHeader}>
             <TouchableOpacity onPress={onClose} style={styles.pickerHeaderBtn} hitSlop={8}>

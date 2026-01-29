@@ -10,6 +10,8 @@
  */
 
 import type { UserWeapon, WeaponStats } from '@/services/weaponService';
+import type { Colors, HeroMode } from '@/types/home';
+import type { HomeSession } from '@/types/home.viewmodel';
 import type { TrainingWithDetails } from '@/types/workspace';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
@@ -26,8 +28,6 @@ import Animated, {
   withSpring,
   withTiming,
 } from 'react-native-reanimated';
-import type { HomeSession } from '@/types/home.viewmodel';
-import type { Colors, HeroMode } from '@/types/home';
 import { TimelineStrip } from './TimelineStrip';
 
 interface HeroActionsProps {
@@ -184,9 +184,7 @@ export function HeroActions({
           {heroMode === 'team-live' && activeTeamTraining && (
             <>
               <View style={s.liveIconContainer}>
-                <Animated.View
-                  style={[s.livePulse, { backgroundColor: `${colors.primary}40` }, pulseStyle]}
-                />
+                <Animated.View style={[s.livePulse, { backgroundColor: `${colors.primary}40` }, pulseStyle]} />
                 <View style={[s.liveIconBadge, { backgroundColor: `${colors.primary}40` }]}>
                   <Radio size={11} color={colors.primary} />
                 </View>
@@ -281,6 +279,7 @@ const s = StyleSheet.create({
   },
   mainTextContainer: {
     flex: 1,
+    alignItems: 'flex-start',
   },
   mainLabel: {
     fontSize: 10,

@@ -17,20 +17,21 @@ import { router } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, Keyboard } from 'react-native';
 
+import { isSniperOrientedTeam } from '@/constants/teamSpecialties';
 import {
-    createTeamPreset,
-    getDrillsGroupedByCategory,
-    getTeamPresets,
-    type CanonicalDrill,
-    type DrillCategory,
-    type DrillConfig,
-    type TeamDrillPreset,
-    type TrainingDrillItem,
+  createTeamPreset,
+  getDrillsGroupedByCategory,
+  getTeamPresets,
+  type CanonicalDrill,
+  type DrillCategory,
+  type DrillConfig,
+  type TeamDrillPreset,
+  type TrainingDrillItem,
 } from '@/services/drills/drillService';
 import { createTraining } from '@/services/trainingService';
 import { useTeamStore } from '@/stores/teamStore';
 import { useTrainingStore } from '@/stores/trainingStore';
-import type { TeamWithRole } from '@/types/workspace';
+import type { SubType, TeamWithRole, TrainingType } from '@/types/workspace';
 
 import { createDefaultScheduledDate, isStep1Complete } from '@/utils/createTraining.helpers';
 
@@ -52,6 +53,9 @@ export interface UseCreateTrainingV2Return {
   isTeamLocked: boolean;
   canCreatePresets: boolean;
 
+  // Feature flags
+  isSniperOriented: boolean; // Hebrew military format enabled
+
   // Form state
   title: string;
   setTitle: (title: string) => void;
@@ -60,6 +64,14 @@ export interface UseCreateTrainingV2Return {
   manualStart: boolean;
   setManualStart: (manual: boolean) => void;
   drills: TrainingDrillItem[];
+
+  // Hebrew military format fields
+  location: string;
+  setLocation: (location: string) => void;
+  trainingType: TrainingType | null;
+  setTrainingType: (type: TrainingType | null) => void;
+  subTypes: SubType[];
+  setSubTypes: (subTypes: SubType[]) => void;
 
   // UI state
   showDatePicker: boolean;
@@ -115,6 +127,11 @@ export function useCreateTrainingV2({ teamIdParam }: UseCreateTrainingV2Params):
   const [manualStart, setManualStart] = useState(true);
   const [drills, setDrills] = useState<TrainingDrillItem[]>([]);
 
+  // Hebrew military format fields
+  const [location, setLocation] = useState('');
+  const [trainingType, setTrainingType] = useState<TrainingType | null>(null);
+  const [subTypes, setSubTypes] = useState<SubType[]>([]);
+
   // UI state
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
@@ -159,6 +176,9 @@ export function useCreateTrainingV2({ teamIdParam }: UseCreateTrainingV2Params):
 
   const selectedTeam = teams.find((t) => t.id === selectedTeamId);
   const canCreatePresets = selectedTeam?.my_role === 'owner' || selectedTeam?.my_role === 'commander';
+
+  // Feature flag: Hebrew military format for sniper-oriented teams
+  const isSniperOriented = isSniperOrientedTeam(selectedTeam?.specialty);
 
   const step1Complete = isStep1Complete(selectedTeamId, title);
   const step2Complete = drills.length > 0;
@@ -371,6 +391,12 @@ export function useCreateTrainingV2({ teamIdParam }: UseCreateTrainingV2Params):
         scheduled_at: finalDate.toISOString(),
         manual_start: manualStart,
         drills: drillsPayload,
+        // Military debrief format fields (only for sniper-oriented teams)
+        ...(isSniperOriented && {
+          location: location.trim() || undefined,
+          training_type: trainingType || undefined,
+          sub_type: subTypes.length > 0 ? subTypes : undefined,
+        }),
       });
 
       console.log('[CreateTrainingV2] Training created successfully:', created.id);
@@ -394,7 +420,19 @@ export function useCreateTrainingV2({ teamIdParam }: UseCreateTrainingV2Params):
     } finally {
       setSubmitting(false);
     }
-  }, [selectedTeamId, title, scheduledDate, manualStart, drills, loadTeamTrainings, loadMyUpcomingTrainings]);
+  }, [
+    selectedTeamId,
+    title,
+    scheduledDate,
+    manualStart,
+    drills,
+    isSniperOriented,
+    location,
+    trainingType,
+    subTypes,
+    loadTeamTrainings,
+    loadMyUpcomingTrainings,
+  ]);
 
   // ============================================================================
   // RETURN
@@ -408,6 +446,9 @@ export function useCreateTrainingV2({ teamIdParam }: UseCreateTrainingV2Params):
     isTeamLocked,
     canCreatePresets,
 
+    // Feature flags
+    isSniperOriented,
+
     // Form state
     title,
     setTitle,
@@ -416,6 +457,14 @@ export function useCreateTrainingV2({ teamIdParam }: UseCreateTrainingV2Params):
     manualStart,
     setManualStart,
     drills,
+
+    // Hebrew military format fields (only for sniper-oriented teams)
+    location,
+    setLocation,
+    trainingType,
+    setTrainingType,
+    subTypes,
+    setSubTypes,
 
     // UI state
     showDatePicker,

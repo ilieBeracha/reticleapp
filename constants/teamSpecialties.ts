@@ -136,3 +136,11 @@ export function isPrimaryCategoryForSpecialty(
   if (!config) return false;
   return config.primaryCategories.includes(category);
 }
+
+/**
+ * Check if team has sniper/precision specialty
+ * Used for Hebrew military debrief format feature flag
+ */
+export function isSniperOrientedTeam(specialty: TeamSpecialty | null | undefined): boolean {
+  return specialty === 'precision';
+}

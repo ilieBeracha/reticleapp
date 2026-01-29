@@ -1,27 +1,30 @@
 /**
- * Training Report Screen
+ * Training Report Screen - Hebrew Military Format
  *
- * Debrief screen after training execution.
- * Primary action: RETURN TO TRAINING (not Home)
- *
- * This is the canonical debrief flow:
- * Training → Execute → Session Complete → Training Report → Return to Training
+ * Debrief screen after training execution with editable notes.
+ * Displays training metadata and allows commander to fill in:
+ * - מהלך האימון ומקצים (Training flow)
+ * - דגשים מקצועיים לשיפור (Improvement points)
+ * - דגשים מקצועיים לשימור (Preservation points)
+ * - לקחים מהאימון (Lessons learned)
+ * - על מה לעבוד באימון הבא (Next training focus)
  */
 
 import { ParticipantInsights } from '@/components/training/ParticipantInsights';
+import { isSniperOrientedTeam } from '@/constants/teamSpecialties';
 import { useAuth } from '@/contexts/AuthContext';
 import { useColors } from '@/hooks/ui/useColors';
 import { usePermissions } from '@/hooks/usePermissions';
 import { getEngagementParticipants } from '@/services/session/participants';
 import { getTrainingSessionsWithStats } from '@/services/session/queries';
-import type { SessionWithDetails } from '@/types/session';
 import { getSessionVerdict, type SessionVerdict } from '@/services/standards/standardsService';
-import { getTrainingById } from '@/services/trainingService';
+import { getTrainingById, updateTrainingDebrief } from '@/services/trainingService';
 import { useTeamStore } from '@/stores/teamStore';
+import type { SessionWithDetails } from '@/types/session';
+import type { SubType, TrainingType, UpdateTrainingDebriefInput } from '@/types/workspace';
 import { format, formatDistanceToNow } from 'date-fns';
 import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useTranslation } from 'react-i18next';
 import {
   AlertCircle,
   ArrowLeft,
@@ -29,24 +32,34 @@ import {
   Calendar,
   CheckCircle2,
   Clock,
+  Edit3,
   FileText,
   Home,
+  MapPin,
+  Moon,
   RefreshCw,
+  Save,
   Share2,
+  Sun,
   Target,
   Trophy,
+  User,
   Users,
   XCircle,
 } from 'lucide-react-native';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
   Alert,
+  I18nManager,
+  Keyboard,
   RefreshControl,
   ScrollView,
   Share,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -66,7 +79,8 @@ interface TrainingWithDrills {
   ended_at: string | null;
   team_id: string;
   created_by?: string;
-  team?: { name: string };
+  team?: { name: string; specialty?: string | null };
+  creator?: { id: string; full_name: string | null; avatar_url: string | null };
   drills: Array<{
     id: string;
     name: string;
@@ -74,10 +88,171 @@ interface TrainingWithDrills {
     distance_m?: number;
     rounds_per_shooter?: number;
   }>;
+  // Hebrew military format fields (only for sniper-oriented teams)
+  location?: string | null;
+  training_type?: TrainingType | null;
+  sub_type?: SubType[] | null;
+  training_flow_notes?: string | null;
+  improvement_points?: string | null;
+  preservation_points?: string | null;
+  lessons_learned?: string | null;
+  next_training_focus?: string | null;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// HEADER STATS CARD
+// HELPER: Day/Night Calculation
+// ═══════════════════════════════════════════════════════════════════════════
+
+function getTimeOfDay(startedAt: string | null): 'day' | 'night' {
+  if (!startedAt) return 'day';
+  const hour = new Date(startedAt).getHours();
+  return hour >= 6 && hour < 18 ? 'day' : 'night';
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// EDITABLE DEBRIEF SECTION
+// ═══════════════════════════════════════════════════════════════════════════
+
+function DebriefSection({
+  label,
+  value,
+  onChange,
+  placeholder,
+  colors,
+}: {
+  label: string;
+  value: string;
+  onChange: (text: string) => void;
+  placeholder: string;
+  colors: ReturnType<typeof useColors>;
+}) {
+  // Use RTL text alignment based on system locale
+  const isRTL = I18nManager.isRTL;
+
+  return (
+    <View style={debriefStyles.section}>
+      <View style={debriefStyles.labelRow}>
+        <Edit3 size={14} color={colors.primary} strokeWidth={1.5} />
+        <Text style={[debriefStyles.label, { color: colors.text }]}>{label}</Text>
+      </View>
+      <TextInput
+        style={[
+          debriefStyles.input,
+          {
+            backgroundColor: colors.card,
+            borderColor: colors.border,
+            color: colors.text,
+          },
+        ]}
+        value={value}
+        onChangeText={onChange}
+        placeholder={placeholder}
+        placeholderTextColor={colors.textMuted}
+        multiline
+        textAlignVertical="top"
+        textAlign={isRTL ? 'right' : 'left'}
+      />
+    </View>
+  );
+}
+
+const debriefStyles = StyleSheet.create({
+  section: {
+    gap: 8,
+  },
+  labelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  label: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  input: {
+    minHeight: 80,
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 12,
+    fontSize: 14,
+    lineHeight: 20,
+  },
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// HEBREW MILITARY FORMAT CARD
+// ═══════════════════════════════════════════════════════════════════════════
+
+function HebrewReportHeader({
+  training,
+  participantCount,
+  colors,
+}: {
+  training: TrainingWithDrills;
+  participantCount: number;
+  colors: ReturnType<typeof useColors>;
+}) {
+  const { t } = useTranslation();
+  const timeOfDay = getTimeOfDay(training.started_at);
+  const TimeIcon = timeOfDay === 'day' ? Sun : Moon;
+  const timeOfDayLabel = t(`training.militaryDebrief.${timeOfDay}`);
+
+  const infoRows = [
+    {
+      label: t('training.militaryDebrief.date'),
+      value: format(new Date(training.scheduled_at), 'dd/MM/yyyy'),
+      icon: Calendar,
+    },
+    { label: t('training.militaryDebrief.location'), value: training.location || '—', icon: MapPin },
+    { label: t('training.militaryDebrief.trainingManager'), value: training.creator?.full_name || '—', icon: User },
+    { label: t('training.militaryDebrief.time'), value: timeOfDayLabel, icon: TimeIcon },
+    { label: t('training.militaryDebrief.personnel'), value: participantCount.toString(), icon: Users },
+    { label: t('training.militaryDebrief.trainingType'), value: training.training_type || '—', icon: Target },
+    { label: t('training.militaryDebrief.subType'), value: training.sub_type?.join(', ') || '—', icon: FileText },
+  ];
+
+  return (
+    <Animated.View entering={FadeInDown.duration(300)}>
+      <View style={[styles.hebrewCard, { backgroundColor: colors.card }]}>
+        {/* Title */}
+        <Text style={[styles.hebrewTitle, { color: colors.text }]}>{training.title}</Text>
+
+        {/* Team Badge */}
+        {training.team?.name && (
+          <View style={[styles.teamBadge, { backgroundColor: colors.primary + '15' }]}>
+            <Users size={12} color={colors.primary} />
+            <Text style={[styles.teamBadgeText, { color: colors.primary }]}>{training.team.name}</Text>
+          </View>
+        )}
+
+        {/* Info Grid */}
+        <View style={[styles.infoGrid, { borderTopColor: colors.border }]}>
+          {infoRows.map((row, index) => (
+            <View
+              key={row.label}
+              style={[
+                styles.infoRow,
+                index < infoRows.length - 1 && {
+                  borderBottomColor: colors.border,
+                  borderBottomWidth: StyleSheet.hairlineWidth,
+                },
+              ]}
+            >
+              <View style={styles.infoLabelContainer}>
+                <row.icon size={14} color={colors.textMuted} strokeWidth={1.5} />
+                <Text style={[styles.infoLabel, { color: colors.textMuted }]}>{row.label}:</Text>
+              </View>
+              <Text style={[styles.infoValue, { color: colors.text }]}>{row.value}</Text>
+            </View>
+          ))}
+        </View>
+      </View>
+    </Animated.View>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// HEADER STATS CARD (Legacy - kept for reference)
 // ═══════════════════════════════════════════════════════════════════════════
 
 function TrainingOverviewCard({
@@ -175,9 +350,7 @@ function AccessDenied({ colors }: { colors: ReturnType<typeof useColors> }) {
         <AlertCircle size={32} color={colors.destructive} />
       </View>
       <Text style={[styles.accessTitle, { color: colors.text }]}>{t('training.commanderAccessOnly')}</Text>
-      <Text style={[styles.accessDesc, { color: colors.textMuted }]}>
-        {t('training.reportsCommanderOnly')}
-      </Text>
+      <Text style={[styles.accessDesc, { color: colors.textMuted }]}>{t('training.reportsCommanderOnly')}</Text>
       <TouchableOpacity style={[styles.accessBtn, { backgroundColor: colors.card }]} onPress={() => router.back()}>
         <Text style={[styles.accessBtnText, { color: colors.text }]}>{t('common.goBack')}</Text>
       </TouchableOpacity>
@@ -205,6 +378,16 @@ export default function TrainingReportScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Debrief state (Hebrew military format)
+  const [trainingFlowNotes, setTrainingFlowNotes] = useState('');
+  const [improvementPoints, setImprovementPoints] = useState('');
+  const [preservationPoints, setPreservationPoints] = useState('');
+  const [lessonsLearned, setLessonsLearned] = useState('');
+  const [nextTrainingFocus, setNextTrainingFocus] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   // Calculate permissions based on loaded training (not active team)
   const canManageTraining = useMemo(() => {
     if (!training) return false;
@@ -214,6 +397,11 @@ export default function TrainingReportScreen() {
     const activeTeamMatchesTraining = !training.team_id || training.team_id === activeTeamId;
     return isCreator || (canManageByRole && activeTeamMatchesTraining);
   }, [training, session?.user?.id, canManageByRole, activeTeamId]);
+
+  // Feature flag: Hebrew military format for sniper-oriented teams
+  const isSniperOriented = useMemo(() => {
+    return isSniperOrientedTeam(training?.team?.specialty as any);
+  }, [training?.team?.specialty]);
 
   // Load data
   const loadData = useCallback(async () => {
@@ -232,7 +420,15 @@ export default function TrainingReportScreen() {
       if (!trainingData) {
         setError(t('training.notFound'));
       } else {
-        setTraining(trainingData as TrainingWithDrills);
+        const typedTraining = trainingData as TrainingWithDrills;
+        setTraining(typedTraining);
+
+        // Initialize debrief fields from loaded data
+        setTrainingFlowNotes(typedTraining.training_flow_notes || '');
+        setImprovementPoints(typedTraining.improvement_points || '');
+        setPreservationPoints(typedTraining.preservation_points || '');
+        setLessonsLearned(typedTraining.lessons_learned || '');
+        setNextTrainingFocus(typedTraining.next_training_focus || '');
 
         // Expand squad/group engagement sessions to include all participants
         // For squad mode, there's ONE session shared by multiple participants
@@ -260,19 +456,20 @@ export default function TrainingReportScreen() {
                     user_id: participant.user_id,
                     user_full_name: participant.user_full_name || 'Unknown',
                     // Override stats with participant's contribution
-                    stats: participant.shots_fired != null
-                      ? {
-                          shots_fired: participant.shots_fired || 0,
-                          hits_total: participant.hits || 0,
-                          accuracy_pct:
-                            participant.shots_fired && participant.shots_fired > 0
-                              ? Math.round(((participant.hits || 0) / participant.shots_fired) * 100)
-                              : 0,
-                          target_count: 0,
-                          best_dispersion_cm: null,
-                          avg_distance_m: session.drill_config?.distance_m || null,
-                        }
-                      : undefined,
+                    stats:
+                      participant.shots_fired != null
+                        ? {
+                            shots_fired: participant.shots_fired || 0,
+                            hits_total: participant.hits || 0,
+                            accuracy_pct:
+                              participant.shots_fired && participant.shots_fired > 0
+                                ? Math.round(((participant.hits || 0) / participant.shots_fired) * 100)
+                                : 0,
+                            target_count: 0,
+                            best_dispersion_cm: null,
+                            avg_distance_m: session.drill_config?.distance_m || null,
+                          }
+                        : undefined,
                   };
                   expandedSessions.push(participantSession);
                 }
@@ -324,6 +521,75 @@ export default function TrainingReportScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     loadData();
   }, [loadData]);
+
+  // Save debrief notes
+  const saveDebrief = useCallback(async () => {
+    if (!params.trainingId || !canManageTraining) return;
+
+    setSaving(true);
+    try {
+      const debrief: UpdateTrainingDebriefInput = {
+        training_flow_notes: trainingFlowNotes,
+        improvement_points: improvementPoints,
+        preservation_points: preservationPoints,
+        lessons_learned: lessonsLearned,
+        next_training_focus: nextTrainingFocus,
+      };
+
+      await updateTrainingDebrief(params.trainingId, debrief);
+      setHasUnsavedChanges(false);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (err: any) {
+      console.error('[TrainingReport] Failed to save debrief:', err);
+      Alert.alert('Error', err.message || 'Failed to save debrief notes');
+    } finally {
+      setSaving(false);
+    }
+  }, [
+    params.trainingId,
+    canManageTraining,
+    trainingFlowNotes,
+    improvementPoints,
+    preservationPoints,
+    lessonsLearned,
+    nextTrainingFocus,
+  ]);
+
+  // Auto-save with debounce
+  const scheduleAutoSave = useCallback(() => {
+    setHasUnsavedChanges(true);
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+    saveTimeoutRef.current = setTimeout(() => {
+      saveDebrief().catch(console.error);
+      return undefined;
+    }, 2000) as unknown as NodeJS.Timeout; // Auto-save after 2 seconds of inactivity
+  }, [saveDebrief]);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  // Track changes to debrief fields
+  const handleDebriefChange = useCallback(
+    (setter: (value: string) => void) => (value: string) => {
+      setter(value);
+      scheduleAutoSave();
+    },
+    [scheduleAutoSave]
+  );
+
+  // Calculate unique participants
+  const participantCount = useMemo(() => {
+    const uniqueUsers = new Set(sessions.map((s) => s.user_id));
+    return uniqueUsers.size;
+  }, [sessions]);
 
   // Generate shareable report text
   const generateReportText = useCallback(() => {
@@ -464,10 +730,96 @@ Generated by ReticleIQ`;
         style={styles.scroll}
         contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 140 }]}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.text} />}
       >
-        {/* Training Overview */}
-        <TrainingOverviewCard training={training} sessionCount={sessions.length} colors={colors} />
+        {/* Hebrew Military Format Header (only for sniper-oriented teams) */}
+        {isSniperOriented ? (
+          <HebrewReportHeader training={training} participantCount={participantCount} colors={colors} />
+        ) : (
+          <TrainingOverviewCard training={training} sessionCount={sessions.length} colors={colors} />
+        )}
+
+        {/* Debrief Sections (Editable) - only for sniper-oriented teams */}
+        {isSniperOriented && (
+          <Animated.View entering={FadeIn.delay(100).duration(300)} style={styles.debriefContainer}>
+            <View style={styles.debriefHeader}>
+              <Edit3 size={16} color={colors.text} />
+              <Text style={[styles.debriefTitle, { color: colors.text }]}>
+                {t('training.militaryDebrief.debriefSummary')}
+              </Text>
+              {hasUnsavedChanges && (
+                <View style={[styles.unsavedBadge, { backgroundColor: colors.primary + '20' }]}>
+                  <Text style={[styles.unsavedText, { color: colors.primary }]}>
+                    {t('training.militaryDebrief.unsaved')}
+                  </Text>
+                </View>
+              )}
+              {saving && <ActivityIndicator size="small" color={colors.primary} />}
+            </View>
+
+            <View style={[styles.debriefCard, { backgroundColor: colors.card }]}>
+              <DebriefSection
+                label={t('training.militaryDebrief.trainingFlow')}
+                value={trainingFlowNotes}
+                onChange={handleDebriefChange(setTrainingFlowNotes)}
+                placeholder={t('training.militaryDebrief.trainingFlowPlaceholder')}
+                colors={colors}
+              />
+              <DebriefSection
+                label={t('training.militaryDebrief.improvementPoints')}
+                value={improvementPoints}
+                onChange={handleDebriefChange(setImprovementPoints)}
+                placeholder={t('training.militaryDebrief.improvementPlaceholder')}
+                colors={colors}
+              />
+              <DebriefSection
+                label={t('training.militaryDebrief.preservationPoints')}
+                value={preservationPoints}
+                onChange={handleDebriefChange(setPreservationPoints)}
+                placeholder={t('training.militaryDebrief.preservationPlaceholder')}
+                colors={colors}
+              />
+              <DebriefSection
+                label={t('training.militaryDebrief.lessonsLearned')}
+                value={lessonsLearned}
+                onChange={handleDebriefChange(setLessonsLearned)}
+                placeholder={t('training.militaryDebrief.lessonsPlaceholder')}
+                colors={colors}
+              />
+              <DebriefSection
+                label={t('training.militaryDebrief.nextTrainingFocus')}
+                value={nextTrainingFocus}
+                onChange={handleDebriefChange(setNextTrainingFocus)}
+                placeholder={t('training.militaryDebrief.nextFocusPlaceholder')}
+                colors={colors}
+              />
+            </View>
+
+            {/* Manual Save Button */}
+            <TouchableOpacity
+              style={[
+                styles.saveButton,
+                {
+                  backgroundColor: hasUnsavedChanges ? colors.primary : colors.card,
+                  borderColor: colors.border,
+                },
+              ]}
+              onPress={() => {
+                Keyboard.dismiss();
+                saveDebrief();
+              }}
+              disabled={saving || !hasUnsavedChanges}
+            >
+              <Save size={16} color={hasUnsavedChanges ? colors.background : colors.textMuted} />
+              <Text
+                style={[styles.saveButtonText, { color: hasUnsavedChanges ? colors.background : colors.textMuted }]}
+              >
+                {saving ? t('training.militaryDebrief.saving') : t('training.militaryDebrief.saveDebrief')}
+              </Text>
+            </TouchableOpacity>
+          </Animated.View>
+        )}
 
         {/* No Sessions State */}
         {!hasSessions && (
@@ -478,9 +830,7 @@ Generated by ReticleIQ`;
               </View>
               <Text style={[styles.emptyTitle, { color: colors.text }]}>{t('training.noParticipantData')}</Text>
               <Text style={[styles.emptyDesc, { color: colors.textMuted }]}>
-                {training.status === 'planned'
-                  ? t('training.notStartedYet')
-                  : t('training.noSessionsRecorded')}
+                {training.status === 'planned' ? t('training.notStartedYet') : t('training.noSessionsRecorded')}
               </Text>
             </View>
           </Animated.View>
@@ -519,7 +869,9 @@ Generated by ReticleIQ`;
                     <Text style={[styles.standardsStatValue, { color: passRate >= 50 ? colors.green : colors.red }]}>
                       {passRate}%
                     </Text>
-                    <Text style={[styles.standardsStatLabel, { color: colors.textMuted }]}>{t('training.passRate')}</Text>
+                    <Text style={[styles.standardsStatLabel, { color: colors.textMuted }]}>
+                      {t('training.passRate')}
+                    </Text>
                   </View>
                 </View>
               </View>
@@ -700,7 +1052,103 @@ const styles = StyleSheet.create({
     gap: 20,
   },
 
-  // Overview Card
+  // Hebrew Military Format Card
+  hebrewCard: {
+    padding: 16,
+    borderRadius: 14,
+    gap: 12,
+  },
+  hebrewTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    letterSpacing: -0.3,
+    textAlign: 'right',
+  },
+  teamBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-end',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+  },
+  teamBadgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  infoGrid: {
+    paddingTop: 12,
+    marginTop: 4,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    gap: 0,
+  },
+  infoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 10,
+  },
+  infoLabelContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  infoLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  infoValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    textAlign: 'right',
+    flex: 1,
+    marginLeft: 16,
+  },
+
+  // Debrief Section
+  debriefContainer: {
+    gap: 12,
+  },
+  debriefHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  debriefTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    flex: 1,
+  },
+  unsavedBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  unsavedText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  debriefCard: {
+    padding: 16,
+    borderRadius: 14,
+    gap: 16,
+  },
+  saveButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  saveButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+
+  // Overview Card (Legacy)
   overviewCard: {
     padding: 16,
     borderRadius: 14,

@@ -5,12 +5,6 @@
 import type { TeamMemberWithProfile, TrainingWithDetails } from '@/types/workspace';
 
 // ============================================================================
-// TAB TYPES
-// ============================================================================
-// Unified tabs - same for all roles (soldiers and commanders see same tabs)
-export type InternalTab = 'calendar' | 'team';
-
-// ============================================================================
 // ROLE CONFIG
 // ============================================================================
 export interface RoleConfig {
@@ -95,7 +89,6 @@ export interface UseTrainingsReturn {
 
   // UI state
   refreshing: boolean;
-  activeTab: InternalTab;
   switcherOpen: boolean;
   loadingTeamTrainings: boolean;
   showSwitcher: boolean;
@@ -103,7 +96,6 @@ export interface UseTrainingsReturn {
 
   // Actions
   onRefresh: () => Promise<void>;
-  handleTabChange: (tab: InternalTab) => void;
   handleTrainingPress: (training: TrainingWithDetails) => void;
   handleCreateTraining: () => void;
   handleOpenArmory: () => void;
