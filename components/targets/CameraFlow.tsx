@@ -1,4 +1,4 @@
-import { BUTTON_GRADIENT } from '@/theme/colors';
+import { BUTTON_GRADIENT } from '@/constants/Colors';
 import { Ionicons } from '@expo/vector-icons';
 import { CameraView } from 'expo-camera';
 import { LinearGradient } from 'expo-linear-gradient';

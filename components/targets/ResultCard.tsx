@@ -1,6 +1,6 @@
 import { useColors } from '@/hooks/ui/useColors';
 import type { DecodedWeather } from '@/services/session/watchTypes';
-import { BUTTON_GRADIENT, BUTTON_GRADIENT_DISABLED } from '@/theme/colors';
+import { BUTTON_GRADIENT, BUTTON_GRADIENT_DISABLED } from '@/constants/Colors';
 import type { AnalyzeDocumentResponse, AnalyzeResponse } from '@/types/api';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';

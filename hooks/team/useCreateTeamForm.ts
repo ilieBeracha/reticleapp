@@ -1,5 +1,5 @@
 import type { TeamSpecialty } from '@/constants/teamSpecialties';
-import { SQUAD_TEMPLATES } from '@/helpers/team/squads';
+import { SQUAD_TEMPLATES } from '@/utils/team/squads';
 import {
   addSquad,
   isDuplicateSquadName,
@@ -8,7 +8,7 @@ import {
   normalizeTeamDescription,
   normalizeTeamName,
   removeSquad,
-} from '@/helpers/team/validation';
+} from '@/utils/team/validation';
 import { useTeamStore } from '@/stores/teamStore';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';

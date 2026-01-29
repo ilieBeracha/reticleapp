@@ -1,6 +1,6 @@
 import { PAPER_TYPE } from '@/constants/drill';
 import { addTargetWithPaperResult, addTargetWithTacticalResult } from '@/services/sessionService';
-import { BUTTON_GRADIENT, BUTTON_GRADIENT_DISABLED } from '@/theme/colors';
+import { BUTTON_GRADIENT, BUTTON_GRADIENT_DISABLED } from '@/constants/Colors';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';

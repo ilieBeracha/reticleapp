@@ -1,5 +1,5 @@
 import { useColors } from '@/hooks/ui/useColors';
-import { BUTTON_GRADIENT, BUTTON_GRADIENT_DISABLED } from '@/theme/colors';
+import { BUTTON_GRADIENT, BUTTON_GRADIENT_DISABLED } from '@/constants/Colors';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
