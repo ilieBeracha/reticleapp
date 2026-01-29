@@ -14,17 +14,11 @@ import { Alert } from 'react-native';
 import type { GarminSessionData } from '@/services/garminService';
 
 import { computeSessionScore } from '@/services/session/scoring';
-import {
-    calculateSessionStats,
-    endSession,
-    getSessionById,
-    getSessionTargetsWithResults,
-    saveWatchSessionData,
-    SessionStats,
-    SessionTargetWithResults,
-    SessionWithDetails,
-    updateSession,
-} from '@/services/sessionService';
+import { calculateSessionStats } from '@/services/session/stats';
+import { endSession, saveWatchSessionData, updateSession } from '@/services/session/mutations';
+import { getSessionById } from '@/services/session/queries';
+import { getSessionTargetsWithResults } from '@/services/session/targets';
+import type { SessionStats, SessionTargetWithResults, SessionWithDetails } from '@/types/session';
 import { useGarminStore, useIsGarminConnected, useSessionStartStatus } from '@/stores/garminStore';
 import { useSessionStore } from '@/stores/sessionStore';
 import { isGroupingDrill } from '@/utils/drillGoal';
@@ -913,7 +907,7 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
           style: 'destructive',
           onPress: async () => {
             try {
-              const { deleteSession } = await import('@/services/sessionService');
+              const { deleteSession } = await import('@/services/session/mutations');
               await deleteSession(sessionId!);
               await refreshSessionList(session?.team_id, loadTeamSessions, loadPersonalSessions);
               navigateAfterSessionEnd(session?.training_id, sessionId!, null);

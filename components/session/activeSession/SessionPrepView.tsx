@@ -1,7 +1,7 @@
 import { isGroupingGoal } from '@/constants/drill';
 import { useColors } from '@/hooks/ui/useColors';
 import type { SessionWithDetails } from '@/types/session';
-import { activateSession, updateSession } from '@/services/sessionService';
+import { activateSession, updateSession } from '@/services/session/mutations';
 import { getUserWeapon, type UserWeapon } from '@/services/weaponService';
 import { useGarminStore, useIsGarminConnected } from '@/stores/garminStore';
 import { deriveDetectionConfig } from '@/utils/detectionSensitivity';

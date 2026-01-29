@@ -1,5 +1,5 @@
 import { PAPER_TYPE } from '@/constants/drill';
-import { addTargetWithPaperResult, addTargetWithTacticalResult } from '@/services/sessionService';
+import { addTargetWithPaperResult, addTargetWithTacticalResult } from '@/services/session/mutations';
 import { BUTTON_GRADIENT, BUTTON_GRADIENT_DISABLED } from '@/constants/Colors';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';

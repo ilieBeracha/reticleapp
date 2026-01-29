@@ -5,7 +5,8 @@ import {
     TrainingDataPayload,
     uploadScannedTargetImage,
 } from '@/services/detectionService';
-import { addTargetWithPaperResult, endSession, PaperType } from '@/services/sessionService';
+import { addTargetWithPaperResult, endSession } from '@/services/session/mutations';
+import type { PaperType } from '@/types/session';
 import { useDetectionStore } from '@/stores/detectionStore';
 import { finiteShotsOrNull, INFINITE_SHOTS_SENTINEL } from '@/utils/drillShots';
 import { CameraView, useCameraPermissions } from 'expo-camera';

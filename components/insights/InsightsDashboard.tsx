@@ -20,8 +20,8 @@
 import { useAuth } from '@/contexts/AuthContext';
 import { useColors } from '@/hooks/ui/useColors';
 import { supabase } from '@/services/supabase';
-import { getDashboardFeatures } from '@/services/sessionService';
-import type { SessionWithDetails } from '@/services/sessionService';
+import { getDashboardFeatures } from '@/services/session/queries';
+import type { SessionWithDetails } from '@/types/session';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';

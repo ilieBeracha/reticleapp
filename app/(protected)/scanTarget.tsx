@@ -1,5 +1,5 @@
 import { PaperTargetFlow } from '@/components/targets/PaperTargetFlow';
-import type { PaperType } from '@/services/sessionService';
+import type { PaperType } from '@/types/session';
 import { useLocalSearchParams } from 'expo-router';
 
 /**

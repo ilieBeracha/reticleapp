@@ -1,4 +1,5 @@
-import { getTrainingSessions, SessionWithDetails } from '@/services/sessionService';
+import { getTrainingSessions } from '@/services/session/queries';
+import type { SessionWithDetails } from '@/types/session';
 import { DrillProgress, getMyDrillProgress, getTrainingById } from '@/services/trainingService';
 import type { TrainingWithDetails } from '@/types/workspace';
 import { router } from 'expo-router';

@@ -2,7 +2,7 @@
  * Type definitions for Active Session Screen
  */
 
-import type { SessionStats, SessionTargetWithResults, SessionWithDetails } from '@/services/sessionService';
+import type { SessionStats, SessionTargetWithResults, SessionWithDetails } from '@/types/session';
 import type { EngagementParticipant } from '@/types/session';
 
 // ============================================================================

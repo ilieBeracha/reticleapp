@@ -1,4 +1,4 @@
-import { SessionTargetWithResults } from '@/services/sessionService';
+import type { SessionTargetWithResults } from '@/types/session';
 import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
 import { useTranslation } from 'react-i18next';

@@ -14,12 +14,9 @@ import { Alert } from 'react-native';
 
 import { useAuth } from '@/contexts/AuthContext';
 import { useModals } from '@/contexts/ModalContext';
-import {
-  deleteSession,
-  getMyActivePersonalSession,
-  getRecentSessionsWithStats,
-  type SessionWithDetails,
-} from '@/services/sessionService';
+import { deleteSession } from '@/services/session/mutations';
+import { getMyActivePersonalSession, getRecentSessionsWithStats } from '@/services/session/queries';
+import type { SessionWithDetails } from '@/types/session';
 import { getDefaultWeapon, getWeaponStats, type UserWeapon, type WeaponStats } from '@/services/weaponService';
 import { useGarminStore } from '@/stores/garminStore';
 import { useSessionStore } from '@/stores/sessionStore';

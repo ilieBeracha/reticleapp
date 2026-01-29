@@ -12,14 +12,10 @@ import { useColors } from '@/hooks/ui/useColors';
 import { getSessionInsights, triggerInsightGeneration, type SessionInsight } from '@/services/insights/insightService';
 import type { ShotDetail } from '@/services/session/timelineService';
 import type { DecodedWeather } from '@/types/session.watch';
-import {
-  calculateSessionStats,
-  getSessionById,
-  getSessionTargetsWithResults,
-  type SessionStats,
-  type SessionTargetWithResults,
-  type SessionWithDetails,
-} from '@/services/sessionService';
+import { calculateSessionStats } from '@/services/session/stats';
+import { getSessionById } from '@/services/session/queries';
+import { getSessionTargetsWithResults } from '@/services/session/targets';
+import type { SessionStats, SessionTargetWithResults, SessionWithDetails } from '@/types/session';
 import { isGroupingSession } from '@/utils/drillGoal';
 import { format, intervalToDuration } from 'date-fns';
 import { router, useLocalSearchParams } from 'expo-router';
