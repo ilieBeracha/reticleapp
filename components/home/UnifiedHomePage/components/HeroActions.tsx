@@ -222,7 +222,6 @@ export function HeroActions({
                   {activeSession?.drillName || 'Solo Practice'}
                 </Text>
               </View>
-              <ChevronRight size={14} color="rgba(255,255,255,0.5)" />
             </>
           )}
 
@@ -232,7 +231,6 @@ export function HeroActions({
                 <Target size={13} color="rgba(255,255,255,0.9)" strokeWidth={2} />
               </View>
               <Text style={s.idleText}>Start Session</Text>
-              <ChevronRight size={14} color="rgba(255,255,255,0.5)" />
             </>
           )}
         </TouchableOpacity>

@@ -2,7 +2,6 @@
  * Insight Service
  *
  * Provides insight generation and retrieval for sessions.
- * Re-exports types and engine functions.
  *
  * NOTE: Insight generation with Pinecone similarity is now handled by the
  * Supabase Edge Function (generate-insights). This service is for:
@@ -21,21 +20,6 @@ import type {
   SessionInsight,
   UserBaseline,
 } from './types';
-
-// Re-export types
-export type {
-  GeneratedInsight,
-  InsightFactor,
-  InsightGenerationInput,
-  InsightPipelineResult,
-  InsightType,
-  SessionFeatures,
-  SessionInsight,
-  UserBaseline
-} from './types';
-
-// Re-export engine functions
-export { generateInsights, getTopInsight } from './insightEngine';
 
 // ============================================================================
 // DATABASE FUNCTIONS

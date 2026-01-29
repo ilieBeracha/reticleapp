@@ -5,7 +5,8 @@
  * Features subtle animations and press feedback.
  */
 
-import { Calendar, ChevronRight, Users } from 'lucide-react-native';
+import { DirectionalChevron } from '@/components/shared/DirectionalChevron';
+import { Calendar, Users } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
@@ -56,7 +57,9 @@ export function TeamTrainingCard({ training, colors, onPress }: TeamTrainingCard
           </Text>
         </View>
         <View style={s.meta}>
-          <Text style={[s.teamName, { color: colors.textMuted }]}>{training.team?.name || t('training.teamTraining')}</Text>
+          <Text style={[s.teamName, { color: colors.textMuted }]}>
+            {training.team?.name || t('training.teamTraining')}
+          </Text>
           {drillCount > 0 && (
             <>
               <View style={[s.dot, { backgroundColor: colors.textMuted }]} />
@@ -68,7 +71,7 @@ export function TeamTrainingCard({ training, colors, onPress }: TeamTrainingCard
         </View>
       </View>
 
-      <ChevronRight size={18} color={colors.textMuted} style={{ opacity: 0.6 }} />
+      <DirectionalChevron size={18} color={colors.textMuted} style={{ opacity: 0.6 }} />
     </AnimatedTouchable>
   );
 }

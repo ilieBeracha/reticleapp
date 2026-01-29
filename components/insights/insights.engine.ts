@@ -18,7 +18,7 @@
  * 5. Context profiles bridging engagement and grouping
  */
 
-import { DRILL_GOAL } from '@/constants';
+import { DRILL_GOAL } from '@/constants/drill';
 import type { SessionWithDetails } from '@/services/session/types';
 import {
   ACCURACY_CHANGE_THRESHOLD,

@@ -4,7 +4,7 @@ import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { LanguageProvider } from '@/contexts/LanguageContext';
 import { ModalProvider } from '@/contexts/ModalContext';
 import { ThemeProvider, useTheme } from '@/contexts/ThemeContext';
-import { initI18n } from '@/lib/i18n';
+import i18n, { initI18n } from '@/lib/i18n';
 import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
 import * as Sentry from '@sentry/react-native';
 import { useFonts } from 'expo-font';
@@ -16,9 +16,7 @@ import { I18nextProvider } from 'react-i18next';
 import { LogBox, Platform } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import i18n from '@/lib/i18n';
 import '../global.css';
-
 // Suppress non-critical warnings on Android
 // SF Symbols warning: Tab icons fall back to default on Android - proper icons should be added later
 // ExpoUI warning: Swift UI components are iOS-only, fallback components are used on Android

@@ -42,8 +42,8 @@ import Animated, { FadeInDown, FadeOut } from 'react-native-reanimated';
 
 import { AIExplanationProvider } from './AIExplanationProvider';
 import { featuresToSessions } from './insights.adapter';
-import type { ActivityDataPoint, ChartDataPoint } from './components';
-import { ActivityChart, PerformanceChart } from './components';
+import { ActivityChart, type ActivityDataPoint } from './components/ActivityChart';
+import { PerformanceChart, type ChartDataPoint } from './components/PerformanceChart';
 import { EvidenceSheet } from './EvidenceSheet';
 import { applyFilters, computeContextProfiles, computeInsights, computeOverviewStatus } from './insights.engine';
 import {
@@ -61,13 +61,11 @@ import {
   WeaknessCard,
 } from './insights.types';
 import { InsightsFilterBar } from './InsightsFilterBar';
-import {
-  ContextSummarySection,
-  DetailedBreakdownSection,
-  OverviewSection,
-  RecommendationsSection,
-  TotalsSection,
-} from './sections';
+import { ContextSummarySection } from './sections/ContextSummarySection';
+import { DetailedBreakdownSection } from './sections/DetailedBreakdownSection';
+import { OverviewSection } from './sections/OverviewSection';
+import { RecommendationsSection } from './sections/RecommendationsSection';
+import { TotalsSection } from './sections/TotalsSection';
 
 // ============================================================================
 // CONSTANTS

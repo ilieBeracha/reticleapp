@@ -1692,8 +1692,14 @@ export const DRILLS_BY_CATEGORY: Record<WeaponCategory, CategoryDrill[]> = {
   precision_rifle: ALL_DRILLS.filter((d) => d.recommendedCategories.includes('precision_rifle')),
   rifle: ALL_DRILLS.filter((d) => d.recommendedCategories.includes('rifle')),
   carbine: ALL_DRILLS.filter((d) => d.recommendedCategories.includes('carbine')),
+  // SMGs share most practical drills with carbines/pistols (close-range, high cadence)
+  smg: ALL_DRILLS.filter(
+    (d) => d.recommendedCategories.includes('carbine') || d.recommendedCategories.includes('pistol')
+  ),
   pistol: ALL_DRILLS.filter((d) => d.recommendedCategories.includes('pistol')),
   shotgun: ALL_DRILLS.filter((d) => d.recommendedCategories.includes('shotgun')),
+  // "Other" = allow full library (non-standard platforms)
+  other: ALL_DRILLS,
   any: ALL_DRILLS, // Any category can use all drills
 };
 

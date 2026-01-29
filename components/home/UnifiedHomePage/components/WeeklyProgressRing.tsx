@@ -5,20 +5,21 @@
  * Animates on mount and provides engaging visual feedback.
  */
 
+import { DirectionalChevron } from '@/components/shared/DirectionalChevron';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
-import { ChevronRight, Target, TrendingUp } from 'lucide-react-native';
-import { useTranslation } from 'react-i18next';
+import { Target, TrendingUp } from 'lucide-react-native';
 import { useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, {
-  Easing,
-  FadeInDown,
-  useAnimatedProps,
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
-  withTiming,
+    Easing,
+    FadeInDown,
+    useAnimatedProps,
+    useAnimatedStyle,
+    useSharedValue,
+    withSpring,
+    withTiming,
 } from 'react-native-reanimated';
 import Svg, { Circle } from 'react-native-svg';
 import type { Colors, WeeklyStats } from '../UnifiedHomePage.types';
@@ -141,9 +142,11 @@ export function WeeklyProgressRing({ stats, colors, weeklyGoal = 5 }: WeeklyProg
 
           <View style={s.progressTextRow}>
             <Text style={[s.progressText, { color: colors.textMuted }]}>
-              {isGoalMet ? t('home.greatWorkThisWeek') : t('home.moreToHitGoal', { count: weeklyGoal - stats.sessions })}
+              {isGoalMet
+                ? t('home.greatWorkThisWeek')
+                : t('home.moreToHitGoal', { count: weeklyGoal - stats.sessions })}
             </Text>
-            <ChevronRight size={16} color={colors.textMuted} style={{ opacity: 0.5 }} />
+            <DirectionalChevron size={16} color={colors.textMuted} style={{ opacity: 0.5 }} />
           </View>
         </View>
       </AnimatedTouchable>

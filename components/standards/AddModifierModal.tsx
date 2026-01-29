@@ -12,7 +12,7 @@ import {
   type CreateModifierInput,
   type ModifierConditionType,
   type StandardModifier,
-} from '@/services/standards';
+} from '@/services/standards/standardsService';
 import * as Haptics from 'expo-haptics';
 import { Check, Clock, CloudRain, Heart, Thermometer, Wind, X, Zap } from 'lucide-react-native';
 import { useEffect, useState } from 'react';

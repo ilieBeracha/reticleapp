@@ -56,7 +56,7 @@ const localStyles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  emptyContent: { flex: 1, gap: 2 },
+  emptyContent: { gap: 2 },
   emptyTitle: { fontSize: 13, fontWeight: '600' },
   emptyText: { fontSize: 11 },
 });

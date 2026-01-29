@@ -5,8 +5,9 @@
  * Shows different stats for grouping vs engagement sessions.
  */
 
+import { DirectionalChevron } from '@/components/shared/DirectionalChevron';
 import { isGroupingGoal } from '@/utils/drillGoal';
-import { ChevronRight, Crosshair, Heart, Target, Users } from 'lucide-react-native';
+import { Crosshair, Heart, Target, Users } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
@@ -75,6 +76,12 @@ export function RecentSessionRow({ session, colors, onPress }: RecentSessionRowP
           <Text style={[s.title, { color: colors.text }]} numberOfLines={1}>
             {session.drillName || (isTeam ? t('home.teamSession') : t('home.practice'))}
           </Text>
+          {/* Training context (if session came from a scheduled training) */}
+          {session.trainingTitle && (
+            <Text style={[s.trainingTitle, { color: colors.textMuted }]} numberOfLines={1}>
+              {session.trainingTitle}
+            </Text>
+          )}
           {hasWatchData && <Heart size={12} color="#EF4444" fill="#EF4444" style={{ opacity: 0.8 }} />}
         </View>
 
@@ -84,9 +91,7 @@ export function RecentSessionRow({ session, colors, onPress }: RecentSessionRowP
             // SQUAD/GROUP: Show participant count + total shots (NO accuracy)
             <>
               {participantCount !== undefined && participantCount > 0 && (
-                <Text style={[s.stat, { color: colors.blue }]}>
-                  {t('home.shooters', { count: participantCount })}
-                </Text>
+                <Text style={[s.stat, { color: colors.blue }]}>{t('home.shooters', { count: participantCount })}</Text>
               )}
               {shots > 0 && (
                 <>
@@ -98,11 +103,15 @@ export function RecentSessionRow({ session, colors, onPress }: RecentSessionRowP
           ) : isGrouping ? (
             // GROUPING: Show shots + best dispersion (NO accuracy)
             <>
-              {shots > 0 && <Text style={[s.stat, { color: colors.textMuted }]}>{t('session.shotsCount', { count: shots })}</Text>}
+              {shots > 0 && (
+                <Text style={[s.stat, { color: colors.textMuted }]}>{t('session.shotsCount', { count: shots })}</Text>
+              )}
               {bestDispersion !== undefined && bestDispersion > 0 && (
                 <>
                   <View style={[s.dot, { backgroundColor: colors.textMuted }]} />
-                  <Text style={[s.stat, { color: colors.orange }]}>{t('session.dispersionCm', { value: bestDispersion.toFixed(1) })}</Text>
+                  <Text style={[s.stat, { color: colors.orange }]}>
+                    {t('session.dispersionCm', { value: bestDispersion.toFixed(1) })}
+                  </Text>
                 </>
               )}
             </>
@@ -110,9 +119,7 @@ export function RecentSessionRow({ session, colors, onPress }: RecentSessionRowP
             // SOLO ENGAGEMENT: Show hits + accuracy
             <>
               {shots > 0 && (
-                <Text style={[s.stat, { color: colors.textMuted }]}>
-                  {t('session.hitsOfShots', { hits, shots })}
-                </Text>
+                <Text style={[s.stat, { color: colors.textMuted }]}>{t('session.hitsOfShots', { hits, shots })}</Text>
               )}
               {accuracy !== undefined && accuracy > 0 && (
                 <>
@@ -128,7 +135,7 @@ export function RecentSessionRow({ session, colors, onPress }: RecentSessionRowP
       {/* Right side */}
       <View style={s.right}>
         <Text style={[s.time, { color: colors.textMuted }]}>{timeAgo}</Text>
-        <ChevronRight size={14} color={colors.border} />
+        <DirectionalChevron size={14} color={colors.border} />
       </View>
     </AnimatedTouchable>
   );
@@ -150,17 +157,22 @@ const s = StyleSheet.create({
   },
   content: {
     flex: 1,
+    justifyContent: 'space-between',
   },
   titleRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: 5,
   },
   title: {
     fontSize: 13,
     fontWeight: '600',
     letterSpacing: -0.2,
-    flex: 1,
+  },
+  trainingTitle: {
+    fontSize: 11,
+    fontWeight: '500',
+    marginTop: 2,
   },
   statsRow: {
     flexDirection: 'row',

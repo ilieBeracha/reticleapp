@@ -1,7 +1,8 @@
-import { SESSION_STATUS, TARGET_TYPE } from '@/constants';
+import { TARGET_TYPE } from '@/constants/drill';
+import { SESSION_STATUS } from '@/constants/session';
 import { supabase } from '@/lib/supabase';
+import { buildSessionContext, evaluateAndStoreVerdict } from '@/services/standards/standardsEngine';
 import { markWeaponUsed } from '@/services/weaponService';
-import { evaluateAndStoreVerdict, buildSessionContext } from '@/services/standards';
 import { getDrillRequirements } from './drillContract';
 import { mapSession } from './mappers';
 import {
@@ -10,17 +11,9 @@ import {
   getSessionById,
   shouldAutoCancelSession,
 } from './queries';
-import {
-  SESSION_SELECT_AFTER_CREATE,
-  SESSION_SELECT_AFTER_UPDATE,
-} from './selectClauses';
+import { SESSION_SELECT_AFTER_CREATE, SESSION_SELECT_AFTER_UPDATE } from './selectClauses';
 import { calculateSessionStats } from './stats';
-import {
-  addSessionTarget,
-  getSessionTargets,
-  savePaperTargetResult,
-  saveTacticalTargetResult,
-} from './targets';
+import { addSessionTarget, getSessionTargets, savePaperTargetResult, saveTacticalTargetResult } from './targets';
 import type {
   BaseSessionConfig,
   CreateSessionParams,
@@ -41,7 +34,7 @@ function normalizeToBaseConfig(params: CreateSessionParams | BaseSessionConfig):
   if ('watch_controlled' in params && typeof params.watch_controlled === 'boolean' && 'drill_config' in params) {
     return params as BaseSessionConfig;
   }
-  
+
   // Convert from CreateSessionParams
   const legacy = params as CreateSessionParams;
   return {
@@ -58,33 +51,37 @@ function normalizeToBaseConfig(params: CreateSessionParams | BaseSessionConfig):
 
 /**
  * Setup Session Parameters
- * 
- * These are the ONLY parameters that belong on a Session:
- * - weapon_id: What weapon is being used
- * - weather: Environmental conditions  
- * - team_id: Team context (optional)
- * - training_id: Training context (optional)
- * - watch_controlled: Recording method
- * - drill_config: Stored for reference (engagement params pass through)
+ *
+ * Session = invisible setup container (weapon, environment, soldier choices)
+ * Drill rules come from training_drills via FK (drill_id)
+ *
+ * Commander's rules: training_drills (via drill_id FK)
+ * Soldier's choices: soldier_distance_m, soldier_bullets, soldier_position
  */
 export interface SetupSessionParams {
   weapon_id: string;
   weather?: any;
   team_id?: string | null;
   training_id?: string | null;
+  drill_id?: string | null;
   watch_controlled?: boolean;
+  // DEPRECATED: Use drill_id FK instead. Only for solo quick practice.
   drill_config?: any;
+  // Soldier choices (when commander allows flexibility)
+  soldier_distance_m?: number | null;
+  soldier_bullets?: number | null;
+  soldier_position?: string | null;
 }
 
 /**
  * Get or create a setup session - CANONICAL API
- * 
+ *
  * Session = implicit setup container (weapon, environment)
  * Session is NOT execution - that's what Engagement is for.
- * 
+ *
  * This function is the internal utility called by execution flows.
  * Users NEVER see "session" - they see "engagement" or "grouping".
- * 
+ *
  * Currently creates a new session each time, but could be extended
  * to reuse sessions with matching setup parameters.
  */
@@ -98,10 +95,14 @@ export async function getOrCreateSetupSession(params: SetupSessionParams): Promi
     watch_controlled: params.watch_controlled ?? false,
     drill_config: params.drill_config ?? null,
     session_mode: 'solo', // Sessions are always solo - squad is on Engagement
-    drill_id: null,
+    drill_id: params.drill_id ?? null,
     drill_template_id: null,
+    // Soldier choices (when commander allows flexibility)
+    soldier_distance_m: params.soldier_distance_m ?? null,
+    soldier_bullets: params.soldier_bullets ?? null,
+    soldier_position: params.soldier_position ?? null,
   };
-  
+
   // For now, delegate to createSession
   // Future: Could check for existing matching session and reuse
   return createSession(config);
@@ -129,7 +130,7 @@ export async function getOrCreateSetupSession(params: SetupSessionParams): Promi
 export async function createSession(params: CreateSessionParams | BaseSessionConfig): Promise<SessionWithDetails> {
   // Normalize to BaseSessionConfig
   const config = normalizeToBaseConfig(params);
-  
+
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -144,18 +145,18 @@ export async function createSession(params: CreateSessionParams | BaseSessionCon
   // Before creating a new session, handle any existing active sessions.
   // This prevents orphaned sessions from accumulating.
   const existingActiveSessions = await getMyActiveSessionsAll();
-  
+
   if (existingActiveSessions.length > 0) {
     console.log(`[createSession] Found ${existingActiveSessions.length} existing active session(s), cleaning up...`);
-    
+
     for (const existingSession of existingActiveSessions) {
       // Sessions older than 24h are stale - cancel them (don't count as completed)
       if (shouldAutoCancelSession(existingSession)) {
         console.log(`[createSession] Auto-cancelling stale session ${existingSession.id} (>24h old)`);
         await supabase
           .from('sessions')
-          .update({ 
-            status: SESSION_STATUS.CANCELLED, 
+          .update({
+            status: SESSION_STATUS.CANCELLED,
             ended_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           })
@@ -165,8 +166,8 @@ export async function createSession(params: CreateSessionParams | BaseSessionCon
         console.log(`[createSession] Auto-ending active session ${existingSession.id}`);
         await supabase
           .from('sessions')
-          .update({ 
-            status: SESSION_STATUS.COMPLETED, 
+          .update({
+            status: SESSION_STATUS.COMPLETED,
             ended_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           })
@@ -196,7 +197,9 @@ export async function createSession(params: CreateSessionParams | BaseSessionCon
       }
 
       const existingLabel = existingSession.drill_name || existingSession.training_title || 'this training';
-      throw new Error(`You already have an active session for "${existingLabel}". End it before starting a different drill.`);
+      throw new Error(
+        `You already have an active session for "${existingLabel}". End it before starting a different drill.`
+      );
     }
 
     // No active session yet: if this training has drills, require selecting a drill
@@ -233,6 +236,7 @@ export async function createSession(params: CreateSessionParams | BaseSessionCon
         target_type: config.drill_config!.target_type || 'paper',
         input_method: config.drill_config!.input_method ?? null, // User's choice
         distance_m: config.drill_config!.distance_m,
+        distance_category: config.drill_config!.distance_category ?? null,
         rounds_per_shooter: config.drill_config!.rounds_per_shooter,
         time_limit_seconds: config.drill_config!.time_limit_seconds ?? null,
         strings_count: config.drill_config!.strings_count ?? null,
@@ -269,19 +273,23 @@ export async function createSession(params: CreateSessionParams | BaseSessionCon
       status,
       started_at: startedAt,
       weather: config.weather ?? null, // Weather data from OpenWeatherMap
+      // Soldier choices (when commander allows flexibility)
+      soldier_distance_m: config.soldier_distance_m ?? null,
+      soldier_bullets: config.soldier_bullets ?? null,
+      soldier_position: config.soldier_position ?? null,
     })
     .select(SESSION_SELECT_AFTER_CREATE)
     .single();
 
   if (error) throw error;
-  
+
   // Mark weapon as used (non-blocking)
   if (config.weapon_id) {
     markWeaponUsed(config.weapon_id).catch((err) => {
       console.warn('[createSession] Failed to mark weapon as used:', err);
     });
   }
-  
+
   return mapSession(data);
 }
 
@@ -357,7 +365,9 @@ export async function createTrainingSession(params: {
   });
 
   // Send notifications (non-blocking)
-  sendTrainingSessionNotifications(params.training_id, training.title, session.user_full_name || 'A member').catch(console.error);
+  sendTrainingSessionNotifications(params.training_id, training.title, session.user_full_name || 'A member').catch(
+    console.error
+  );
 
   return session;
 }
@@ -438,29 +448,26 @@ export async function deleteSession(sessionId: string): Promise<boolean> {
 
 /**
  * Activate a pending session
- * 
+ *
  * Changes status from 'pending' to 'active' and sets:
  * - started_at to now
  * - watch_controlled based on user choice
- * 
+ *
  * @param sessionId - The pending session to activate
  * @param watchControlled - Whether the watch should control this session
  * @returns The activated session
  */
-export async function activateSession(
-  sessionId: string,
-  watchControlled: boolean
-): Promise<SessionWithDetails> {
+export async function activateSession(sessionId: string, watchControlled: boolean): Promise<SessionWithDetails> {
   const session = await getSessionById(sessionId);
-  
+
   if (!session) {
     throw new Error('Session not found');
   }
-  
+
   if (session.status !== SESSION_STATUS.PENDING) {
     throw new Error(`Cannot activate session with status '${session.status}'. Expected '${SESSION_STATUS.PENDING}'.`);
   }
-  
+
   return updateSession(sessionId, {
     status: SESSION_STATUS.ACTIVE,
     started_at: new Date().toISOString(),
@@ -603,13 +610,10 @@ async function computeSessionFeaturesAndInsights(sessionId: string): Promise<voi
  * Evaluate session against team performance standards.
  * Called after session ends for team sessions.
  * Non-blocking - verdict storage failure doesn't affect session.
- * 
+ *
  * DOCTRINE: This is DETERMINISTIC evaluation - no AI/ML influence.
  */
-async function evaluateSessionStandardsVerdict(
-  session: SessionWithDetails,
-  stats: SessionStats
-): Promise<void> {
+async function evaluateSessionStandardsVerdict(session: SessionWithDetails, stats: SessionStats): Promise<void> {
   try {
     // Build the context from session data
     const drill = session.drill_config;
@@ -629,27 +633,39 @@ async function evaluateSessionStandardsVerdict(
       team_id: session.team_id,
       drill_config: {
         drill_goal: drill.drill_goal,
-        distance_m: drill.distance_m,
+
+        distance_m: drill.distance_m ?? undefined,
       },
       weapon: {
         category: session.weapon_category ?? undefined,
       },
-      weather: session.weather ? {
-        conditions: session.weather.condition ?? undefined,
-        wind_speed_kmh: session.weather.wind_speed_kph ?? (session.weather.wind_speed_mps ? session.weather.wind_speed_mps * 3.6 : 0),
-        temp_c: session.weather.temperature_c ?? 20,
-      } : undefined,
+      weather: session.weather
+        ? {
+            conditions: session.weather.condition ?? undefined,
+            wind_speed_kmh:
+              session.weather.wind_speed_kph ??
+              (session.weather.wind_speed_mps ? session.weather.wind_speed_mps * 3.6 : 0),
+            temp_c: session.weather.temperature_c ?? 20,
+          }
+        : undefined,
       shots_fired: stats.totalShotsFired,
       started_at: session.started_at,
       ended_at: session.ended_at ?? undefined,
       // Pass biometrics from stats (extracted from watch data in target_data)
-      biometrics: stats.biometrics ? {
-        avg_hr: stats.biometrics.avgHR,
-        max_hr: stats.biometrics.maxHR,
-      } : undefined,
-      paper_results: stats.bestDispersionCm != null ? [{
-        grouping_cm: stats.bestDispersionCm,
-      }] : undefined,
+      biometrics: stats.biometrics
+        ? {
+            avg_hr: stats.biometrics.avgHR,
+            max_hr: stats.biometrics.maxHR,
+          }
+        : undefined,
+      paper_results:
+        stats.bestDispersionCm != null
+          ? [
+              {
+                grouping_cm: stats.bestDispersionCm,
+              },
+            ]
+          : undefined,
       // For engagement drills
       hits: stats.totalHits,
       total_shots: stats.totalShotsFired,
@@ -707,14 +723,18 @@ async function recordDrillCompletion(params: {
 // ============================================================================
 // DRILL LIMITS - Soft tracking only (no enforcement)
 // ============================================================================
-// 
+//
 // Per sessions.mdc mental model:
 // - "Drills set expectations. Sessions record reality."
 // - Users can always record what actually happened
 // - Limits are tracked for analytics, not enforcement
 //
 
-async function enforceDrillLimitsForNewTarget(_params: { sessionId: string; targetType: TargetType; bulletsFired: number }) {
+async function enforceDrillLimitsForNewTarget(_params: {
+  sessionId: string;
+  targetType: TargetType;
+  bulletsFired: number;
+}) {
   // No enforcement - users can always add targets
   // Stats will track actual vs expected for analytics
   return;
@@ -949,7 +969,7 @@ export interface WatchSessionData {
 /**
  * Save watch data to session and optionally end it.
  * Creates a tactical target entry with the watch data as the result.
- * 
+ *
  * @param data - Watch session data from Garmin
  * @param endSession - Whether to end the session after saving
  * @returns The updated session
@@ -959,28 +979,28 @@ export async function saveWatchSessionData(
   shouldEnd: boolean = true
 ): Promise<SessionWithDetails> {
   const session = await getSessionById(data.sessionId);
-  
+
   if (!session) {
     throw new Error('Session not found');
   }
-  
+
   console.log('[SessionService] Saving watch data:', data);
-  
+
   // Check if we already have a watch target for this session (prevent duplicates from retries)
   const existingTargets = await getSessionTargets(data.sessionId);
   const hasWatchTarget = existingTargets.some(
     (t) => (t.target_data as Record<string, unknown> | null)?.source === 'garmin_watch'
   );
-  
+
   if (hasWatchTarget) {
     console.log('[SessionService] ⚠️ Watch target already exists for session, skipping duplicate save');
     return session;
   }
-  
+
   // Get drill config for distance if not provided by watch
   const drill = session.drill_config;
   const distance = data.distance ?? drill?.distance_m ?? 0;
-  
+
   // Build comprehensive target_data with all watch telemetry
   const targetData: Record<string, unknown> = {
     source: 'garmin_watch',
@@ -995,15 +1015,16 @@ export async function saveWatchSessionData(
     detection_sensitivity: data.detectionSensitivity,
     manual_overrides: data.manualOverrides,
   };
-  
+
   // Add split times if available (from watch directly)
   if (data.splitTimes && data.splitTimes.length > 0) {
     targetData.splits = data.splitTimes;
-    targetData.avg_split_ms = data.avgSplitMs ?? Math.round(data.splitTimes.reduce((a, b) => a + b, 0) / data.splitTimes.length);
+    targetData.avg_split_ms =
+      data.avgSplitMs ?? Math.round(data.splitTimes.reduce((a, b) => a + b, 0) / data.splitTimes.length);
     targetData.fastest_split_ms = Math.min(...data.splitTimes);
     targetData.slowest_split_ms = Math.max(...data.splitTimes);
   }
-  
+
   // Add performance analytics if available
   if (data.performance) {
     targetData.performance = {
@@ -1018,7 +1039,7 @@ export async function saveWatchSessionData(
       last_three_avg: data.performance.lastThreeAvg,
     };
   }
-  
+
   // Add full biometrics data if available
   if (data.biometrics?.enabled) {
     targetData.biometrics = {
@@ -1028,7 +1049,7 @@ export async function saveWatchSessionData(
       breath_timeline: data.biometrics.breathTimeline,
       shot_biometrics: data.biometrics.shotBiometrics,
     };
-    
+
     // Also store summary at top level for easy access
     if (data.biometrics.summary) {
       targetData.heart_rate = {
@@ -1049,7 +1070,7 @@ export async function saveWatchSessionData(
       targetData.optimal_pct = data.biometrics.summary.optimalPct;
     }
   }
-  
+
   // Add steadiness data if available
   if (data.steadiness?.enabled) {
     targetData.steadiness = {
@@ -1074,9 +1095,9 @@ export async function saveWatchSessionData(
       timeline: data.steadiness.timeline,
     };
   }
-  
+
   console.log('[SessionService] Target data keys:', Object.keys(targetData));
-  
+
   // Create a tactical target entry with watch data
   // This allows the data to be picked up by normal stats calculation
   const target = await addSessionTarget({
@@ -1086,10 +1107,10 @@ export async function saveWatchSessionData(
     notes: 'Recorded via Garmin watch',
     target_data: targetData,
   });
-  
+
   // Calculate time in seconds from milliseconds
   const timeSeconds = data.durationMs ? data.durationMs / 1000 : null;
-  
+
   // Save the tactical result
   // Use user-provided hits if available, otherwise assume all shots are hits
   const hits = data.hitsRecorded ?? data.shotsRecorded;
@@ -1101,15 +1122,15 @@ export async function saveWatchSessionData(
     time_seconds: timeSeconds,
     notes: 'Watch session data',
   });
-  
+
   console.log('[SessionService] Watch data saved as tactical target:', target.id);
-  
+
   // End the session if requested
   if (shouldEnd) {
     // Calculate ended_at based on watch duration (not current phone time)
     // This ensures the session duration matches what the watch recorded
     let calculatedEndedAt: string;
-    
+
     if (data.durationMs && session.started_at) {
       // Use watch duration: started_at + durationMs
       const startedAtMs = new Date(session.started_at).getTime();
@@ -1125,28 +1146,28 @@ export async function saveWatchSessionData(
       calculatedEndedAt = new Date().toISOString();
       console.log('[SessionService] No watch duration, using current time for ended_at');
     }
-    
+
     // Update session with calculated ended_at
     const updatedSession = await updateSession(data.sessionId, {
       status: SESSION_STATUS.COMPLETED,
       ended_at: calculatedEndedAt,
     });
-    
+
     // Check drill completion if applicable
     if (session.training_id && session.drill_id && session.drill_config) {
       const drill = session.drill_config;
       const stats = await calculateSessionStats(data.sessionId);
-      
+
       const meetsShotCount = !drill.rounds_per_shooter || stats.totalShotsFired >= drill.rounds_per_shooter;
       const targetRequirement = (drill.strings_count ?? 1) * (drill.target_count ?? 1);
       const meetsTargetCount = stats.targetCount >= targetRequirement;
       const meetsAccuracy = !drill.min_accuracy_percent || stats.accuracyPct >= drill.min_accuracy_percent;
-      
+
       const endedAt = new Date(calculatedEndedAt).getTime();
       const startedAt = session.started_at ? new Date(session.started_at).getTime() : endedAt;
       const durationSeconds = Math.max(0, Math.floor((endedAt - startedAt) / 1000));
       const meetsTime = !drill.time_limit_seconds || durationSeconds <= drill.time_limit_seconds;
-      
+
       if (meetsShotCount && meetsTargetCount && meetsAccuracy && meetsTime) {
         await recordDrillCompletion({
           sessionId: data.sessionId,
@@ -1162,10 +1183,10 @@ export async function saveWatchSessionData(
     computeSessionFeaturesAndInsights(data.sessionId).catch((err) => {
       console.error('[SessionService] Watch session: Failed to generate insights:', err);
     });
-    
+
     return updatedSession;
   }
-  
+
   // Otherwise just return the current session
   return session;
 }
@@ -1173,7 +1194,7 @@ export async function saveWatchSessionData(
 /**
  * Merge SESSION_DETAILS into an existing watch session target.
  * Called when Phase 2 data arrives after Phase 1 summary was already saved.
- * 
+ *
  * @param sessionId - The session to update
  * @param details - The full details data from SESSION_DETAILS
  * @returns true if update was successful, false if no target found
@@ -1183,57 +1204,58 @@ export async function mergeWatchSessionDetails(
   details: Partial<WatchSessionData>
 ): Promise<boolean> {
   console.log('[SessionService] Merging watch session details for:', sessionId);
-  
+
   // Find the existing target with garmin_watch source
   // Note: session_targets doesn't have created_at, so we filter by target_data source
   const { data: targets, error: fetchError } = await supabase
     .from('session_targets')
     .select('id, target_data')
     .eq('session_id', sessionId)
-    .limit(10);  // Get all targets for this session, we'll filter for garmin_watch
-  
+    .limit(10); // Get all targets for this session, we'll filter for garmin_watch
+
   if (fetchError) {
     console.error('[SessionService] Error fetching target for merge:', fetchError);
     return false;
   }
-  
+
   if (!targets || targets.length === 0) {
     console.log('[SessionService] No target found for session, details will be saved on next save');
     return false;
   }
-  
+
   // Find the garmin_watch target
   const watchTarget = targets.find((t) => {
     const data = t.target_data as Record<string, unknown> | null;
     return data?.source === 'garmin_watch';
   });
-  
+
   if (!watchTarget) {
     console.log('[SessionService] No garmin_watch target found, details will be saved on next save');
     return false;
   }
-  
+
   const target = watchTarget;
   const existingData = (target.target_data as Record<string, unknown>) || {};
-  
+
   console.log('[SessionService] Found existing garmin_watch target:', target.id);
-  
+
   // Build the details to merge
   const detailsToMerge: Record<string, unknown> = {};
-  
+
   // Add split times if available
   if (details.splitTimes && details.splitTimes.length > 0) {
     detailsToMerge.splits = details.splitTimes;
-    detailsToMerge.avg_split_ms = details.avgSplitMs ?? Math.round(details.splitTimes.reduce((a, b) => a + b, 0) / details.splitTimes.length);
+    detailsToMerge.avg_split_ms =
+      details.avgSplitMs ?? Math.round(details.splitTimes.reduce((a, b) => a + b, 0) / details.splitTimes.length);
     detailsToMerge.fastest_split_ms = Math.min(...details.splitTimes);
     detailsToMerge.slowest_split_ms = Math.max(...details.splitTimes);
   }
-  
+
   // Add detection info
   if (details.autoDetected !== undefined) detailsToMerge.auto_detected = details.autoDetected;
   if (details.detectionSensitivity !== undefined) detailsToMerge.detection_sensitivity = details.detectionSensitivity;
   if (details.manualOverrides !== undefined) detailsToMerge.manual_overrides = details.manualOverrides;
-  
+
   // Add performance analytics if available
   if (details.performance) {
     detailsToMerge.performance = {
@@ -1248,7 +1270,7 @@ export async function mergeWatchSessionDetails(
       last_three_avg: details.performance.lastThreeAvg,
     };
   }
-  
+
   // Add full biometrics data if available
   if (details.biometrics?.enabled) {
     detailsToMerge.biometrics = {
@@ -1257,7 +1279,7 @@ export async function mergeWatchSessionDetails(
       breath_timeline: details.biometrics.breathTimeline,
       shot_biometrics: details.biometrics.shotBiometrics,
     };
-    
+
     // Also update top-level fields
     if (details.biometrics.summary) {
       detailsToMerge.heart_rate = {
@@ -1276,7 +1298,7 @@ export async function mergeWatchSessionDetails(
       detailsToMerge.optimal_pct = details.biometrics.summary.optimalPct;
     }
   }
-  
+
   // Add steadiness data if available
   if (details.steadiness?.enabled) {
     detailsToMerge.steadiness = {
@@ -1296,30 +1318,30 @@ export async function mergeWatchSessionDetails(
       timeline: details.steadiness.timeline,
     };
   }
-  
+
   // Mark as complete (details merged)
   detailsToMerge.details_merged = true;
   detailsToMerge.details_merged_at = new Date().toISOString();
-  
+
   // Merge with existing data
   const mergedData = {
     ...existingData,
     ...detailsToMerge,
   };
-  
+
   console.log('[SessionService] Merging keys:', Object.keys(detailsToMerge));
-  
+
   // Update the target
   const { error: updateError } = await supabase
     .from('session_targets')
     .update({ target_data: mergedData })
     .eq('id', target.id);
-  
+
   if (updateError) {
     console.error('[SessionService] Error updating target with details:', updateError);
     return false;
   }
-  
+
   console.log('[SessionService] ✅ Watch session details merged successfully');
   return true;
 }
@@ -1331,7 +1353,7 @@ export async function mergeWatchSessionDetails(
 /**
  * Save transformed watch data from new compact payload format.
  * Creates a tactical target entry with comprehensive telemetry data.
- * 
+ *
  * @param data - Transformed watch data from transformSummaryPayload()
  * @param shouldEnd - Whether to end the session after saving (default: true)
  * @returns The updated session
@@ -1341,11 +1363,11 @@ export async function saveTransformedWatchData(
   shouldEnd: boolean = true
 ): Promise<SessionWithDetails> {
   const session = await getSessionById(data.sessionId);
-  
+
   if (!session) {
     throw new Error('Session not found');
   }
-  
+
   console.log('[SessionService] Saving transformed watch data:', {
     sessionId: data.sessionId,
     shots: data.shotsRecorded,
@@ -1353,19 +1375,19 @@ export async function saveTransformedWatchData(
     durationMs: data.durationMs,
     isSummaryOnly: data.isSummaryOnly,
   });
-  
+
   // Get drill config for distance if not provided by watch
   const drill = session.drill_config;
   const distance = data.distance || drill?.distance_m || 0;
-  
+
   // Build target_data using the transformer
   const targetData = buildTargetData({
     ...data,
     distance,
   });
-  
+
   console.log('[SessionService] Target data keys:', Object.keys(targetData));
-  
+
   // Create a tactical target entry with watch data
   const target = await addSessionTarget({
     session_id: data.sessionId,
@@ -1374,10 +1396,10 @@ export async function saveTransformedWatchData(
     notes: 'Recorded via Garmin watch',
     target_data: targetData,
   });
-  
+
   // Calculate time in seconds from milliseconds
   const timeSeconds = data.durationMs ? data.durationMs / 1000 : null;
-  
+
   // Save the tactical result
   await saveTacticalTargetResult({
     session_target_id: target.id,
@@ -1387,14 +1409,14 @@ export async function saveTransformedWatchData(
     time_seconds: timeSeconds,
     notes: data.isSummaryOnly ? 'Watch summary (details pending)' : 'Watch session data',
   });
-  
+
   console.log('[SessionService] Transformed watch data saved as tactical target:', target.id);
-  
+
   // End the session if requested
   if (shouldEnd) {
     // Calculate ended_at based on watch duration
     let calculatedEndedAt: string;
-    
+
     if (data.durationMs && session.started_at) {
       const startedAtMs = new Date(session.started_at).getTime();
       const endedAtMs = startedAtMs + data.durationMs;
@@ -1402,27 +1424,27 @@ export async function saveTransformedWatchData(
     } else {
       calculatedEndedAt = new Date().toISOString();
     }
-    
+
     const updatedSession = await updateSession(data.sessionId, {
       status: SESSION_STATUS.COMPLETED,
       ended_at: calculatedEndedAt,
     });
-    
+
     // Check drill completion if applicable
     if (session.training_id && session.drill_id && session.drill_config) {
       const drillConfig = session.drill_config;
       const stats = await calculateSessionStats(data.sessionId);
-      
+
       const meetsShotCount = !drillConfig.rounds_per_shooter || stats.totalShotsFired >= drillConfig.rounds_per_shooter;
       const targetRequirement = (drillConfig.strings_count ?? 1) * (drillConfig.target_count ?? 1);
       const meetsTargetCount = stats.targetCount >= targetRequirement;
       const meetsAccuracy = !drillConfig.min_accuracy_percent || stats.accuracyPct >= drillConfig.min_accuracy_percent;
-      
+
       const endedAt = new Date(calculatedEndedAt).getTime();
       const startedAt = session.started_at ? new Date(session.started_at).getTime() : endedAt;
       const durationSeconds = Math.max(0, Math.floor((endedAt - startedAt) / 1000));
       const meetsTime = !drillConfig.time_limit_seconds || durationSeconds <= drillConfig.time_limit_seconds;
-      
+
       if (meetsShotCount && meetsTargetCount && meetsAccuracy && meetsTime) {
         await recordDrillCompletion({
           sessionId: data.sessionId,
@@ -1438,90 +1460,86 @@ export async function saveTransformedWatchData(
     computeSessionFeaturesAndInsights(data.sessionId).catch((err) => {
       console.error('[SessionService] Failed to generate insights:', err);
     });
-    
+
     return updatedSession;
   }
-  
+
   return session;
 }
 
 /**
  * Merge Phase 2 details from new compact payload format.
  * Updates existing garmin_watch target with per-shot data.
- * 
+ *
  * @param sessionId - The session to update
  * @param details - The WatchDetailsPayload from Phase 2
  * @returns true if merge was successful
  */
-export async function mergeCompactWatchDetails(
-  sessionId: string,
-  details: WatchDetailsPayload
-): Promise<boolean> {
+export async function mergeCompactWatchDetails(sessionId: string, details: WatchDetailsPayload): Promise<boolean> {
   console.log('[SessionService] Merging compact watch details for:', sessionId);
-  
+
   // Find the existing target with garmin_watch source
   const { data: targets, error: fetchError } = await supabase
     .from('session_targets')
     .select('id, target_data')
     .eq('session_id', sessionId)
     .limit(10);
-  
+
   if (fetchError) {
     console.error('[SessionService] Error fetching target for merge:', fetchError);
     return false;
   }
-  
+
   if (!targets || targets.length === 0) {
     console.log('[SessionService] No target found for session');
     return false;
   }
-  
+
   // Find the garmin_watch target
   const watchTarget = targets.find((t) => {
     const targetDataRaw = t.target_data as Record<string, unknown> | null;
     return targetDataRaw?.source === 'garmin_watch';
   });
-  
+
   if (!watchTarget) {
     console.log('[SessionService] No garmin_watch target found');
     return false;
   }
-  
+
   const existingData = (watchTarget.target_data as Record<string, unknown>) || {};
-  
+
   // Build details merge payload using transformer
   const detailsToMerge = buildDetailsMergePayload(details);
-  
+
   console.log('[SessionService] Merging keys:', Object.keys(detailsToMerge));
-  
+
   // Merge with existing data
   const mergedData = {
     ...existingData,
     ...detailsToMerge,
   };
-  
+
   // Update the target
   const { error: updateError } = await supabase
     .from('session_targets')
     .update({ target_data: mergedData })
     .eq('id', watchTarget.id);
-  
+
   if (updateError) {
     console.error('[SessionService] Error updating target with details:', updateError);
     return false;
   }
-  
+
   // Also update the tactical_results notes to indicate details are merged
   const { error: resultUpdateError } = await supabase
     .from('tactical_results')
     .update({ notes: 'Watch session data (details synced)' })
     .eq('session_target_id', watchTarget.id);
-  
+
   if (resultUpdateError) {
     console.warn('[SessionService] Could not update tactical result notes:', resultUpdateError);
   }
-  
+
   console.log('[SessionService] ✅ Compact watch details merged successfully');
   return true;
 }
-

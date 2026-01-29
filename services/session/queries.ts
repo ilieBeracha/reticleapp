@@ -1,5 +1,5 @@
 import type { DashboardFeature } from '@/components/insights/insights.types';
-import { SESSION_STATUS } from '@/constants';
+import { SESSION_STATUS } from '@/constants/session';
 import { supabase } from '@/lib/supabase';
 import { withQueryTiming } from '@/services/_shared/instrumentation';
 import { mapSession } from './mappers';

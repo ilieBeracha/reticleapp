@@ -11,11 +11,11 @@
  * Session = invisible setup container created at execution time.
  */
 
-import { SessionContextStep } from '@/components/session/creation';
+import { SessionContextStep } from '@/components/session/creation/SessionContextStep';
 import type { SessionContextState, SessionPurpose } from '@/components/session/creation/sessionCreation.types';
+import { RANGE_CATEGORIES } from '@/constants/drill';
 import { useColors } from '@/hooks/ui/useColors';
-import { useTranslation } from 'react-i18next';
-import { type TrainingDrillItem } from '@/services/drills';
+import { type RangeCategory, type TrainingDrillItem } from '@/services/drills/drillService';
 import type { ExecutionPolicy } from '@/services/session/types';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -34,6 +34,7 @@ import {
   Users,
 } from 'lucide-react-native';
 import { useCallback, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   LayoutAnimation,
   Modal,
@@ -41,10 +42,9 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   UIManager,
-  View,
+  View
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -81,7 +81,11 @@ function SessionCard({ session, index, total, onRemove, onMove, colors }: Sessio
   const isGrouping = session.drill_goal === 'grouping';
   const isSquad = session.engagement_mode === 'squad';
   const purposeColor = isGrouping ? colors.blue : colors.orange;
-  const purposeLabel = isGrouping ? t('session.grouping') : isSquad ? t('training.squadEngagement') : t('session.engagement');
+  const purposeLabel = isGrouping
+    ? t('session.grouping')
+    : isSquad
+      ? t('training.squadEngagement')
+      : t('session.engagement');
 
   // Execution policy display
   const policy = session.execution_policy || 'locked';
@@ -126,10 +130,17 @@ function SessionCard({ session, index, total, onRemove, onMove, colors }: Sessio
           </View>
           <Text style={[styles.sessionMeta, { color: colors.textMuted }]}>
             {purposeLabel}
-            {session.config.distance_m != null ? ` · ${session.config.distance_m}m` : ''}
+            {session.config.distance_category
+              ? ` · ${session.config.distance_category === 'short' ? t('training.shortRange') : session.config.distance_category === 'medium' ? t('training.mediumRange') : t('training.longRange')}`
+              : session.config.distance_m != null
+                ? ` · ${session.config.distance_m}m`
+                : ''}
             {session.config.rounds != null ? ` · ${t('training.shotsCount', { count: session.config.rounds })}` : ''}
             {session.config.position && ` · ${t(`session.positionOptions.${session.config.position}`)}`}
-            {session.config.distance_m == null && session.config.rounds == null && ` · ${t('training.soldierChooses')}`}
+            {session.config.distance_m == null &&
+              !session.config.distance_category &&
+              session.config.rounds == null &&
+              ` · ${t('training.soldierChooses')}`}
           </Text>
         </View>
         <View style={styles.sessionActions}>
@@ -173,6 +184,7 @@ const EMPTY_CONTEXT: SessionContextState = {
   weaponName: null,
   weaponCategory: null,
   distance: 0, // 0 = not set (will become null in drill config)
+  distanceCategory: null, // Range category (short/medium/long)
   position: 'any', // 'any' = not specified
   targetType: 'paper',
   shotsPlanned: 0, // 0 = not set (will become null in drill config)
@@ -207,6 +219,7 @@ function AddSessionSheet({ visible, onClose, onAdd }: AddSessionSheetProps) {
   const [context, setContext] = useState<SessionContextState>(EMPTY_CONTEXT);
   const [customDistanceEditing, setCustomDistanceEditing] = useState(false);
   const [customDistanceText, setCustomDistanceText] = useState('');
+  const [distanceCategory, setDistanceCategory] = useState<RangeCategory | null>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
 
   // Grouping drills are ALWAYS solo (enforced by canonical model)
@@ -248,6 +261,7 @@ function AddSessionSheet({ visible, onClose, onAdd }: AddSessionSheetProps) {
     setContext(EMPTY_CONTEXT);
     setCustomDistanceEditing(false);
     setCustomDistanceText('');
+    setDistanceCategory(null);
     setValidationError(null);
     setStep(2);
   }, []);
@@ -267,6 +281,7 @@ function AddSessionSheet({ visible, onClose, onAdd }: AddSessionSheetProps) {
     setContext(EMPTY_CONTEXT);
     setCustomDistanceEditing(false);
     setCustomDistanceText('');
+    setDistanceCategory(null);
     setValidationError(null);
     onClose();
   }, [onClose]);
@@ -283,15 +298,19 @@ function AddSessionSheet({ visible, onClose, onAdd }: AddSessionSheetProps) {
   const handleSubmit = useCallback(() => {
     // 0 = not set, convert to null for config
     const hasDistance = context.distance > 0;
+    // For squad mode: use local distanceCategory state
+    // For solo mode: use context.distanceCategory (set via SessionContextStep)
+    const effectiveDistanceCategory = effectiveEngagementMode === 'squad' ? distanceCategory : context.distanceCategory;
+    const hasDistanceCategory = effectiveDistanceCategory !== null;
     const hasRounds = context.shotsPlanned > 0;
     const hasPosition = context.position && context.position !== 'any';
 
     // Validation for LOCKED policy only - commander must specify config
-    // Squad mode: only distance required (free-form session)
+    // Squad mode: distance OR distance category required (free-form session)
     // Grouping mode: only distance + position required (shot count comes from scan)
     // Engagement mode: full config required (distance, rounds, position)
     if (executionPolicy === 'locked') {
-      if (!hasDistance) {
+      if (!hasDistance && !hasDistanceCategory) {
         setValidationError(t('training.distanceRequiredForLocked'));
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
         return;
@@ -318,7 +337,17 @@ function AddSessionSheet({ visible, onClose, onAdd }: AddSessionSheetProps) {
 
     // Build name based on what's configured
     const nameParts = [purpose === 'grouping' ? t('session.grouping') : t('session.engagement')];
-    if (hasDistance) nameParts.push(`${context.distance}m`);
+    if (hasDistanceCategory) {
+      const catLabel =
+        effectiveDistanceCategory === 'short'
+          ? t('training.shortRange')
+          : effectiveDistanceCategory === 'medium'
+            ? t('training.mediumRange')
+            : t('training.longRange');
+      nameParts.push(catLabel);
+    } else if (hasDistance) {
+      nameParts.push(`${context.distance}m`);
+    }
     if (effectiveEngagementMode === 'squad') nameParts.push(`(${t('training.squadType')})`);
 
     const newSession: TrainingDrillItem = {
@@ -332,7 +361,8 @@ function AddSessionSheet({ visible, onClose, onAdd }: AddSessionSheetProps) {
       engagement_mode: effectiveEngagementMode,
       config: {
         // null = soldier chooses at execution time
-        distance_m: hasDistance ? context.distance : null,
+        distance_m: hasDistanceCategory ? null : hasDistance ? context.distance : null,
+        distance_category: hasDistanceCategory ? effectiveDistanceCategory : null,
         rounds: hasRounds ? context.shotsPlanned : null,
         time_limit_seconds: context.timeLimit,
         position: mapPosition(context.position),
@@ -349,9 +379,10 @@ function AddSessionSheet({ visible, onClose, onAdd }: AddSessionSheetProps) {
     setContext(EMPTY_CONTEXT);
     setCustomDistanceEditing(false);
     setCustomDistanceText('');
+    setDistanceCategory(null);
     setValidationError(null);
     onClose();
-  }, [purpose, context, executionPolicy, effectiveEngagementMode, onAdd, onClose]);
+  }, [purpose, context, distanceCategory, executionPolicy, effectiveEngagementMode, onAdd, onClose, t]);
 
   // Get step title
   const stepTitle = step === 1 ? t('training.drillType') : t('training.configuration');
@@ -582,7 +613,11 @@ function AddSessionSheet({ visible, onClose, onAdd }: AddSessionSheetProps) {
                       {executionPolicy === 'guided' && <Sparkles size={14} color={colors.green} />}
                       {executionPolicy === 'free' && <Unlock size={14} color={colors.orange} />}
                       <Text style={[styles.summaryText, { color: colors.text }]}>
-                        {executionPolicy === 'locked' ? t('training.locked') : executionPolicy === 'guided' ? t('training.guided') : t('training.free')}
+                        {executionPolicy === 'locked'
+                          ? t('training.locked')
+                          : executionPolicy === 'guided'
+                            ? t('training.guided')
+                            : t('training.free')}
                       </Text>
                     </View>
                   </View>
@@ -608,6 +643,7 @@ function AddSessionSheet({ visible, onClose, onAdd }: AddSessionSheetProps) {
                     onUpdateContext={handleUpdateContext}
                     onBack={() => {}}
                     hideWeaponSection
+                    showRangeCategory
                   />
                 </>
               )}
@@ -632,99 +668,57 @@ function AddSessionSheet({ visible, onClose, onAdd }: AddSessionSheetProps) {
 
                   <View style={styles.squadDistanceSection}>
                     <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>{t('session.distance')}</Text>
-                    <View style={[styles.distanceRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                      {[15, 25, 50, 100].map((d) => {
-                        const isActive = context.distance === d && !customDistanceEditing;
+
+                    {/* Range category selection (Short / Medium / Long only) */}
+                    <View
+                      style={[
+                        styles.distanceRow,
+                        { backgroundColor: colors.card, borderColor: colors.border, marginBottom: 8 },
+                      ]}
+                    >
+                      {RANGE_CATEGORIES.map((cat) => {
+                        const isSelected = distanceCategory === cat.value;
+                        const label =
+                          cat.value === 'short'
+                            ? t('training.short')
+                            : cat.value === 'medium'
+                              ? t('training.medium')
+                              : t('training.long');
                         return (
                           <TouchableOpacity
-                            key={d}
+                            key={cat.value}
                             style={[
                               styles.distanceOption,
-                              isActive && [styles.distanceOptionActive, { backgroundColor: colors.primary }],
-                              customDistanceEditing && { opacity: 0.5 },
+                              isSelected && [styles.distanceOptionActive, { backgroundColor: colors.primary }],
                             ]}
-                            disabled={customDistanceEditing}
                             onPress={() => {
-                              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                              handleUpdateContext({ distance: d });
-                              setCustomDistanceEditing(false);
+                              Haptics.selectionAsync();
+                              setDistanceCategory(cat.value);
+                              handleUpdateContext({ distance: 0 });
                             }}
                           >
-                            <Text style={[styles.distanceText, { color: isActive ? '#fff' : colors.text }]}>{d}m</Text>
+                            <Text style={[styles.distanceText, { color: isSelected ? '#fff' : colors.text }]}>
+                              {label}
+                            </Text>
                           </TouchableOpacity>
                         );
                       })}
-                      {/* Custom distance input */}
-                      {customDistanceEditing ? (
-                        <View
-                          style={[
-                            styles.distanceOption,
-                            styles.distanceInputContainer,
-                            { borderColor: colors.primary },
-                          ]}
-                        >
-                          <TextInput
-                            style={[styles.distanceInput, { color: colors.text }]}
-                            value={customDistanceText}
-                            onChangeText={setCustomDistanceText}
-                            onBlur={() => {
-                              const num = parseInt(customDistanceText, 10);
-                              if (!isNaN(num) && num > 0) {
-                                handleUpdateContext({ distance: num });
-                              }
-                              setCustomDistanceEditing(false);
-                            }}
-                            onSubmitEditing={() => {
-                              const num = parseInt(customDistanceText, 10);
-                              if (!isNaN(num) && num > 0) {
-                                handleUpdateContext({ distance: num });
-                              }
-                              setCustomDistanceEditing(false);
-                            }}
-                            keyboardType="number-pad"
-                            autoFocus
-                            selectTextOnFocus
-                            placeholder="0"
-                            placeholderTextColor={colors.textMuted}
-                          />
-                          <Text style={[styles.distanceInputSuffix, { color: colors.text }]}>m</Text>
-                        </View>
-                      ) : (
-                        <TouchableOpacity
-                          style={[
-                            styles.distanceOption,
-                            context.distance > 0 &&
-                              ![15, 25, 50, 100].includes(context.distance) && [
-                                styles.distanceOptionActive,
-                                { backgroundColor: colors.primary },
-                              ],
-                          ]}
-                          onPress={() => {
-                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                            setCustomDistanceText(context.distance > 0 ? String(context.distance) : '');
-                            setCustomDistanceEditing(true);
-                          }}
-                        >
-                          <Text
-                            style={[
-                              styles.distanceText,
-                              {
-                                color:
-                                  context.distance > 0 && ![15, 25, 50, 100].includes(context.distance)
-                                    ? '#fff'
-                                    : colors.textMuted,
-                              },
-                            ]}
-                          >
-                            {context.distance > 0 && ![15, 25, 50, 100].includes(context.distance)
-                              ? `${context.distance}m`
-                              : t('common.other')}
-                          </Text>
-                        </TouchableOpacity>
-                      )}
                     </View>
-                    {context.distance === 0 && (
-                      <Text style={[styles.policyDesc, { color: colors.red }]}>{t('training.selectDistanceRequired')}</Text>
+
+                    {/* Show range description when category selected */}
+                    {distanceCategory && (
+                      <Text style={[styles.policyDesc, { color: colors.textMuted, marginBottom: 8 }]}>
+                        {distanceCategory === 'short' && t('training.shortRangeDesc')}
+                        {distanceCategory === 'medium' && t('training.mediumRangeDesc')}
+                        {distanceCategory === 'long' && t('training.longRangeDesc')}
+                      </Text>
+                    )}
+
+                    {/* Validation message */}
+                    {!distanceCategory && (
+                      <Text style={[styles.policyDesc, { color: colors.red }]}>
+                        {t('training.selectDistanceRequired')}
+                      </Text>
                     )}
                   </View>
                 </>
@@ -737,7 +731,9 @@ function AddSessionSheet({ visible, onClose, onAdd }: AddSessionSheetProps) {
                 >
                   <Unlock size={20} color={colors.orange} />
                   <View style={styles.freeNoticeText}>
-                    <Text style={[styles.freeNoticeTitle, { color: colors.text }]}>{t('training.fullFreedomMode')}</Text>
+                    <Text style={[styles.freeNoticeTitle, { color: colors.text }]}>
+                      {t('training.fullFreedomMode')}
+                    </Text>
                     <Text style={[styles.freeNoticeDesc, { color: colors.textMuted }]}>
                       {t('training.fullFreedomDescription')}
                     </Text>
@@ -813,9 +809,7 @@ export function AddDrillStep({ drills, onAddDrill, onRemoveDrill, onMoveDrill }:
         </View>
         <View style={styles.headerText}>
           <Text style={[styles.headerTitle, { color: colors.text }]}>{t('training.whatWillYouTrain')}</Text>
-          <Text style={[styles.headerHint, { color: colors.textMuted }]}>
-            {t('training.addDrillsEveryoneRuns')}
-          </Text>
+          <Text style={[styles.headerHint, { color: colors.textMuted }]}>{t('training.addDrillsEveryoneRuns')}</Text>
         </View>
       </View>
 

@@ -80,11 +80,11 @@ export default function ProtectedLayout() {
         name="createTeam"
         options={{
           headerShown: false,
-          presentation: 'containedModal',
+          presentation: 'formSheet',
           gestureEnabled: true,
           sheetGrabberVisible: true,
-          contentStyle: { backgroundColor: colors.card, paddingTop: insets.top },
-          sheetAllowedDetents: [0.8, 0.95],
+          contentStyle: { backgroundColor: colors.card },
+          sheetAllowedDetents: [0.85, 0.95],
           sheetInitialDetentIndex: 0,
           sheetLargestUndimmedDetentIndex: -1,
         }}

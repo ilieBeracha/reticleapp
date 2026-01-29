@@ -21,9 +21,9 @@
  */
 
 import { useCallback, useMemo } from 'react';
-import { useRealtimeChannel } from '../core';
-import type { TeamInvitationRecord, TeamMemberRecord, TeamTrainingRecord } from '../records';
-import type { ChangePayload } from '../table';
+import { useRealtimeChannel } from '../core/channel';
+import type { TeamInvitationRecord, TeamMemberRecord, TeamTrainingRecord } from '../records/team';
+import type { ChangePayload } from '../table/table.types';
 import type { UseTeamRealtimeOptions, UseTeamRealtimeReturn } from './team.types';
 
 export function useTeamRealtime(options: UseTeamRealtimeOptions): UseTeamRealtimeReturn {

@@ -8,8 +8,9 @@
  * Execution happens via startEngagement when soldiers actually shoot.
  */
 
-import { useCreateTrainingV2 } from '@/components/training/create';
-import { AddDrillStep, TrainingDetailsStep } from '@/components/training/create/steps';
+import { useCreateTrainingV2 } from '@/components/training/create/useCreateTrainingV2';
+import { AddDrillStep } from '@/components/training/create/steps/AddDrillStep';
+import { TrainingDetailsStep } from '@/components/training/create/steps/TrainingDetailsStep';
 import { useColors } from '@/hooks/ui/useColors';
 import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';

@@ -6,6 +6,7 @@
  * 2. Start from scratch → Configure → Add/Save
  */
 
+import { RANGE_CATEGORIES, type RangeCategory } from '@/constants/drill';
 import { useColors } from '@/hooks/ui/useColors';
 import { getCategoryLabel, WEAPON_CATEGORIES } from '@/services/weaponService';
 import type { Drill, DrillGoal, WeaponCategory } from '@/types/workspace';
@@ -115,6 +116,7 @@ export function DrillCreator({
   const [weaponCategory, setWeaponCategory] = useState<WeaponCategory | null>(null);
   const [customDistance, setCustomDistance] = useState('');
   const [customShots, setCustomShots] = useState('');
+  const [distanceCategory, setDistanceCategory] = useState<RangeCategory | null>(null);
 
   // Save state
   const [saveToLibrary, setSaveToLibrary] = useState(false);
@@ -142,6 +144,7 @@ export function DrillCreator({
     setWeaponCategory(null);
     setCustomDistance('');
     setCustomShots('');
+    setDistanceCategory(null);
     setSaveToLibrary(false);
   };
 
@@ -156,6 +159,7 @@ export function DrillCreator({
     setTimeLimit(drill.time_limit_seconds || null);
     setStrings(drill.strings_count || 1);
     setWeaponCategory(drill.weapon_category || null);
+    setDistanceCategory(null);
     setStep('configure');
   };
 
@@ -186,7 +190,8 @@ export function DrillCreator({
     const inputMethod = drillGoal === 'grouping' ? 'scan' : 'manual';
 
     const config: NewDrillInstanceConfig = {
-      distance_m: distance,
+      distance_m: distanceCategory ? 0 : distance,
+      distance_category: distanceCategory,
       rounds_per_shooter: shots,
       time_limit_seconds: timeLimit,
       strings_count: strings,
@@ -202,7 +207,7 @@ export function DrillCreator({
             name: name.trim() || 'New Drill',
             drill_goal: drillGoal,
             target_type: targetType,
-            distance_m: distance,
+            distance_m: distanceCategory ? 0 : distance,
             rounds_per_shooter: shots,
             time_limit_seconds: timeLimit || undefined,
             strings_count: strings,
@@ -223,7 +228,8 @@ export function DrillCreator({
         target_type: targetType,
         description: undefined,
         input_method: inputMethod,
-        distance_m: distance,
+        distance_m: distanceCategory ? 0 : distance,
+        distance_category: distanceCategory,
         rounds_per_shooter: shots,
         time_limit_seconds: timeLimit || undefined,
         strings_count: strings,
@@ -239,6 +245,7 @@ export function DrillCreator({
     drillGoal,
     targetType,
     distance,
+    distanceCategory,
     shots,
     timeLimit,
     strings,
@@ -300,6 +307,7 @@ export function DrillCreator({
             drillGoal={drillGoal}
             targetType={targetType}
             distance={distance}
+            distanceCategory={distanceCategory}
             shots={shots}
             timeLimit={timeLimit}
             strings={strings}
@@ -313,6 +321,7 @@ export function DrillCreator({
             onDrillGoalChange={setDrillGoal}
             onTargetTypeChange={setTargetType}
             onDistanceChange={setDistance}
+            onDistanceCategoryChange={setDistanceCategory}
             onShotsChange={setShots}
             onTimeLimitChange={setTimeLimit}
             onStringsChange={setStrings}
@@ -511,6 +520,7 @@ function ConfigureStep({
   drillGoal,
   targetType,
   distance,
+  distanceCategory,
   shots,
   timeLimit,
   strings,
@@ -524,6 +534,7 @@ function ConfigureStep({
   onDrillGoalChange,
   onTargetTypeChange,
   onDistanceChange,
+  onDistanceCategoryChange,
   onShotsChange,
   onTimeLimitChange,
   onStringsChange,
@@ -541,6 +552,7 @@ function ConfigureStep({
   drillGoal: DrillGoal;
   targetType: 'paper' | 'tactical';
   distance: number;
+  distanceCategory: RangeCategory | null;
   shots: number;
   timeLimit: number | null;
   strings: number;
@@ -554,6 +566,7 @@ function ConfigureStep({
   onDrillGoalChange: (g: DrillGoal) => void;
   onTargetTypeChange: (t: 'paper' | 'tactical') => void;
   onDistanceChange: (d: number) => void;
+  onDistanceCategoryChange: (c: RangeCategory | null) => void;
   onShotsChange: (s: number) => void;
   onTimeLimitChange: (t: number | null) => void;
   onStringsChange: (s: number) => void;
@@ -673,51 +686,110 @@ function ConfigureStep({
           <View style={styles.sectionHeader}>
             <MapPin size={14} color={colors.textMuted} />
             <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>Distance</Text>
-            <Text style={[styles.sectionValue, { color: colors.text }]}>{distance}m</Text>
+            <Text style={[styles.sectionValue, { color: colors.text }]}>
+              {distanceCategory
+                ? `${distanceCategory === 'short' ? 'Short (0-300m)' : distanceCategory === 'medium' ? 'Medium (300-600m)' : 'Long (600m+)'}`
+                : `${distance}m`}
+            </Text>
           </View>
+          {/* Row 1: Mode toggle */}
           <View style={styles.chipRow}>
-            {DISTANCE_PRESETS.map((val) => (
-              <TouchableOpacity
-                key={val}
-                style={[
-                  styles.chip,
-                  {
-                    backgroundColor: distance === val && !customDistance ? colors.text : 'transparent',
-                    borderColor: distance === val && !customDistance ? colors.text : colors.border,
-                  },
-                ]}
-                onPress={() => {
-                  Haptics.selectionAsync();
-                  onDistanceChange(val);
-                  onCustomDistanceChange('');
-                }}
-              >
-                <Text
-                  style={[
-                    styles.chipText,
-                    { color: distance === val && !customDistance ? colors.background : colors.text },
-                  ]}
-                >
-                  {val}m
-                </Text>
-              </TouchableOpacity>
-            ))}
-            <TextInput
+            <TouchableOpacity
               style={[
-                styles.customInput,
+                styles.chip,
                 {
-                  backgroundColor: customDistance ? colors.text : colors.card,
-                  borderColor: customDistance ? colors.text : colors.border,
-                  color: customDistance ? colors.background : colors.text,
+                  backgroundColor: !distanceCategory ? colors.text : 'transparent',
+                  borderColor: !distanceCategory ? colors.text : colors.border,
                 },
               ]}
-              placeholder="..."
-              placeholderTextColor={colors.textMuted}
-              keyboardType="number-pad"
-              value={customDistance}
-              onChangeText={onCustomDistanceChange}
-            />
+              onPress={() => {
+                Haptics.selectionAsync();
+                onDistanceCategoryChange(null);
+              }}
+            >
+              <Text style={[styles.chipText, { color: !distanceCategory ? colors.background : colors.text }]}>
+                Exact
+              </Text>
+            </TouchableOpacity>
+            {RANGE_CATEGORIES.map((cat) => {
+              const isSelected = distanceCategory === cat.value;
+              const desc = cat.max ? `${cat.min}-${cat.max}m` : `${cat.min}m+`;
+              const label = cat.value === 'short' ? 'Short' : cat.value === 'medium' ? 'Medium' : 'Long';
+              return (
+                <TouchableOpacity
+                  key={cat.value}
+                  style={[
+                    styles.chip,
+                    {
+                      backgroundColor: isSelected ? colors.text : 'transparent',
+                      borderColor: isSelected ? colors.text : colors.border,
+                    },
+                  ]}
+                  onPress={() => {
+                    Haptics.selectionAsync();
+                    onDistanceCategoryChange(cat.value);
+                    onCustomDistanceChange('');
+                  }}
+                >
+                  <Text style={[styles.chipText, { color: isSelected ? colors.background : colors.text }]}>
+                    {label} ({desc})
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
+          {/* Row 2: Exact presets (only when Exact mode) */}
+          {!distanceCategory && (
+            <View style={styles.chipRow}>
+              {DISTANCE_PRESETS.map((val) => (
+                <TouchableOpacity
+                  key={val}
+                  style={[
+                    styles.chip,
+                    {
+                      backgroundColor: distance === val && !customDistance ? colors.text : 'transparent',
+                      borderColor: distance === val && !customDistance ? colors.text : colors.border,
+                    },
+                  ]}
+                  onPress={() => {
+                    Haptics.selectionAsync();
+                    onDistanceChange(val);
+                    onDistanceCategoryChange(null);
+                    onCustomDistanceChange('');
+                  }}
+                >
+                  <Text
+                    style={[
+                      styles.chipText,
+                      { color: distance === val && !customDistance ? colors.background : colors.text },
+                    ]}
+                  >
+                    {val}m
+                  </Text>
+                </TouchableOpacity>
+              ))}
+              <TextInput
+                style={[
+                  styles.customInput,
+                  {
+                    backgroundColor: customDistance ? colors.text : colors.card,
+                    borderColor: customDistance ? colors.text : colors.border,
+                    color: customDistance ? colors.background : colors.text,
+                  },
+                ]}
+                placeholder="..."
+                placeholderTextColor={colors.textMuted}
+                keyboardType="number-pad"
+                value={customDistance}
+                onChangeText={onCustomDistanceChange}
+              />
+            </View>
+          )}
+          {distanceCategory && (
+            <Text style={[styles.sectionHint, { color: colors.textMuted }]}>
+              Soldier picks exact distance within this range
+            </Text>
+          )}
         </View>
 
         {/* Shots */}

@@ -9,7 +9,8 @@
  * Uses source filters instead of separate routes.
  */
 
-import { CreateWeaponFlow, WeaponPicker } from '@/components/weapons';
+import { CreateWeaponFlow } from '@/components/weapons/CreateWeaponFlow';
+import { WeaponPicker } from '@/components/weapons/WeaponPicker';
 import { getCategoryConfig } from '@/constants/weaponCategories';
 import { useColors } from '@/hooks/ui/useColors';
 import {

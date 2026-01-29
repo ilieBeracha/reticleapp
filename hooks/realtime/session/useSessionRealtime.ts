@@ -21,9 +21,9 @@
  */
 
 import { useCallback, useMemo } from 'react';
-import { useRealtimeChannel } from '../core';
-import type { ChangePayload } from '../table';
-import type { SessionRecord, SessionTargetRecord } from '../records';
+import { useRealtimeChannel } from '../core/channel';
+import type { ChangePayload } from '../table/table.types';
+import type { SessionRecord, SessionTargetRecord } from '../records/session';
 import type { UseSessionRealtimeOptions, UseSessionRealtimeReturn } from './session.types';
 
 export function useSessionRealtime(options: UseSessionRealtimeOptions): UseSessionRealtimeReturn {

@@ -4,12 +4,12 @@
  * Shows session summary, stats, and image previews.
  * Opens as a formSheet modal above tabs.
  */
-import { useSessionTimeline } from '@/components/session';
+import { useSessionTimeline } from '@/components/session/useSessionTimeline';
 import { WeatherStrip } from '@/components/session/WeatherDisplay';
-import { isEngagementPaper, isGroupingPaper, isPaperTarget } from '@/constants';
+import { isEngagementPaper, isGroupingPaper, isPaperTarget } from '@/constants/drill';
 import { useAuth } from '@/contexts/AuthContext';
 import { useColors } from '@/hooks/ui/useColors';
-import { getSessionInsights, triggerInsightGeneration, type SessionInsight } from '@/services/insights';
+import { getSessionInsights, triggerInsightGeneration, type SessionInsight } from '@/services/insights/insightService';
 import type { ShotDetail } from '@/services/session/timelineService';
 import type { DecodedWeather } from '@/services/session/watchTypes';
 import {

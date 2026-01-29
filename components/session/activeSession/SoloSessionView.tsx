@@ -12,10 +12,10 @@
 import { TargetCard } from '@/components/session/TargetCard';
 import { WeatherStrip } from '@/components/session/WeatherDisplay';
 import { useColors } from '@/hooks/ui/useColors';
-import { useTranslation } from 'react-i18next';
 import type { SessionDrillConfig, SessionWithDetails } from '@/services/session/types';
 import { isGroupingSession } from '@/utils/drillGoal';
 import { Camera, Check, Crosshair, Square, Target, X } from 'lucide-react-native';
+import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { EdgeInsets } from 'react-native-safe-area-context';
@@ -23,7 +23,9 @@ import { COLORS } from './activeSession.constants';
 import { formatTime } from './activeSession.helpers';
 import { styles as sharedStyles } from './activeSession.styles';
 import type { DrillProgress, WatchState } from './activeSession.types';
-import { CompactStats, DrillBanner, HeroTarget } from './components';
+import { CompactStats } from './components/CompactStats';
+import { DrillBanner } from './components/DrillBanner';
+import { HeroTarget } from './components/HeroTarget';
 
 interface SoloSessionViewProps {
   session: SessionWithDetails;
@@ -118,7 +120,9 @@ export function SoloSessionView({
           {weatherLoading ? (
             <View style={[styles.weatherLoading, { backgroundColor: colors.card }]}>
               <ActivityIndicator size="small" color={colors.textMuted} />
-              <Text style={[styles.weatherLoadingText, { color: colors.textMuted }]}>{t('session.loadingWeather')}</Text>
+              <Text style={[styles.weatherLoadingText, { color: colors.textMuted }]}>
+                {t('session.loadingWeather')}
+              </Text>
             </View>
           ) : weatherError ? (
             <View style={[styles.weatherLoading, { backgroundColor: colors.card }]}>
@@ -133,6 +137,7 @@ export function SoloSessionView({
       {/* Drill Banner */}
       {hasDrill && drill && (
         <DrillBanner
+          session={session}
           drill={drill}
           drillProgress={drillProgress}
           targets={targets}

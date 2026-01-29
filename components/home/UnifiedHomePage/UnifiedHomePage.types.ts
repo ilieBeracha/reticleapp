@@ -1,10 +1,11 @@
 /**
  * UnifiedHomePage Types
- * 
+ *
  * Type definitions for the unified home page components.
  */
 
 import type { useColors } from '@/hooks/ui/useColors';
+import type { SessionWithDetails } from '@/services/session/types';
 import type { UserWeapon, WeaponStats } from '@/services/weaponService';
 import type { TrainingWithDetails } from '@/types/workspace';
 import type { HomeSession } from '../types';
@@ -40,6 +41,8 @@ export interface WeeklyStatsCardProps {
   stats: WeeklyStats;
   streak: number;
   colors: Colors;
+  /** Raw sessions (used for mode/weapon filtering inside the card) */
+  sessionsData: SessionWithDetails[];
 }
 
 /** Props for ActiveSessionCard */
@@ -47,14 +50,6 @@ export interface ActiveSessionCardProps {
   session: HomeSession;
   colors: Colors;
   onPress: () => void;
-}
-
-/** Props for StartPracticeCard */
-export interface StartPracticeCardProps {
-  colors: Colors;
-  onPress: () => void;
-  starting: boolean;
-  lastSessionDaysAgo: number | null;
 }
 
 /** Props for TeamTrainingCard */
@@ -125,4 +120,3 @@ export interface RecentActivitySectionProps {
   colors: Colors;
   onSessionPress: (session: HomeSession) => void;
 }
-

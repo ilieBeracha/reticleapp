@@ -2,6 +2,7 @@
  * Type definitions for Create Training Screen
  */
 
+import type { RangeCategory } from '@/constants/drill';
 import type {
   CreateTrainingDrillInput,
   Drill,
@@ -21,6 +22,7 @@ export interface DrillFormData {
   target_type: TargetType;
   input_method: 'scan' | 'manual';
   distance_m: number;
+  distance_category?: RangeCategory | null;
   rounds_per_shooter: number;
   strings_count: number;
   time_limit_seconds: number | null;
@@ -37,6 +39,7 @@ export interface TrainingDrillItem extends CreateTrainingDrillInput {
 // ============================================================================
 export interface NewDrillInstanceConfig {
   distance_m: number;
+  distance_category?: RangeCategory | null;
   rounds_per_shooter: number;
   time_limit_seconds: number | null;
   strings_count: number;

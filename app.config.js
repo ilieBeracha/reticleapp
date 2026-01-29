@@ -53,7 +53,6 @@ export default ({ config }) => {
       },
     },
     android: {
-      versionCode: 5,
       adaptiveIcon: {
         backgroundColor: '#E6F4FE',
         foregroundImage: './assets/images/ios.png',

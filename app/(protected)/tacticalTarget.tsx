@@ -1,4 +1,4 @@
-import { TacticalTargetFlow } from '@/components/targets';
+import { TacticalTargetFlow } from '@/components/targets/TacticalTargetFlow';
 import { useLocalSearchParams } from 'expo-router';
 
 /**

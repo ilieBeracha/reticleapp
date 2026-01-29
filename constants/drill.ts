@@ -130,3 +130,21 @@ export const DRILL_DEFAULTS = {
   STRINGS_COUNT: 1,
   TARGET_COUNT: 1,
 } as const;
+
+// =============================================================================
+// RANGE CATEGORIES
+// =============================================================================
+
+export const RANGE_CATEGORY = {
+  SHORT: 'short',
+  MEDIUM: 'medium',
+  LONG: 'long',
+} as const;
+
+export type RangeCategory = (typeof RANGE_CATEGORY)[keyof typeof RANGE_CATEGORY];
+
+export const RANGE_CATEGORIES: { value: RangeCategory; min: number; max: number | null }[] = [
+  { value: 'short', min: 0, max: 300 },
+  { value: 'medium', min: 300, max: 600 },
+  { value: 'long', min: 600, max: null },
+];

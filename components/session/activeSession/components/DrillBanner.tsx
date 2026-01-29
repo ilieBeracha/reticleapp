@@ -6,16 +6,17 @@
  */
 
 import { useColors } from '@/hooks/ui/useColors';
-import type { SessionDrillConfig } from '@/services/session/types';
+import type { SessionDrillConfig, SessionWithDetails } from '@/services/session/types';
 import { formatMaxShots } from '@/utils/drillShots';
-import { useTranslation } from 'react-i18next';
 import { Camera, Check, Clock, Focus, Lock, MapPin, Target, Trophy, Zap } from 'lucide-react-native';
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, View } from 'react-native';
 import { COLORS } from '../activeSession.constants';
-import { formatTime } from '../activeSession.helpers';
+import { formatDistanceDisplay, formatTime } from '../activeSession.helpers';
 import type { DrillProgress } from '../activeSession.types';
 
 interface DrillBannerProps {
+  session: SessionWithDetails;
   drill: SessionDrillConfig;
   drillProgress: DrillProgress | null;
   targets: any[];
@@ -26,6 +27,7 @@ interface DrillBannerProps {
 }
 
 export function DrillBanner({
+  session,
   drill,
   drillProgress,
   targets,
@@ -41,9 +43,7 @@ export function DrillBanner({
     <View style={styles.container}>
       <View style={[styles.inner, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <View style={styles.infoRow}>
-          <View
-            style={[styles.typeIcon, { backgroundColor: isLocked ? colors.primary + '20' : colors.secondary }]}
-          >
+          <View style={[styles.typeIcon, { backgroundColor: isLocked ? colors.primary + '20' : colors.secondary }]}>
             {isLocked ? (
               <Lock size={16} color={colors.primary} />
             ) : isGroupingDrill ? (
@@ -62,14 +62,21 @@ export function DrillBanner({
               )}
               <View style={styles.reqItem}>
                 <MapPin size={12} color={colors.textMuted} />
-                <Text style={[styles.reqText, { color: colors.text }]}>{drill.distance_m}m</Text>
+                <Text style={[styles.reqText, { color: colors.text }]}>
+                  {/* Soldier's choice first, then commander's distance/category */}
+                  {session.soldier_distance_m
+                    ? `${session.soldier_distance_m}m`
+                    : formatDistanceDisplay(drill.distance_m, drill.distance_category, t)}
+                </Text>
               </View>
               <View style={styles.reqItem}>
                 {isTacticalDrill ? (
                   <>
                     <Zap size={12} color={colors.textMuted} />
                     <Text style={[styles.reqText, { color: colors.text }]}>
-                      {t('session.shotsPerRound', { shots: drillProgress?.bulletsPerRound ?? drill.rounds_per_shooter })}
+                      {t('session.shotsPerRound', {
+                        shots: drillProgress?.bulletsPerRound ?? drill.rounds_per_shooter,
+                      })}
                     </Text>
                   </>
                 ) : (

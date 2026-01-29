@@ -5,11 +5,11 @@
  */
 
 import { useColors } from '@/hooks/ui/useColors';
-import { useTranslation } from 'react-i18next';
 import type { DrillGoal } from '@/types/workspace';
 import * as Haptics from 'expo-haptics';
 import { Crosshair, Plus, Target } from 'lucide-react-native';
 import { useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 // ============================================================================

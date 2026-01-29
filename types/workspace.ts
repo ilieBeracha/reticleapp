@@ -3,6 +3,8 @@
 // Users create and manage teams directly
 // =====================================================
 
+import type { RangeCategory } from '@/constants/drill';
+import type { TeamSpecialty } from '@/constants/teamSpecialties';
 import type { WeaponPolicy } from '@/constants/weaponPolicy';
 
 export type TeamRole = 'owner' | 'commander' | 'squad_commander' | 'soldier';
@@ -13,14 +15,15 @@ export interface Team {
   name: string;
   description?: string | null;
   team_type?: TeamType | null;
-  squads?: string[];  // Array of squad names (e.g. ["Alpha", "Bravo", "Charlie"])
-  weapon_policy?: WeaponPolicy | null;  // Team weapon access policy
+  specialty?: TeamSpecialty | null; // Team's primary training focus (sniper, tactical, etc.)
+  squads?: string[]; // Array of squad names (e.g. ["Alpha", "Bravo", "Charlie"])
+  weapon_policy?: WeaponPolicy | null; // Team weapon access policy
   created_by: string;
   created_at: string;
   updated_at: string;
 }
 
-export type TeamType = "field" | "back_office";
+export type TeamType = 'field' | 'back_office';
 
 // Team with user's role in it
 export interface TeamWithRole extends Team {
@@ -38,7 +41,7 @@ export interface TeamMember {
     role: TeamRole;
     squad_id?: string;
   };
-  details?: { squad_id?: string };  // Squad assignment from team's squads array
+  details?: { squad_id?: string }; // Squad assignment from team's squads array
   joined_at: string;
 }
 
@@ -68,7 +71,7 @@ export interface TeamInvitation {
   id: string;
   team_id: string;
   invite_code: string;
-  role: TeamRole;  // Team role to be assigned
+  role: TeamRole; // Team role to be assigned
   details?: Record<string, any> | null;
   status: InvitationStatus;
   invited_by: string;
@@ -96,10 +99,10 @@ export type TargetType = 'paper' | 'tactical';
 
 /**
  * DrillGoal - Primary classification for drills/sessions
- * 
+ *
  * This is the SINGLE SOURCE OF TRUTH for drill goal types.
  * Import this type everywhere instead of defining locally.
- * 
+ *
  * Values:
  * - 'grouping': Measure shot consistency/dispersion (scan-only, no hit %)
  * - 'engagement': Measure accuracy/hits (scan OR manual, tracks hit %)
@@ -120,7 +123,14 @@ export type ScoringMode = 'accuracy' | 'speed' | 'combined' | 'pass_fail' | 'poi
 export type DrillDifficulty = 'beginner' | 'intermediate' | 'advanced' | 'expert';
 
 /** @deprecated Removed - use tags if needed */
-export type DrillCategory = 'fundamentals' | 'speed' | 'accuracy' | 'stress' | 'tactical' | 'competition' | 'qualification';
+export type DrillCategory =
+  | 'fundamentals'
+  | 'speed'
+  | 'accuracy'
+  | 'stress'
+  | 'tactical'
+  | 'competition'
+  | 'qualification';
 
 /** @deprecated Simplified - just use freestyle/any */
 export type ShootingPosition = 'standing' | 'kneeling' | 'prone' | 'sitting' | 'barricade' | 'transition' | 'freestyle';
@@ -129,7 +139,7 @@ export type ShootingPosition = 'standing' | 'kneeling' | 'prone' | 'sitting' | '
 export type StartPosition = 'holstered' | 'low_ready' | 'high_ready' | 'table_start' | 'surrender' | 'compressed_ready';
 
 /** @deprecated Removed - weapon is implicit */
-export type WeaponCategory = 'rifle' | 'pistol' | 'shotgun' | 'carbine' | 'precision_rifle' | 'any';
+export type WeaponCategory = 'rifle' | 'pistol' | 'shotgun' | 'carbine' | 'precision_rifle' | 'smg' | 'other' | 'any';
 
 /** @deprecated Removed */
 export type TargetSize = 'full' | 'half' | 'head' | 'a_zone' | 'c_zone' | 'steel_8in' | 'steel_10in' | 'custom';
@@ -172,11 +182,11 @@ export interface TrainingWithDetails extends Training {
 
 /**
  * TrainingDrill - Individual drill instance within a training.
- * 
+ *
  * NEW ARCHITECTURE:
  * - drill_id: Reference to the source Drill definition (static properties)
  * - Instance fields: Variable properties configured for this training
- * 
+ *
  * LEGACY:
  * - drill_template_id: Old reference (deprecated, use drill_id)
  * - Inline fields: All fields present for backwards compatibility
@@ -185,33 +195,35 @@ export interface TrainingDrill {
   id: string;
   training_id: string;
   order_index: number;
-  
+
   // === DRILL REFERENCE (NEW) ===
-  drill_id?: string | null;                // Reference to source Drill
-  
+  drill_id?: string | null; // Reference to source Drill
+
   // === LEGACY REFERENCE ===
   /** @deprecated Use drill_id */
   drill_template_id?: string | null;
-  
+
   // === INLINE DRILL DATA (from linked drill or legacy) ===
   name: string;
   description?: string | null;
   drill_goal: DrillGoal;
   target_type: TargetType;
-  
+
   // === EXECUTION POLICY ===
   /** How strictly soldiers must follow this config */
   execution_policy?: 'locked' | 'guided' | 'free' | null;
-  
+
   // === ENGAGEMENT MODE ===
   /** How the drill should be executed:
    * 'solo' = individual execution only (required for grouping)
    * 'squad' = squad participation allowed (engagement only) */
   engagement_mode?: 'solo' | 'squad' | null;
-  
+
   // === INSTANCE CONFIGURATION (variable per training) ===
   /** Distance in meters. Null = soldier chooses at execution time */
   distance_m?: number | null;
+  /** Range category (short/medium/long). Soldier picks exact distance within range */
+  distance_category?: RangeCategory | null;
   /** Rounds per shooter. Null = soldier chooses at execution time */
   rounds_per_shooter?: number | null;
   time_limit_seconds?: number | null;
@@ -225,9 +237,9 @@ export interface TrainingDrill {
   movement_distance_m?: number | null;
 
   // === INSTANCE-SPECIFIC ===
-  instance_notes?: string | null;          // Notes specific to this training
-  notes?: string | null;                   // Legacy notes field
-  
+  instance_notes?: string | null; // Notes specific to this training
+  notes?: string | null; // Legacy notes field
+
   // === STATIC FIELDS (from linked drill or legacy inline) ===
   scoring_mode?: ScoringMode | null;
   points_per_hit?: number | null;
@@ -244,7 +256,7 @@ export interface TrainingDrill {
   diagram_url?: string | null;
   video_url?: string | null;
   safety_notes?: string | null;
-  
+
   created_at: string;
 }
 
@@ -262,31 +274,31 @@ export interface CreateTrainingInput {
 
 /**
  * Input for adding a drill instance to a training.
- * 
+ *
  * NEW ARCHITECTURE:
  * - Provide drill_id to link to an existing Drill definition
  * - Instance fields (distance, shots, time) are configured here
- * 
+ *
  * LEGACY:
  * - All fields inline for backwards compatibility
  */
 export interface CreateTrainingDrillInput {
   // === DRILL REFERENCE (preferred) ===
-  drill_id?: string;                      // Reference to source Drill
-  
+  drill_id?: string; // Reference to source Drill
+
   // === LEGACY REFERENCE ===
   /** @deprecated Use drill_id */
   drill_template_id?: string;
-  
+
   // === INLINE DRILL DATA (required if no drill_id) ===
   name: string;
   drill_goal: DrillGoal;
   target_type: TargetType;
   description?: string;
-  
+
   // === ENTRY METHOD (commander chooses in advance) ===
-  input_method?: 'scan' | 'manual';       // How results are entered: scan (camera) or manual
-  
+  input_method?: 'scan' | 'manual'; // How results are entered: scan (camera) or manual
+
   // === EXECUTION POLICY ===
   /** How strictly soldiers must follow this drill config:
    * 'locked' = must execute exactly as defined (qualification, assessment)
@@ -294,17 +306,19 @@ export interface CreateTrainingDrillInput {
    * 'free' = drill is label only, full freedom (open practice)
    * Default: 'locked' */
   execution_policy?: 'locked' | 'guided' | 'free';
-  
+
   // === ENGAGEMENT MODE ===
   /** How the drill should be executed:
    * 'solo' = individual execution only (required for grouping)
    * 'squad' = squad participation allowed (engagement only)
    * Default: 'solo' */
   engagement_mode?: 'solo' | 'squad';
-  
+
   // === INSTANCE CONFIGURATION (variable per training) ===
   /** Distance in meters. Null/undefined = soldier chooses at execution time */
   distance_m?: number | null;
+  /** Range category (short/medium/long). Soldier picks exact distance within range */
+  distance_category?: RangeCategory | null;
   /** Rounds per shooter. Null/undefined = soldier chooses at execution time */
   rounds_per_shooter?: number | null;
   time_limit_seconds?: number;
@@ -316,11 +330,11 @@ export interface CreateTrainingDrillInput {
   target_size?: TargetSize;
   target_exposure_seconds?: number;
   movement_distance_m?: number;
-  
+
   // === INSTANCE-SPECIFIC ===
   instance_notes?: string;
-  notes?: string;                         // Legacy
-  
+  notes?: string; // Legacy
+
   // === STATIC FIELDS (from linked drill or inline) ===
   scoring_mode?: ScoringMode;
   points_per_hit?: number;
@@ -365,7 +379,7 @@ export type DrillOwnerType = 'user' | 'team';
  * OWNERSHIP MODEL:
  * - owner_type: 'user' = personal preset (owner_id = user_id)
  * - owner_type: 'team' = team drill (owner_id = team_id)
- * 
+ *
  * ESSENTIAL PROPERTIES:
  * - name, goal, target_type (what kind of drill)
  * - distance, shots, time_limit, strings (how to run it)
@@ -375,24 +389,24 @@ export interface Drill {
   created_by: string;
 
   // === OWNERSHIP (NEW: unified model) ===
-  owner_type: DrillOwnerType;            // 'user' = personal preset, 'team' = team drill
-  owner_id: string;                       // user_id OR team_id based on owner_type
-  
+  owner_type: DrillOwnerType; // 'user' = personal preset, 'team' = team drill
+  owner_id: string; // user_id OR team_id based on owner_type
+
   /** @deprecated Use owner_id with owner_type='team' instead */
-  team_id?: string;                       // Kept for backwards compatibility
+  team_id?: string; // Kept for backwards compatibility
 
   // === ESSENTIAL ===
   name: string;
   description?: string | null;
-  drill_goal: DrillGoal;                 // grouping vs achievement
-  target_type: TargetType;               // paper vs tactical
-  is_default?: boolean;                  // True for Quick Start default drill
+  drill_goal: DrillGoal; // grouping vs achievement
+  target_type: TargetType; // paper vs tactical
+  is_default?: boolean; // True for Quick Start default drill
 
   // === DEFAULTS FOR INSTANCES ===
-  distance_m: number;                    // Default distance in meters
-  rounds_per_shooter: number;            // Default shots per run
-  time_limit_seconds?: number | null;    // Optional time limit
-  strings_count?: number | null;         // Rounds/repetitions (default 1)
+  distance_m: number; // Default distance in meters
+  rounds_per_shooter: number; // Default shots per run
+  time_limit_seconds?: number | null; // Optional time limit
+  strings_count?: number | null; // Rounds/repetitions (default 1)
 
   // === LEGACY FIELDS (kept for backwards compatibility) ===
   /** @deprecated */ icon?: string | null;
@@ -429,7 +443,7 @@ export interface Drill {
   /** @deprecated */ default_movement_distance_m?: number | null;
   /** @deprecated */ diagram_url?: string | null;
   /** @deprecated */ video_url?: string | null;
-  
+
   created_at: string;
   updated_at: string;
 }
@@ -439,11 +453,12 @@ export interface Drill {
  * SIMPLIFIED: Only essential run-time properties.
  */
 export interface DrillInstanceConfig {
-  distance_m: number;                    // Distance in meters
-  rounds_per_shooter: number;            // Shots per entry
-  time_limit_seconds?: number | null;    // Max time allowed
-  strings_count?: number | null;         // Number of rounds (default 1)
-  input_method?: 'scan' | 'manual';      // How results are entered (commander choice)
+  distance_m: number; // Distance in meters
+  distance_category?: RangeCategory | null; // Range category (short/medium/long)
+  rounds_per_shooter: number; // Shots per entry
+  time_limit_seconds?: number | null; // Max time allowed
+  strings_count?: number | null; // Number of rounds (default 1)
+  input_method?: 'scan' | 'manual'; // How results are entered (commander choice)
 
   // Legacy (kept for backwards compatibility)
   /** @deprecated */ par_time_seconds?: number | null;
@@ -457,7 +472,7 @@ export interface DrillInstanceConfig {
 
 /**
  * Training Drill Instance - Links a drill to a training with instance config.
- * 
+ *
  * This is the junction table entry that combines:
  * - Reference to the source Drill (static definition)
  * - Instance-specific configuration (variable per training)
@@ -466,14 +481,14 @@ export interface DrillInstanceConfig {
 export interface TrainingDrillInstance extends DrillInstanceConfig {
   id: string;
   training_id: string;
-  drill_id?: string | null;              // Reference to source Drill (null for legacy inline)
+  drill_id?: string | null; // Reference to source Drill (null for legacy inline)
   order_index: number;
-  
+
   // === INLINE DRILL DATA (for display, copied from drill or legacy) ===
   name: string;
   drill_goal: DrillGoal;
   target_type: TargetType;
-  
+
   // Optional static fields (from linked drill or legacy inline)
   scoring_mode?: ScoringMode | null;
   position?: ShootingPosition | null;
@@ -490,16 +505,16 @@ export interface TrainingDrillInstance extends DrillInstanceConfig {
   safety_notes?: string | null;
   points_per_hit?: number | null;
   penalty_per_miss?: number | null;
-  
+
   // === INSTANCE-SPECIFIC ===
-  instance_notes?: string | null;        // Notes specific to this training
-  description?: string | null;           // Legacy notes field
-  
+  instance_notes?: string | null; // Notes specific to this training
+  description?: string | null; // Legacy notes field
+
   // === LEGACY ===
   /** @deprecated Use drill_id */
   drill_template_id?: string | null;
   notes?: string | null;
-  
+
   created_at: string;
 }
 
@@ -552,14 +567,13 @@ export interface CreateDrillInput {
  * Input for creating a drill instance within a training
  */
 export interface CreateDrillInstanceInput extends DrillInstanceConfig {
-  drill_id?: string;                     // Reference to source Drill (optional for inline)
-  
+  drill_id?: string; // Reference to source Drill (optional for inline)
+
   // === INLINE FIELDS (required if no drill_id) ===
   name?: string;
   drill_goal?: DrillGoal;
   target_type?: TargetType;
-  
+
   // === INSTANCE-SPECIFIC ===
   instance_notes?: string;
 }
-

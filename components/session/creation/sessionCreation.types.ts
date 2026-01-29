@@ -50,6 +50,9 @@ export type Position = 'standing' | 'kneeling' | 'prone' | 'seated' | 'supported
 export type TargetType = 'paper' | 'tactical' | 'steel' | 'ipsc';
 export type TimeOfDay = 'day' | 'night';
 
+/** Range category for distance selection */
+export type RangeCategory = 'short' | 'medium' | 'long';
+
 export interface SessionContextState {
   // Required
   weaponId: string | null;
@@ -57,6 +60,8 @@ export interface SessionContextState {
   /** Weapon category - shapes the entire experience */
   weaponCategory: string | null;
   distance: number;
+  /** Range category (short/medium/long) - soldier picks exact distance within range */
+  distanceCategory: RangeCategory | null;
 
   // Common
   position: Position;
@@ -117,6 +122,7 @@ export const DEFAULT_CONTEXT: SessionContextState = {
   weaponName: null,
   weaponCategory: null,
   distance: 25,
+  distanceCategory: null,
   position: 'any',
   targetType: 'paper',
   shotsPlanned: 5,

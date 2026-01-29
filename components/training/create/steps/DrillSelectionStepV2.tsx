@@ -19,8 +19,8 @@ import type {
   ShootingPosition,
   TeamDrillPreset,
   TrainingDrillItem,
-} from '@/services/drills';
-import { buildTrainingDrillItem, validateDrillConfig } from '@/services/drills';
+} from '@/services/drills/drillService';
+import { buildTrainingDrillItem, validateDrillConfig } from '@/services/drills/drillService';
 import { useTranslation } from 'react-i18next';
 import * as Haptics from 'expo-haptics';
 import { Check, Focus, Plus, Save, Star, Target, Trophy, X, Zap } from 'lucide-react-native';

@@ -5,10 +5,11 @@
  * sessions, accuracy, best group, rounds, and last-used recency.
  */
 
+import { DirectionalChevron } from '@/components/shared/DirectionalChevron';
 import type { UserWeapon, WeaponStats } from '@/services/weaponService';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
-import { ChevronRight, Crosshair, Minus, TrendingDown, TrendingUp } from 'lucide-react-native';
+import { Crosshair, Minus, TrendingDown, TrendingUp } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
@@ -121,7 +122,7 @@ export function WeaponPerformanceCard({ weapon, stats, colors }: WeaponPerforman
         {/* Footer link */}
         <View style={s.footer}>
           <Text style={[s.footerText, { color: colors.primary }]}>{t('common.viewDetails')}</Text>
-          <ChevronRight size={13} color={colors.primary} />
+          <DirectionalChevron size={13} color={colors.primary} />
         </View>
       </TouchableOpacity>
     </Animated.View>

@@ -26,7 +26,7 @@ import type {
   ContextProfile,
   ContextQuadrant,
 } from '../insights.types';
-import { ContextProfileRow } from '../components';
+import { ContextProfileRow } from '../components/ContextProfileRow';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);

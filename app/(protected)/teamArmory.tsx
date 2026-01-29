@@ -6,8 +6,10 @@
  * - Soldier: View assignment, pool weapons, request weapon
  */
 
-import { ApproveRequestModal, RequestWeaponModal } from '@/components/weapons';
-import { useWeaponRealtime, type WeaponRequestRecord } from '@/hooks/realtime';
+import { ApproveRequestModal } from '@/components/weapons/ApproveRequestModal';
+import { RequestWeaponModal } from '@/components/weapons/RequestWeaponModal';
+import { useWeaponRealtime } from '@/hooks/realtime/weapon/useWeaponRealtime';
+import type { WeaponRequestRecord } from '@/hooks/realtime/records/weapon';
 import { useColors } from '@/hooks/ui/useColors';
 import { notifyWeaponRequested } from '@/services/notifications';
 import { getTeamMembers } from '@/services/teamService';

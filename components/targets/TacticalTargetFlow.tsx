@@ -1,4 +1,4 @@
-import { PAPER_TYPE } from '@/constants';
+import { PAPER_TYPE } from '@/constants/drill';
 import { addTargetWithPaperResult, addTargetWithTacticalResult } from '@/services/sessionService';
 import { BUTTON_GRADIENT, BUTTON_GRADIENT_DISABLED } from '@/theme/colors';
 import * as Haptics from 'expo-haptics';

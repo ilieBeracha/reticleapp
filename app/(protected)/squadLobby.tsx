@@ -12,8 +12,8 @@
  * /(protected)/squadLobby?engagementId=...
  */
 
-import { InviteParticipantsPanel } from '@/components/session/creation';
-import { useParticipantsRealtime } from '@/hooks/realtime';
+import { InviteParticipantsPanel } from '@/components/session/creation/InviteParticipantsPanel';
+import { useParticipantsRealtime } from '@/hooks/realtime/participants/useParticipantsRealtime';
 import { useColors } from '@/hooks/ui/useColors';
 import { supabase } from '@/lib/supabase';
 import { notifySquadEngagementInvites, notifySquadEngagementStarting } from '@/services/pushService';

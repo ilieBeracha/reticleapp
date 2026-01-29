@@ -7,7 +7,7 @@
  */
 
 import { useAuth } from '@/contexts/AuthContext';
-import { getPersonalizedDailyTip, type PersonalizedTip } from '@/services/insights';
+import { getPersonalizedDailyTip, type PersonalizedTip } from '@/services/insights/insightService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { format } from 'date-fns';
 import * as Haptics from 'expo-haptics';

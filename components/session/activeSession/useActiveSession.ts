@@ -15,36 +15,38 @@ import type { GarminSessionData } from '@/services/garminService';
 
 import { computeSessionScore } from '@/services/session/scoring';
 import {
-  calculateSessionStats,
-  endSession,
-  getSessionById,
-  getSessionTargetsWithResults,
-  saveWatchSessionData,
-  SessionStats,
-  SessionTargetWithResults,
-  SessionWithDetails,
-  updateSession,
+    calculateSessionStats,
+    endSession,
+    getSessionById,
+    getSessionTargetsWithResults,
+    saveWatchSessionData,
+    SessionStats,
+    SessionTargetWithResults,
+    SessionWithDetails,
+    updateSession,
 } from '@/services/sessionService';
 import { useGarminStore, useIsGarminConnected, useSessionStartStatus } from '@/store/garminStore';
 import { useSessionStore } from '@/store/sessionStore';
 import { isGroupingDrill } from '@/utils/drillGoal';
 import { isInfiniteShots } from '@/utils/drillShots';
 
-import { useParticipantsRealtime, useSessionRealtime } from '@/hooks/realtime';
+import { useParticipantsRealtime } from '@/hooks/realtime/participants/useParticipantsRealtime';
+import { useSessionRealtime } from '@/hooks/realtime/session/useSessionRealtime';
 import { completeEngagement, getSessionParticipants } from '@/services/session/participants';
 import type { EngagementParticipant } from '@/services/session/types';
 import { deriveDetectionConfig } from '@/utils/detectionSensitivity';
 import { SHOT_MARKING_ENABLED, TIMER_INTERVAL_MS, VIBRATE_ON_SHOT } from './activeSession.constants';
 import {
-  buildEndSessionMessage,
-  buildWatchSessionPayload,
-  calculateAccuracy,
-  calculateDrillProgress,
-  calculateElapsedSeconds,
-  calculateNextTargetPlan,
-  formatTime,
-  getDefaultDistance,
-  isDrillLimitReached,
+    buildEndSessionMessage,
+    buildWatchSessionPayload,
+    calculateAccuracy,
+    calculateDrillProgress,
+    calculateElapsedSeconds,
+    calculateNextTargetPlan,
+    formatTime,
+    getDefaultDistance,
+    getEffectiveDistance,
+    isDrillLimitReached,
 } from './activeSession.helpers';
 import type { SessionMode, UseActiveSessionParams, UseActiveSessionReturn } from './activeSession.types';
 
@@ -277,7 +279,7 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
   // 'solo' mode allows full control over drill configuration
   const sessionMode: SessionMode = isTeamTraining ? 'training' : 'solo';
   const canEditDrill = !isConfigLocked;
-  
+
   // Locked config - applies when execution policy is 'locked' OR it's team training
   // This enforces the drill's distance/shots in manual entry
   const lockedConfig = isConfigLocked || isTeamTraining ? drill : null;
@@ -611,7 +613,10 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
       }
     }
 
-    const distance = lockedConfig?.distance_m ?? defaultDistance;
+    // Use soldier's choice first, then commander's distance/category, then default
+    const distance =
+      session?.soldier_distance_m ??
+      getEffectiveDistance(lockedConfig?.distance_m, lockedConfig?.distance_category, defaultDistance);
     const maxShots = computeMaxShots(lockedConfig, drill);
 
     router.push({
@@ -622,9 +627,11 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
         ...(lockedConfig ? { locked: '1' } : {}),
         ...(maxShots ? { maxShots } : {}),
         ...(drill?.drill_goal ? { drillGoal: drill.drill_goal } : {}),
+        // Pass distance category so soldier can adjust within range
+        ...(lockedConfig?.distance_category ? { distanceCategory: lockedConfig.distance_category } : {}),
       },
     });
-  }, [sessionId, defaultDistance, hasDrill, drill, nextTargetPlan, lockedConfig]);
+  }, [sessionId, defaultDistance, hasDrill, drill, nextTargetPlan, lockedConfig, session?.soldier_distance_m]);
 
   const handleLogTactical = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -640,13 +647,15 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
       }
     }
 
-    // Use drill config distance, or default
-    const distance = drill?.distance_m ?? defaultDistance;
-    
-    // For ENGAGEMENT drills: pass bullets limit
-    const bulletsForEngagement = !isGrouping && hasDrill
-      ? (nextTargetPlan?.nextBullets || drill?.rounds_per_shooter)
-      : undefined;
+    // Use soldier's choice first, then commander's distance/category, then default
+    const distance =
+      session?.soldier_distance_m ?? getEffectiveDistance(drill?.distance_m, drill?.distance_category, defaultDistance);
+
+    // For ENGAGEMENT drills: pass bullets limit (soldier's choice or commander's setting)
+    const bulletsForEngagement =
+      !isGrouping && hasDrill
+        ? (session?.soldier_bullets ?? nextTargetPlan?.nextBullets ?? drill?.rounds_per_shooter)
+        : undefined;
 
     router.push({
       pathname: '/(protected)/tacticalTarget',
@@ -657,6 +666,8 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
         ...(bulletsForEngagement ? { bullets: String(bulletsForEngagement) } : {}),
         ...(isGrouping ? { isGrouping: '1' } : {}),
         showTimeInput: session?.watch_controlled ? '0' : '1',
+        // Pass distance category so soldier can adjust within range
+        ...(drill?.distance_category ? { distanceCategory: drill.distance_category } : {}),
       },
     });
   }, [
@@ -676,14 +687,13 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
 
     // Use drill config distance, or default
     const distance = drill?.distance_m ?? defaultDistance;
-    
+
     // For ENGAGEMENT drills: pass bullets limit
     // - nextBullets = remaining shots (preferred - respects progress)
     // - rounds_per_shooter = total configured shots (fallback)
     // For GROUPING drills: no bullets limit (user enters shots manually)
-    const bulletsForEngagement = !isGrouping && hasDrill
-      ? (nextTargetPlan?.nextBullets || drill?.rounds_per_shooter)
-      : undefined;
+    const bulletsForEngagement =
+      !isGrouping && hasDrill ? nextTargetPlan?.nextBullets || drill?.rounds_per_shooter : undefined;
 
     router.push({
       pathname: '/(protected)/tacticalTarget',

@@ -18,15 +18,15 @@ import { useCallback, useEffect, useState } from 'react';
 import { Alert, Keyboard } from 'react-native';
 
 import {
-  createTeamPreset,
-  getDrillsGroupedByCategory,
-  getTeamPresets,
-  type CanonicalDrill,
-  type DrillCategory,
-  type DrillConfig,
-  type TeamDrillPreset,
-  type TrainingDrillItem,
-} from '@/services/drills';
+    createTeamPreset,
+    getDrillsGroupedByCategory,
+    getTeamPresets,
+    type CanonicalDrill,
+    type DrillCategory,
+    type DrillConfig,
+    type TeamDrillPreset,
+    type TrainingDrillItem,
+} from '@/services/drills/drillService';
 import { createTraining } from '@/services/trainingService';
 import { useTeamStore } from '@/store/teamStore';
 import { useTrainingStore } from '@/store/trainingStore';
@@ -344,6 +344,7 @@ export function useCreateTrainingV2({ teamIdParam }: UseCreateTrainingV2Params):
         engagement_mode: d.engagement_mode || 'solo',
         // Config values - null means soldier chooses at execution time
         distance_m: d.config.distance_m,
+        distance_category: d.config.distance_category ?? null,
         rounds_per_shooter: d.config.rounds,
         time_limit_seconds: d.config.time_limit_seconds ?? undefined,
         strings_count: d.config.strings_count,

@@ -4,7 +4,7 @@
  * Hook options and return types for session subscriptions.
  */
 
-import type { SessionRecord, SessionTargetRecord } from '../records';
+import type { SessionRecord, SessionTargetRecord } from '../records/session';
 
 export interface UseSessionRealtimeOptions {
   /** Session ID to subscribe to */

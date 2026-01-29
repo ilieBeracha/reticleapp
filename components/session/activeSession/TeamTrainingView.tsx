@@ -10,18 +10,18 @@
 
 import { TargetCard } from '@/components/session/TargetCard';
 import { useColors } from '@/hooks/ui/useColors';
-import { useTranslation } from 'react-i18next';
 import type { SessionDrillConfig, SessionWithDetails } from '@/services/session/types';
 import { isGroupingSession } from '@/utils/drillGoal';
 import { Camera, Check, Crosshair, Lock, MapPin, Square, Target, Zap } from 'lucide-react-native';
+import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { EdgeInsets } from 'react-native-safe-area-context';
 import { COLORS } from './activeSession.constants';
-import { formatTime } from './activeSession.helpers';
+import { formatDistanceDisplay, formatTime } from './activeSession.helpers';
 import { styles as sharedStyles } from './activeSession.styles';
 import type { DrillProgress, WatchState } from './activeSession.types';
-import { HeroTarget } from './components';
+import { HeroTarget } from './components/HeroTarget';
 
 interface TeamTrainingViewProps {
   session: SessionWithDetails;
@@ -109,11 +109,19 @@ export function TeamTrainingView({
             )}
             <View style={styles.param}>
               <MapPin size={14} color={colors.textMuted} />
-              <Text style={[styles.paramText, { color: colors.text }]}>{drill?.distance_m || 25}m</Text>
+              <Text style={[styles.paramText, { color: colors.text }]}>
+                {/* Soldier's choice first, then commander's distance/category */}
+                {session.soldier_distance_m
+                  ? `${session.soldier_distance_m}m`
+                  : formatDistanceDisplay(drill?.distance_m, drill?.distance_category, t)}
+              </Text>
             </View>
             <View style={styles.param}>
               <Zap size={14} color={colors.textMuted} />
-              <Text style={[styles.paramText, { color: colors.text }]}>{drill?.rounds_per_shooter || 5} shots</Text>
+              <Text style={[styles.paramText, { color: colors.text }]}>
+                {/* Soldier's bullets first, then commander's setting */}
+                {session.soldier_bullets ?? drill?.rounds_per_shooter ?? 5} shots
+              </Text>
             </View>
           </View>
 

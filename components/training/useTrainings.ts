@@ -10,7 +10,7 @@ import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import { useTeamRealtime } from '@/hooks/realtime';
+import { useTeamRealtime } from '@/hooks/realtime/team/useTeamRealtime';
 import { getRecentSessionsWithStats } from '@/services/session/queries';
 import { getTeamMembers } from '@/services/teamService';
 import { useTeamContext, useTeamPermissions, useTeamStore } from '@/store/teamStore';

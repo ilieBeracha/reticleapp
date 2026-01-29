@@ -3,6 +3,8 @@
  * No React dependencies, no side effects
  */
 
+import { RANGE_CATEGORIES } from '@/constants/drill';
+import type { RangeCategory } from '@/services/session/types';
 import { deriveDetectionConfig, type DetectionConfig } from '@/utils/detectionSensitivity';
 import { ACCURACY_THRESHOLDS, COLORS } from './activeSession.constants';
 import type { DrillProgress, NextTargetPlan } from './activeSession.types';
@@ -26,6 +28,90 @@ export function formatTime(seconds: number): string {
 export function calculateElapsedSeconds(startedAt: string): number {
   const startTime = new Date(startedAt).getTime();
   return Math.floor((Date.now() - startTime) / 1000);
+}
+
+// ============================================================================
+// DISTANCE FORMATTING
+// ============================================================================
+
+/**
+ * Formats distance display - shows exact meters or range category label
+ * @param distanceM - Exact distance in meters (may be null/0 if using category)
+ * @param distanceCategory - Range category (short/medium/long)
+ * @param t - Translation function (optional, for localized labels)
+ * @returns Formatted distance string
+ */
+export function formatDistanceDisplay(
+  distanceM?: number | null,
+  distanceCategory?: RangeCategory | null,
+  t?: (key: string) => string
+): string {
+  // If we have an exact distance, show it
+  if (distanceM && distanceM > 0) {
+    return `${distanceM}m`;
+  }
+
+  // If we have a range category, show its label
+  if (distanceCategory) {
+    const cat = RANGE_CATEGORIES.find((c) => c.value === distanceCategory);
+    if (cat) {
+      // Use translation if available, otherwise use category label
+      if (t) {
+        const key = `training.${distanceCategory}Range`;
+        const translated = t(key);
+        // If translation key not found, fallback to label
+        return translated !== key ? translated : cat.label;
+      }
+      return cat.label;
+    }
+  }
+
+  // Default fallback
+  return '25m';
+}
+
+/**
+ * Gets the range description for a distance category
+ */
+export function getRangeCategoryDescription(category: RangeCategory): string {
+  const cat = RANGE_CATEGORIES.find((c) => c.value === category);
+  if (!cat) return '';
+  return cat.max ? `${cat.min}-${cat.max}m` : `${cat.min}m+`;
+}
+
+/**
+ * Gets a suggested default distance for a range category
+ * Used when soldier needs to enter a target but only has a category (not exact distance)
+ */
+export function getDefaultDistanceForCategory(category: RangeCategory): number {
+  switch (category) {
+    case 'short':
+      return 25; // Typical short range distance
+    case 'medium':
+      return 100; // Typical medium range distance
+    case 'long':
+      return 300; // Typical long range distance
+    default:
+      return 25;
+  }
+}
+
+/**
+ * Gets the effective distance for routing - uses exact distance if available,
+ * otherwise falls back to category default
+ */
+export function getEffectiveDistance(
+  distanceM?: number | null,
+  distanceCategory?: RangeCategory | null,
+  defaultDistance: number = 25
+): number {
+  if (distanceM && distanceM > 0) {
+    return distanceM;
+  }
+  if (distanceCategory) {
+    return getDefaultDistanceForCategory(distanceCategory);
+  }
+  return defaultDistance;
 }
 
 // ============================================================================

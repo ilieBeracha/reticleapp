@@ -1,4 +1,4 @@
-import { UnifiedHomePage } from '@/components/home/UnifiedHomePage';
+import { UnifiedHomePage } from '@/components/home/UnifiedHomePage/UnifiedHomePage';
 import { ThemedText } from '@/components/shared/ThemedText';
 import { ThemedView } from '@/components/shared/ThemedView';
 import { useColors } from '@/hooks/ui/useColors';

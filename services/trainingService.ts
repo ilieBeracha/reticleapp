@@ -1,19 +1,19 @@
 /**
  * TRAINING SERVICE
  * Handles all training-related operations for teams
- * 
+ *
  * Team-first architecture: Trainings belong to teams directly
  */
 
 import { supabase } from '@/lib/supabase';
 import type {
-  CreateTrainingDrillInput,
-  CreateTrainingInput,
-  Training,
-  TrainingDrill,
-  TrainingStatus,
-  TrainingWithDetails,
-  UpdateTrainingInput,
+    CreateTrainingDrillInput,
+    CreateTrainingInput,
+    Training,
+    TrainingDrill,
+    TrainingStatus,
+    TrainingWithDetails,
+    UpdateTrainingInput,
 } from '@/types/workspace';
 import { scheduleTrainingReminder } from './notifications';
 import { notifyTeamNewTraining, notifyTeamTrainingStarted } from './pushService';
@@ -35,6 +35,8 @@ function buildDrillInsertPayload(drill: CreateTrainingDrillInput, trainingId: st
     target_type: drill.target_type,
     // Nullable - null means soldier chooses at execution time
     distance_m: drill.distance_m ?? null,
+    // Nullable - null means no range category constraint (commander set exact distance or left it open)
+    distance_category: drill.distance_category ?? null,
     rounds_per_shooter: drill.rounds_per_shooter ?? null,
     // Execution policy - how strictly soldiers must follow config
     execution_policy: drill.execution_policy || 'locked',
@@ -76,8 +78,10 @@ function buildDrillInsertPayload(drill: CreateTrainingDrillInput, trainingId: st
  * Create a new training with drills
  */
 export async function createTraining(input: CreateTrainingInput): Promise<TrainingWithDetails> {
-  const { data: { user } } = await supabase.auth.getUser();
-  
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
   if (!user) {
     throw new Error('Not authenticated');
   }
@@ -98,11 +102,13 @@ export async function createTraining(input: CreateTrainingInput): Promise<Traini
       status: 'planned',
       created_by: user.id,
     })
-    .select(`
+    .select(
+      `
       *,
       team:teams(id, name, team_type),
       creator:profiles!trainings_created_by_fkey(id, full_name, avatar_url)
-    `)
+    `
+    )
     .single();
 
   if (trainingError) {
@@ -112,14 +118,9 @@ export async function createTraining(input: CreateTrainingInput): Promise<Traini
 
   // Create drills if provided
   if (input.drills && input.drills.length > 0) {
-    const drillsToInsert = input.drills.map((drill, index) =>
-      buildDrillInsertPayload(drill, training.id, index + 1)
-    );
+    const drillsToInsert = input.drills.map((drill, index) => buildDrillInsertPayload(drill, training.id, index + 1));
 
-    const { data: drills, error: drillsError } = await supabase
-      .from('training_drills')
-      .insert(drillsToInsert)
-      .select();
+    const { data: drills, error: drillsError } = await supabase.from('training_drills').insert(drillsToInsert).select();
 
     if (drillsError) {
       console.error('Failed to create drills:', drillsError);
@@ -164,24 +165,11 @@ async function sendTrainingCreatedNotifications(training: TrainingWithDetails) {
   const scheduledAt = new Date(training.scheduled_at);
 
   // Schedule local reminder for the creator (30 min before)
-  await scheduleTrainingReminder(
-    training.id,
-    training.title,
-    teamName,
-    scheduledAt
-  );
+  await scheduleTrainingReminder(training.id, training.title, teamName, scheduledAt);
 
   // Send push notification to all team members (excluding creator)
   if (teamId && creatorId) {
-    await notifyTeamNewTraining(
-      teamId,
-      training.id,
-      training.title,
-      teamName,
-      scheduledAt,
-      creatorId,
-      creatorName
-    );
+    await notifyTeamNewTraining(teamId, training.id, training.title, teamName, scheduledAt, creatorId, creatorName);
   }
 }
 
@@ -197,12 +185,14 @@ export async function getTeamTrainings(
 ): Promise<TrainingWithDetails[]> {
   let query = supabase
     .from('trainings')
-    .select(`
+    .select(
+      `
       *,
       team:teams(id, name, team_type),
       creator:profiles!trainings_created_by_fkey(id, full_name, avatar_url),
       training_drills(id)
-    `)
+    `
+    )
     .eq('team_id', teamId)
     .order('scheduled_at', { ascending: true });
 
@@ -245,20 +235,19 @@ export async function getOrgTrainings(
 /**
  * Get upcoming trainings for a team
  */
-export async function getUpcomingTrainings(
-  teamId: string,
-  limit: number = 10
-): Promise<TrainingWithDetails[]> {
+export async function getUpcomingTrainings(teamId: string, limit: number = 10): Promise<TrainingWithDetails[]> {
   const now = new Date().toISOString();
-  
+
   const { data, error } = await supabase
     .from('trainings')
-    .select(`
+    .select(
+      `
       *,
       team:teams(id, name, team_type),
       creator:profiles!trainings_created_by_fkey(id, full_name, avatar_url),
       training_drills(id)
-    `)
+    `
+    )
     .eq('team_id', teamId)
     .in('status', ['planned', 'ongoing'])
     .gte('scheduled_at', now)
@@ -284,12 +273,14 @@ export async function getUpcomingTrainings(
 export async function getTrainingById(trainingId: string): Promise<TrainingWithDetails | null> {
   const { data, error } = await supabase
     .from('trainings')
-    .select(`
+    .select(
+      `
       *,
       team:teams(id, name, team_type, description, squads),
       creator:profiles!trainings_created_by_fkey(id, full_name, avatar_url),
       training_drills(*)
-    `)
+    `
+    )
     .eq('id', trainingId)
     .single();
 
@@ -312,16 +303,9 @@ export async function getTrainingById(trainingId: string): Promise<TrainingWithD
 /**
  * Update a training
  */
-export async function updateTraining(
-  trainingId: string,
-  updates: UpdateTrainingInput
-): Promise<Training | null> {
+export async function updateTraining(trainingId: string, updates: UpdateTrainingInput): Promise<Training | null> {
   // First check if training exists
-  const { data: existing } = await supabase
-    .from('trainings')
-    .select('id, status')
-    .eq('id', trainingId)
-    .maybeSingle();
+  const { data: existing } = await supabase.from('trainings').select('id, status').eq('id', trainingId).maybeSingle();
 
   if (!existing) {
     console.log('[TrainingService] Training not found for update:', trainingId);
@@ -357,10 +341,7 @@ export async function updateTraining(
  * Delete a training (and its drills via cascade)
  */
 export async function deleteTraining(trainingId: string): Promise<void> {
-  const { error } = await supabase
-    .from('trainings')
-    .delete()
-    .eq('id', trainingId);
+  const { error } = await supabase.from('trainings').delete().eq('id', trainingId);
 
   if (error) {
     console.error('Failed to delete training:', error);
@@ -372,14 +353,12 @@ export async function deleteTraining(trainingId: string): Promise<void> {
  * Start a training (change status to ongoing, set started_at)
  */
 export async function startTraining(trainingId: string): Promise<Training | null> {
-  const { data: { user } } = await supabase.auth.getUser();
-  
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
   // First check if training exists and can be started
-  const { data: existing } = await supabase
-    .from('trainings')
-    .select('id, status')
-    .eq('id', trainingId)
-    .maybeSingle();
+  const { data: existing } = await supabase.from('trainings').select('id, status').eq('id', trainingId).maybeSingle();
 
   if (!existing) {
     console.log('[TrainingService] Training not found for start:', trainingId);
@@ -388,14 +367,10 @@ export async function startTraining(trainingId: string): Promise<Training | null
 
   // Already ongoing or finished
   if (existing.status === 'ongoing' || existing.status === 'finished') {
-    const { data } = await supabase
-      .from('trainings')
-      .select('*')
-      .eq('id', trainingId)
-      .single();
+    const { data } = await supabase.from('trainings').select('*').eq('id', trainingId).single();
     return data as Training;
   }
-  
+
   // Update with started_at timestamp
   const { data, error } = await supabase
     .from('trainings')
@@ -422,19 +397,11 @@ export async function startTraining(trainingId: string): Promise<Training | null
 
   // Send push notification to team members
   if (training.team_id && user?.id) {
-    const { data: teamData } = await supabase
-      .from('teams')
-      .select('name')
-      .eq('id', training.team_id)
-      .single();
+    const { data: teamData } = await supabase.from('teams').select('name').eq('id', training.team_id).single();
 
-    notifyTeamTrainingStarted(
-      training.team_id,
-      trainingId,
-      training.title,
-      teamData?.name || 'Team',
-      user.id
-    ).catch(console.error);
+    notifyTeamTrainingStarted(training.team_id, trainingId, training.title, teamData?.name || 'Team', user.id).catch(
+      console.error
+    );
   }
 
   return training;
@@ -442,20 +409,19 @@ export async function startTraining(trainingId: string): Promise<Training | null
 
 /**
  * Finish a training (change status to finished, set ended_at)
- * 
+ *
  * Safe to call even if training is already finished or doesn't exist.
  */
 export async function finishTraining(trainingId: string): Promise<Training | null> {
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
   if (!user) {
     return null;
   }
 
-  const { data: memberships } = await supabase
-    .from('team_members')
-    .select('team_id, role')
-    .eq('user_id', user.id);
+  const { data: memberships } = await supabase.from('team_members').select('team_id, role').eq('user_id', user.id);
 
   const { data: existing, error: fetchError } = await supabase
     .from('trainings')
@@ -488,16 +454,12 @@ export async function finishTraining(trainingId: string): Promise<Training | nul
   }
 
   if (existing.status === 'finished' || existing.status === 'cancelled') {
-    const { data } = await supabase
-      .from('trainings')
-      .select('*')
-      .eq('id', trainingId)
-      .maybeSingle();
+    const { data } = await supabase.from('trainings').select('*').eq('id', trainingId).maybeSingle();
     return data as Training;
   }
 
   const isCreator = existing.created_by === user.id;
-  const teamMembership = memberships?.find(m => m.team_id === existing.team_id);
+  const teamMembership = memberships?.find((m) => m.team_id === existing.team_id);
   const isTeamManager = teamMembership?.role === 'owner' || teamMembership?.role === 'commander';
 
   if (!isCreator && !isTeamManager) {
@@ -542,14 +504,14 @@ export async function cancelTraining(trainingId: string): Promise<Training | nul
  * Get all trainings the current user has access to (via team membership)
  * This is for the personal home view - shows trainings across all orgs
  */
-export async function getMyTrainings(
-  options?: {
-    status?: TrainingStatus[];
-    limit?: number;
-  }
-): Promise<TrainingWithDetails[]> {
-  const { data: { user } } = await supabase.auth.getUser();
-  
+export async function getMyTrainings(options?: {
+  status?: TrainingStatus[];
+  limit?: number;
+}): Promise<TrainingWithDetails[]> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
   if (!user) {
     throw new Error('Not authenticated');
   }
@@ -565,7 +527,7 @@ export async function getMyTrainings(
     throw new Error('Failed to fetch your teams');
   }
 
-  const teamIds = teamMemberships?.map(tm => tm.team_id) || [];
+  const teamIds = teamMemberships?.map((tm) => tm.team_id) || [];
 
   if (teamIds.length === 0) {
     return []; // User has no team memberships
@@ -574,12 +536,14 @@ export async function getMyTrainings(
   // Get trainings for those teams
   let query = supabase
     .from('trainings')
-    .select(`
+    .select(
+      `
       *,
       team:teams(id, name, team_type),
       creator:profiles!trainings_created_by_fkey(id, full_name, avatar_url),
       training_drills(id)
-    `)
+    `
+    )
     .in('team_id', teamIds)
     .order('scheduled_at', { ascending: true });
 
@@ -624,19 +588,18 @@ export async function getMyTrainingStats(): Promise<{
   completed: number;
   total: number;
 }> {
-  const { data: { user } } = await supabase.auth.getUser();
-  
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
   if (!user) {
     throw new Error('Not authenticated');
   }
 
   // Get user's team memberships
-  const { data: teamMemberships } = await supabase
-    .from('team_members')
-    .select('team_id')
-    .eq('user_id', user.id);
+  const { data: teamMemberships } = await supabase.from('team_members').select('team_id').eq('user_id', user.id);
 
-  const teamIds = teamMemberships?.map(tm => tm.team_id) || [];
+  const teamIds = teamMemberships?.map((tm) => tm.team_id) || [];
 
   if (teamIds.length === 0) {
     return { upcoming: 0, completed: 0, total: 0 };
@@ -650,8 +613,16 @@ export async function getMyTrainingStats(): Promise<{
     { count: completedCount, error: completedError },
   ] = await Promise.all([
     supabase.from('trainings').select('id', { count: 'exact', head: true }).in('team_id', teamIds),
-    supabase.from('trainings').select('id', { count: 'exact', head: true }).in('team_id', teamIds).in('status', ['planned', 'ongoing']),
-    supabase.from('trainings').select('id', { count: 'exact', head: true }).in('team_id', teamIds).eq('status', 'finished'),
+    supabase
+      .from('trainings')
+      .select('id', { count: 'exact', head: true })
+      .in('team_id', teamIds)
+      .in('status', ['planned', 'ongoing']),
+    supabase
+      .from('trainings')
+      .select('id', { count: 'exact', head: true })
+      .in('team_id', teamIds)
+      .eq('status', 'finished'),
   ]);
 
   if (totalError || upcomingError || completedError) {
@@ -672,15 +643,12 @@ export async function getMyTrainingStats(): Promise<{
 
 /**
  * Add a drill instance to a training.
- * 
+ *
  * NEW ARCHITECTURE:
  * - drill_id: Reference to core Drill definition
  * - Instance fields: Configured for this specific training
  */
-export async function addDrill(
-  trainingId: string,
-  drill: CreateTrainingDrillInput
-): Promise<TrainingDrill> {
+export async function addDrill(trainingId: string, drill: CreateTrainingDrillInput): Promise<TrainingDrill> {
   // Get the current max order_index
   const { data: existingDrills } = await supabase
     .from('training_drills')
@@ -726,16 +694,8 @@ export async function getTrainingDrills(trainingId: string): Promise<TrainingDri
 /**
  * Update a drill instance within a training
  */
-export async function updateDrill(
-  drillId: string,
-  updates: Partial<CreateTrainingDrillInput>
-): Promise<TrainingDrill> {
-  const { data, error } = await supabase
-    .from('training_drills')
-    .update(updates)
-    .eq('id', drillId)
-    .select()
-    .single();
+export async function updateDrill(drillId: string, updates: Partial<CreateTrainingDrillInput>): Promise<TrainingDrill> {
+  const { data, error } = await supabase.from('training_drills').update(updates).eq('id', drillId).select().single();
 
   if (error) {
     console.error('Failed to update drill:', error);
@@ -749,10 +709,7 @@ export async function updateDrill(
  * Delete a drill
  */
 export async function deleteDrill(drillId: string): Promise<void> {
-  const { error } = await supabase
-    .from('training_drills')
-    .delete()
-    .eq('id', drillId);
+  const { error } = await supabase.from('training_drills').delete().eq('id', drillId);
 
   if (error) {
     console.error('Failed to delete drill:', error);
@@ -763,12 +720,9 @@ export async function deleteDrill(drillId: string): Promise<void> {
 /**
  * Reorder drills
  */
-export async function reorderDrills(
-  trainingId: string,
-  drillIds: string[]
-): Promise<void> {
+export async function reorderDrills(trainingId: string, drillIds: string[]): Promise<void> {
   // Update each drill's order_index
-  const updates = drillIds.map((id, index) => 
+  const updates = drillIds.map((id, index) =>
     supabase
       .from('training_drills')
       .update({ order_index: index + 1 })
@@ -777,8 +731,8 @@ export async function reorderDrills(
   );
 
   const results = await Promise.all(updates);
-  
-  const errors = results.filter(r => r.error);
+
+  const errors = results.filter((r) => r.error);
   if (errors.length > 0) {
     console.error('Failed to reorder drills:', errors);
     throw new Error('Failed to reorder drills');
@@ -787,7 +741,7 @@ export async function reorderDrills(
 
 /**
  * Batch update drill instance configurations.
- * 
+ *
  * Used by commanders to set instance values (distance, shots, time)
  * before starting a training.
  */
@@ -806,31 +760,30 @@ export async function updateTrainingDrills(
 ): Promise<void> {
   if (drillOverrides.size === 0) return;
 
-  const updates = Array.from(drillOverrides.entries()).map(([drillId, overrides]) => {
-    const updateData: Record<string, unknown> = {};
-    
-    if (overrides.distance_m !== undefined) updateData.distance_m = overrides.distance_m;
-    if (overrides.rounds_per_shooter !== undefined) updateData.rounds_per_shooter = overrides.rounds_per_shooter;
-    if (overrides.time_limit_seconds !== undefined) updateData.time_limit_seconds = overrides.time_limit_seconds;
-    if (overrides.strings_count !== undefined) updateData.strings_count = overrides.strings_count;
-    if (overrides.par_time_seconds !== undefined) updateData.par_time_seconds = overrides.par_time_seconds;
-    if (overrides.min_accuracy_percent !== undefined) updateData.min_accuracy_percent = overrides.min_accuracy_percent;
+  const updates = Array.from(drillOverrides.entries())
+    .map(([drillId, overrides]) => {
+      const updateData: Record<string, unknown> = {};
 
-    // Only update if there are actual changes
-    if (Object.keys(updateData).length === 0) return null;
+      if (overrides.distance_m !== undefined) updateData.distance_m = overrides.distance_m;
+      if (overrides.rounds_per_shooter !== undefined) updateData.rounds_per_shooter = overrides.rounds_per_shooter;
+      if (overrides.time_limit_seconds !== undefined) updateData.time_limit_seconds = overrides.time_limit_seconds;
+      if (overrides.strings_count !== undefined) updateData.strings_count = overrides.strings_count;
+      if (overrides.par_time_seconds !== undefined) updateData.par_time_seconds = overrides.par_time_seconds;
+      if (overrides.min_accuracy_percent !== undefined)
+        updateData.min_accuracy_percent = overrides.min_accuracy_percent;
 
-    return supabase
-      .from('training_drills')
-      .update(updateData)
-      .eq('id', drillId)
-      .eq('training_id', trainingId);
-  }).filter(Boolean);
+      // Only update if there are actual changes
+      if (Object.keys(updateData).length === 0) return null;
+
+      return supabase.from('training_drills').update(updateData).eq('id', drillId).eq('training_id', trainingId);
+    })
+    .filter(Boolean);
 
   if (updates.length === 0) return;
 
   const results = await Promise.all(updates);
-  const errors = results.filter(r => r?.error);
-  
+  const errors = results.filter((r) => r?.error);
+
   if (errors.length > 0) {
     console.error('Failed to update drill instances:', errors);
     throw new Error('Failed to update some drill configurations');
@@ -839,7 +792,7 @@ export async function updateTrainingDrills(
 
 /**
  * Start a training with optional drill instance overrides.
- * 
+ *
  * This is the main flow for commanders to configure and start a training.
  * 1. Apply any drill overrides (distance, shots, time)
  * 2. Change training status to ongoing
@@ -872,8 +825,10 @@ export interface DrillProgress {
  * Returns which drills have been completed (have a completed session)
  */
 export async function getMyDrillProgress(trainingId: string): Promise<DrillProgress[]> {
-  const { data: { user } } = await supabase.auth.getUser();
-  
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
   if (!user) {
     throw new Error('Not authenticated');
   }
@@ -916,7 +871,7 @@ export async function getMyDrillProgress(trainingId: string): Promise<DrillProgr
   });
 
   // Build progress array
-  return drills.map(drill => ({
+  return drills.map((drill) => ({
     drillId: drill.id,
     completed: completedDrills.has(drill.id),
     sessionId: completedDrills.get(drill.id),
@@ -934,12 +889,14 @@ export async function getMyDrillProgress(trainingId: string): Promise<DrillProgr
 export async function getLastTeamTraining(teamId: string): Promise<TrainingWithDetails | null> {
   const { data, error } = await supabase
     .from('trainings')
-    .select(`
+    .select(
+      `
       *,
       team:teams(id, name, team_type),
       creator:profiles!trainings_created_by_fkey(id, full_name, avatar_url),
       training_drills(*)
-    `)
+    `
+    )
     .eq('team_id', teamId)
     .in('status', ['finished', 'ongoing'])
     .order('scheduled_at', { ascending: false })
@@ -968,11 +925,10 @@ export async function getLastTeamTraining(teamId: string): Promise<TrainingWithD
  */
 export async function getLastTrainingDrills(teamId: string): Promise<TrainingDrill[]> {
   const lastTraining = await getLastTeamTraining(teamId);
-  
+
   if (!lastTraining || !lastTraining.drills) {
     return [];
   }
 
   return lastTraining.drills;
 }
-

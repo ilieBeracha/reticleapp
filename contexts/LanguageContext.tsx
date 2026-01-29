@@ -1,16 +1,8 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
-import { Alert, I18nManager } from 'react-native';
+import i18n, { getDeviceLanguage, getStoredLanguage, isRTLLanguage, Language, setStoredLanguage } from '@/lib/i18n';
 import * as Updates from 'expo-updates';
-import i18n, {
-  Language,
-  LANGUAGE_KEY,
-  getDeviceLanguage,
-  getStoredLanguage,
-  isRTLLanguage,
-  setStoredLanguage,
-} from '@/lib/i18n';
+import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Alert, I18nManager } from 'react-native';
 
 interface LanguageContextType {
   language: Language;
@@ -33,12 +25,39 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
       try {
         const stored = await getStoredLanguage();
         const lang = stored ?? getDeviceLanguage();
+        const newIsRTL = isRTLLanguage(lang);
+        const currentSwap = (I18nManager as any).doLeftAndRightSwapInRTL;
+        const needsRTLChange = I18nManager.isRTL !== newIsRTL;
+        const needsSwapChange = newIsRTL && currentSwap !== true;
+
         setLanguageState(lang);
-        setIsRTL(isRTLLanguage(lang));
+        setIsRTL(newIsRTL);
 
         // Ensure i18n is set to the correct language
         if (i18n.language !== lang) {
           await i18n.changeLanguage(lang);
+        }
+
+        // Ensure RTL support is configured (swap left/right styles in RTL)
+        // Note: applying these changes fully requires an app restart.
+        I18nManager.allowRTL(true);
+        I18nManager.swapLeftAndRightInRTL(true);
+        I18nManager.forceRTL(newIsRTL);
+
+        if (needsRTLChange || needsSwapChange) {
+          Alert.alert(t('settings.restartRequired'), t('settings.restartMessage'), [
+            { text: t('settings.restartLater'), style: 'cancel' },
+            {
+              text: t('settings.restartNow'),
+              onPress: async () => {
+                try {
+                  await Updates.reloadAsync();
+                } catch (error) {
+                  Alert.alert(t('common.error'), t('settings.restartManually'));
+                }
+              },
+            },
+          ]);
         }
       } catch (error) {
         console.error('Failed to initialize language:', error);
@@ -54,7 +73,9 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     async (lang: Language) => {
       try {
         const newIsRTL = isRTLLanguage(lang);
+        const currentSwap = (I18nManager as any).doLeftAndRightSwapInRTL;
         const needsRTLChange = I18nManager.isRTL !== newIsRTL;
+        const needsSwapChange = newIsRTL && currentSwap !== true;
 
         // Save the preference
         await setStoredLanguage(lang);
@@ -66,9 +87,12 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
         setLanguageState(lang);
         setIsRTL(newIsRTL);
 
-        // Handle RTL change - requires app restart
-        if (needsRTLChange) {
-          I18nManager.allowRTL(true);
+        // Ensure swap left/right styles in RTL (affects many layouts that use `left`, `marginLeft`, etc.)
+        I18nManager.allowRTL(true);
+        I18nManager.swapLeftAndRightInRTL(true);
+
+        // Handle RTL and/or swap change - requires app restart
+        if (needsRTLChange || needsSwapChange) {
           I18nManager.forceRTL(newIsRTL);
 
           // Show restart prompt
@@ -84,10 +108,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
                   await Updates.reloadAsync();
                 } catch (error) {
                   // If Updates.reloadAsync fails (e.g., in dev mode), inform the user
-                  Alert.alert(
-                    t('common.error'),
-                    'Please close and reopen the app to apply the language change.'
-                  );
+                  Alert.alert(t('common.error'), t('settings.restartManually'));
                 }
               },
             },

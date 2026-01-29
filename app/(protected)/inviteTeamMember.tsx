@@ -1,5 +1,5 @@
 import { Text } from '@/components/shared/ui/text';
-import { CreateWeaponFlow } from '@/components/weapons';
+import { CreateWeaponFlow } from '@/components/weapons/CreateWeaponFlow';
 import { useColors } from '@/hooks/ui/useColors';
 import { createInvitation } from '@/services/invitationService';
 import { updateTeam } from '@/services/teamService';

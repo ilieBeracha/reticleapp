@@ -1,6 +1,5 @@
 import { isGroupingGoal } from '@/constants/drill';
 import { useColors } from '@/hooks/ui/useColors';
-import { useTranslation } from 'react-i18next';
 import type { SessionWithDetails } from '@/services/session/types';
 import { activateSession, updateSession } from '@/services/sessionService';
 import { getUserWeapon, type UserWeapon } from '@/services/weaponService';
@@ -9,34 +8,36 @@ import { deriveDetectionConfig } from '@/utils/detectionSensitivity';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import {
-  ChevronDown,
-  ChevronLeft,
-  ChevronUp,
-  Clock,
-  Crosshair,
-  MapPin,
-  Phone,
-  RefreshCw,
-  Settings,
-  Target,
-  Trophy,
-  Users,
-  Watch,
-  X,
-  Zap,
+    ChevronDown,
+    ChevronLeft,
+    ChevronUp,
+    Clock,
+    Crosshair,
+    MapPin,
+    Phone,
+    RefreshCw,
+    Settings,
+    Target,
+    Trophy,
+    Users,
+    Watch,
+    X,
+    Zap,
 } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, {
-  Easing,
-  FadeIn,
-  FadeInDown,
-  useAnimatedStyle,
-  useSharedValue,
-  withRepeat,
-  withSequence,
-  withTiming,
+    Easing,
+    FadeIn,
+    FadeInDown,
+    useAnimatedStyle,
+    useSharedValue,
+    withRepeat,
+    withSequence,
+    withTiming,
 } from 'react-native-reanimated';
+import { formatDistanceDisplay } from './activeSession.helpers';
 
 interface SessionPrepViewProps {
   session: SessionWithDetails;
@@ -251,7 +252,9 @@ export function SessionPrepView({ session, insets, onSessionActivated, onBack, o
           <View style={styles.drillMeta}>
             <View style={styles.drillMetaItem}>
               <MapPin size={14} color={colors.textMuted} />
-              <Text style={[styles.drillMetaText, { color: colors.text }]}>{drill?.distance_m || 25}m</Text>
+              <Text style={[styles.drillMetaText, { color: colors.text }]}>
+                {formatDistanceDisplay(drill?.distance_m, drill?.distance_category, t)}
+              </Text>
             </View>
             {drill?.rounds_per_shooter && (
               <>
@@ -509,9 +512,7 @@ export function SessionPrepView({ session, insets, onSessionActivated, onBack, o
         >
           <Ionicons name="information-circle" size={18} color={colors.blue} />
           <Text style={[styles.infoText, { color: colors.blue }]}>
-            {isWatchConnected
-              ? t('session.watchWillTrack')
-              : t('session.connectWatchLater')}
+            {isWatchConnected ? t('session.watchWillTrack') : t('session.connectWatchLater')}
           </Text>
         </Animated.View>
       </View>
@@ -558,7 +559,9 @@ export function SessionPrepView({ session, insets, onSessionActivated, onBack, o
             ) : (
               <>
                 <Zap size={20} color={colors.background} />
-                <Text style={[styles.primaryButtonText, { color: colors.background }]}>{t('session.startSession')}</Text>
+                <Text style={[styles.primaryButtonText, { color: colors.background }]}>
+                  {t('session.startSession')}
+                </Text>
               </>
             )}
           </TouchableOpacity>

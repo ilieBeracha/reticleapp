@@ -5,12 +5,12 @@
  * Tapping a day expands to show training details.
  */
 
+import { DirectionalChevron } from '@/components/shared/DirectionalChevron';
 import type { TrainingWithDetails } from '@/types/workspace';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
-import { ChevronRight } from 'lucide-react-native';
-import { useTranslation } from 'react-i18next';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, {
   Easing,
@@ -46,15 +46,14 @@ interface DayData {
 // ═══════════════════════════════════════════════════════════════════════════
 
 const TEAM_COLORS = [
-  '#3B82F6', // blue
+  '#6366F1', // indigo
   '#10B981', // green
-  '#F97316', // orange
-  '#EF4444', // red
-  '#EAB308', // yellow
+  '#F59E0B', // amber
+  '#EC4899', // pink
   '#8B5CF6', // purple
   '#14B8A6', // teal
-  '#6366F1', // indigo
-  '#EC4899', // pink
+  '#F97316', // orange
+  '#3B82F6', // blue
 ];
 
 function getTeamColor(teamId: string | undefined): string {
@@ -83,25 +82,31 @@ function buildDayData(trainings: TrainingWithDetails[], t: ReturnType<typeof use
 
   const days: DayData[] = [];
 
-  for (let i = 0; i < 7; i++) {
+  // Show 2 days before, today, and 4 days after (7 total)
+  const DAYS_BEFORE = 2;
+  const TOTAL_DAYS = 7;
+
+  for (let i = -DAYS_BEFORE; i < TOTAL_DAYS - DAYS_BEFORE; i++) {
     const date = new Date(today);
     date.setDate(today.getDate() + i);
 
     const nextDay = new Date(date);
     nextDay.setDate(date.getDate() + 1);
 
+    const isToday = i === 0;
+
     const dayTrainings = trainings.filter((t) => {
-      if (t.status === 'ongoing' && i === 0) return true;
-      if (t.status === 'ongoing' && i !== 0) return false;
+      if (t.status === 'ongoing' && isToday) return true;
+      if (t.status === 'ongoing' && !isToday) return false;
       const trainingDate = new Date(t.scheduled_at || t.created_at);
       return trainingDate >= date && trainingDate < nextDay;
     });
 
     days.push({
       date,
-      dayName: i === 0 ? t('time.today') : DAY_NAMES[date.getDay()],
+      dayName: isToday ? t('time.today') : DAY_NAMES[date.getDay()],
       dayNumber: date.getDate(),
-      isToday: i === 0,
+      isToday,
       trainings: dayTrainings,
     });
   }
@@ -124,7 +129,7 @@ function formatTrainingTime(training: TrainingWithDetails, t: ReturnType<typeof 
 const MAX_DOTS = 3;
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
-function TeamDot({ color, isPulsing, size = 9 }: { color: string; isPulsing: boolean; size?: number }) {
+function TrainingDot({ isPulsing, colors }: { isPulsing: boolean; colors: Colors }) {
   const opacity = useSharedValue(1);
 
   useEffect(() => {
@@ -144,9 +149,7 @@ function TeamDot({ color, isPulsing, size = 9 }: { color: string; isPulsing: boo
     opacity: opacity.value,
   }));
 
-  return (
-    <Animated.View style={[{ width: size, height: size, borderRadius: size / 2, backgroundColor: color }, animStyle]} />
-  );
+  return <Animated.View style={[s.trainingDot, { backgroundColor: colors.textMuted }, animStyle]} />;
 }
 
 function DayColumn({
@@ -240,12 +243,12 @@ function DayColumn({
         </Text>
       </View>
 
-      {/* Dot stack */}
+      {/* Training indicator */}
       <View style={s.dotStack}>
         {hasTrainings ? (
           <>
             {uniqueTeams.slice(0, MAX_DOTS).map((t) => (
-              <TeamDot key={t.id} color={getTeamColor(t.team?.id)} isPulsing={t.status === 'ongoing'} />
+              <TrainingDot key={t.id} isPulsing={t.status === 'ongoing'} colors={colors} />
             ))}
             {overflow > 0 && <Text style={[s.overflowText, { color: colors.textMuted }]}>+{overflow}</Text>}
           </>
@@ -270,13 +273,10 @@ function ExpandedTrainingItem({ training, colors }: { training: TrainingWithDeta
 
   return (
     <TouchableOpacity
-      style={[s.expandedItem, { backgroundColor: `${teamColor}08` }]}
+      style={[s.expandedItem, { backgroundColor: colors.secondary }]}
       onPress={handlePress}
       activeOpacity={0.7}
     >
-      {/* Color bar */}
-      <View style={[s.expandedColorBar, { backgroundColor: teamColor }]} />
-
       <View style={s.expandedContent}>
         <View style={s.expandedInfo}>
           <Text style={[s.expandedTitle, { color: colors.text }]} numberOfLines={1}>
@@ -291,14 +291,14 @@ function ExpandedTrainingItem({ training, colors }: { training: TrainingWithDeta
 
         <View style={s.expandedRight}>
           {isLive ? (
-            <View style={[s.liveBadge, { backgroundColor: `${colors.orange}20` }]}>
-              <View style={[s.liveBadgeDot, { backgroundColor: colors.orange }]} />
-              <Text style={[s.liveBadgeText, { color: colors.orange }]}>{t('training.live')}</Text>
+            <View style={[s.liveBadge, { backgroundColor: `${teamColor}15` }]}>
+              <View style={[s.liveBadgeDot, { backgroundColor: teamColor }]} />
+              <Text style={[s.liveBadgeText, { color: teamColor }]}>{t('training.live')}</Text>
             </View>
           ) : timeStr ? (
             <Text style={[s.expandedTime, { color: colors.textMuted }]}>{timeStr}</Text>
           ) : null}
-          <ChevronRight size={14} color={colors.textMuted} />
+          <DirectionalChevron size={14} color={colors.textMuted} />
         </View>
       </View>
     </TouchableOpacity>
@@ -314,10 +314,7 @@ export function TimelineStrip({ colors, trainings }: TimelineStripProps) {
   const days = useMemo(() => buildDayData(trainings, t), [trainings, t]);
 
   // Auto-expand today if there's a live training
-  const liveDayIndex = useMemo(
-    () => days.findIndex((d) => d.trainings.some((t) => t.status === 'ongoing')),
-    [days]
-  );
+  const liveDayIndex = useMemo(() => days.findIndex((d) => d.trainings.some((t) => t.status === 'ongoing')), [days]);
   const [selectedDayIndex, setSelectedDayIndex] = useState<number | null>(liveDayIndex >= 0 ? liveDayIndex : null);
 
   const handleDayPress = useCallback((index: number) => {
@@ -344,7 +341,7 @@ export function TimelineStrip({ colors, trainings }: TimelineStripProps) {
         <Text style={[s.headerTitle, { color: colors.textMuted }]}>{t('home.schedule')}</Text>
         <TouchableOpacity onPress={handleGoToTeam} activeOpacity={0.7} style={s.headerLink}>
           <Text style={[s.headerLinkText, { color: colors.primary }]}>{t('teams.team')}</Text>
-          <ChevronRight size={12} color={colors.primary} />
+          <DirectionalChevron size={12} color={colors.primary} />
         </TouchableOpacity>
       </View>
 
@@ -451,6 +448,11 @@ const s = StyleSheet.create({
     gap: 3,
     minHeight: 10,
   },
+  trainingDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+  },
   dotPlaceholder: {
     height: 10,
   },
@@ -472,20 +474,18 @@ const s = StyleSheet.create({
     borderRadius: 10,
     overflow: 'hidden',
   },
-  expandedColorBar: {
-    width: 4,
-    alignSelf: 'stretch',
-  },
   expandedContent: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     paddingVertical: 10,
     paddingHorizontal: 12,
     gap: 8,
   },
   expandedInfo: {
     flex: 1,
+    alignItems: 'flex-start',
     gap: 2,
   },
   expandedTitle: {

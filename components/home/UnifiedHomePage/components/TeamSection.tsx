@@ -4,8 +4,11 @@
  * Displays team training section with upcoming trainings or empty state.
  */
 
+import { DirectionalChevron } from '@/components/shared/DirectionalChevron';
+import { SpecialtyBadge } from '@/components/teams/SpecialtyBadge';
+import { useTeamStore } from '@/store/teamStore';
 import { router } from 'expo-router';
-import { Calendar, ChevronRight, Users } from 'lucide-react-native';
+import { Calendar, Users } from 'lucide-react-native';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeInUp } from 'react-native-reanimated';
 import { styles } from '../UnifiedHomePage.styles';
@@ -13,11 +16,15 @@ import type { TeamSectionProps } from '../UnifiedHomePage.types';
 import { TeamTrainingCard } from './TeamTrainingCard';
 
 export function TeamSection({ trainings, hasTeams, colors, onTrainingPress }: TeamSectionProps) {
+  const { activeTeam } = useTeamStore();
+  const specialty = activeTeam?.specialty;
+
   return (
     <Animated.View entering={FadeInUp.duration(350).delay(100)} style={styles.section}>
       <View style={styles.sectionHeader}>
         <Users size={14} color={colors.textMuted} />
         <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>Team Training</Text>
+        {specialty && <SpecialtyBadge specialty={specialty} size="small" />}
       </View>
 
       {trainings.length > 0 ? (
@@ -37,7 +44,7 @@ export function TeamSection({ trainings, hasTeams, colors, onTrainingPress }: Te
           <Text style={[styles.emptyTeamText, { color: colors.textMuted }]}>No trainings scheduled</Text>
           <TouchableOpacity style={styles.viewScheduleBtn} onPress={() => router.push('/(protected)/(tabs)/team')}>
             <Text style={[styles.viewScheduleText, { color: colors.primary }]}>Schedule</Text>
-            <ChevronRight size={14} color={colors.primary} />
+            <DirectionalChevron size={14} color={colors.primary} />
           </TouchableOpacity>
         </View>
       ) : (
@@ -53,7 +60,7 @@ export function TeamSection({ trainings, hasTeams, colors, onTrainingPress }: Te
             <Text style={[localStyles.joinTeamTitle, { color: colors.text }]}>Join a team</Text>
             <Text style={[localStyles.joinTeamText, { color: colors.textMuted }]}>Train together with your unit</Text>
           </View>
-          <ChevronRight size={18} color={colors.textMuted} />
+          <DirectionalChevron size={18} color={colors.textMuted} />
         </TouchableOpacity>
       )}
     </Animated.View>

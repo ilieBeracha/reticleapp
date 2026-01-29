@@ -4,7 +4,8 @@
  * Compact AI-powered shooter insights.
  */
 
-import { AlertTriangle, Award, ChevronRight, Clock, Sparkles, Target, TrendingUp, Zap } from 'lucide-react-native';
+import { DirectionalChevron } from '@/components/shared/DirectionalChevron';
+import { AlertTriangle, Award, Clock, Sparkles, Target, TrendingUp, Zap } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import type { Colors, WeeklyStats } from '../UnifiedHomePage.types';
@@ -146,7 +147,7 @@ export function InsightsCard({ stats, streak, lastSessionDaysAgo, colors, onPres
         {insight.highlight && <Text style={[s.highlight, { color: colors.textMuted }]}>{insight.highlight}</Text>}
       </View>
 
-      {onPress && <ChevronRight size={16} color={colors.textMuted} />}
+      {onPress && <DirectionalChevron size={16} color={colors.textMuted} />}
     </TouchableOpacity>
   );
 }

@@ -16,15 +16,19 @@ import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, {
-  FadeIn,
-  FadeInDown,
-  FadeOut,
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
+    FadeIn,
+    FadeInDown,
+    FadeOut,
+    useAnimatedStyle,
+    useSharedValue,
+    withSpring,
 } from 'react-native-reanimated';
 import { styles } from './UnifiedHomePage.styles';
-import { CoachMessage, DailyTip, HeroActions, HomeHeader, RecentActivitySection } from './components';
+import { CoachMessage } from './components/CoachMessage';
+import { DailyTip } from './components/DailyTip';
+import { HeroActions } from './components/HeroActions';
+import { HomeHeader } from './components/HomeHeader';
+import { RecentActivitySection } from './components/RecentActivitySection';
 import { WeeklyStatsCard } from './components/WeeklyStatsCard';
 import { useUnifiedHomePage } from './useUnifiedHomePage';
 
@@ -186,11 +190,7 @@ export function UnifiedHomePage() {
         {/* ─────────────────────────────────────────────────────────────────── */}
         {/* SECTION: QUICK ACTIONS */}
         {/* ─────────────────────────────────────────────────────────────────── */}
-        <SectionHeader
-          title={t('home.quickActions')}
-          tooltip={t('home.quickActionsTooltip')}
-          colors={colors}
-        />
+        <SectionHeader title={t('home.quickActions')} tooltip={t('home.quickActionsTooltip')} colors={colors} />
         <HeroActions
           colors={colors}
           heroMode={heroMode}
@@ -212,11 +212,7 @@ export function UnifiedHomePage() {
         {/* ─────────────────────────────────────────────────────────────────── */}
         {/* SECTION: THIS WEEK */}
         {/* ─────────────────────────────────────────────────────────────────── */}
-        <SectionHeader
-          title={t('home.thisWeek')}
-          tooltip={t('home.thisWeekTooltip')}
-          colors={colors}
-        />
+        <SectionHeader title={t('home.thisWeek')} tooltip={t('home.thisWeekTooltip')} colors={colors} />
         <DailyTip
           colors={colors}
           streak={streak}
@@ -224,16 +220,12 @@ export function UnifiedHomePage() {
           sessionsThisWeek={weeklyStats.sessions}
           totalSessions={allSessions.length}
         />
-        <WeeklyStatsCard stats={weeklyStats} streak={streak} colors={colors} />
+        <WeeklyStatsCard stats={weeklyStats} streak={streak} colors={colors} sessionsData={allSessions} />
 
         {/* ─────────────────────────────────────────────────────────────────── */}
         {/* SECTION: RECENT ACTIVITY */}
         {/* ─────────────────────────────────────────────────────────────────── */}
-        <SectionHeader
-          title={t('home.recentActivity')}
-          tooltip={t('home.recentActivityTooltip')}
-          colors={colors}
-        />
+        <SectionHeader title={t('home.recentActivity')} tooltip={t('home.recentActivityTooltip')} colors={colors} />
         <RecentActivitySection sessions={recentSessions} colors={colors} onSessionPress={handleSessionPress} />
 
         {/* ─────────────────────────────────────────────────────────────────── */}

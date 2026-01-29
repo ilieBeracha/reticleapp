@@ -39,16 +39,14 @@ const s = StyleSheet.create({
     opacity: 0.4,
   },
   content: {
-    flex: 1,
     flexDirection: 'row',
-    alignItems: 'flex-start',
     gap: 6,
   },
   iconWrapper: {
     marginTop: 1,
   },
   message: {
-    flex: 1,
+    // flex: 1,
     fontSize: 13,
     fontWeight: '500',
     lineHeight: 18,

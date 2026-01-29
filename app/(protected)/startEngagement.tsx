@@ -1,25 +1,27 @@
 /**
- * START ENGAGEMENT
+ * START ENGAGEMENT - SOLO PRACTICE ONLY
  *
- * This is the ONLY execution entry point.
- * Users start engagements - they never "create sessions".
- *
- * Session = invisible setup container (weapon, environment)
- * Engagement = what users actually configure and run
+ * For team training drills, use StartDrillSheet in trainingDetail.tsx instead.
+ * This screen is now exclusively for solo/personal practice.
  *
  * Flow:
  * 1. User selects goal (Grouping / Engagement)
  * 2. User configures engagement params (distance, position, rounds)
  * 3. User selects weapon (for setup)
- * 4. System auto-creates/reuses Session invisibly
- * 5. System creates Engagement with user's config
- * 6. Navigate to execution
+ * 4. System auto-creates Session
+ * 5. Navigate to active session
+ *
+ * NOTE: The team training params (teamId, trainingId, drillId) are kept for
+ * backward compatibility but team training should use StartDrillSheet instead.
  */
 
 import { CaptureModePickerInline, type CaptureMode } from '@/components/session/CaptureModePicker';
-import { EngagementModeToggle } from '@/components/session/creation';
-import { DrillPresetPicker, PresetForm } from '@/components/shared/drills';
-import { CreateWeaponFlow, WeaponPicker } from '@/components/weapons';
+import { EngagementModeToggle } from '@/components/session/creation/EngagementModeToggle';
+import { DrillPresetPicker } from '@/components/shared/drills/DrillPresetPicker';
+import { PresetForm } from '@/components/shared/drills/PresetForm';
+import { CreateWeaponFlow } from '@/components/weapons/CreateWeaponFlow';
+import { WeaponPicker } from '@/components/weapons/WeaponPicker';
+import { RANGE_CATEGORIES, type RangeCategory } from '@/constants/drill';
 import { getCategoryConfig } from '@/constants/weaponCategories';
 import { useColors } from '@/hooks/ui/useColors';
 import { useOpenWeather } from '@/hooks/useOpenWeather';
@@ -30,7 +32,7 @@ import { createEngagement } from '@/services/session/participants';
 import type { DrillGoal, EngagementMode } from '@/services/session/types';
 import { deleteSession, getMyActiveSession, getOrCreateSetupSession } from '@/services/sessionService';
 import { getUserWeapon, type UserWeapon } from '@/services/weaponService';
-import { toSessionWeatherData } from '@/services/weather';
+import { toSessionWeatherData } from '@/services/weather/openWeatherDecoder';
 import { useGarminDevice, useIsGarminConnected } from '@/store/garminStore';
 import { useSessionStore } from '@/store/sessionStore';
 import { Ionicons } from '@expo/vector-icons';
@@ -81,66 +83,169 @@ export default function StartEngagementScreen() {
     // Team context (optional)
     teamId?: string;
     trainingId?: string;
-    // Pre-fill from drill/preset
+    drillId?: string;
+    // Return destination
+    returnTo?: string;
+    returnId?: string;
+    // DEPRECATED: These are no longer passed from trainingDetail
+    // Drill data is now fetched from DB using drillId
     purpose?: string;
     distance?: string;
     shots?: string;
     position?: string;
     timeLimit?: string;
     drillName?: string;
-    // Execution policy: how strict is the drill configuration?
-    // 'locked' = must execute exactly as defined
-    // 'guided' = defaults pre-filled, user may change
-    // 'free' = no constraints, full freedom
     executionPolicy?: 'locked' | 'guided' | 'free';
-    // Engagement mode: solo, squad, or group (from commander config)
     engagementMode?: 'solo' | 'squad' | 'group';
-    // Return destination
-    returnTo?: string;
-    returnId?: string;
+    distanceCategory?: string;
   }>();
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // DRILL DATA (fetched from DB when drillId is present)
+  // Commander's rules come from training_drills table
+  // ═══════════════════════════════════════════════════════════════════════════
+  const [drillData, setDrillData] = useState<{
+    id: string;
+    name: string;
+    drill_goal: string;
+    target_type: string;
+    execution_policy: string | null;
+    engagement_mode: string | null;
+    distance_m: number | null;
+    distance_category: string | null;
+    rounds_per_shooter: number | null;
+    position: string | null;
+    time_limit_seconds: number | null;
+    max_executions: number | null;
+  } | null>(null);
+  const [loadingDrill, setLoadingDrill] = useState(!!params.drillId);
+
+  // Fetch drill from DB when drillId is present
+  useEffect(() => {
+    async function fetchDrill() {
+      if (!params.drillId) {
+        setLoadingDrill(false);
+        return;
+      }
+      try {
+        const { data, error } = await supabase
+          .from('training_drills')
+          .select(
+            'id, name, drill_goal, target_type, execution_policy, engagement_mode, distance_m, distance_category, rounds_per_shooter, position, time_limit_seconds, max_executions'
+          )
+          .eq('id', params.drillId)
+          .single();
+
+        if (error) throw error;
+        setDrillData(data);
+      } catch (err) {
+        console.error('[StartEngagement] Failed to fetch drill:', err);
+      } finally {
+        setLoadingDrill(false);
+      }
+    }
+    fetchDrill();
+  }, [params.drillId]);
 
   const teamId = params.teamId || null;
   const trainingId = params.trainingId || null;
   const isTeamContext = !!teamId;
 
+  // ═══════════════════════════════════════════════════════════════════════════
+  // DERIVED VALUES (prefer drillData from DB, fall back to legacy params)
+  // ═══════════════════════════════════════════════════════════════════════════
+
   // Execution Policy - explicit control over configuration freedom
   // Default to 'free' for solo practice (no drill context)
-  const executionPolicy = params.executionPolicy || 'free';
-  const drillName = params.drillName || null;
+  const executionPolicy =
+    (drillData?.execution_policy as 'locked' | 'guided' | 'free') || params.executionPolicy || 'free';
+  const drillName = drillData?.name || params.drillName || null;
+
+  // Range category (soldier picks exact distance within this range)
+  const rawDistanceCategory = drillData?.distance_category || params.distanceCategory;
+  const distanceCategory: RangeCategory | null =
+    rawDistanceCategory && ['short', 'medium', 'long'].includes(rawDistanceCategory)
+      ? (rawDistanceCategory as RangeCategory)
+      : null;
+  const categoryBounds = distanceCategory ? RANGE_CATEGORIES.find((c) => c.value === distanceCategory) : null;
+  const minCategoryDistance = categoryBounds ? categoryBounds.min || 1 : 1;
+  const maxCategoryDistance = categoryBounds?.max ?? 9999;
+
+  // Commander-defined values (from DB drill or legacy params)
+  const commanderDistance = drillData?.distance_m ?? (params.distance ? parseInt(params.distance, 10) : null);
+  const commanderBullets = drillData?.rounds_per_shooter ?? (params.shots ? parseInt(params.shots, 10) : null);
+  const commanderPosition = drillData?.position || params.position || null;
+  const commanderTimeLimit =
+    drillData?.time_limit_seconds ?? (params.timeLimit ? parseInt(params.timeLimit, 10) : null);
+  const commanderGoal = (drillData?.drill_goal as DrillGoalType) || (params.purpose as DrillGoalType) || 'grouping';
+  const commanderEngagementMode =
+    (drillData?.engagement_mode as EngagementMode) || (params.engagementMode as EngagementMode) || 'solo';
+
+  // Explicit values set by commander (not null = commander set it)
+  const hasExplicitDistance = commanderDistance !== null;
+  const hasExplicitPosition = commanderPosition !== null;
 
   // Derived flags from policy
   const isConfigLocked = executionPolicy === 'locked';
   const hasPrefilledConfig = executionPolicy === 'locked' || executionPolicy === 'guided';
 
   // Goal is ALWAYS locked when coming from a training drill (regardless of policy)
-  // The drill type (grouping/engagement) is set by commander and cannot be changed
-  const isFromTrainingDrill = !!trainingId && !!params.purpose;
+  const isFromTrainingDrill = !!trainingId && (!!drillData || !!params.drillId);
   const isGoalLocked = isFromTrainingDrill;
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // ENGAGEMENT CONFIG STATE (what users actually configure)
+  // ENGAGEMENT CONFIG STATE (soldier's choices)
+  // These start with defaults, then get updated when drillData loads
   // ═══════════════════════════════════════════════════════════════════════════
 
-  const [drillGoal, setDrillGoal] = useState<DrillGoalType>((params.purpose as DrillGoalType) || 'grouping');
-  // Engagement mode from commander config (or default to solo)
-  // Grouping drills are ALWAYS solo (enforced)
-  const initialEngagementMode = params.purpose === 'grouping' ? 'solo' : params.engagementMode || 'solo';
-  const [engagementMode, setEngagementMode] = useState<EngagementMode>(initialEngagementMode);
+  const [drillGoal, setDrillGoal] = useState<DrillGoalType>('grouping');
+  const [engagementMode, setEngagementMode] = useState<EngagementMode>('solo');
+  const [distance, setDistance] = useState(25);
+  const [rounds, setRounds] = useState(5); // bullets
+  const [position, setPosition] = useState<Position>('standing');
+  const [timeLimit, setTimeLimit] = useState<number | null>(null);
 
-  // Debug: Log params on mount
+  // Update state when drillData loads from DB
   useEffect(() => {
-    console.log('[StartEngagement] Params received:', {
-      purpose: params.purpose,
-      engagementMode: params.engagementMode,
-      teamId: params.teamId,
-      initialEngagementMode,
-    });
-  }, []);
-  const [distance, setDistance] = useState(params.distance ? parseInt(params.distance, 10) : 25);
-  const [rounds, setRounds] = useState(params.shots ? parseInt(params.shots, 10) : 5);
-  const [position, setPosition] = useState<Position>((params.position as Position) || 'standing');
-  const [timeLimit, setTimeLimit] = useState<number | null>(params.timeLimit ? parseInt(params.timeLimit, 10) : null);
+    if (!drillData) return;
+
+    console.log('[StartEngagement] Drill loaded from DB:', drillData);
+
+    // Update goal and mode
+    setDrillGoal((drillData.drill_goal as DrillGoalType) || 'grouping');
+    const mode = drillData.drill_goal === 'grouping' ? 'solo' : (drillData.engagement_mode as EngagementMode) || 'solo';
+    setEngagementMode(mode);
+
+    // Update soldier choices (only if commander set them, otherwise keep defaults)
+    if (drillData.distance_m != null) {
+      setDistance(drillData.distance_m);
+    } else if (drillData.distance_category) {
+      // Default based on category
+      switch (drillData.distance_category) {
+        case 'short':
+          setDistance(100);
+          break;
+        case 'medium':
+          setDistance(400);
+          break;
+        case 'long':
+          setDistance(700);
+          break;
+      }
+    }
+
+    if (drillData.rounds_per_shooter != null) {
+      setRounds(drillData.rounds_per_shooter);
+    }
+
+    if (drillData.position) {
+      setPosition(drillData.position as Position);
+    }
+
+    if (drillData.time_limit_seconds != null) {
+      setTimeLimit(drillData.time_limit_seconds);
+    }
+  }, [drillData]);
 
   // ═══════════════════════════════════════════════════════════════════════════
   // SETUP STATE (for invisible Session)
@@ -183,11 +288,13 @@ export default function StartEngagementScreen() {
           const w = await getUserWeapon(weapons[0].id);
           if (w) {
             setWeapon(w);
-            // Apply weapon defaults
+            // Apply weapon defaults (don't override drill-specified distance)
+            // IMPORTANT: For training drills, the commander drill config must win.
             const config = w.category ? getCategoryConfig(w.category) : null;
             if (config) {
-              setDistance(config.distances.zeroDistance);
-              setPosition(config.drillDefaults.defaultPosition as Position);
+              // Only apply defaults when drill did NOT specify them
+              if (!distanceCategory && !hasExplicitDistance) setDistance(config.distances.zeroDistance);
+              if (!hasExplicitPosition) setPosition(config.drillDefaults.defaultPosition as Position);
             }
           }
         }
@@ -198,7 +305,7 @@ export default function StartEngagementScreen() {
       }
     }
     loadDefaultWeapon();
-  }, []);
+  }, [distanceCategory, hasExplicitDistance, hasExplicitPosition]);
 
   // ═══════════════════════════════════════════════════════════════════════════
   // CHECK FOR ACTIVE SESSION OR EXISTING SQUAD ENGAGEMENT
@@ -407,7 +514,8 @@ export default function StartEngagementScreen() {
       }
 
       // Step 1: Get or create Session (INVISIBLE to user)
-      // Session is based on setup params: weapon, environment
+      // Session stores: weapon, environment, and SOLDIER'S CHOICES
+      // Commander's rules come from training_drills (via drill_id FK)
       const sessionWeather = toSessionWeatherData(openWeather, 'openweathermap');
       const isWatchMode = captureMode === 'watch';
 
@@ -416,20 +524,27 @@ export default function StartEngagementScreen() {
         weather: sessionWeather,
         team_id: teamId,
         training_id: trainingId,
+        drill_id: params.drillId || null,
         watch_controlled: isWatchMode,
-        // Drill config stored for reference (engagement params)
-        drill_config: {
-          drill_goal: drillGoal,
-          distance_m: distance,
-          rounds_per_shooter: rounds,
-          position,
-          // Execution policy - controls whether user can reconfigure during active session
-          execution_policy: executionPolicy,
-          ...(timeLimit && { time_limit_seconds: timeLimit }),
-          ...(isWatchMode && { detection_sensitivity: sensitivity }),
-          // Store drill name for squad lobby display
-          ...(drillName && { name: drillName }),
-        },
+        // Soldier's actual choices (stored in explicit columns)
+        soldier_distance_m: distance,
+        soldier_bullets: rounds,
+        soldier_position: position,
+        // DEPRECATED: drill_config is only for solo quick practice (no drill_id)
+        // For team training, rules come from training_drills FK
+        drill_config: !params.drillId
+          ? {
+              drill_goal: drillGoal,
+              distance_m: distance,
+              rounds_per_shooter: rounds,
+              position,
+              execution_policy: executionPolicy,
+              ...(timeLimit && { time_limit_seconds: timeLimit }),
+              ...(isWatchMode && { detection_sensitivity: sensitivity }),
+              ...(distanceCategory && { distance_category: distanceCategory }),
+              ...(drillName && { name: drillName }),
+            }
+          : null,
       });
 
       // Step 2: Create Engagement (the actual execution unit)
@@ -527,17 +642,22 @@ export default function StartEngagementScreen() {
     }
   }, []);
 
-  const handleWeaponSelect = useCallback((w: UserWeapon) => {
-    setWeapon(w);
-    setShowWeaponPicker(false);
-    // Apply weapon defaults
-    const config = w.category ? getCategoryConfig(w.category) : null;
-    if (config) {
-      setDistance(config.distances.zeroDistance);
-      setPosition(config.drillDefaults.defaultPosition as Position);
-    }
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-  }, []);
+  const handleWeaponSelect = useCallback(
+    (w: UserWeapon) => {
+      setWeapon(w);
+      setShowWeaponPicker(false);
+      // Apply weapon defaults (don't override drill-specified distance)
+      // IMPORTANT: For training drills, the commander drill config must win.
+      const config = w.category ? getCategoryConfig(w.category) : null;
+      if (config) {
+        // Only apply defaults when drill did NOT specify them
+        if (!distanceCategory && !hasExplicitDistance) setDistance(config.distances.zeroDistance);
+        if (!hasExplicitPosition) setPosition(config.drillDefaults.defaultPosition as Position);
+      }
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    },
+    [distanceCategory, hasExplicitDistance, hasExplicitPosition]
+  );
 
   const handleWeaponCreated = useCallback(
     async (weaponId: string) => {
@@ -570,10 +690,16 @@ export default function StartEngagementScreen() {
     [handlePresetSelect]
   );
 
-  const adjustDistance = useCallback((delta: number) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setDistance((d) => Math.max(1, d + delta));
-  }, []);
+  const adjustDistance = useCallback(
+    (delta: number) => {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      setDistance((d) => {
+        const next = d + delta;
+        return Math.max(minCategoryDistance, Math.min(maxCategoryDistance, next));
+      });
+    },
+    [minCategoryDistance, maxCategoryDistance]
+  );
 
   const adjustRounds = useCallback((delta: number) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -672,7 +798,15 @@ export default function StartEngagementScreen() {
                   {/* Distance */}
                   <View style={styles.overviewItem}>
                     <Text style={[styles.overviewLabel, { color: colors.textMuted }]}>Distance</Text>
-                    <Text style={[styles.overviewValue, { color: colors.text }]}>{distance}m</Text>
+                    <Text style={[styles.overviewValue, { color: colors.text }]}>
+                      {distanceCategory
+                        ? distanceCategory === 'short'
+                          ? 'Short (0–300m)'
+                          : distanceCategory === 'medium'
+                            ? 'Medium (300–600m)'
+                            : 'Long (600m+)'
+                        : `${distance}m`}
+                    </Text>
                   </View>
 
                   {/* Rounds - only for engagement, grouping gets count from scanned target */}
@@ -700,6 +834,60 @@ export default function StartEngagementScreen() {
                   )}
                 </View>
               </View>
+
+              {/* Distance Selection - when range category is set, soldier picks exact distance */}
+              {distanceCategory && (
+                <View style={styles.section}>
+                  <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>PICK YOUR DISTANCE</Text>
+                  <View style={[styles.counterRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                    <TouchableOpacity
+                      style={[styles.counterBtn, { backgroundColor: colors.secondary }]}
+                      onPress={() => adjustDistance(-5)}
+                    >
+                      <Minus size={18} color={colors.text} />
+                    </TouchableOpacity>
+                    <TextInput
+                      style={[styles.counterInput, { color: colors.text }]}
+                      value={String(distance)}
+                      onChangeText={(t) => setDistance(parseInt(t, 10) || 0)}
+                      keyboardType="number-pad"
+                      selectTextOnFocus
+                    />
+                    <Text style={[styles.counterUnit, { color: colors.textMuted }]}>m</Text>
+                    <TouchableOpacity
+                      style={[styles.counterBtn, { backgroundColor: colors.secondary }]}
+                      onPress={() => adjustDistance(5)}
+                    >
+                      <Plus size={18} color={colors.text} />
+                    </TouchableOpacity>
+                  </View>
+                  <View style={styles.quickDistances}>
+                    {(distanceCategory === 'short'
+                      ? [25, 50, 100, 150, 200, 300]
+                      : distanceCategory === 'medium'
+                        ? [300, 350, 400, 450, 500, 600]
+                        : [600, 700, 800, 900, 1000]
+                    ).map((d) => (
+                      <TouchableOpacity
+                        key={d}
+                        style={[
+                          styles.quickBtn,
+                          {
+                            backgroundColor: distance === d ? colors.primary : colors.card,
+                            borderColor: colors.border,
+                          },
+                        ]}
+                        onPress={() => {
+                          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                          setDistance(d);
+                        }}
+                      >
+                        <Text style={[styles.quickBtnText, { color: distance === d ? '#fff' : colors.text }]}>{d}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+              )}
 
               {/* Weapon Selection (always editable) */}
               <View style={styles.section}>
@@ -850,7 +1038,18 @@ export default function StartEngagementScreen() {
 
               {/* Distance */}
               <View style={styles.section}>
-                <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>DISTANCE (meters)</Text>
+                <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>
+                  {distanceCategory ? 'PICK YOUR DISTANCE' : 'DISTANCE (meters)'}
+                </Text>
+                {distanceCategory && (
+                  <Text style={[styles.rangeHint, { color: colors.blue }]}>
+                    {distanceCategory === 'short'
+                      ? 'Short range: 0–300m'
+                      : distanceCategory === 'medium'
+                        ? 'Medium range: 300–600m'
+                        : 'Long range: 600m+'}
+                  </Text>
+                )}
                 <View style={[styles.counterRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
                   <TouchableOpacity
                     style={[styles.counterBtn, { backgroundColor: colors.secondary }]}
@@ -874,7 +1073,14 @@ export default function StartEngagementScreen() {
                   </TouchableOpacity>
                 </View>
                 <View style={styles.quickDistances}>
-                  {COMMON_DISTANCES.map((d) => (
+                  {(distanceCategory === 'short'
+                    ? [25, 50, 100, 150, 200, 300]
+                    : distanceCategory === 'medium'
+                      ? [300, 350, 400, 450, 500, 600]
+                      : distanceCategory === 'long'
+                        ? [600, 700, 800, 900, 1000]
+                        : COMMON_DISTANCES
+                  ).map((d) => (
                     <TouchableOpacity
                       key={d}
                       style={[
@@ -1081,6 +1287,7 @@ const styles = StyleSheet.create({
   scrollContent: { paddingHorizontal: 20, paddingTop: 12 },
   section: { marginBottom: 24 },
   sectionLabel: { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 10 },
+  rangeHint: { fontSize: 12, fontWeight: '600', marginBottom: 8 },
   lockedSection: { opacity: 0.8 },
 
   // Locked drill banner

@@ -15,7 +15,7 @@
  * 8. Solo           → SoloSessionView (full features)
  */
 
-import { PAPER_TYPE } from '@/constants';
+import { PAPER_TYPE } from '@/constants/drill';
 import { useColors } from '@/hooks/ui/useColors';
 import { useOpenWeather } from '@/hooks/useOpenWeather';
 import { supabase } from '@/lib/supabase';
@@ -26,19 +26,17 @@ import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import {
-  GroupSessionView,
-  SessionPrepView,
-  SoloSessionView,
-  SquadSessionView,
-  TeamTrainingView,
-  WatchFailedView,
-  WatchPreviewView,
-  WatchStartingView,
-  WatchWaitingView,
-  styles,
-  useActiveSession,
-} from '@/components/session/activeSession';
+import { GroupSessionView } from '@/components/session/activeSession/GroupSessionView';
+import { SessionPrepView } from '@/components/session/activeSession/SessionPrepView';
+import { SoloSessionView } from '@/components/session/activeSession/SoloSessionView';
+import { SquadSessionView } from '@/components/session/activeSession/SquadSessionView';
+import { TeamTrainingView } from '@/components/session/activeSession/TeamTrainingView';
+import { styles } from '@/components/session/activeSession/activeSession.styles';
+import { useActiveSession } from '@/components/session/activeSession/useActiveSession';
+import { WatchFailedView } from '@/components/session/activeSession/watch/WatchFailedView';
+import { WatchPreviewView } from '@/components/session/activeSession/watch/WatchPreviewView';
+import { WatchStartingView } from '@/components/session/activeSession/watch/WatchStartingView';
+import { WatchWaitingView } from '@/components/session/activeSession/watch/WatchWaitingView';
 
 export default function ActiveSessionScreen() {
   const insets = useSafeAreaInsets();
@@ -137,13 +135,17 @@ export default function ActiveSessionScreen() {
                   })
                 }
               >
-                <Text style={[localStyles.exitPrimaryText, { color: colors.background }]}>{t('session.returnToTraining')}</Text>
+                <Text style={[localStyles.exitPrimaryText, { color: colors.background }]}>
+                  {t('session.returnToTraining')}
+                </Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={localStyles.exitSecondaryBtn}
                 onPress={() => router.replace('/(protected)/(tabs)')}
               >
-                <Text style={[localStyles.exitSecondaryText, { color: colors.textMuted }]}>{t('session.exitToHome')}</Text>
+                <Text style={[localStyles.exitSecondaryText, { color: colors.textMuted }]}>
+                  {t('session.exitToHome')}
+                </Text>
               </TouchableOpacity>
             </>
           ) : (
@@ -312,6 +314,7 @@ export default function ActiveSessionScreen() {
     return (
       <WatchWaitingView
         insets={insets}
+        session={session}
         drillName={drillName}
         drill={drill}
         isWatchConnected={watchState.watchActivelyControlling}

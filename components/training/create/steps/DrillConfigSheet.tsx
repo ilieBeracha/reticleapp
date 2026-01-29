@@ -4,6 +4,7 @@
  * Allows customizing: distance, shots, time limit, weapon category
  */
 
+import { RANGE_CATEGORIES, type RangeCategory } from '@/constants/drill';
 import { useColors } from '@/hooks/ui/useColors';
 import { getCategoryLabel, WEAPON_CATEGORIES } from '@/services/weaponService';
 import type { WeaponCategory } from '@/types/workspace';
@@ -53,6 +54,7 @@ export function DrillConfigSheet({ visible, drill, onConfirm, onClose }: DrillCo
   const [weaponCategory, setWeaponCategory] = useState<WeaponCategory | null>(drill?.weapon_category || null);
   const [customDistance, setCustomDistance] = useState('');
   const [customShots, setCustomShots] = useState('');
+  const [distanceCategory, setDistanceCategory] = useState<RangeCategory | null>(null);
 
   // Reset when drill changes
   const resetConfig = useCallback(() => {
@@ -64,6 +66,7 @@ export function DrillConfigSheet({ visible, drill, onConfirm, onClose }: DrillCo
       setWeaponCategory(drill.weapon_category || null);
       setCustomDistance('');
       setCustomShots('');
+      setDistanceCategory(null);
     }
   }, [drill]);
 
@@ -74,7 +77,8 @@ export function DrillConfigSheet({ visible, drill, onConfirm, onClose }: DrillCo
     const inputMethod = drill.drill_goal === 'grouping' ? 'scan' : 'manual';
 
     onConfirm({
-      distance_m: distance,
+      distance_m: distanceCategory ? 0 : distance,
+      distance_category: distanceCategory,
       rounds_per_shooter: shots,
       time_limit_seconds: timeLimit,
       strings_count: strings,
@@ -83,12 +87,13 @@ export function DrillConfigSheet({ visible, drill, onConfirm, onClose }: DrillCo
     });
 
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-  }, [drill, distance, shots, timeLimit, strings, weaponCategory, onConfirm]);
+  }, [drill, distance, distanceCategory, shots, timeLimit, strings, weaponCategory, onConfirm]);
 
   const handleDistancePreset = (val: number) => {
     Haptics.selectionAsync();
     setDistance(val);
     setCustomDistance('');
+    setDistanceCategory(null);
   };
 
   const handleCustomDistance = (text: string) => {
@@ -160,47 +165,105 @@ export function DrillConfigSheet({ visible, drill, onConfirm, onClose }: DrillCo
             <View style={styles.sectionHeader}>
               <MapPin size={14} color={colors.textMuted} />
               <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>Distance</Text>
-              <Text style={[styles.sectionValue, { color: colors.text }]}>{distance}m</Text>
+              <Text style={[styles.sectionValue, { color: colors.text }]}>
+                {distanceCategory
+                  ? `${distanceCategory === 'short' ? 'Short (0-300m)' : distanceCategory === 'medium' ? 'Medium (300-600m)' : 'Long (600m+)'}`
+                  : `${distance}m`}
+              </Text>
             </View>
+            {/* Row 1: Mode toggle */}
             <View style={styles.presetRow}>
-              {DISTANCE_PRESETS.map((val) => (
-                <TouchableOpacity
-                  key={val}
-                  style={[
-                    styles.presetChip,
-                    {
-                      backgroundColor: distance === val && !customDistance ? colors.text : 'transparent',
-                      borderColor: distance === val && !customDistance ? colors.text : colors.border,
-                    },
-                  ]}
-                  onPress={() => handleDistancePreset(val)}
-                >
-                  <Text
-                    style={[
-                      styles.presetText,
-                      { color: distance === val && !customDistance ? colors.background : colors.text },
-                    ]}
-                  >
-                    {val}m
-                  </Text>
-                </TouchableOpacity>
-              ))}
-              <TextInput
+              <TouchableOpacity
                 style={[
-                  styles.customInput,
+                  styles.presetChip,
                   {
-                    backgroundColor: customDistance ? colors.text : colors.card,
-                    borderColor: customDistance ? colors.text : colors.border,
-                    color: customDistance ? colors.background : colors.text,
+                    backgroundColor: !distanceCategory ? colors.text : 'transparent',
+                    borderColor: !distanceCategory ? colors.text : colors.border,
                   },
                 ]}
-                placeholder="..."
-                placeholderTextColor={colors.textMuted}
-                keyboardType="number-pad"
-                value={customDistance}
-                onChangeText={handleCustomDistance}
-              />
+                onPress={() => {
+                  Haptics.selectionAsync();
+                  setDistanceCategory(null);
+                }}
+              >
+                <Text style={[styles.presetText, { color: !distanceCategory ? colors.background : colors.text }]}>
+                  Exact
+                </Text>
+              </TouchableOpacity>
+              {RANGE_CATEGORIES.map((cat) => {
+                const isSelected = distanceCategory === cat.value;
+                const desc = cat.max ? `${cat.min}-${cat.max}m` : `${cat.min}m+`;
+                const label = cat.value === 'short' ? 'Short' : cat.value === 'medium' ? 'Medium' : 'Long';
+                return (
+                  <TouchableOpacity
+                    key={cat.value}
+                    style={[
+                      styles.presetChip,
+                      {
+                        backgroundColor: isSelected ? colors.text : 'transparent',
+                        borderColor: isSelected ? colors.text : colors.border,
+                      },
+                    ]}
+                    onPress={() => {
+                      Haptics.selectionAsync();
+                      setDistanceCategory(cat.value);
+                      setCustomDistance('');
+                    }}
+                  >
+                    <Text style={[styles.presetText, { color: isSelected ? colors.background : colors.text }]}>
+                      {label} ({desc})
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
+            {/* Row 2: Exact presets (only when Exact mode) */}
+            {!distanceCategory && (
+              <View style={styles.presetRow}>
+                {DISTANCE_PRESETS.map((val) => (
+                  <TouchableOpacity
+                    key={val}
+                    style={[
+                      styles.presetChip,
+                      {
+                        backgroundColor: distance === val && !customDistance ? colors.text : 'transparent',
+                        borderColor: distance === val && !customDistance ? colors.text : colors.border,
+                      },
+                    ]}
+                    onPress={() => handleDistancePreset(val)}
+                  >
+                    <Text
+                      style={[
+                        styles.presetText,
+                        { color: distance === val && !customDistance ? colors.background : colors.text },
+                      ]}
+                    >
+                      {val}m
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+                <TextInput
+                  style={[
+                    styles.customInput,
+                    {
+                      backgroundColor: customDistance ? colors.text : colors.card,
+                      borderColor: customDistance ? colors.text : colors.border,
+                      color: customDistance ? colors.background : colors.text,
+                    },
+                  ]}
+                  placeholder="..."
+                  placeholderTextColor={colors.textMuted}
+                  keyboardType="number-pad"
+                  value={customDistance}
+                  onChangeText={handleCustomDistance}
+                />
+              </View>
+            )}
+            {distanceCategory && (
+              <Text style={[styles.sectionHint, { color: colors.textMuted }]}>
+                Soldier picks exact distance within this range
+              </Text>
+            )}
           </View>
 
           {/* Shots */}

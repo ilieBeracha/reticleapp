@@ -3,7 +3,7 @@
  *
  * Manage team configuration and preferences - native form sheet
  */
-import { StandardsManager } from '@/components/standards';
+import { StandardsManager } from '@/components/standards/StandardsManager';
 import { useAuth } from '@/contexts/AuthContext';
 import { useColors } from '@/hooks/ui/useColors';
 import { deleteTeam, removeTeamMember, updateTeam } from '@/services/teamService';

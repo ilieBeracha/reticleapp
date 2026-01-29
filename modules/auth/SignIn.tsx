@@ -1,4 +1,4 @@
-import { EmailOTPSheet } from "@/components/auth/EmailOTPSheet";
+import { EmailPasswordSheet } from "@/components/auth/EmailPasswordSheet";
 import { useColors } from "@/hooks/ui/useColors";
 import { Ionicons } from "@expo/vector-icons";
 import { useState } from "react";
@@ -10,7 +10,7 @@ import { SocialButtons } from "./SocialButtons";
 export function SignIn() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const [showEmailOTP, setShowEmailOTP] = useState(false);
+  const [showEmailPassword, setShowEmailPassword] = useState(false);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -35,10 +35,10 @@ export function SignIn() {
             <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
           </View>
 
-          {/* Email OTP Button */}
+          {/* Email + Password Button */}
           <TouchableOpacity
             style={[styles.emailButton, { backgroundColor: colors.cardBackground, borderColor: colors.border }]}
-            onPress={() => setShowEmailOTP(true)}
+            onPress={() => setShowEmailPassword(true)}
           >
             <Ionicons name="mail-outline" size={20} color={colors.tint} />
             <Text style={[styles.emailButtonText, { color: colors.text }]}>
@@ -48,10 +48,10 @@ export function SignIn() {
         </View>
       </ScrollView>
 
-      {/* Email OTP Bottom Sheet */}
-      <EmailOTPSheet
-        visible={showEmailOTP}
-        onClose={() => setShowEmailOTP(false)}
+      {/* Email + Password Sheet */}
+      <EmailPasswordSheet
+        visible={showEmailPassword}
+        onClose={() => setShowEmailPassword(false)}
       />
     </View>
   );

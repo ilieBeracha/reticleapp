@@ -6,15 +6,17 @@
  */
 
 import { useColors } from '@/hooks/ui/useColors';
-import type { SessionDrillConfig } from '@/services/session/types';
-import { useTranslation } from 'react-i18next';
+import type { SessionDrillConfig, SessionWithDetails } from '@/services/session/types';
 import { MapPin, Target, Watch, X } from 'lucide-react-native';
+import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { EdgeInsets } from 'react-native-safe-area-context';
+import { formatDistanceDisplay } from '../activeSession.helpers';
 import { styles as sharedStyles } from '../activeSession.styles';
 
 interface WatchWaitingViewProps {
   insets: EdgeInsets;
+  session: SessionWithDetails;
   drillName: string;
   drill: SessionDrillConfig | null | undefined;
   isWatchConnected: boolean;
@@ -26,6 +28,7 @@ interface WatchWaitingViewProps {
 
 export function WatchWaitingView({
   insets,
+  session,
   drillName,
   drill,
   isWatchConnected,
@@ -66,17 +69,22 @@ export function WatchWaitingView({
         </View>
 
         <Text style={[styles.title, { color: colors.text }]}>{t('session.sessionRunningOnWatch')}</Text>
-        <Text style={[styles.subtitle, { color: colors.textMuted }]}>
-          {t('session.focusOnShooting')}
-        </Text>
+        <Text style={[styles.subtitle, { color: colors.textMuted }]}>{t('session.focusOnShooting')}</Text>
 
         {drill && (
           <View style={[styles.drillChip, { backgroundColor: colors.card }]}>
             <MapPin size={14} color={colors.textMuted} />
-            <Text style={[styles.drillChipText, { color: colors.text }]}>{drill.distance_m}m</Text>
+            <Text style={[styles.drillChipText, { color: colors.text }]}>
+              {/* Soldier's choice first, then commander's distance/category */}
+              {session.soldier_distance_m
+                ? `${session.soldier_distance_m}m`
+                : formatDistanceDisplay(drill.distance_m, drill.distance_category, t)}
+            </Text>
             <View style={[styles.drillChipDivider, { backgroundColor: colors.border }]} />
             <Target size={14} color={colors.textMuted} />
-            <Text style={[styles.drillChipText, { color: colors.text }]}>{t('session.shotsCount', { count: drill.rounds_per_shooter })}</Text>
+            <Text style={[styles.drillChipText, { color: colors.text }]}>
+              {t('session.shotsCount', { count: session.soldier_bullets ?? drill.rounds_per_shooter })}
+            </Text>
           </View>
         )}
       </View>

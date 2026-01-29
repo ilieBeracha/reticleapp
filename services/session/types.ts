@@ -78,7 +78,7 @@ export interface Engagement {
 /** State of a participant in a squad engagement */
 export type ParticipantState = 'pending' | 'joined' | 'declined' | 'left';
 
-/** 
+/**
  * Engagement role: shooter (fires weapon) or spotter (observer/assistant).
  * Different from ParticipantRole which is for broader session context.
  */
@@ -184,6 +184,8 @@ export interface DrillConfig {
   target_type?: 'paper' | 'tactical';
   input_method?: 'scan' | 'manual' | null; // User's explicit choice
   distance_m: number;
+  /** Range category constraint (short/medium/long). Soldier picks exact distance within range. */
+  distance_category?: RangeCategory | null;
   rounds_per_shooter: number;
   time_limit_seconds?: number | null;
   strings_count?: number | null; // Number of entries allowed (null = unlimited)
@@ -223,7 +225,7 @@ export interface BaseSessionConfig {
   // Config source (ONE of these, or neither for blank session)
   drill_id: string | null; // Reference to saved drill/preset
   drill_template_id?: string | null; // @deprecated - use drill_id
-  drill_config: DrillConfig | null; // Inline custom drill
+  drill_config: DrillConfig | null; // Inline custom drill (DEPRECATED for team training)
 
   // Session mode
   session_mode: 'solo' | 'group';
@@ -240,6 +242,17 @@ export interface BaseSessionConfig {
   // Start as pending (for watch selection flow)
   // When true, session is created as 'pending' and user must call activateSession()
   start_as_pending?: boolean;
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SOLDIER CHOICES - Values chosen by soldier when commander allows flexibility
+  // Commander sets rules in training_drills, soldier picks within those constraints
+  // ═══════════════════════════════════════════════════════════════════════════
+  /** Actual distance soldier chose (when commander set distance_category or NULL distance_m) */
+  soldier_distance_m?: number | null;
+  /** Actual bullets soldier chose (when commander left rounds_per_shooter NULL) */
+  soldier_bullets?: number | null;
+  /** Actual position soldier chose (when commander left position NULL) */
+  soldier_position?: string | null;
 }
 
 /**
@@ -262,6 +275,9 @@ export interface CreateSessionParams {
   custom_drill_config?: DrillConfig;
 }
 
+/** Range category for distance selection (soldier picks exact distance within range) */
+export type RangeCategory = 'short' | 'medium' | 'long';
+
 /** Drill configuration embedded in session */
 export interface SessionDrillConfig {
   id: string;
@@ -269,7 +285,8 @@ export interface SessionDrillConfig {
   drill_goal: DrillGoal; // Primary: what the drill measures
   target_type: 'paper' | 'tactical'; // Secondary: input method hint
   input_method?: 'scan' | 'manual' | null; // Commander's explicit choice (overrides target_type inference)
-  distance_m: number;
+  distance_m?: number | null; // Exact distance (null when using distance_category)
+  distance_category?: RangeCategory | null; // Range category (short 0-300, medium 300-600, long 600+)
   rounds_per_shooter: number;
   time_limit_seconds?: number | null;
   par_time_seconds?: number | null;
@@ -322,7 +339,7 @@ export interface SessionWithDetails {
   training_title?: string | null;
   drill_id: string | null;
   drill_name?: string | null;
-  drill_config?: SessionDrillConfig | null; // Full drill configuration
+  drill_config?: SessionDrillConfig | null; // Full drill configuration (from FK join)
   weapon_id: string | null; // Reference to user's weapon profile
   weapon_name?: string | null; // Joined weapon name
   weapon_category?: string | null; // Weapon category for detection sensitivity
@@ -340,6 +357,17 @@ export interface SessionWithDetails {
   stats?: SessionAggregatedStats;
   // Engagement (execution unit) - populated when fetched with engagement
   engagement?: Engagement | null;
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SOLDIER CHOICES - Values chosen by soldier at execution time
+  // These override drill defaults when commander allows flexibility
+  // ═══════════════════════════════════════════════════════════════════════════
+  /** Actual distance soldier shot at (when commander set distance_category or NULL distance_m) */
+  soldier_distance_m?: number | null;
+  /** Actual bullets soldier used (when commander left rounds_per_shooter NULL) */
+  soldier_bullets?: number | null;
+  /** Actual position soldier used (when commander left position NULL) */
+  soldier_position?: string | null;
 }
 
 // ============================================================================

@@ -1,4 +1,4 @@
-import { PaperTargetFlow } from '@/components/targets';
+import { PaperTargetFlow } from '@/components/targets/PaperTargetFlow';
 import type { PaperType } from '@/services/sessionService';
 import { useLocalSearchParams } from 'expo-router';
 

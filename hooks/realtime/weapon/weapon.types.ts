@@ -4,8 +4,8 @@
  * Hook options and return types for weapon subscriptions.
  */
 
-import type { ChangePayload } from '../table';
-import type { TeamWeaponRecord, WeaponRequestRecord } from '../records';
+import type { ChangePayload } from '../table/table.types';
+import type { TeamWeaponRecord, WeaponRequestRecord } from '../records/weapon';
 
 export interface UseWeaponRealtimeOptions {
   /** Team ID to subscribe to */

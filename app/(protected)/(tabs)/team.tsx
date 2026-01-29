@@ -7,54 +7,54 @@
 
 import { NoTeamsEmptyState } from '@/components/teams/NoTeamsEmptyState';
 import { TeamSwitcherPill, TeamSwitcherSheet } from '@/components/teams/TeamSwitcherSheet';
-import { getStatusConfig } from '@/components/training';
+import { getStatusConfig } from '@/components/training/utils';
 import { COLORS, PULSE_ANIMATION } from '@/components/training/trainings.constants';
 import { groupTrainingsByTimeframe } from '@/components/training/trainings.helpers';
 import { styles } from '@/components/training/trainings.styles';
 import { useTrainings } from '@/components/training/useTrainings';
-import { RequestWeaponModal } from '@/components/weapons';
+import { RequestWeaponModal } from '@/components/weapons/RequestWeaponModal';
 import { useColors } from '@/hooks/ui/useColors';
 import {
-    cancelWeaponRequest,
-    getCategoryLabel,
-    getMyPendingRequest,
-    getPoolWeapons,
-    getTeamWeaponForUser,
-    type TeamWeapon,
-    type WeaponRequest,
+  cancelWeaponRequest,
+  getCategoryLabel,
+  getMyPendingRequest,
+  getPoolWeapons,
+  getTeamWeaponForUser,
+  type TeamWeapon,
+  type WeaponRequest,
 } from '@/services/weaponService';
 import type { TrainingWithDetails } from '@/types/workspace';
 import { format } from 'date-fns';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
-import { useTranslation } from 'react-i18next';
 import {
-    Activity,
-    BarChart3,
-    Calendar,
-    ChevronRight,
-    Clock,
-    Gift,
-    Plus,
-    Settings,
-    Shield,
-    ShieldCheck,
-    Target,
-    UserPlus,
-    Users,
-    X,
-    Zap,
+  Activity,
+  BarChart3,
+  Calendar,
+  ChevronRight,
+  Clock,
+  Gift,
+  Plus,
+  Settings,
+  Shield,
+  ShieldCheck,
+  Target,
+  UserPlus,
+  Users,
+  X,
+  Zap,
 } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
-    ActivityIndicator,
-    Animated,
-    RefreshControl,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Animated,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -108,7 +108,7 @@ function TrainingRow({
   onViewReport?: () => void;
 }) {
   const { t } = useTranslation();
-  const statusConfig = getStatusConfig(training.status, t);
+  const statusConfig = getStatusConfig(training.status);
   const date = new Date(training.scheduled_at);
   const isLive = training.status === 'ongoing';
   const isFinished = training.status === 'finished';
@@ -280,7 +280,9 @@ function ScheduleView({
         {upcomingTrainings.length === 0 ? (
           <View style={[scheduleStyles.emptyCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Calendar size={20} color={colors.textMuted} style={{ opacity: 0.6 }} />
-            <Text style={[scheduleStyles.emptyCardText, { color: colors.textMuted }]}>{t('training.noTrainingsScheduled')}</Text>
+            <Text style={[scheduleStyles.emptyCardText, { color: colors.textMuted }]}>
+              {t('training.noTrainingsScheduled')}
+            </Text>
             {canSchedule && (
               <TouchableOpacity
                 style={[scheduleStyles.emptyCardBtn, { backgroundColor: colors.secondary }]}
@@ -296,7 +298,6 @@ function ScheduleView({
           <View style={scheduleStyles.list}>
             {upcomingTrainings.map((training) => {
               const isLive = training.status === 'ongoing';
-              const statusConfig = getStatusConfig(training.status, t);
 
               return (
                 <TouchableOpacity
@@ -353,7 +354,9 @@ function ScheduleView({
         {pastTrainings.length === 0 ? (
           <View style={[scheduleStyles.emptyCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <BarChart3 size={20} color={colors.textMuted} style={{ opacity: 0.6 }} />
-            <Text style={[scheduleStyles.emptyCardText, { color: colors.textMuted }]}>{t('training.noCompletedTrainingsYet')}</Text>
+            <Text style={[scheduleStyles.emptyCardText, { color: colors.textMuted }]}>
+              {t('training.noCompletedTrainingsYet')}
+            </Text>
           </View>
         ) : (
           <>
@@ -855,7 +858,9 @@ function ManageTab({
             <Text style={manageStyles.liveBannerTitle} numberOfLines={1}>
               {liveTraining.title}
             </Text>
-            <Text style={manageStyles.liveBannerMeta}>{t('teams.activeMembers', { count: memberStats.training })} • {t('teams.tapToView')}</Text>
+            <Text style={manageStyles.liveBannerMeta}>
+              {t('teams.activeMembers', { count: memberStats.training })} • {t('teams.tapToView')}
+            </Text>
           </View>
           <ChevronRight size={16} color="rgba(255,255,255,0.7)" />
         </TouchableOpacity>
@@ -869,7 +874,9 @@ function ManageTab({
           activeOpacity={0.85}
         >
           <Plus size={18} color={colors.background} strokeWidth={2.5} />
-          <Text style={[manageStyles.primaryActionText, { color: colors.background }]}>{t('training.createTraining')}</Text>
+          <Text style={[manageStyles.primaryActionText, { color: colors.background }]}>
+            {t('training.createTraining')}
+          </Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[manageStyles.secondaryAction, { backgroundColor: colors.card, borderColor: colors.border }]}
@@ -955,7 +962,9 @@ function ManageTab({
               )}
             </View>
             <View>
-              <Text style={[manageStyles.teamCardTitle, { color: colors.text }]}>{t('teams.membersCount', { count: members.length })}</Text>
+              <Text style={[manageStyles.teamCardTitle, { color: colors.text }]}>
+                {t('teams.membersCount', { count: members.length })}
+              </Text>
               <View style={manageStyles.statusDots}>
                 {memberStats.training > 0 && (
                   <View style={manageStyles.statusDotItem}>
@@ -1519,7 +1528,9 @@ function UnifiedTeamTab({
             <Text style={unifiedStyles.liveBannerTitle} numberOfLines={1}>
               {liveTraining.title}
             </Text>
-            <Text style={unifiedStyles.liveBannerMeta}>{t('teams.activeMembers', { count: memberStats.training })} • {t('teams.tapToView')}</Text>
+            <Text style={unifiedStyles.liveBannerMeta}>
+              {t('teams.activeMembers', { count: memberStats.training })} • {t('teams.tapToView')}
+            </Text>
           </View>
           <ChevronRight size={16} color="rgba(255,255,255,0.7)" />
         </TouchableOpacity>
@@ -1573,7 +1584,9 @@ function UnifiedTeamTab({
                 <Clock size={14} color={colors.yellow} />
                 <Text style={[soldierStyles.pendingTitle, { color: colors.yellow }]}>{t('teams.requestPending')}</Text>
               </View>
-              <Text style={[soldierStyles.pendingText, { color: colors.text }]}>{t('teams.awaitingCommanderReview')}</Text>
+              <Text style={[soldierStyles.pendingText, { color: colors.text }]}>
+                {t('teams.awaitingCommanderReview')}
+              </Text>
               {myPendingRequest.weapon_category && (
                 <Text style={[soldierStyles.pendingPreference, { color: colors.textMuted }]}>
                   {t('teams.preferred')}: {getCategoryLabel(myPendingRequest.weapon_category)}
@@ -1589,7 +1602,9 @@ function UnifiedTeamTab({
                 ) : (
                   <>
                     <X size={14} color={colors.destructive} />
-                    <Text style={[soldierStyles.cancelBtnText, { color: colors.destructive }]}>{t('teams.cancelRequest')}</Text>
+                    <Text style={[soldierStyles.cancelBtnText, { color: colors.destructive }]}>
+                      {t('teams.cancelRequest')}
+                    </Text>
                   </>
                 )}
               </TouchableOpacity>
@@ -1614,7 +1629,9 @@ function UnifiedTeamTab({
                   <Text style={soldierStyles.countText}>{poolWeapons.length}</Text>
                 </View>
               </View>
-              <Text style={[soldierStyles.poolHint, { color: colors.textMuted }]}>{t('teams.availableForAllMembers')}</Text>
+              <Text style={[soldierStyles.poolHint, { color: colors.textMuted }]}>
+                {t('teams.availableForAllMembers')}
+              </Text>
               {poolWeapons.map((weapon) => (
                 <View
                   key={weapon.id}
@@ -1644,7 +1661,9 @@ function UnifiedTeamTab({
             activeOpacity={0.85}
           >
             <Plus size={18} color={colors.background} strokeWidth={2.5} />
-            <Text style={[unifiedStyles.primaryActionText, { color: colors.background }]}>{t('training.createTraining')}</Text>
+            <Text style={[unifiedStyles.primaryActionText, { color: colors.background }]}>
+              {t('training.createTraining')}
+            </Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[unifiedStyles.secondaryAction, { backgroundColor: colors.card, borderColor: colors.border }]}
@@ -1740,7 +1759,9 @@ function UnifiedTeamTab({
               )}
             </View>
             <View>
-              <Text style={[unifiedStyles.teamCardTitle, { color: colors.text }]}>{t('teams.membersCount', { count: members.length })}</Text>
+              <Text style={[unifiedStyles.teamCardTitle, { color: colors.text }]}>
+                {t('teams.membersCount', { count: members.length })}
+              </Text>
               <View style={unifiedStyles.statusDots}>
                 {memberStats.training > 0 && (
                   <View style={unifiedStyles.statusDotItem}>

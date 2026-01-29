@@ -1,11 +1,11 @@
 /**
  * DRILL SERVICE (Simplified Architecture)
- * 
+ *
  * Key concepts:
  * - Canonical Drills: Global, read-only execution patterns ("verbs")
  * - Team Presets: Saved configurations referencing canonical drills
  * - Training Instances: Config used in a specific training (not stored here)
- * 
+ *
  * "Drills are verbs. Presets are shortcuts. Standards are judgment."
  */
 
@@ -62,11 +62,18 @@ export interface TeamDrillPreset {
 }
 
 /**
+ * Range category for distance selection
+ */
+export type RangeCategory = 'short' | 'medium' | 'long';
+
+/**
  * Drill configuration for a training instance
  */
 export interface DrillConfig {
   /** Distance in meters - null means soldier chooses */
   distance_m: number | null;
+  /** Range category (short/medium/long) - soldier picks exact distance within range */
+  distance_category?: RangeCategory | null;
   /** Number of rounds - null means soldier chooses */
   rounds: number | null;
   time_limit_seconds?: number | null;
@@ -78,13 +85,13 @@ export interface DrillConfig {
  * Training drill item - what gets added to a training
  */
 export interface TrainingDrillItem {
-  id: string;                    // Instance ID
-  drill_id: string;              // References canonical drill
+  id: string; // Instance ID
+  drill_id: string; // References canonical drill
   config: DrillConfig;
-  preset_id?: string;            // If loaded from preset
+  preset_id?: string; // If loaded from preset
   // Display helpers (computed from canonical drill)
   name?: string;
-  description?: string | null;   // Drill explanation/purpose
+  description?: string | null; // Drill explanation/purpose
   drill_goal?: DrillGoal;
   target_type?: TargetType;
   /**
@@ -92,7 +99,7 @@ export interface TrainingDrillItem {
    * - 'locked': Must execute exactly as defined (qualification, assessment)
    * - 'guided': Defaults pre-filled, soldier may adjust (training)
    * - 'free': Drill is just a label, full freedom (open practice)
-   * 
+   *
    * Default: 'locked' (commander intent is respected)
    */
   execution_policy?: 'locked' | 'guided' | 'free';
@@ -100,7 +107,7 @@ export interface TrainingDrillItem {
    * Engagement Mode - Commander's intent for how drill should be executed
    * - 'solo': Individual execution only (default for grouping)
    * - 'squad': Squad participation allowed (engagement only)
-   * 
+   *
    * NOTE: For grouping drills, this MUST be 'solo' (enforced by canonical model)
    */
   engagement_mode?: 'solo' | 'squad';
@@ -114,10 +121,7 @@ export interface TrainingDrillItem {
  * Get all canonical drills
  */
 export async function getAllDrills(): Promise<CanonicalDrill[]> {
-  const { data, error } = await supabase
-    .from('drills')
-    .select('*')
-    .order('sort_order', { ascending: true });
+  const { data, error } = await supabase.from('drills').select('*').order('sort_order', { ascending: true });
 
   if (error) {
     console.error('[DrillService] Failed to fetch drills:', error);
@@ -149,11 +153,7 @@ export async function getDrillsByCategory(category: DrillCategory): Promise<Cano
  * Get a single drill by ID
  */
 export async function getDrill(drillId: string): Promise<CanonicalDrill | null> {
-  const { data, error } = await supabase
-    .from('drills')
-    .select('*')
-    .eq('id', drillId)
-    .single();
+  const { data, error } = await supabase.from('drills').select('*').eq('id', drillId).single();
 
   if (error) {
     if (error.code === 'PGRST116') return null;
@@ -169,7 +169,7 @@ export async function getDrill(drillId: string): Promise<CanonicalDrill | null> 
  */
 export async function getDrillsGroupedByCategory(): Promise<Record<DrillCategory, CanonicalDrill[]>> {
   const drills = await getAllDrills();
-  
+
   const grouped: Record<DrillCategory, CanonicalDrill[]> = {
     zeroing: [],
     grouping: [],
@@ -196,10 +196,12 @@ export async function getDrillsGroupedByCategory(): Promise<Record<DrillCategory
 export async function getTeamPresets(teamId: string): Promise<TeamDrillPreset[]> {
   const { data, error } = await supabase
     .from('team_drill_presets')
-    .select(`
+    .select(
+      `
       *,
       drill:drills(*)
-    `)
+    `
+    )
     .eq('team_id', teamId)
     .order('created_at', { ascending: false });
 
@@ -217,10 +219,12 @@ export async function getTeamPresets(teamId: string): Promise<TeamDrillPreset[]>
 export async function getPresetsForDrill(teamId: string, drillId: string): Promise<TeamDrillPreset[]> {
   const { data, error } = await supabase
     .from('team_drill_presets')
-    .select(`
+    .select(
+      `
       *,
       drill:drills(*)
-    `)
+    `
+    )
     .eq('team_id', teamId)
     .eq('drill_id', drillId)
     .order('created_at', { ascending: false });
@@ -264,10 +268,12 @@ export async function createTeamPreset(input: CreatePresetInput): Promise<TeamDr
       strings_count: input.strings_count || 1,
       created_by: userData.user.id,
     })
-    .select(`
+    .select(
+      `
       *,
       drill:drills(*)
-    `)
+    `
+    )
     .single();
 
   if (error) {
@@ -282,7 +288,7 @@ export async function createTeamPreset(input: CreatePresetInput): Promise<TeamDr
  * Update a team preset
  */
 export async function updateTeamPreset(
-  presetId: string, 
+  presetId: string,
   updates: Partial<Omit<CreatePresetInput, 'team_id' | 'drill_id'>>
 ): Promise<TeamDrillPreset> {
   const { data, error } = await supabase
@@ -296,10 +302,12 @@ export async function updateTeamPreset(
       strings_count: updates.strings_count,
     })
     .eq('id', presetId)
-    .select(`
+    .select(
+      `
       *,
       drill:drills(*)
-    `)
+    `
+    )
     .single();
 
   if (error) {
@@ -314,10 +322,7 @@ export async function updateTeamPreset(
  * Delete a team preset
  */
 export async function deleteTeamPreset(presetId: string): Promise<void> {
-  const { error } = await supabase
-    .from('team_drill_presets')
-    .delete()
-    .eq('id', presetId);
+  const { error } = await supabase.from('team_drill_presets').delete().eq('id', presetId);
 
   if (error) {
     console.error('[DrillService] Failed to delete preset:', error);
@@ -386,10 +391,7 @@ export function buildTrainingDrillItemFromPreset(preset: TeamDrillPreset): Train
 /**
  * Get display name for a drill (uses preset label if available)
  */
-export function getDrillDisplayName(
-  drill: CanonicalDrill,
-  preset?: TeamDrillPreset | null
-): string {
+export function getDrillDisplayName(drill: CanonicalDrill, preset?: TeamDrillPreset | null): string {
   if (preset?.label) {
     return preset.label;
   }

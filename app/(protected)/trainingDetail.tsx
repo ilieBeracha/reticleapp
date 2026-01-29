@@ -11,13 +11,15 @@
  *   - Drills tab: Active session banner, planned drills list
  *   - Results tab: Summary card, completed sessions history
  */
-import { useTrainingDetail } from '@/components/training';
+import { TrainingHero } from '@/components/training/detail/TrainingHero';
+import { TrainingSettingsModal } from '@/components/training/detail/TrainingSettingsModal';
+import { useTrainingDetail } from '@/components/training/hooks/useTrainingDetail';
+import { RunDrillSheet } from '@/components/training/RunDrillSheet';
 import { SquadInvitationBanner } from '@/components/training/SquadInvitationBanner';
 import { SquadLobbyBanner } from '@/components/training/SquadLobbyBanner';
-import { TrainingHero, TrainingSettingsModal } from '@/components/training/detail';
 import { useAuth } from '@/contexts/AuthContext';
 import { useModals } from '@/contexts/ModalContext';
-import { useTrainingRealtime } from '@/hooks/realtime';
+import { useTrainingRealtime } from '@/hooks/realtime/training/useTrainingRealtime';
 import { useColors } from '@/hooks/ui/useColors';
 import { usePermissions } from '@/hooks/usePermissions';
 import { getTrainingSessionsWithStats, SessionWithDetails } from '@/services/sessionService';
@@ -510,10 +512,17 @@ function DrillRow({
         </View>
         <Text style={[styles.sessionMeta, { color: colors.textMuted }]}>
           {isGrouping ? t('session.grouping') : t('session.engagement')}
-          {drill.distance_m != null ? ` · ${drill.distance_m}m` : ''}
+          {drill.distance_category
+            ? ` · ${drill.distance_category === 'short' ? t('training.shortRange') : drill.distance_category === 'medium' ? t('training.mediumRange') : t('training.longRange')}`
+            : drill.distance_m != null
+              ? ` · ${drill.distance_m}m`
+              : ''}
           {drill.rounds_per_shooter != null ? ` · ${drill.rounds_per_shooter} ${t('session.shots')}` : ''}
           {drill.position && ` · ${t(`session.${drill.position}`)}`}
-          {drill.distance_m == null && drill.rounds_per_shooter == null && ` · ${t('training.soldierChooses')}`}
+          {!drill.distance_category &&
+            drill.distance_m == null &&
+            drill.rounds_per_shooter == null &&
+            ` · ${t('training.soldierChooses')}`}
         </Text>
       </View>
       {canStart && (
@@ -715,6 +724,9 @@ export default function TrainingDetailScreen() {
   const [showSettings, setShowSettings] = useState(false);
   const [completedSessions, setCompletedSessions] = useState<SessionWithDetails[]>([]);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  // Start drill sheet state
+  const [selectedDrill, setSelectedDrill] = useState<TrainingDrill | null>(null);
+  const [showStartDrillSheet, setShowStartDrillSheet] = useState(false);
 
   const isMountedRef = useRef(true);
 
@@ -861,33 +873,22 @@ export default function TrainingDetailScreen() {
   }, [training?.id, isUpdatingStatus, setTraining]);
 
   // ─────────────────────────────────────────────────────────────────────────────
-  // Drill Start Handler
+  // Drill Start Handler - Opens bottom sheet instead of navigating
   // ─────────────────────────────────────────────────────────────────────────────
   const handleStartDrill = useCallback(
     (drill: TrainingDrill) => {
       if (!training?.id) return;
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-
-      router.push({
-        pathname: '/(protected)/startEngagement',
-        params: {
-          teamId: training.team_id || '',
-          trainingId: training.id,
-          purpose: drill.drill_goal || 'grouping',
-          distance: String(drill.distance_m || 25),
-          shots: String(drill.rounds_per_shooter || 5),
-          position: drill.position || '',
-          timeLimit: drill.time_limit_seconds ? String(drill.time_limit_seconds) : '',
-          drillName: drill.name || `Drill`,
-          executionPolicy: drill.execution_policy || 'locked',
-          engagementMode: drill.engagement_mode || 'solo',
-          returnTo: 'trainingDetail',
-          returnId: training.id,
-        },
-      });
+      setSelectedDrill(drill);
+      setShowStartDrillSheet(true);
     },
-    [training?.id, training?.team_id]
+    [training?.id]
   );
+
+  const handleCloseStartDrillSheet = useCallback(() => {
+    setShowStartDrillSheet(false);
+    setSelectedDrill(null);
+  }, []);
 
   // ─────────────────────────────────────────────────────────────────────────────
   // Loading State
@@ -954,6 +955,15 @@ export default function TrainingDetailScreen() {
         training={training}
         onUpdate={setTraining}
         colors={colors}
+      />
+
+      {/* Run Drill Sheet - soldier picks values and runs drill */}
+      <RunDrillSheet
+        visible={showStartDrillSheet}
+        onClose={handleCloseStartDrillSheet}
+        drill={selectedDrill}
+        trainingId={training.id}
+        teamId={training.team_id || ''}
       />
     </View>
   );

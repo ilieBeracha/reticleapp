@@ -1,4 +1,4 @@
-import { SessionHistoryCatalog } from '@/components/session/history';
+import { SessionHistoryCatalog } from '@/components/session/history/SessionHistoryCatalog';
 import { useColors } from '@/hooks/ui/useColors';
 import { Stack, useRouter } from 'expo-router';
 import { Platform, StyleSheet, View } from 'react-native';
