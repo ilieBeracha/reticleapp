@@ -20,7 +20,7 @@ import {
   formatTime,
   getAccuracyColor,
   isDrillLimitReached,
-} from '../activeSession.helpers';
+} from '@/utils/activeSession.helpers';
 import type { DrillProgress } from '@/types/activeSession';
 
 // ============================================================================

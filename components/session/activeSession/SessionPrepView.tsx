@@ -37,7 +37,7 @@ import Animated, {
     withSequence,
     withTiming,
 } from 'react-native-reanimated';
-import { formatDistanceDisplay } from './activeSession.helpers';
+import { formatDistanceDisplay } from '@/utils/activeSession.helpers';
 
 interface SessionPrepViewProps {
   session: SessionWithDetails;

@@ -22,7 +22,7 @@ import {
     calculateTeamStatsFromSessions,
     getRoleConfig,
     type SessionStatsData,
-} from './trainings.helpers';
+} from '@/utils/trainings.helpers';
 import type { InternalTab, UseTrainingsReturn } from '@/types/trainings';
 
 export function useTrainings(): UseTrainingsReturn {

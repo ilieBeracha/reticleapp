@@ -21,8 +21,8 @@ import {
   DRILL_GOAL_OPTIONS,
   SORT_OPTIONS,
   STATUS_OPTIONS,
-} from './SessionHistory.constants';
-import { countActiveFilters } from './SessionHistory.helpers';
+} from '@/constants/sessionHistory';
+import { countActiveFilters } from '@/utils/sessionHistory.helpers';
 import type { DateRangePreset, SessionFilters, SortConfig, SortField } from '@/types/sessionHistory';
 
 interface FilterSheetProps {

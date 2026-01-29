@@ -13,8 +13,8 @@ import React, { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeInDown, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
-import { STREAK_DISPLAY_THRESHOLD } from '../UnifiedHomePage.constants';
-import { formatDuration } from '../UnifiedHomePage.helpers';
+import { STREAK_DISPLAY_THRESHOLD } from '@/constants/unifiedHomePage';
+import { formatDuration } from '@/utils/unifiedHomePage.helpers';
 import type { WeeklyStatsCardProps } from '@/types/home';
 
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);

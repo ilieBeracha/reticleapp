@@ -2,8 +2,8 @@ import { getRecentSessionsWithStats } from '@/services/session/queries';
 import type { SessionWithDetails } from '@/types/session';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import { DEFAULT_FILTERS, DEFAULT_SORT, PAGE_SIZE } from './SessionHistory.constants';
-import { applyFilters, applySearch, applySorting } from './SessionHistory.helpers';
+import { DEFAULT_FILTERS, DEFAULT_SORT, PAGE_SIZE } from '@/constants/sessionHistory';
+import { applyFilters, applySearch, applySorting } from '@/utils/sessionHistory.helpers';
 import type {
   SessionFilters,
   SessionHistoryState,

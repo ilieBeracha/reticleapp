@@ -11,8 +11,8 @@ import { formatMaxShots } from '@/utils/drillShots';
 import { Camera, Check, Clock, Focus, Lock, MapPin, Target, Trophy, Zap } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, View } from 'react-native';
-import { COLORS } from '../activeSession.constants';
-import { formatDistanceDisplay, formatTime } from '../activeSession.helpers';
+import { COLORS } from '@/constants/activeSession';
+import { formatDistanceDisplay, formatTime } from '@/utils/activeSession.helpers';
 import type { DrillProgress } from '@/types/activeSession';
 
 interface DrillBannerProps {

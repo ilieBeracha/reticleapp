@@ -16,7 +16,7 @@ import {
   View,
 } from 'react-native';
 
-import { countActiveFilters } from './SessionHistory.helpers';
+import { countActiveFilters } from '@/utils/sessionHistory.helpers';
 import type { SessionHistoryCatalogProps } from '@/types/sessionHistory';
 import { FilterSheet } from './FilterSheet';
 import { SessionCard } from './SessionCard';

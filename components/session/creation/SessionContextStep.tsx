@@ -19,7 +19,7 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, Modal, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { CategoryDrillPicker } from '../CategoryDrillPicker';
-import { DISTANCE_PRESETS, POSITION_OPTIONS, SHOTS_PRESETS, TIME_PRESETS } from './sessionCreation.constants';
+import { DISTANCE_PRESETS, POSITION_OPTIONS, SHOTS_PRESETS, TIME_PRESETS } from '@/constants/sessionCreation';
 import type { Position, RangeCategory, SessionContextState, SessionPurpose } from '@/types/sessionCreation';
 
 // ============================================================================

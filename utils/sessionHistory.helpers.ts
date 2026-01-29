@@ -1,6 +1,6 @@
 import type { SessionWithDetails } from '@/types/session';
 import type { DateRangePreset, SessionFilters, SortConfig } from '@/types/sessionHistory';
-import { DATE_RANGE_OPTIONS } from './SessionHistory.constants';
+import { DATE_RANGE_OPTIONS } from '@/constants/sessionHistory';
 
 // ============================================================================
 // DATE HELPERS

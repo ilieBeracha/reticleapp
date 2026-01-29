@@ -27,14 +27,14 @@ import { useTeamStore } from '@/stores/teamStore';
 import { useTrainingStore } from '@/stores/trainingStore';
 import { mapSessionToHomeSession, type HomeSession } from '@/types/home.viewmodel';
 import { useHomeState } from '../useHomeState';
-import { RECENT_SESSIONS_LIMIT, SESSION_FETCH_DAYS, SESSION_FETCH_LIMIT } from './UnifiedHomePage.constants';
+import { RECENT_SESSIONS_LIMIT, SESSION_FETCH_DAYS, SESSION_FETCH_LIMIT } from '@/constants/unifiedHomePage';
 import {
   calculateLastSessionDaysAgo,
   calculateStreak,
   calculateWeeklyStats,
   getCoachMessage,
   getGreeting,
-} from './UnifiedHomePage.helpers';
+} from '@/utils/unifiedHomePage.helpers';
 import type { HeroMode, WeeklyStats } from '@/types/home';
 
 export function useUnifiedHomePage() {

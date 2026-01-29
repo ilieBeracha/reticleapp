@@ -32,7 +32,7 @@ import { useTeamStore } from '@/stores/teamStore';
 import { useTrainingStore } from '@/stores/trainingStore';
 import type { TeamWithRole } from '@/types/workspace';
 
-import { createDefaultScheduledDate, isStep1Complete } from './createTraining.helpers';
+import { createDefaultScheduledDate, isStep1Complete } from '@/utils/createTraining.helpers';
 
 // ============================================================================
 // TYPES

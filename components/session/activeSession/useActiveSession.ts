@@ -35,7 +35,7 @@ import { useSessionRealtime } from '@/hooks/realtime/session/useSessionRealtime'
 import { completeEngagement, getSessionParticipants } from '@/services/session/participants';
 import type { EngagementParticipant } from '@/types/session';
 import { deriveDetectionConfig } from '@/utils/detectionSensitivity';
-import { SHOT_MARKING_ENABLED, TIMER_INTERVAL_MS, VIBRATE_ON_SHOT } from './activeSession.constants';
+import { SHOT_MARKING_ENABLED, TIMER_INTERVAL_MS, VIBRATE_ON_SHOT } from '@/constants/activeSession';
 import {
     buildEndSessionMessage,
     buildWatchSessionPayload,
@@ -47,7 +47,7 @@ import {
     getDefaultDistance,
     getEffectiveDistance,
     isDrillLimitReached,
-} from './activeSession.helpers';
+} from '@/utils/activeSession.helpers';
 import type { SessionMode, UseActiveSessionParams, UseActiveSessionReturn } from '@/types/activeSession';
 
 /**

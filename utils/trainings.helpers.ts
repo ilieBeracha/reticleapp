@@ -5,7 +5,7 @@
 
 import type { TeamMemberWithProfile, TrainingWithDetails } from '@/types/workspace';
 import { addDays, isSameDay, startOfWeek } from 'date-fns';
-import { DEFAULT_WEEKLY_GOAL, ROLE_CONFIG, STATUS_CONFIG, getRoleConfig as getRoleConfigTranslated, getStatusConfig as getStatusConfigTranslated } from './trainings.constants';
+import { DEFAULT_WEEKLY_GOAL, ROLE_CONFIG, STATUS_CONFIG, getRoleConfig as getRoleConfigTranslated, getStatusConfig as getStatusConfigTranslated } from '@/constants/trainings';
 import type { GroupedTrainings, MemberStats, QuickStats, RoleConfig, StatusConfig, TeamStats } from '@/types/trainings';
 
 // ============================================================================

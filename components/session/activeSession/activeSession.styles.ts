@@ -3,7 +3,7 @@
  */
 
 import { StyleSheet } from 'react-native';
-import { SIZES } from './activeSession.constants';
+import { SIZES } from '@/constants/activeSession';
 
 export const styles = StyleSheet.create({
   container: {

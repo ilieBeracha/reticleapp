@@ -41,11 +41,11 @@ import {
 import Animated, { FadeInDown, FadeOut } from 'react-native-reanimated';
 
 import { AIExplanationProvider } from './AIExplanationProvider';
-import { featuresToSessions } from './insights.adapter';
+import { featuresToSessions } from '@/services/insights/insightsAdapter';
 import { ActivityChart, type ActivityDataPoint } from './components/ActivityChart';
 import { PerformanceChart, type ChartDataPoint } from './components/PerformanceChart';
 import { EvidenceSheet } from './EvidenceSheet';
-import { applyFilters, computeContextProfiles, computeInsights, computeOverviewStatus } from './insights.engine';
+import { applyFilters, computeContextProfiles, computeInsights, computeOverviewStatus } from '@/services/insights/dashboardEngine';
 import type {
   ComputedContextProfiles,
   ComputedInsights,

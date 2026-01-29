@@ -7,9 +7,9 @@
 
 import { NoTeamsEmptyState } from '@/components/teams/NoTeamsEmptyState';
 import { TeamSwitcherPill, TeamSwitcherSheet } from '@/components/teams/TeamSwitcherSheet';
-import { getStatusConfig } from '@/components/training/utils';
-import { COLORS, PULSE_ANIMATION } from '@/components/training/trainings.constants';
-import { groupTrainingsByTimeframe } from '@/components/training/trainings.helpers';
+import { getStatusConfig } from '@/utils/training.utils';
+import { COLORS, PULSE_ANIMATION } from '@/constants/trainings';
+import { groupTrainingsByTimeframe } from '@/utils/trainings.helpers';
 import { styles } from '@/components/training/trainings.styles';
 import { useTrainings } from '@/components/training/useTrainings';
 import { RequestWeaponModal } from '@/components/weapons/RequestWeaponModal';

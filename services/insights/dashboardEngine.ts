@@ -27,7 +27,7 @@ import {
   MIN_SHOTS_FOR_CATEGORY,
   RECENT_SESSION_COUNT,
   getConfidence,
-} from './changeRules';
+} from '@/utils/insights.changeRules';
 import type {
   BaselineStrategy,
   BaselineValues,
