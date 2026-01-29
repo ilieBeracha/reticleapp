@@ -6,7 +6,15 @@
  * 2. Start from scratch → Configure → Add/Save
  */
 
-import { RANGE_CATEGORIES, type RangeCategory } from '@/constants/drill';
+import {
+  GOAL_COLORS,
+  RANGE_CATEGORIES,
+  TRAINING_DISTANCE_PRESETS,
+  TRAINING_SHOTS_PRESETS,
+  TRAINING_STRINGS_PRESETS,
+  TRAINING_TIME_PRESETS,
+  type RangeCategory,
+} from '@/constants/drill';
 import { useColors } from '@/hooks/ui/useColors';
 import { getCategoryLabel, WEAPON_CATEGORIES } from '@/services/weaponService';
 import type { Drill, DrillGoal, WeaponCategory } from '@/types/workspace';
@@ -71,16 +79,6 @@ type CreatorStep = 'select' | 'configure';
 // ============================================================================
 // CONSTANTS
 // ============================================================================
-
-const GOAL_COLORS: Record<string, string> = {
-  grouping: '#10B981',
-  engagement: '#F59E0B',
-};
-
-const DISTANCE_PRESETS = [25, 50, 100, 200, 300];
-const SHOTS_PRESETS = [3, 5, 10, 15, 20];
-const TIME_PRESETS: (number | null)[] = [null, 30, 60, 90, 120];
-const STRINGS_PRESETS = [1, 2, 3, 5];
 
 // ============================================================================
 // MAIN COMPONENT
@@ -741,7 +739,7 @@ function ConfigureStep({
           {/* Row 2: Exact presets (only when Exact mode) */}
           {!distanceCategory && (
             <View style={styles.chipRow}>
-              {DISTANCE_PRESETS.map((val) => (
+              {TRAINING_DISTANCE_PRESETS.map((val) => (
                 <TouchableOpacity
                   key={val}
                   style={[
@@ -800,7 +798,7 @@ function ConfigureStep({
             <Text style={[styles.sectionValue, { color: colors.text }]}>{shots}</Text>
           </View>
           <View style={styles.chipRow}>
-            {SHOTS_PRESETS.map((val) => (
+            {TRAINING_SHOTS_PRESETS.map((val) => (
               <TouchableOpacity
                 key={val}
                 style={[
@@ -849,7 +847,7 @@ function ConfigureStep({
             <Text style={[styles.sectionValue, { color: colors.text }]}>{strings}x</Text>
           </View>
           <View style={styles.chipRow}>
-            {STRINGS_PRESETS.map((val) => (
+            {TRAINING_STRINGS_PRESETS.map((val) => (
               <TouchableOpacity
                 key={val}
                 style={[
@@ -880,7 +878,7 @@ function ConfigureStep({
             <Text style={[styles.sectionValue, { color: colors.text }]}>{timeLimit ? `${timeLimit}s` : 'None'}</Text>
           </View>
           <View style={styles.chipRow}>
-            {TIME_PRESETS.map((val, i) => (
+            {TRAINING_TIME_PRESETS.map((val, i) => (
               <TouchableOpacity
                 key={val ?? 'none'}
                 style={[

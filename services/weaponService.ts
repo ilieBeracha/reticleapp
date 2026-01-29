@@ -1638,3 +1638,22 @@ export async function getWeaponStats(): Promise<Map<string, WeaponStats>> {
 
   return statsMap;
 }
+
+/**
+ * Get the most recently updated weapon ID for a user.
+ */
+export async function getMostRecentUserWeaponId(userId: string): Promise<string | null> {
+  const { data, error } = await supabase
+    .from('user_weapons')
+    .select('id')
+    .eq('user_id', userId)
+    .order('updated_at', { ascending: false })
+    .limit(1);
+
+  if (error) {
+    console.error('[weaponService] getMostRecentUserWeaponId error:', error);
+    throw error;
+  }
+
+  return data?.[0]?.id ?? null;
+}

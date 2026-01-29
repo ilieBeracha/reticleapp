@@ -11,18 +11,18 @@
 
 import { TargetCard } from '@/components/session/TargetCard';
 import { WeatherStrip } from '@/components/session/WeatherDisplay';
+import { COLORS } from '@/constants/activeSession';
 import { useColors } from '@/hooks/ui/useColors';
+import type { DrillProgress, WatchState } from '@/types/activeSession';
 import type { SessionDrillConfig, SessionWithDetails } from '@/types/session';
+import { formatTime } from '@/utils/activeSession.helpers';
 import { isGroupingSession } from '@/utils/drillGoal';
 import { Camera, Check, Crosshair, Square, Target, X } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { EdgeInsets } from 'react-native-safe-area-context';
-import { COLORS } from '@/constants/activeSession';
-import { formatTime } from '@/utils/activeSession.helpers';
 import { styles as sharedStyles } from './activeSession.styles';
-import type { DrillProgress, WatchState } from '@/types/activeSession';
 import { CompactStats } from './components/CompactStats';
 import { DrillBanner } from './components/DrillBanner';
 import { HeroTarget } from './components/HeroTarget';

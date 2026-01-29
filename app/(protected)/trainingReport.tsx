@@ -2,14 +2,22 @@
  * Training Report Screen
  *
  * Displays training summary and participant performance after training execution.
+ * Includes weather conditions, biometrics data, and PDF export functionality.
  */
 
 import { ParticipantInsights } from '@/components/training/ParticipantInsights';
 import { useAuth } from '@/contexts/AuthContext';
 import { useColors } from '@/hooks/ui/useColors';
 import { usePermissions } from '@/hooks/usePermissions';
+import { shareTrainingReportPDF, type TrainingReportData } from '@/services/report/pdfGenerator';
 import { getEngagementParticipants } from '@/services/session/participants';
-import { getTrainingSessionsWithStats } from '@/services/session/queries';
+import {
+  aggregateTrainingWeather,
+  getTrainingBiometrics,
+  getTrainingSessionsWithStats,
+  type TrainingBiometricsSummary,
+  type TrainingWeatherSummary,
+} from '@/services/session/queries';
 import { getSessionVerdict, type SessionVerdict } from '@/services/standards/standardsService';
 import { getTrainingById } from '@/services/trainingService';
 import { useTeamStore } from '@/stores/teamStore';
@@ -24,13 +32,18 @@ import {
   Calendar,
   CheckCircle2,
   Clock,
+  CloudRain,
+  FileDown,
   FileText,
+  Heart,
   Home,
   RefreshCw,
   Share2,
   Target,
+  Thermometer,
   Trophy,
   Users,
+  Wind,
   XCircle,
 } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -38,6 +51,8 @@ import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
   Alert,
+  Modal,
+  Pressable,
   RefreshControl,
   ScrollView,
   Share,
@@ -181,6 +196,303 @@ function AccessDenied({ colors }: { colors: ReturnType<typeof useColors> }) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// WEATHER CONDITIONS CARD
+// ═══════════════════════════════════════════════════════════════════════════
+
+function WeatherConditionsCard({
+  weather,
+  colors,
+}: {
+  weather: TrainingWeatherSummary;
+  colors: ReturnType<typeof useColors>;
+}) {
+  const { t } = useTranslation();
+
+  const getWindImpactColor = (impact: string | null) => {
+    switch (impact) {
+      case 'calm':
+        return colors.green;
+      case 'light':
+        return '#22C55E';
+      case 'moderate':
+        return '#F59E0B';
+      case 'strong':
+        return colors.red;
+      default:
+        return colors.textMuted;
+    }
+  };
+
+  const getWindImpactLabel = (impact: string | null) => {
+    switch (impact) {
+      case 'calm':
+        return t('training.windCalm');
+      case 'light':
+        return t('training.windLight');
+      case 'moderate':
+        return t('training.windModerate');
+      case 'strong':
+        return t('training.windStrong');
+      default:
+        return '-';
+    }
+  };
+
+  const getSeverityColor = (severity: string | null) => {
+    switch (severity) {
+      case 'ideal':
+        return colors.green;
+      case 'good':
+        return '#22C55E';
+      case 'challenging':
+        return '#F59E0B';
+      case 'difficult':
+        return '#F97316';
+      case 'extreme':
+        return colors.red;
+      default:
+        return colors.textMuted;
+    }
+  };
+
+  const getSeverityLabel = (severity: string | null) => {
+    switch (severity) {
+      case 'ideal':
+        return t('training.conditionIdeal');
+      case 'good':
+        return t('training.conditionGood');
+      case 'challenging':
+        return t('training.conditionChallenging');
+      case 'difficult':
+        return t('training.conditionDifficult');
+      case 'extreme':
+        return t('training.conditionExtreme');
+      default:
+        return '-';
+    }
+  };
+
+  return (
+    <Animated.View entering={FadeInDown.delay(50).duration(300)}>
+      <View style={[styles.weatherCard, { backgroundColor: colors.card }]}>
+        <View style={styles.weatherHeader}>
+          <View style={styles.weatherTitleRow}>
+            <CloudRain size={16} color={colors.textMuted} />
+            <Text style={[styles.weatherTitle, { color: colors.text }]}>{t('training.weatherConditions')}</Text>
+          </View>
+          <Text style={[styles.weatherSubtitle, { color: colors.textMuted }]}>
+            {t('training.sessionsWithData', { count: weather.sessionsWithWeather })}
+          </Text>
+        </View>
+
+        <View style={styles.weatherGrid}>
+          {/* Temperature */}
+          <View style={styles.weatherItem}>
+            <View style={[styles.weatherIconBg, { backgroundColor: colors.primary + '15' }]}>
+              <Thermometer size={18} color={colors.primary} />
+            </View>
+            <View>
+              <Text style={[styles.weatherValue, { color: colors.text }]}>
+                {weather.avgTemperatureC !== null ? `${weather.avgTemperatureC}°C` : '-'}
+              </Text>
+              <Text style={[styles.weatherLabel, { color: colors.textMuted }]}>{t('training.temperature')}</Text>
+            </View>
+          </View>
+
+          {/* Humidity */}
+          <View style={styles.weatherItem}>
+            <View style={[styles.weatherIconBg, { backgroundColor: '#3B82F6' + '15' }]}>
+              <CloudRain size={18} color="#3B82F6" />
+            </View>
+            <View>
+              <Text style={[styles.weatherValue, { color: colors.text }]}>
+                {weather.avgHumidity !== null ? `${weather.avgHumidity}%` : '-'}
+              </Text>
+              <Text style={[styles.weatherLabel, { color: colors.textMuted }]}>{t('training.humidity')}</Text>
+            </View>
+          </View>
+
+          {/* Wind */}
+          <View style={styles.weatherItem}>
+            <View style={[styles.weatherIconBg, { backgroundColor: getWindImpactColor(weather.maxWindImpact) + '15' }]}>
+              <Wind size={18} color={getWindImpactColor(weather.maxWindImpact)} />
+            </View>
+            <View>
+              <Text style={[styles.weatherValue, { color: colors.text }]}>
+                {weather.avgWindSpeedMps !== null ? `${weather.avgWindSpeedMps} m/s` : '-'}
+                {weather.dominantWindDirection ? ` ${weather.dominantWindDirection}` : ''}
+              </Text>
+              <Text style={[styles.weatherLabel, { color: colors.textMuted }]}>{t('training.wind')}</Text>
+            </View>
+          </View>
+
+          {/* Wind Impact */}
+          <View style={styles.weatherItem}>
+            <View style={[styles.weatherIconBg, { backgroundColor: getWindImpactColor(weather.maxWindImpact) + '15' }]}>
+              <Target size={18} color={getWindImpactColor(weather.maxWindImpact)} />
+            </View>
+            <View>
+              <View
+                style={[styles.weatherBadge, { backgroundColor: getWindImpactColor(weather.maxWindImpact) + '20' }]}
+              >
+                <Text style={[styles.weatherBadgeText, { color: getWindImpactColor(weather.maxWindImpact) }]}>
+                  {getWindImpactLabel(weather.maxWindImpact)}
+                </Text>
+              </View>
+              <Text style={[styles.weatherLabel, { color: colors.textMuted }]}>{t('training.windImpact')}</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Condition Summary */}
+        {weather.dominantCondition && (
+          <View style={[styles.weatherConditionRow, { borderTopColor: colors.border }]}>
+            <Text style={[styles.weatherConditionLabel, { color: colors.textMuted }]}>{weather.dominantCondition}</Text>
+            <View
+              style={[styles.weatherBadge, { backgroundColor: getSeverityColor(weather.maxConditionSeverity) + '20' }]}
+            >
+              <Text style={[styles.weatherBadgeText, { color: getSeverityColor(weather.maxConditionSeverity) }]}>
+                {getSeverityLabel(weather.maxConditionSeverity)}
+              </Text>
+            </View>
+          </View>
+        )}
+      </View>
+    </Animated.View>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// BIOMETRICS SUMMARY CARD
+// ═══════════════════════════════════════════════════════════════════════════
+
+function BiometricsSummaryCard({
+  biometrics,
+  colors,
+}: {
+  biometrics: TrainingBiometricsSummary;
+  colors: ReturnType<typeof useColors>;
+}) {
+  const { t } = useTranslation();
+
+  return (
+    <Animated.View entering={FadeInDown.delay(100).duration(300)}>
+      <View style={[styles.biometricsCard, { backgroundColor: colors.card }]}>
+        <View style={styles.biometricsHeader}>
+          <View style={styles.biometricsTitleRow}>
+            <Heart size={16} color={colors.red} />
+            <Text style={[styles.biometricsTitle, { color: colors.text }]}>{t('training.teamBiometrics')}</Text>
+          </View>
+          <Text style={[styles.biometricsSubtitle, { color: colors.textMuted }]}>
+            {t('training.sessionsWithData', { count: biometrics.sessionsWithBiometrics })}
+          </Text>
+        </View>
+
+        <View style={styles.biometricsGrid}>
+          {/* Avg Heart Rate */}
+          <View style={styles.biometricsStat}>
+            <Text style={[styles.biometricsStatValue, { color: colors.red }]}>{biometrics.teamAvgHR ?? '-'}</Text>
+            <Text style={[styles.biometricsStatUnit, { color: colors.textMuted }]}>bpm</Text>
+            <Text style={[styles.biometricsStatLabel, { color: colors.textMuted }]}>{t('training.avgHeartRate')}</Text>
+          </View>
+
+          {/* HR Range */}
+          <View style={styles.biometricsStat}>
+            <Text style={[styles.biometricsStatValue, { color: colors.text }]}>
+              {biometrics.teamHRRange ? `${biometrics.teamHRRange.min}-${biometrics.teamHRRange.max}` : '-'}
+            </Text>
+            <Text style={[styles.biometricsStatUnit, { color: colors.textMuted }]}>bpm</Text>
+            <Text style={[styles.biometricsStatLabel, { color: colors.textMuted }]}>
+              {t('training.heartRateRange')}
+            </Text>
+          </View>
+
+          {/* Breath Rate */}
+          <View style={styles.biometricsStat}>
+            <Text style={[styles.biometricsStatValue, { color: '#3B82F6' }]}>
+              {biometrics.teamAvgBreathRate ?? '-'}
+            </Text>
+            <Text style={[styles.biometricsStatUnit, { color: colors.textMuted }]}>/min</Text>
+            <Text style={[styles.biometricsStatLabel, { color: colors.textMuted }]}>{t('training.avgBreathRate')}</Text>
+          </View>
+
+          {/* Steadiness */}
+          <View style={styles.biometricsStat}>
+            <Text style={[styles.biometricsStatValue, { color: colors.green }]}>
+              {biometrics.teamAvgSteadiness ?? '-'}
+            </Text>
+            <Text style={[styles.biometricsStatUnit, { color: colors.textMuted }]}>/100</Text>
+            <Text style={[styles.biometricsStatLabel, { color: colors.textMuted }]}>{t('training.avgSteadiness')}</Text>
+          </View>
+        </View>
+
+        {/* Flinches Row */}
+        {biometrics.totalFlinches > 0 && (
+          <View style={[styles.flinchRow, { borderTopColor: colors.border }]}>
+            <Text style={[styles.flinchLabel, { color: colors.textMuted }]}>{t('training.totalFlinches')}</Text>
+            <View style={[styles.flinchBadge, { backgroundColor: colors.red + '15' }]}>
+              <Text style={[styles.flinchValue, { color: colors.red }]}>{biometrics.totalFlinches}</Text>
+            </View>
+          </View>
+        )}
+      </View>
+    </Animated.View>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// EXPORT MENU MODAL
+// ═══════════════════════════════════════════════════════════════════════════
+
+function ExportMenuModal({
+  visible,
+  onClose,
+  onShareText,
+  onExportPDF,
+  exporting,
+  colors,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  onShareText: () => void;
+  onExportPDF: () => void;
+  exporting: boolean;
+  colors: ReturnType<typeof useColors>;
+}) {
+  const { t } = useTranslation();
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <Pressable style={styles.modalOverlay} onPress={onClose}>
+        <Pressable style={[styles.exportMenu, { backgroundColor: colors.card }]} onPress={(e) => e.stopPropagation()}>
+          <Text style={[styles.exportMenuTitle, { color: colors.text }]}>{t('training.exportOptions')}</Text>
+
+          <TouchableOpacity
+            style={[styles.exportMenuItem, { borderBottomColor: colors.border }]}
+            onPress={onShareText}
+            disabled={exporting}
+          >
+            <Share2 size={20} color={colors.text} />
+            <Text style={[styles.exportMenuItemText, { color: colors.text }]}>{t('training.shareText')}</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.exportMenuItem} onPress={onExportPDF} disabled={exporting}>
+            {exporting ? (
+              <ActivityIndicator size="small" color={colors.primary} />
+            ) : (
+              <FileDown size={20} color={colors.primary} />
+            )}
+            <Text style={[styles.exportMenuItemText, { color: exporting ? colors.textMuted : colors.primary }]}>
+              {exporting ? t('training.generatingPDF') : t('training.exportPDF')}
+            </Text>
+          </TouchableOpacity>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // MAIN SCREEN
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -196,8 +508,12 @@ export default function TrainingReportScreen() {
   const [training, setTraining] = useState<TrainingWithDrills | null>(null);
   const [sessions, setSessions] = useState<SessionWithDetails[]>([]);
   const [verdicts, setVerdicts] = useState<Map<string, SessionVerdict>>(new Map());
+  const [weather, setWeather] = useState<TrainingWeatherSummary | null>(null);
+  const [biometrics, setBiometrics] = useState<TrainingBiometricsSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [exportingPDF, setExportingPDF] = useState(false);
+  const [showExportMenu, setShowExportMenu] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Calculate permissions based on loaded training (not active team)
@@ -290,6 +606,15 @@ export default function TrainingReportScreen() {
         setSessions(expandedSessions);
         setError(null);
 
+        // Aggregate weather data from sessions
+        const weatherSummary = aggregateTrainingWeather(sessionsData);
+        setWeather(weatherSummary);
+
+        // Fetch biometrics data from session targets
+        const sessionIds = sessionsData.map((s: SessionWithDetails) => s.id);
+        const biometricsSummary = await getTrainingBiometrics(sessionIds);
+        setBiometrics(biometricsSummary);
+
         // Fetch verdicts for all original sessions (not expanded)
         const verdictPromises = sessionsData.map((s: SessionWithDetails) =>
           getSessionVerdict(s.id)
@@ -347,8 +672,9 @@ ${training.team?.name ? `👥 Team: ${training.team.name}` : ''}
 Generated by ReticleIQ`;
   }, [training, sessions]);
 
-  const handleShare = useCallback(async () => {
+  const handleShareText = useCallback(async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setShowExportMenu(false);
     const reportText = generateReportText();
 
     if (!reportText) {
@@ -364,7 +690,42 @@ Generated by ReticleIQ`;
     } catch (err: any) {
       console.error('[TrainingReport] Share failed:', err);
     }
-  }, [generateReportText, training?.title]);
+  }, [generateReportText, training?.title, t]);
+
+  const handleExportPDF = useCallback(async () => {
+    if (!training || !weather || !biometrics) return;
+
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setShowExportMenu(false);
+    setExportingPDF(true);
+
+    try {
+      const reportData: TrainingReportData = {
+        training: {
+          id: training.id,
+          title: training.title,
+          status: training.status,
+          scheduled_at: training.scheduled_at,
+          started_at: training.started_at,
+          ended_at: training.ended_at,
+          team_name: training.team?.name,
+          drills: training.drills,
+        },
+        sessions,
+        weather,
+        biometrics,
+        verdicts,
+      };
+
+      await shareTrainingReportPDF(reportData);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (err: any) {
+      console.error('[TrainingReport] PDF export failed:', err);
+      Alert.alert(t('common.error'), err.message || t('training.failedLoadReport'));
+    } finally {
+      setExportingPDF(false);
+    }
+  }, [training, sessions, weather, biometrics, verdicts, t]);
 
   // Loading state
   if (loading) {
@@ -450,7 +811,10 @@ Generated by ReticleIQ`;
             )}
           </TouchableOpacity>
           {hasSessions && (
-            <TouchableOpacity style={[styles.headerBtn, { backgroundColor: colors.card }]} onPress={handleShare}>
+            <TouchableOpacity
+              style={[styles.headerBtn, { backgroundColor: colors.card }]}
+              onPress={() => setShowExportMenu(true)}
+            >
               <Share2 size={18} color={colors.text} />
             </TouchableOpacity>
           )}
@@ -466,6 +830,14 @@ Generated by ReticleIQ`;
       >
         {/* Training Overview */}
         <TrainingOverviewCard training={training} sessionCount={sessions.length} colors={colors} />
+
+        {/* Weather Conditions */}
+        {weather && weather.sessionsWithWeather > 0 && <WeatherConditionsCard weather={weather} colors={colors} />}
+
+        {/* Biometrics Summary */}
+        {biometrics && biometrics.sessionsWithBiometrics > 0 && (
+          <BiometricsSummaryCard biometrics={biometrics} colors={colors} />
+        )}
 
         {/* No Sessions State */}
         {!hasSessions && (
@@ -645,6 +1017,16 @@ Generated by ReticleIQ`;
           <Text style={[styles.secondaryBtnText, { color: colors.textMuted }]}>{t('training.exitToHome')}</Text>
         </TouchableOpacity>
       </View>
+
+      {/* Export Menu Modal */}
+      <ExportMenuModal
+        visible={showExportMenu}
+        onClose={() => setShowExportMenu(false)}
+        onShareText={handleShareText}
+        onExportPDF={handleExportPDF}
+        exporting={exportingPDF}
+        colors={colors}
+      />
     </View>
   );
 }
@@ -983,6 +1365,171 @@ const styles = StyleSheet.create({
   },
   secondaryBtnText: {
     fontSize: 13,
+    fontWeight: '500',
+  },
+
+  // Weather Card
+  weatherCard: {
+    borderRadius: 14,
+    padding: 16,
+    gap: 14,
+  },
+  weatherHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  weatherTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  weatherTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  weatherSubtitle: {
+    fontSize: 12,
+  },
+  weatherGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  weatherItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    width: '47%',
+  },
+  weatherIconBg: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  weatherValue: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  weatherLabel: {
+    fontSize: 11,
+    marginTop: 1,
+  },
+  weatherBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    alignSelf: 'flex-start',
+  },
+  weatherBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  weatherConditionRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingTop: 12,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  weatherConditionLabel: {
+    fontSize: 13,
+  },
+
+  // Biometrics Card
+  biometricsCard: {
+    borderRadius: 14,
+    padding: 16,
+    gap: 14,
+  },
+  biometricsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  biometricsTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  biometricsTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  biometricsSubtitle: {
+    fontSize: 12,
+  },
+  biometricsGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  biometricsStat: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  biometricsStatValue: {
+    fontSize: 20,
+    fontWeight: '700',
+  },
+  biometricsStatUnit: {
+    fontSize: 11,
+    marginTop: -2,
+  },
+  biometricsStatLabel: {
+    fontSize: 10,
+    marginTop: 4,
+    textAlign: 'center',
+  },
+  flinchRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingTop: 12,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  flinchLabel: {
+    fontSize: 13,
+  },
+  flinchBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  flinchValue: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+
+  // Export Menu Modal
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  exportMenu: {
+    width: '80%',
+    maxWidth: 300,
+    borderRadius: 14,
+    padding: 20,
+  },
+  exportMenuTitle: {
+    fontSize: 17,
+    fontWeight: '600',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  exportMenuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  exportMenuItemText: {
+    fontSize: 16,
     fontWeight: '500',
   },
 });

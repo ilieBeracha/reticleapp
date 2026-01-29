@@ -983,6 +983,80 @@ function MemberPickerModal({
 }
 
 // ============================================================================
+// WEAPON PICKER FOR MEMBER MODAL
+// ============================================================================
+
+function WeaponPickerForMemberModal({
+  visible,
+  member,
+  availableWeapons,
+  colors,
+  onSelect,
+  onClose,
+  actionLoading,
+}: {
+  visible: boolean;
+  member: TeamMember | null;
+  availableWeapons: TeamWeapon[];
+  colors: ReturnType<typeof useColors>;
+  onSelect: (weaponId: string) => void;
+  onClose: () => void;
+  actionLoading: string | null;
+}) {
+  const { t } = useTranslation();
+  if (!member) return null;
+
+  return (
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+      <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
+        <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
+          <TouchableOpacity onPress={onClose}>
+            <X size={20} color={colors.textMuted} />
+          </TouchableOpacity>
+          <Text style={[styles.modalTitle, { color: colors.text }]}>
+            {t('weapons.assignToMember', { name: member.full_name })}
+          </Text>
+          <View style={{ width: 20 }} />
+        </View>
+
+        <Text style={[styles.memberPickerHint, { color: colors.textMuted }]}>{t('weapons.selectWeaponForMember')}</Text>
+
+        <FlatList
+          data={availableWeapons}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => {
+            const isLoading = actionLoading === item.id;
+            return (
+              <TouchableOpacity
+                style={[styles.memberItem, { backgroundColor: colors.card, borderColor: colors.border }]}
+                onPress={() => onSelect(item.id)}
+                disabled={isLoading}
+                activeOpacity={0.7}
+              >
+                <Shield size={18} color={colors.primary} />
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.memberName, { color: colors.text }]}>{item.name}</Text>
+                  <Text style={[styles.memberWeapon, { color: colors.textMuted }]}>
+                    {getCategoryLabel(item.category)}
+                    {item.caliber && ` \u2022 ${item.caliber}`}
+                  </Text>
+                </View>
+                {isLoading ? (
+                  <ActivityIndicator size="small" color={colors.primary} />
+                ) : (
+                  <ChevronRight size={18} color={colors.textMuted} />
+                )}
+              </TouchableOpacity>
+            );
+          }}
+          contentContainerStyle={styles.memberList}
+        />
+      </View>
+    </Modal>
+  );
+}
+
+// ============================================================================
 // MAIN COMPONENT
 // ============================================================================
 
@@ -1011,6 +1085,7 @@ export default function TeamArmoryScreen() {
   const [showRequestModal, setShowRequestModal] = useState(false);
   const [selectedWeaponForAssign, setSelectedWeaponForAssign] = useState<TeamWeapon | null>(null);
   const [selectedRequestForReview, setSelectedRequestForReview] = useState<WeaponRequest | null>(null);
+  const [targetMemberForAssign, setTargetMemberForAssign] = useState<TeamMember | null>(null);
   const [cancelling, setCancelling] = useState(false);
 
   // Load data
@@ -1424,13 +1499,7 @@ export default function TeamArmoryScreen() {
                         {(data?.unassignedWeapons.length || 0) + (data?.poolWeapons.length || 0) > 0 && (
                           <TouchableOpacity
                             style={[styles.memberCardAction, { backgroundColor: colors.primary }]}
-                            onPress={() => {
-                              // Pre-select this member when assigning
-                              const availableWeapon = data?.unassignedWeapons[0] || data?.poolWeapons[0];
-                              if (availableWeapon) {
-                                setSelectedWeaponForAssign(availableWeapon);
-                              }
-                            }}
+                            onPress={() => setTargetMemberForAssign(member)}
                           >
                             <Text style={[styles.memberCardActionText, { color: '#fff' }]}>{t('weapons.assign')}</Text>
                           </TouchableOpacity>
@@ -1604,6 +1673,21 @@ export default function TeamArmoryScreen() {
         availableWeapons={unassignedForApproval}
         onClose={() => setSelectedRequestForReview(null)}
         onSuccess={loadData}
+      />
+
+      <WeaponPickerForMemberModal
+        visible={!!targetMemberForAssign}
+        member={targetMemberForAssign}
+        availableWeapons={[...(data?.unassignedWeapons || []), ...(data?.poolWeapons || [])]}
+        colors={colors}
+        onSelect={async (weaponId) => {
+          if (targetMemberForAssign) {
+            await handleAssign(weaponId, targetMemberForAssign.id);
+            setTargetMemberForAssign(null);
+          }
+        }}
+        onClose={() => setTargetMemberForAssign(null)}
+        actionLoading={actionLoading}
       />
     </View>
   );

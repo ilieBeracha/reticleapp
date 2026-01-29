@@ -9,8 +9,7 @@
  */
 
 import { useColors } from '@/hooks/ui/useColors';
-import { useTranslation } from 'react-i18next';
-import { supabase } from '@/services/supabase';
+import { getCurrentUserId } from '@/services/authService';
 import { calculateGroupTotals, updateParticipantResults } from '@/services/session/participants';
 import type { EngagementParticipant } from '@/types/session';
 import * as Haptics from 'expo-haptics';
@@ -29,6 +28,7 @@ import {
   X,
 } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
   Alert,
@@ -101,8 +101,8 @@ export function SquadSessionView({
   // Get current user
   // ─────────────────────────────────────────────────────────────────────────────
   useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user) setCurrentUserId(user.id);
+    getCurrentUserId().then((id) => {
+      if (id) setCurrentUserId(id);
     });
   }, []);
 
@@ -112,7 +112,7 @@ export function SquadSessionView({
   const groupTotals = calculateGroupTotals(participants);
   const myParticipant = participants.find((p) => p.user_id === currentUserId);
   const hasSubmitted = myParticipant && (myParticipant.shots_fired || 0) > 0;
-  
+
   // Check if all participants have submitted their shots
   const shooters = participants.filter((p) => p.role === 'shooter');
   const allShotsSubmitted = shooters.length > 0 && shooters.every((p) => (p.shots_fired || 0) > 0);
@@ -348,9 +348,9 @@ export function SquadSessionView({
                       {isOwner && <Crown size={12} color={colors.orange} />}
                     </View>
                     <Text style={[styles.participantMeta, { color: colors.textMuted }]}>
-                      {!isShooter 
+                      {!isShooter
                         ? t('session.spotter')
-                        : hasData 
+                        : hasData
                           ? t('session.shotsCount', { count: p.shots_fired ?? 0 })
                           : t('session.notReportedYet')}
                     </Text>
@@ -416,8 +416,12 @@ export function SquadSessionView({
         {isCommander && allShotsSubmitted && (
           <TouchableOpacity
             style={[
-              styles.addResultsCard, 
-              { backgroundColor: hasAnyHits ? colors.card : colors.green, borderWidth: hasAnyHits ? 1 : 0, borderColor: colors.border }
+              styles.addResultsCard,
+              {
+                backgroundColor: hasAnyHits ? colors.card : colors.green,
+                borderWidth: hasAnyHits ? 1 : 0,
+                borderColor: colors.border,
+              },
             ]}
             onPress={handleOpenHitsSheet}
             activeOpacity={0.8}
@@ -427,8 +431,12 @@ export function SquadSessionView({
               <Text style={[styles.addResultsTitle, { color: hasAnyHits ? colors.text : '#fff' }]}>
                 {hasAnyHits ? t('session.totalHits', { hits: groupTotals.totalHits }) : t('session.addTotalHits')}
               </Text>
-              <Text style={[styles.addResultsSubtitle, { color: hasAnyHits ? colors.textMuted : 'rgba(255,255,255,0.8)' }]}>
-                {hasAnyHits ? t('session.accuracyTapToUpdate', { accuracy: groupTotals.accuracy }) : t('session.enterCombinedHits')}
+              <Text
+                style={[styles.addResultsSubtitle, { color: hasAnyHits ? colors.textMuted : 'rgba(255,255,255,0.8)' }]}
+              >
+                {hasAnyHits
+                  ? t('session.accuracyTapToUpdate', { accuracy: groupTotals.accuracy })
+                  : t('session.enterCombinedHits')}
               </Text>
             </View>
             {!hasAnyHits && <Plus size={20} color="#fff" />}
@@ -438,11 +446,12 @@ export function SquadSessionView({
         {/* Waiting for shots message */}
         {isCommander && !allShotsSubmitted && shooters.length > 0 && (
           <View style={[styles.waitingCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Text style={[styles.waitingText, { color: colors.textMuted }]}>
-              {t('session.waitingForShooters')}
-            </Text>
+            <Text style={[styles.waitingText, { color: colors.textMuted }]}>{t('session.waitingForShooters')}</Text>
             <Text style={[styles.waitingSubtext, { color: colors.textMuted }]}>
-              {t('session.shootersReported', { reported: shooters.filter((p) => (p.shots_fired || 0) > 0).length, total: shooters.length })}
+              {t('session.shootersReported', {
+                reported: shooters.filter((p) => (p.shots_fired || 0) > 0).length,
+                total: shooters.length,
+              })}
             </Text>
           </View>
         )}
@@ -546,12 +555,7 @@ export function SquadSessionView({
       {/* ═══════════════════════════════════════════════════════════════════════ */}
       {/* Total Hits Entry Bottom Sheet (Commander only)                          */}
       {/* ═══════════════════════════════════════════════════════════════════════ */}
-      <Modal
-        visible={showHitsSheet}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setShowHitsSheet(false)}
-      >
+      <Modal visible={showHitsSheet} transparent animationType="slide" onRequestClose={() => setShowHitsSheet(false)}>
         <TouchableOpacity style={styles.sheetOverlay} activeOpacity={1} onPress={() => setShowHitsSheet(false)}>
           <TouchableOpacity activeOpacity={1} onPress={(e) => e.stopPropagation()}>
             <Animated.View
@@ -589,7 +593,10 @@ export function SquadSessionView({
                     onPress={() => adjustTotalHits(1)}
                     disabled={totalHitsCount >= groupTotals.totalShotsFired}
                   >
-                    <Plus size={22} color={totalHitsCount >= groupTotals.totalShotsFired ? colors.textMuted : colors.text} />
+                    <Plus
+                      size={22}
+                      color={totalHitsCount >= groupTotals.totalShotsFired ? colors.textMuted : colors.text}
+                    />
                   </TouchableOpacity>
                 </View>
                 {/* Quick add */}
@@ -610,7 +617,9 @@ export function SquadSessionView({
                 {/* Accuracy preview */}
                 {groupTotals.totalShotsFired > 0 && (
                   <Text style={[styles.accuracyPreview, { color: colors.textMuted }]}>
-                    {t('session.accuracyPreview', { accuracy: Math.round((totalHitsCount / groupTotals.totalShotsFired) * 100) })}
+                    {t('session.accuracyPreview', {
+                      accuracy: Math.round((totalHitsCount / groupTotals.totalShotsFired) * 100),
+                    })}
                   </Text>
                 )}
               </View>

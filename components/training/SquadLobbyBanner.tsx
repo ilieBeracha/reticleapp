@@ -11,12 +11,13 @@
  */
 
 import { useColors } from '@/hooks/ui/useColors';
-import { supabase } from '@/services/supabase';
-import { getEngagementParticipants, getParticipantCounts } from '@/services/session/participants';
+import { useTableSubscription } from '@/hooks/realtime/table/useTableSubscription';
+import { getCommanderActiveLobby, getEngagementParticipants, getParticipantCounts } from '@/services/session/participants';
+import { getSessionTargetCount } from '@/services/session/queries';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { ChevronRight, Users } from 'lucide-react-native';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeInDown, FadeOutUp } from 'react-native-reanimated';
@@ -45,59 +46,26 @@ export function SquadLobbyBanner({ trainingId, userId, onLobbyChanged }: SquadLo
   // Load active lobby for this commander in this training
   const loadActiveLobby = useCallback(async () => {
     try {
-      // Find squad/group engagements for this training where user is the shooter (commander)
-      // We identify "active" by: team mode (squad or group) + session not completed
-      const { data: engagements, error: engError } = await supabase
-        .from('engagements')
-        .select(
-          `
-          id,
-          session_id,
-          engagement_mode,
-          status,
-          created_at,
-          started_at,
-          sessions!inner (
-            id,
-            custom_drill_config,
-            training_id,
-            user_id,
-            status
-          )
-        `
-        )
-        .eq('sessions.training_id', trainingId)
-        .eq('sessions.user_id', userId)
-        .in('engagement_mode', ['squad', 'group'])
-        .in('status', ['pending', 'active']) // Only show pending or active engagements
-        .order('created_at', { ascending: false })
-        .limit(1);
+      const engagement = await getCommanderActiveLobby(trainingId, userId);
 
-      if (engError) throw engError;
-      
-      console.log('[SquadLobbyBanner] Query result:', engagements?.length || 0, 'engagements found');
-      
-      if (!engagements?.length) {
+      console.log('[SquadLobbyBanner] Query result:', engagement ? 1 : 0, 'engagements found');
+
+      if (!engagement) {
         console.log('[SquadLobbyBanner] No active engagements, hiding banner');
         setActiveLobby(null);
         return;
       }
 
-      const engagement = engagements[0] as any;
       console.log('[SquadLobbyBanner] Found engagement:', engagement.id, 'status:', engagement.status);
-      const session = engagement.sessions as any;
+      const session = (engagement as any).sessions as any;
 
       // Check if this engagement has any targets (results)
-      const { count: targetCount } = await supabase
-        .from('session_targets')
-        .select('id', { count: 'exact', head: true })
-        .eq('session_id', session.id);
+      const targetCount = await getSessionTargetCount(session.id);
 
       // If started but no targets yet, show "in progress" banner
       // If not started and no targets, show "lobby" banner
       // If has targets, the engagement is done - don't show banner
-      if (targetCount && targetCount > 0 && !engagement.started_at) {
-        // Session has results but wasn't formally started - probably completed
+      if (targetCount > 0 && !(engagement as any).started_at) {
         setActiveLobby(null);
         return;
       }
@@ -114,7 +82,7 @@ export function SquadLobbyBanner({ trainingId, userId, onLobbyChanged }: SquadLo
         sessionId: session.id,
         drillName: drillConfig?.name || (isGroup ? t('training.groupEngagement') : t('training.squadEngagement')),
         participantCount: counts.total,
-        hasStarted: !!engagement.started_at,
+        hasStarted: !!(engagement as any).started_at,
         engagementMode: engagement.engagement_mode as 'squad' | 'group',
       });
     } catch (error) {
@@ -127,48 +95,35 @@ export function SquadLobbyBanner({ trainingId, userId, onLobbyChanged }: SquadLo
     loadActiveLobby();
   }, [loadActiveLobby]);
 
-  // Realtime subscription for engagement changes
-  // Uses debouncing to prevent rapid re-queries on burst updates
+  // Debounced reload for realtime updates
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const debouncedLoad = useCallback(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      loadActiveLobby();
+    }, 300);
+  }, [loadActiveLobby]);
+
   useEffect(() => {
-    if (!trainingId || !userId) return;
-
-    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
-    const debouncedLoad = () => {
-      if (debounceTimer) clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(() => {
-        loadActiveLobby();
-      }, 300); // 300ms debounce
-    };
-
-    const channelName = `squad-lobby-commander-${trainingId}-${userId}`;
-    const channel = supabase
-      .channel(channelName)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'engagements',
-          filter: `training_id=eq.${trainingId}`,
-        },
-        debouncedLoad
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'engagement_participants',
-        },
-        debouncedLoad
-      )
-      .subscribe();
-
     return () => {
-      if (debounceTimer) clearTimeout(debounceTimer);
-      supabase.removeChannel(channel);
+      if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [trainingId, userId, loadActiveLobby]);
+  }, []);
+
+  // Realtime subscription for engagements changes
+  useTableSubscription({
+    table: 'engagements',
+    filter: `training_id=eq.${trainingId}`,
+    onChange: debouncedLoad,
+    enabled: !!trainingId && !!userId,
+  });
+
+  // Realtime subscription for engagement_participants changes
+  useTableSubscription({
+    table: 'engagement_participants',
+    onChange: debouncedLoad,
+    enabled: !!trainingId && !!userId,
+  });
 
   // Navigate to lobby or active session
   const handleGoToLobby = () => {

@@ -8,6 +8,7 @@
 
 import { useAuth } from '@/contexts/AuthContext';
 import { getPersonalizedDailyTip, type PersonalizedTip } from '@/services/insights/insightService';
+import type { Colors } from '@/types/home';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { format } from 'date-fns';
 import * as Haptics from 'expo-haptics';
@@ -15,7 +16,6 @@ import { Lightbulb, Sparkles } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
-import type { Colors } from '@/types/home';
 
 const DAILY_TIP_CACHE_KEY = 'daily_tip_cache';
 

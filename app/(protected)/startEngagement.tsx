@@ -26,16 +26,23 @@ import { getCategoryConfig } from '@/constants/weaponCategories';
 import { useColors } from '@/hooks/ui/useColors';
 import { useOpenWeather } from '@/hooks/useOpenWeather';
 import { usePermissions } from '@/hooks/usePermissions';
-import { supabase } from '@/services/supabase';
 import type { DrillPreset } from '@/services/presetService';
-import { createEngagement } from '@/services/session/participants';
-import type { DrillGoal, EngagementMode } from '@/types/session';
 import { deleteSession, getOrCreateSetupSession } from '@/services/session/mutations';
-import { getMyActiveSession } from '@/services/session/queries';
+import { createEngagement } from '@/services/session/participants';
+import {
+  checkUserParticipation,
+  getActiveSquadEngagement,
+  getMyActiveSession,
+  getTrainingDrill,
+  getUserDefaultWeaponId,
+  type TrainingDrillData,
+} from '@/services/session/queries';
+import { supabase } from '@/services/supabase';
 import { getUserWeapon, type UserWeapon } from '@/services/weaponService';
 import { toSessionWeatherData } from '@/services/weather/openWeatherDecoder';
 import { useGarminDevice, useIsGarminConnected } from '@/stores/garminStore';
 import { useSessionStore } from '@/stores/sessionStore';
+import type { DrillGoal, EngagementMode } from '@/types/session';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
@@ -105,20 +112,7 @@ export default function StartEngagementScreen() {
   // DRILL DATA (fetched from DB when drillId is present)
   // Commander's rules come from training_drills table
   // ═══════════════════════════════════════════════════════════════════════════
-  const [drillData, setDrillData] = useState<{
-    id: string;
-    name: string;
-    drill_goal: string;
-    target_type: string;
-    execution_policy: string | null;
-    engagement_mode: string | null;
-    distance_m: number | null;
-    distance_category: string | null;
-    rounds_per_shooter: number | null;
-    position: string | null;
-    time_limit_seconds: number | null;
-    max_executions: number | null;
-  } | null>(null);
+  const [drillData, setDrillData] = useState<TrainingDrillData | null>(null);
   const [loadingDrill, setLoadingDrill] = useState(!!params.drillId);
 
   // Fetch drill from DB when drillId is present
@@ -129,15 +123,7 @@ export default function StartEngagementScreen() {
         return;
       }
       try {
-        const { data, error } = await supabase
-          .from('training_drills')
-          .select(
-            'id, name, drill_goal, target_type, execution_policy, engagement_mode, distance_m, distance_category, rounds_per_shooter, position, time_limit_seconds, max_executions'
-          )
-          .eq('id', params.drillId)
-          .single();
-
-        if (error) throw error;
+        const data = await getTrainingDrill(params.drillId);
         setDrillData(data);
       } catch (err) {
         console.error('[StartEngagement] Failed to fetch drill:', err);
@@ -272,31 +258,22 @@ export default function StartEngagementScreen() {
   useEffect(() => {
     async function loadDefaultWeapon() {
       try {
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
-        if (!user) return;
+        const weaponId = await getUserDefaultWeaponId();
+        if (!weaponId) {
+          setLoadingWeapon(false);
+          return;
+        }
 
-        // Get user's most recently used weapon
-        const { data: weapons } = await supabase
-          .from('user_weapons')
-          .select('id')
-          .eq('user_id', user.id)
-          .order('updated_at', { ascending: false })
-          .limit(1);
-
-        if (weapons && weapons.length > 0) {
-          const w = await getUserWeapon(weapons[0].id);
-          if (w) {
-            setWeapon(w);
-            // Apply weapon defaults (don't override drill-specified distance)
-            // IMPORTANT: For training drills, the commander drill config must win.
-            const config = w.category ? getCategoryConfig(w.category) : null;
-            if (config) {
-              // Only apply defaults when drill did NOT specify them
-              if (!distanceCategory && !hasExplicitDistance) setDistance(config.distances.zeroDistance);
-              if (!hasExplicitPosition) setPosition(config.drillDefaults.defaultPosition as Position);
-            }
+        const w = await getUserWeapon(weaponId);
+        if (w) {
+          setWeapon(w);
+          // Apply weapon defaults (don't override drill-specified distance)
+          // IMPORTANT: For training drills, the commander drill config must win.
+          const config = w.category ? getCategoryConfig(w.category) : null;
+          if (config) {
+            // Only apply defaults when drill did NOT specify them
+            if (!distanceCategory && !hasExplicitDistance) setDistance(config.distances.zeroDistance);
+            if (!hasExplicitPosition) setPosition(config.drillDefaults.defaultPosition as Position);
           }
         }
       } catch (error) {
@@ -328,37 +305,11 @@ export default function StartEngagementScreen() {
 
           // Check for active squad/group engagement in this training first
           if (trainingId) {
-            const { data: activeEngagements } = await supabase
-              .from('engagements')
-              .select(
-                `
-                id,
-                session_id,
-                status,
-                engagement_mode,
-                started_at,
-                shooter_id
-              `
-              )
-              .eq('training_id', trainingId)
-              .in('engagement_mode', ['squad', 'group'])
-              .not('status', 'in', '("completed","cancelled")')
-              .order('created_at', { ascending: false })
-              .limit(1);
+            const engagement = await getActiveSquadEngagement(trainingId);
 
-            if (activeEngagements && activeEngagements.length > 0) {
-              const engagement = activeEngagements[0];
+            if (engagement) {
               const isCommander = engagement.shooter_id === user.id;
-
-              // Check if user is a participant
-              const { data: participation } = await supabase
-                .from('engagement_participants')
-                .select('id, state')
-                .eq('engagement_id', engagement.id)
-                .eq('user_id', user.id)
-                .maybeSingle();
-
-              const isParticipant = !!participation && participation.state === 'joined';
+              const { isParticipant } = await checkUserParticipation(engagement.id, user.id);
               const hasStarted = !!engagement.started_at;
 
               // If user is commander or participant, redirect to existing engagement
@@ -468,16 +419,9 @@ export default function StartEngagementScreen() {
       // Safety check: Prevent creating duplicate squad/group engagement
       const isTeamMode = effectiveEngagementMode === 'squad' || effectiveEngagementMode === 'group';
       if (isTeamMode && trainingId) {
-        const { data: existingEngagements } = await supabase
-          .from('engagements')
-          .select('id, session_id, status, started_at, shooter_id')
-          .eq('training_id', trainingId)
-          .in('engagement_mode', ['squad', 'group'])
-          .not('status', 'in', '("completed","cancelled")')
-          .limit(1);
+        const existing = await getActiveSquadEngagement(trainingId);
 
-        if (existingEngagements && existingEngagements.length > 0) {
-          const existing = existingEngagements[0];
+        if (existing) {
           Alert.alert(
             'Active Squad Engagement',
             "There's already an active squad/group engagement for this training. You'll be redirected to it.",

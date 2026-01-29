@@ -148,52 +148,23 @@ export function TrainingDetailsStep({
         />
       </View>
 
-      {/* Team Selection (only if multiple teams) */}
-      {showTeamSelector ? (
-        <View style={styles.section}>
-          <Text style={[styles.label, { color: colors.textMuted }]}>{t('navigation.team')}</Text>
-          <View style={styles.teamGrid}>
-            {teams.map((team) => {
-              const isSelected = selectedTeamId === team.id;
-              return (
-                <TouchableOpacity
-                  key={team.id}
-                  style={[
-                    styles.teamChip,
-                    {
-                      backgroundColor: isSelected ? colors.text : colors.card,
-                      borderColor: isSelected ? colors.text : colors.border,
-                    },
-                  ]}
-                  onPress={() => {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    onSelectTeam(team.id);
-                  }}
-                  activeOpacity={0.7}
-                >
-                  {isSelected && <Check size={14} color={colors.background} strokeWidth={2.5} />}
-                  <Text
-                    style={[styles.teamChipText, { color: isSelected ? colors.background : colors.text }]}
-                    numberOfLines={1}
-                  >
-                    {team.name}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        </View>
-      ) : effectiveTeam ? (
-        <View style={styles.teamBadge}>
-          <Users size={14} color={colors.textMuted} strokeWidth={1.5} />
-          <Text style={[styles.teamBadgeText, { color: colors.textMuted }]}>{effectiveTeam.name}</Text>
-        </View>
-      ) : null}
+      {/* Training Description - Optional */}
+      <Text style={[styles.label, { color: colors.textMuted }]}>{t('training.trainingDescription')}</Text>
+      <TextInput
+        style={[styles.textArea, { backgroundColor: colors.card, borderColor: colors.border, color: colors.text }]}
+        placeholder={t('training.trainingDescriptionPlaceholder')}
+        placeholderTextColor={colors.textMuted}
+        multiline
+        numberOfLines={4}
+        textAlignVertical="top"
+      />
 
       {/* Participants - Who should attend */}
       {hasTeam && (
         <Animated.View entering={FadeIn.duration(200)} style={styles.section}>
-          <Text style={[styles.label, { color: colors.textMuted }]}>{t('training.participants', 'PARTICIPANTS')}</Text>
+          <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>
+            {t('training.participants', 'PARTICIPANTS')}
+          </Text>
 
           {/* Mode toggle: Entire Team vs Select Members */}
           <View style={styles.participantToggle}>
@@ -440,27 +411,37 @@ export function TrainingDetailsStep({
 
 const styles = StyleSheet.create({
   container: {
-    gap: 24,
+    gap: 10,
   },
 
   // Name
   nameSection: {
-    gap: 10,
+    gap: 8,
   },
   label: {
+    paddingTop: 8,
     fontSize: 11,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
+    fontWeight: '500',
+    letterSpacing: 0.3,
   },
   nameInput: {
-    height: 56,
+    height: 46,
     borderWidth: 1.5,
     borderRadius: 14,
     paddingHorizontal: 18,
-    fontSize: 18,
+    fontSize: 14,
     fontWeight: '500',
     letterSpacing: -0.2,
+  },
+
+  textArea: {
+    minHeight: 100,
+    borderWidth: 1.5,
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    fontSize: 15,
+    fontWeight: '400',
+    lineHeight: 22,
   },
 
   // Team
@@ -470,7 +451,7 @@ const styles = StyleSheet.create({
   teamGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 10,
+    gap: 8,
   },
   teamChip: {
     flexDirection: 'row',
@@ -499,7 +480,14 @@ const styles = StyleSheet.create({
   // Participants
   participantToggle: {
     flexDirection: 'row',
-    gap: 10,
+    gap: 8,
+  },
+  sectionLabel: {
+    paddingTop: 8,
+    fontSize: 16,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
   },
   participantOption: {
     flex: 1,
@@ -655,7 +643,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 14,
     borderRadius: 12,
-    gap: 10,
+    gap: 8,
   },
   scheduleBtnText: {
     fontSize: 14,

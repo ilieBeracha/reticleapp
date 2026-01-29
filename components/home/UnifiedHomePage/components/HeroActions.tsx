@@ -72,11 +72,8 @@ export function HeroActions({
   onActiveSessionPress,
   activeTeamTraining,
   isTrainingCommander,
-  hasTeams,
   onTrainingPress,
-  nextUpcomingTraining,
   defaultWeapon,
-  defaultWeaponStats,
   upcomingTrainings,
 }: HeroActionsProps) {
   const mainScale = useSharedValue(1);

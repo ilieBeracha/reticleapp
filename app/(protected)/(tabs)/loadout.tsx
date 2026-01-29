@@ -50,7 +50,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 type SourceFilter = 'all' | 'personal' | 'team_assigned' | 'team_pool';
 
-function getSourceFilterConfig(t: (key: string) => string): Record<SourceFilter, { label: string; shortLabel: string }> {
+function getSourceFilterConfig(
+  t: (key: string) => string
+): Record<SourceFilter, { label: string; shortLabel: string }> {
   return {
     all: { label: t('loadout.filters.all'), shortLabel: t('loadout.filters.all') },
     personal: { label: t('loadout.filters.personal'), shortLabel: t('loadout.filters.mine') },
@@ -270,7 +272,11 @@ function WeaponCard({ weapon, stats, isDefault, onPress, onSetDefault, colors }:
             }}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
-            <Star size={14} color={isDefault ? colors.primary : colors.textMuted} fill={isDefault ? colors.primary : 'none'} />
+            <Star
+              size={14}
+              color={isDefault ? colors.primary : colors.textMuted}
+              fill={isDefault ? colors.primary : 'none'}
+            />
           </TouchableOpacity>
         ) : (
           <View style={[s.teamIndicator, { backgroundColor: sourceConfig.bg }]}>
@@ -677,7 +683,6 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 8,
   },
   sectionTitle: {
     fontSize: 14,
@@ -703,7 +708,7 @@ const s = StyleSheet.create({
   cardMain: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 14,
+
     paddingHorizontal: 14,
     gap: 12,
   },

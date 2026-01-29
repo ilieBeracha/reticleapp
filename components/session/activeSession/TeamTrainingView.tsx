@@ -9,18 +9,18 @@
  */
 
 import { TargetCard } from '@/components/session/TargetCard';
+import { COLORS } from '@/constants/activeSession';
 import { useColors } from '@/hooks/ui/useColors';
+import type { DrillProgress, WatchState } from '@/types/activeSession';
 import type { SessionDrillConfig, SessionWithDetails } from '@/types/session';
+import { formatDistanceDisplay, formatTime } from '@/utils/activeSession.helpers';
 import { isGroupingSession } from '@/utils/drillGoal';
 import { Camera, Check, Crosshair, Lock, MapPin, Square, Target, Zap } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { EdgeInsets } from 'react-native-safe-area-context';
-import { COLORS } from '@/constants/activeSession';
-import { formatDistanceDisplay, formatTime } from '@/utils/activeSession.helpers';
 import { styles as sharedStyles } from './activeSession.styles';
-import type { DrillProgress, WatchState } from '@/types/activeSession';
 import { HeroTarget } from './components/HeroTarget';
 
 interface TeamTrainingViewProps {

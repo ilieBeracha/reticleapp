@@ -11,11 +11,12 @@
  * 4. Soldier taps "Start" → session created → navigate to activeSession
  */
 
-import { RANGE_CATEGORIES, type RangeCategory } from '@/constants/drill';
+import { POSITIONS, QUICK_DISTANCES, RANGE_CATEGORIES, RANGE_LABELS, type RangeCategory } from '@/constants/drill';
 import { useColors } from '@/hooks/ui/useColors';
+import { requireCurrentUserId } from '@/services/authService';
 import { getOrCreateSetupSession } from '@/services/session/mutations';
-import { supabase } from '@/services/supabase';
-import { getUserWeapon, type UserWeapon } from '@/services/weaponService';
+import { getCompletedDrillExecutionCount } from '@/services/session/queries';
+import { getMostRecentUserWeaponId, getUserWeapon, type UserWeapon } from '@/services/weaponService';
 import type { TrainingDrill } from '@/types/workspace';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
@@ -32,27 +33,6 @@ interface RunDrillSheetProps {
   trainingId: string;
   teamId: string;
 }
-
-const POSITIONS = [
-  { value: 'standing', label: 'Standing' },
-  { value: 'kneeling', label: 'Kneeling' },
-  { value: 'prone', label: 'Prone' },
-  { value: 'sitting', label: 'Sitting' },
-] as const;
-
-// Quick distance options based on range category
-const QUICK_DISTANCES: Record<RangeCategory, number[]> = {
-  short: [25, 50, 100, 150, 200, 250],
-  medium: [300, 350, 400, 450, 500, 550],
-  long: [600, 700, 800, 900, 1000],
-};
-
-// Range category labels
-const RANGE_LABELS: Record<RangeCategory, string> = {
-  short: 'Short Range (0-300m)',
-  medium: 'Medium Range (300-600m)',
-  long: 'Long Range (600m+)',
-};
 
 export function RunDrillSheet({ visible, onClose, drill, trainingId, teamId }: RunDrillSheetProps) {
   const colors = useColors();
@@ -138,26 +118,9 @@ export function RunDrillSheet({ visible, onClose, drill, trainingId, teamId }: R
       if (!drill?.id || !trainingId) return;
 
       try {
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
-        if (!user) return;
-
-        // Count completed sessions for this user + drill + training
-        const { count, error } = await supabase
-          .from('sessions')
-          .select('id', { count: 'exact', head: true })
-          .eq('user_id', user.id)
-          .eq('drill_id', drill.id)
-          .eq('training_id', trainingId)
-          .eq('status', 'completed');
-
-        if (error) {
-          console.error('[RunDrillSheet] Failed to count executions:', error);
-          return;
-        }
-
-        setCompletedExecutions(count ?? 0);
+        const userId = await requireCurrentUserId();
+        const count = await getCompletedDrillExecutionCount(userId, drill.id, trainingId);
+        setCompletedExecutions(count);
       } catch (err) {
         console.error('[RunDrillSheet] Failed to load executions:', err);
       } finally {
@@ -178,21 +141,11 @@ export function RunDrillSheet({ visible, onClose, drill, trainingId, teamId }: R
   useEffect(() => {
     async function loadDefaultWeapon() {
       try {
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
-        if (!user) return;
+        const userId = await requireCurrentUserId();
+        const weaponId = await getMostRecentUserWeaponId(userId);
 
-        // Get user's most recently used weapon
-        const { data: weapons } = await supabase
-          .from('user_weapons')
-          .select('id')
-          .eq('user_id', user.id)
-          .order('updated_at', { ascending: false })
-          .limit(1);
-
-        if (weapons && weapons.length > 0) {
-          const w = await getUserWeapon(weapons[0].id);
+        if (weaponId) {
+          const w = await getUserWeapon(weaponId);
           if (w) setWeapon(w);
         }
       } catch (err) {

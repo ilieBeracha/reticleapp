@@ -2,8 +2,8 @@
  * Styles for Active Session Screen
  */
 
-import { StyleSheet } from 'react-native';
 import { SIZES } from '@/constants/activeSession';
+import { StyleSheet } from 'react-native';
 
 export const styles = StyleSheet.create({
   container: {
