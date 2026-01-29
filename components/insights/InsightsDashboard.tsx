@@ -40,7 +40,7 @@ import {
 } from 'react-native';
 import Animated, { FadeInDown, FadeOut } from 'react-native-reanimated';
 
-import { AIExplanationProvider } from './AIExplanationProvider';
+import { AIExplanationProvider } from '@/contexts/AIExplanationContext';
 import { featuresToSessions } from '@/services/insights/insightsAdapter';
 import { ActivityChart, type ActivityDataPoint } from './components/ActivityChart';
 import { PerformanceChart, type ChartDataPoint } from './components/PerformanceChart';

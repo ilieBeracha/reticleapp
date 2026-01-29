@@ -7,7 +7,7 @@ import { CheckCircle2, Clock, XCircle, Zap } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeInDown, FadeInRight } from 'react-native-reanimated';
-import { LiveDot } from './AnimatedComponents';
+import { LiveDot } from './LiveDot';
 import { AutoCloseCountdown } from './AutoCloseCountdown';
 import type { TrainingHeroProps } from '@/types/trainingDetail';
 

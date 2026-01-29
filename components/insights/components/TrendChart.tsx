@@ -6,18 +6,16 @@
  */
 
 import { useColors } from '@/hooks/ui/useColors';
+import type { TrendDataPoint } from '@/types/insights';
 import { useMemo } from 'react';
 import { Dimensions, StyleSheet, Text, View } from 'react-native';
 import Svg, { Defs, LinearGradient, Path, Stop } from 'react-native-svg';
 
+import { Sparkline } from './Sparkline';
+
 // ============================================================================
 // TYPES
 // ============================================================================
-
-export interface TrendDataPoint {
-  value: number;
-  date: string; // ISO date string
-}
 
 interface TrendChartProps {
   /** Data points to display */
@@ -70,7 +68,7 @@ function generatePath(
     const midX = (prev.x + curr.x) / 2;
     path += ` Q ${prev.x} ${prev.y}, ${midX} ${(prev.y + curr.y) / 2}`;
   }
-  
+
   // Final point
   const last = scaledPoints[scaledPoints.length - 1];
   path += ` L ${last.x} ${last.y}`;
@@ -88,55 +86,9 @@ function generateFillPath(
 
   const linePath = generatePath(points, width, height, padding);
   const plotWidth = width - padding * 2;
-  
+
   // Close the path to create a fill area
   return `${linePath} L ${padding + plotWidth} ${height - padding} L ${padding} ${height - padding} Z`;
-}
-
-// ============================================================================
-// SPARKLINE (compact inline chart)
-// ============================================================================
-
-interface SparklineProps {
-  data: TrendDataPoint[];
-  width?: number;
-  height?: number;
-  color: string;
-  showFill?: boolean;
-}
-
-export function Sparkline({ data, width = 80, height = 32, color, showFill = true }: SparklineProps) {
-  const padding = 2;
-  const points = useMemo(() => data.map((d, i) => ({ x: i, y: d.value })), [data]);
-  
-  if (data.length < 2) return null;
-
-  return (
-    <Svg width={width} height={height} viewBox={`0 0 ${width} ${height}`}>
-      <Defs>
-        <LinearGradient id={`spark-${color}`} x1="0" y1="0" x2="0" y2="1">
-          <Stop offset="0%" stopColor={color} stopOpacity={0.25} />
-          <Stop offset="100%" stopColor={color} stopOpacity={0} />
-        </LinearGradient>
-      </Defs>
-      
-      {showFill && (
-        <Path
-          d={generateFillPath(points, width, height, padding)}
-          fill={`url(#spark-${color})`}
-        />
-      )}
-      
-      <Path
-        d={generatePath(points, width, height, padding)}
-        stroke={color}
-        strokeWidth={1.5}
-        fill="none"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </Svg>
-  );
 }
 
 // ============================================================================
@@ -166,7 +118,7 @@ export function TrendChart({
     const firstAvg = first.reduce((s, p) => s + p.value, 0) / first.length;
     const lastAvg = last.reduce((s, p) => s + p.value, 0) / last.length;
     const diff = lastAvg - firstAvg;
-    
+
     if (Math.abs(diff) < 2) return 'stable';
     if (higherIsBetter) {
       return diff > 0 ? 'improving' : 'declining';
@@ -174,10 +126,10 @@ export function TrendChart({
     return diff < 0 ? 'improving' : 'declining';
   }, [data, higherIsBetter]);
 
-  const trendColor = trend === 'improving' 
-    ? colors.green 
-    : trend === 'declining' 
-    ? colors.red 
+  const trendColor = trend === 'improving'
+    ? colors.green
+    : trend === 'declining'
+    ? colors.red
     : colors.primary;
 
   // Convert data to points
@@ -251,7 +203,7 @@ export function TrendChart({
               <Stop offset="100%" stopColor={trendColor} stopOpacity={0} />
             </LinearGradient>
           </Defs>
-          
+
           {/* Fill */}
           {showFill && (
             <Path
@@ -259,7 +211,7 @@ export function TrendChart({
               fill="url(#chartGradient)"
             />
           )}
-          
+
           {/* Line */}
           <Path
             d={generatePath(points, width, height, padding)}
@@ -325,7 +277,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     paddingVertical: 20,
   },
-  
+
   // Compact mode
   compactContainer: {
     flexDirection: 'row',

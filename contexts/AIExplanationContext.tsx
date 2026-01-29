@@ -1,5 +1,5 @@
 /**
- * AI Explanation Provider
+ * AI Explanation Context
  *
  * Context provider that manages AI explanations for all insight cards.
  * Wraps the Insights page and provides a shared hook instance.
@@ -10,7 +10,7 @@
  * - Components access via useAIExplanations()
  */
 
-import React, { createContext, useContext } from 'react';
+import React, { createContext } from 'react';
 import { useAIContext, ExplanationParams } from '@/hooks/insights/useAIContext';
 import type { AIContextResponse } from '@/types/ai-context.contract';
 
@@ -18,7 +18,7 @@ import type { AIContextResponse } from '@/types/ai-context.contract';
 // CONTEXT TYPE
 // ============================================================================
 
-interface AIExplanationContextValue {
+export interface AIExplanationContextValue {
   /** Get cached explanation for an insight */
   getExplanation: (insightId: string) => AIContextResponse | null;
   /** Check if an explanation is loading */
@@ -31,7 +31,7 @@ interface AIExplanationContextValue {
   clearAll: () => void;
 }
 
-const AIExplanationContext = createContext<AIExplanationContextValue | null>(null);
+export const AIExplanationContext = createContext<AIExplanationContextValue | null>(null);
 
 // ============================================================================
 // PROVIDER
@@ -64,37 +64,7 @@ export function AIExplanationProvider({ userId, children }: AIExplanationProvide
 }
 
 // ============================================================================
-// HOOK
-// ============================================================================
-
-/**
- * Access the AI explanation context.
- * Must be used within an AIExplanationProvider.
- */
-export function useAIExplanations(): AIExplanationContextValue {
-  const context = useContext(AIExplanationContext);
-  
-  if (!context) {
-    // Return a no-op implementation if used outside provider
-    // This allows components to work without AI features
-    return {
-      getExplanation: () => null,
-      isLoading: () => false,
-      getError: () => null,
-      requestExplanation: async () => ({
-        request_id: '',
-        success: false,
-        error: 'AI explanations not available',
-      }),
-      clearAll: () => {},
-    };
-  }
-  
-  return context;
-}
-
-// ============================================================================
-// HELPER: Build params from card types
+// RE-EXPORT HELPER TYPE
 // ============================================================================
 
 export type { ExplanationParams };
