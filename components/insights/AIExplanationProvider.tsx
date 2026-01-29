@@ -11,7 +11,7 @@
  */
 
 import React, { createContext, useContext } from 'react';
-import { useAIContext, ExplanationParams } from './hooks/useAIContext';
+import { useAIContext, ExplanationParams } from '@/hooks/insights/useAIContext';
 import type { AIContextResponse } from '@/types/ai-context.contract';
 
 // ============================================================================

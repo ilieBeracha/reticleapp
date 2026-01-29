@@ -20,7 +20,7 @@ import { countActiveFilters } from '@/utils/sessionHistory.helpers';
 import type { SessionHistoryCatalogProps } from '@/types/sessionHistory';
 import { FilterSheet } from './FilterSheet';
 import { SessionCard } from './SessionCard';
-import { useSessionHistory } from './useSessionHistory';
+import { useSessionHistory } from '@/hooks/session/useSessionHistory';
 
 /**
  * SessionHistoryCatalog - Full session history with search, filters, and sorting

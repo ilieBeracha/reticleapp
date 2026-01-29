@@ -11,7 +11,7 @@ import { getStatusConfig } from '@/utils/training.utils';
 import { COLORS, PULSE_ANIMATION } from '@/constants/trainings';
 import { groupTrainingsByTimeframe } from '@/utils/trainings.helpers';
 import { styles } from '@/components/training/trainings.styles';
-import { useTrainings } from '@/components/training/useTrainings';
+import { useTrainings } from '@/hooks/training/useTrainings';
 import { RequestWeaponModal } from '@/components/weapons/RequestWeaponModal';
 import { useColors } from '@/hooks/ui/useColors';
 import {

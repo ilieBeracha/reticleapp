@@ -13,7 +13,7 @@
  */
 import { TrainingHero } from '@/components/training/detail/TrainingHero';
 import { TrainingSettingsModal } from '@/components/training/detail/TrainingSettingsModal';
-import { useTrainingDetail } from '@/components/training/hooks/useTrainingDetail';
+import { useTrainingDetail } from '@/hooks/training/useTrainingDetail';
 import { RunDrillSheet } from '@/components/training/RunDrillSheet';
 import { SquadInvitationBanner } from '@/components/training/SquadInvitationBanner';
 import { SquadLobbyBanner } from '@/components/training/SquadLobbyBanner';

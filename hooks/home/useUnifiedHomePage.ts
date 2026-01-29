@@ -26,7 +26,7 @@ import { useSessionStore } from '@/stores/sessionStore';
 import { useTeamStore } from '@/stores/teamStore';
 import { useTrainingStore } from '@/stores/trainingStore';
 import { mapSessionToHomeSession, type HomeSession } from '@/types/home.viewmodel';
-import { useHomeState } from '../useHomeState';
+import { useHomeState } from '@/hooks/home/useHomeState';
 import { RECENT_SESSIONS_LIMIT, SESSION_FETCH_DAYS, SESSION_FETCH_LIMIT } from '@/constants/unifiedHomePage';
 import {
   calculateLastSessionDaysAgo,

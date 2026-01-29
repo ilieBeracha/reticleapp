@@ -4,7 +4,7 @@
  * Shows session summary, stats, and image previews.
  * Opens as a formSheet modal above tabs.
  */
-import { useSessionTimeline } from '@/components/session/useSessionTimeline';
+import { useSessionTimeline } from '@/hooks/session/useSessionTimeline';
 import { WeatherStrip } from '@/components/session/WeatherDisplay';
 import { isEngagementPaper, isGroupingPaper, isPaperTarget } from '@/constants/drill';
 import { useAuth } from '@/contexts/AuthContext';
