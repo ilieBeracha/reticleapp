@@ -1,5 +1,5 @@
 import { useColors } from '@/hooks/ui/useColors';
-import type { SessionWithDetails } from '@/services/session/types';
+import type { SessionWithDetails } from '@/types/session';
 import { isGroupingSession } from '@/utils/drillGoal';
 import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';

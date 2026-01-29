@@ -12,7 +12,7 @@ import { useColors } from '@/hooks/ui/useColors';
 import { useTranslation } from 'react-i18next';
 import { supabase } from '@/services/supabase';
 import { calculateGroupTotals, updateParticipantResults } from '@/services/session/participants';
-import type { EngagementParticipant } from '@/services/session/types';
+import type { EngagementParticipant } from '@/types/session';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import {

@@ -8,14 +8,14 @@
 //
 // ============================================================================
 
-import type { SessionWeatherData } from '@/services/session/types';
-import type { DecodedWeather } from '@/services/session/watchTypes';
+import type { SessionWeatherData } from '@/types/session';
+import type { DecodedWeather } from '@/types/session.watch';
 import {
     getConditionSeverity,
     getWindImpact,
 } from '@/services/session/weatherDecoder';
 
-import type { OpenWeatherConditionMain, OpenWeatherResponse } from './types';
+import type { OpenWeatherConditionMain, OpenWeatherResponse } from '@/types/weather';
 
 // ============================================================================
 // CONDITION MAPPING

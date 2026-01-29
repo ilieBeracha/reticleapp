@@ -12,7 +12,7 @@ import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { formatTimeAgo } from '../UnifiedHomePage.helpers';
-import type { RecentSessionRowProps } from '../UnifiedHomePage.types';
+import type { RecentSessionRowProps } from '@/types/home';
 
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 

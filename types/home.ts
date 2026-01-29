@@ -5,10 +5,10 @@
  */
 
 import type { useColors } from '@/hooks/ui/useColors';
-import type { SessionWithDetails } from '@/services/session/types';
+import type { SessionWithDetails } from '@/types/session';
 import type { UserWeapon, WeaponStats } from '@/services/weaponService';
 import type { TrainingWithDetails } from '@/types/workspace';
-import type { HomeSession } from '../types';
+import type { HomeSession } from '@/types/home.viewmodel';
 
 /** Hero mode determined by priority logic */
 export type HeroMode = 'team-live' | 'solo-active' | 'idle';

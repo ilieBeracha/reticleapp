@@ -1,20 +1,10 @@
 /**
- * Execution Policy Types
+ * Execution Policy Utilities
  *
- * HOW STRICT drill configuration must be followed.
- *
- * This is about config freedom during execution.
- * Training decides strictness, not execution mode.
+ * Runtime functions for execution policy management.
  */
 
-/**
- * Execution policy - Commander's intent for how strictly a drill must be followed.
- *
- * - locked: Military qualification - execute EXACTLY as defined (no editing)
- * - guided: Training drill - defaults provided, adjustments allowed
- * - free: Open practice - drill is just a label, full freedom
- */
-export type ExecutionPolicy = 'locked' | 'guided' | 'free';
+import type { ExecutionPolicy } from '@/types/executionPolicy';
 
 /**
  * Check if config editing is allowed based on execution policy

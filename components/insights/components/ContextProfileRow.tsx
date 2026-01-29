@@ -35,7 +35,7 @@ import {
   View,
 } from 'react-native';
 
-import type { ContextProfile, ContextQuadrant } from '../insights.types';
+import type { ContextProfile, ContextQuadrant } from '@/types/insights';
 import { useAIExplanations, type ExplanationParams } from '../AIExplanationProvider';
 import { AIExplanationBlock } from '../AIExplanationBlock';
 import { ContextQuadrantGlyph } from './ContextQuadrantGlyph';

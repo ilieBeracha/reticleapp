@@ -15,7 +15,7 @@ import { Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { Drill } from '@/types/workspace';
-import type { NewDrillInstanceConfig } from '../createTraining.types';
+import type { NewDrillInstanceConfig } from '@/types/createTraining';
 
 interface DrillConfigSheetProps {
   visible: boolean;

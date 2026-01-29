@@ -6,8 +6,8 @@
  * Avoids rewriting the engine while eliminating heavy multi-table joins.
  */
 
-import type { SessionWithDetails } from '@/services/session/types';
-import type { DashboardFeature } from './insights.types';
+import type { SessionWithDetails } from '@/types/session';
+import type { DashboardFeature } from '@/types/insights';
 
 /**
  * Convert an array of DashboardFeature rows into SessionWithDetails objects

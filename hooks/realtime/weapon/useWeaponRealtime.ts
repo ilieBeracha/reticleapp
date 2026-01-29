@@ -33,9 +33,9 @@
 
 import { useCallback, useMemo } from 'react';
 import { useRealtimeChannel } from '../core/channel';
-import type { ChangePayload } from '../table/table.types';
+import type { ChangePayload } from '@/types/realtime.table';
 import type { TeamWeaponRecord, WeaponRequestRecord } from '../records/weapon';
-import type { UseWeaponRealtimeOptions, UseWeaponRealtimeReturn } from './weapon.types';
+import type { UseWeaponRealtimeOptions, UseWeaponRealtimeReturn } from '@/types/realtime.weapon';
 
 export function useWeaponRealtime(options: UseWeaponRealtimeOptions): UseWeaponRealtimeReturn {
   const {

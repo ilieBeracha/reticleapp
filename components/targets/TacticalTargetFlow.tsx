@@ -18,7 +18,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { COLORS } from './types';
+import { COLORS } from '@/types/targets';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // DISTANCE CATEGORIES

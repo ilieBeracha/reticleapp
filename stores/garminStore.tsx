@@ -45,7 +45,7 @@ import {
   mergeCompactWatchDetails,
   mergeWatchSessionDetails,
 } from '@/services/session/mutations';
-import type { WatchDetailsPayload } from '@/services/session/watchTypes';
+import type { WatchDetailsPayload } from '@/types/session.watch';
 
 // Re-export types for convenience
 export type { GarminConnectionStatus, GarminDevice, GarminSessionData, GarminTimelineData };

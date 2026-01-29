@@ -25,7 +25,7 @@ import { useGarminStore } from '@/stores/garminStore';
 import { useSessionStore } from '@/stores/sessionStore';
 import { useTeamStore } from '@/stores/teamStore';
 import { useTrainingStore } from '@/stores/trainingStore';
-import { mapSessionToHomeSession, type HomeSession } from '../types';
+import { mapSessionToHomeSession, type HomeSession } from '@/types/home.viewmodel';
 import { useHomeState } from '../useHomeState';
 import { RECENT_SESSIONS_LIMIT, SESSION_FETCH_DAYS, SESSION_FETCH_LIMIT } from './UnifiedHomePage.constants';
 import {
@@ -35,7 +35,7 @@ import {
   getCoachMessage,
   getGreeting,
 } from './UnifiedHomePage.helpers';
-import type { HeroMode, WeeklyStats } from './UnifiedHomePage.types';
+import type { HeroMode, WeeklyStats } from '@/types/home';
 
 export function useUnifiedHomePage() {
   // ═══════════════════════════════════════════════════════════════════════════

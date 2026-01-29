@@ -22,9 +22,9 @@ import type {
   SessionTargetWithResults,
   SessionWithDetails,
   TargetType,
-} from './types';
+} from '@/types/session';
 import { buildDetailsMergePayload, buildTargetData } from './watchDataTransformer';
-import type { TransformedWatchData, WatchDetailsPayload } from './watchTypes';
+import type { TransformedWatchData, WatchDetailsPayload } from '@/types/session.watch';
 
 /**
  * Convert legacy CreateSessionParams to BaseSessionConfig

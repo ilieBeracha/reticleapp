@@ -4,9 +4,9 @@
  * Hook options and return types for training subscriptions.
  */
 
-import type { ChangePayload } from '../table/table.types';
-import type { SessionRecord, SessionTargetRecord } from '../records/session';
-import type { TrainingRecord } from '../records/training';
+import type { ChangePayload } from '@/types/realtime.table';
+import type { SessionRecord, SessionTargetRecord } from '@/hooks/realtime/records/session';
+import type { TrainingRecord } from '@/hooks/realtime/records/training';
 
 export interface UseTrainingRealtimeOptions {
   /** Training ID to subscribe to */

@@ -8,7 +8,7 @@
 
 import { useColors } from '@/hooks/ui/useColors';
 import { supabase } from '@/services/supabase';
-import type { EngagementParticipant } from '@/services/session/types';
+import type { EngagementParticipant } from '@/types/session';
 import { useTranslation } from 'react-i18next';
 import * as Haptics from 'expo-haptics';
 import { Check, ChevronDown, Crown, Target, User, Users } from 'lucide-react-native';

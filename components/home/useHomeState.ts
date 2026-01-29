@@ -11,10 +11,10 @@
  * Training is EXPLICIT. Users see their trainings and drills clearly.
  */
 
-import type { SessionWithDetails } from '@/services/session/types';
+import type { SessionWithDetails } from '@/types/session';
 import type { TrainingWithDetails } from '@/types/workspace';
 import { useMemo } from 'react';
-import { type HomeSession, type HomeState, mapSessionToHomeSession, mapTrainingToScheduledSession } from './types';
+import { type HomeSession, type HomeState, mapSessionToHomeSession, mapTrainingToScheduledSession } from '@/types/home.viewmodel';
 
 interface UseHomeStateParams {
   sessions: SessionWithDetails[];

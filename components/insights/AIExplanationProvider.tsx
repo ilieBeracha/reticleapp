@@ -12,7 +12,7 @@
 
 import React, { createContext, useContext } from 'react';
 import { useAIContext, ExplanationParams } from './hooks/useAIContext';
-import type { AIContextResponse } from './ai-context.contract';
+import type { AIContextResponse } from '@/types/ai-context.contract';
 
 // ============================================================================
 // CONTEXT TYPE

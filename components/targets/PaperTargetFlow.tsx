@@ -17,7 +17,7 @@ import { useTranslation } from 'react-i18next';
 import { Alert, StyleSheet, View } from 'react-native';
 import { CameraFlow } from './CameraFlow';
 import { ResultCard } from './ResultCard';
-import { COLORS, EditableDetection, Step, TargetType } from './types';
+import { COLORS, EditableDetection, Step, TargetType } from '@/types/targets';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // PAPER TARGET FLOW

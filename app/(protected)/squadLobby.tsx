@@ -29,7 +29,7 @@ import {
   startEngagement,
   updateParticipantRole,
 } from '@/services/session/participants';
-import type { Engagement, EngagementParticipant, EngagementRole } from '@/services/session/types';
+import type { Engagement, EngagementParticipant, EngagementRole } from '@/types/session';
 import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Check, ChevronDown, ChevronLeft, Clock, LogOut, Play, UserPlus, Users, X } from 'lucide-react-native';

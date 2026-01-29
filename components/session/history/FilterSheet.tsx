@@ -23,7 +23,7 @@ import {
   STATUS_OPTIONS,
 } from './SessionHistory.constants';
 import { countActiveFilters } from './SessionHistory.helpers';
-import type { DateRangePreset, SessionFilters, SortConfig, SortField } from './SessionHistory.types';
+import type { DateRangePreset, SessionFilters, SortConfig, SortField } from '@/types/sessionHistory';
 
 interface FilterSheetProps {
   isOpen: boolean;

@@ -15,7 +15,7 @@ import { useColors } from '@/hooks/ui/useColors';
 import { Ionicons } from '@expo/vector-icons';
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-import type { AIContextResponse, AIExplanation } from './ai-context.contract';
+import type { AIContextResponse, AIExplanation } from '@/types/ai-context.contract';
 
 // ============================================================================
 // PROPS

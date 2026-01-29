@@ -23,7 +23,7 @@ import {
     getRoleConfig,
     type SessionStatsData,
 } from './trainings.helpers';
-import type { InternalTab, UseTrainingsReturn } from './trainings.types';
+import type { InternalTab, UseTrainingsReturn } from '@/types/trainings';
 
 export function useTrainings(): UseTrainingsReturn {
   // Team context - single source of truth

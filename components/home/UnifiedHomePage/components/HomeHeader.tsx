@@ -12,7 +12,7 @@ import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeIn, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
-import type { HomeHeaderProps } from '../UnifiedHomePage.types';
+import type { HomeHeaderProps } from '@/types/home';
 
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 

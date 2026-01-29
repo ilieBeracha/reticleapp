@@ -19,7 +19,7 @@
  */
 
 import { DRILL_GOAL } from '@/constants/drill';
-import type { SessionWithDetails } from '@/services/session/types';
+import type { SessionWithDetails } from '@/types/session';
 import {
   ACCURACY_CHANGE_THRESHOLD,
   GROUPING_CHANGE_THRESHOLD,
@@ -28,7 +28,7 @@ import {
   RECENT_SESSION_COUNT,
   getConfidence,
 } from './changeRules';
-import {
+import type {
   BaselineStrategy,
   BaselineValues,
   CategoryStats,
@@ -40,9 +40,6 @@ import {
   ContextKey,
   ContextProfile,
   ContextQuadrant,
-  DEFAULT_FILTERS,
-  DEFAULT_THRESHOLD_CONFIG,
-  DISTANCE_BUCKETS,
   FocusItem,
   InsightsFilters,
   MetricDirection,
@@ -50,15 +47,20 @@ import {
   Recommendation,
   StrengthCard,
   ThresholdConfig,
-  TIME_OF_DAY_BUCKETS,
   TotalsMetric,
   TrendData,
   TrendDataPoint,
   TrendSummary,
   TrustItem,
   WeaknessCard,
+} from '@/types/insights';
+import {
+  DEFAULT_FILTERS,
+  DEFAULT_THRESHOLD_CONFIG,
+  DISTANCE_BUCKETS,
+  TIME_OF_DAY_BUCKETS,
   WIND_BUCKETS,
-} from './insights.types';
+} from '@/constants/insights';
 
 // ============================================================================
 // CONSTANTS

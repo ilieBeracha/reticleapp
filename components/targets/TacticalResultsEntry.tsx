@@ -15,7 +15,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { COLORS } from './types';
+import { COLORS } from '@/types/targets';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // CIRCULAR STEPPER COMPONENT

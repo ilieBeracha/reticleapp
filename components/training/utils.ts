@@ -1,4 +1,4 @@
-import type { StatusConfig, TrainingStatus } from './types';
+import type { StatusConfig, TrainingStatus } from '@/types/training.viewmodel';
 
 const STATUS_CONFIGS: Record<TrainingStatus, StatusConfig> = {
   planned: { color: '#3B82F6', bg: '#3B82F615', icon: 'calendar', label: 'Planned' },

@@ -24,7 +24,7 @@ import { Dimensions, StyleSheet, Text, TouchableOpacity, View } from 'react-nati
 
 import { AIExplanationBlock, WhyButton } from '../AIExplanationBlock';
 import { useAIExplanations, type ExplanationParams } from '../AIExplanationProvider';
-import type { TrendData, TrendDataPoint, TrendDirection } from '../insights.types';
+import type { TrendData, TrendDataPoint, TrendDirection } from '@/types/insights';
 
 // ============================================================================
 // PROPS

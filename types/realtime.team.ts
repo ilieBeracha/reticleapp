@@ -4,8 +4,8 @@
  * Hook options and return types for team subscriptions.
  */
 
-import type { ChangePayload } from '../table/table.types';
-import type { TeamInvitationRecord, TeamMemberRecord, TeamTrainingRecord } from '../records/team';
+import type { ChangePayload } from '@/types/realtime.table';
+import type { TeamInvitationRecord, TeamMemberRecord, TeamTrainingRecord } from '@/hooks/realtime/records/team';
 
 export interface UseTeamRealtimeOptions {
   /** Team ID to subscribe to */

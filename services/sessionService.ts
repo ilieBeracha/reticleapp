@@ -5,9 +5,9 @@
  * across files in services/session/* for maintainability.
  */
 
-export type * from './session/types';
-export type * from './session/watchTypes';
-export { enforceEngagementMode } from './session/types';
+export type * from '@/types/session';
+export type * from '@/types/session.watch';
+export { enforceEngagementMode } from '@/utils/engagementMode';
 export * from './session/mutations';
 export * from './session/queries';
 export * from './session/stats';

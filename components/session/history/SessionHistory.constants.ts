@@ -1,4 +1,4 @@
-import type { DateRangePreset, SessionFilters, SortConfig, SortField } from './SessionHistory.types';
+import type { DateRangePreset, SessionFilters, SortConfig, SortField } from '@/types/sessionHistory';
 
 // ============================================================================
 // DEFAULT VALUES

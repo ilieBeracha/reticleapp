@@ -26,8 +26,8 @@ import Animated, {
   withSpring,
   withTiming,
 } from 'react-native-reanimated';
-import type { HomeSession } from '../../types';
-import type { Colors, HeroMode } from '../UnifiedHomePage.types';
+import type { HomeSession } from '@/types/home.viewmodel';
+import type { Colors, HeroMode } from '@/types/home';
 import { TimelineStrip } from './TimelineStrip';
 
 interface HeroActionsProps {

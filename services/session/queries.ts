@@ -1,4 +1,4 @@
-import type { DashboardFeature } from '@/components/insights/insights.types';
+import type { DashboardFeature } from '@/types/insights';
 import { SESSION_STATUS } from '@/constants/session';
 import { supabase } from '@/services/supabase';
 import { withQueryTiming } from '@/services/_shared/instrumentation';
@@ -9,7 +9,7 @@ import {
   SESSION_SELECT_WITH_WEAPON,
   TARGET_STATS_SELECT,
 } from './selectClauses';
-import type { SessionAggregatedStats, SessionWithDetails } from './types';
+import type { SessionAggregatedStats, SessionWithDetails } from '@/types/session';
 
 /**
  * Get user's active session for a specific training (if any)

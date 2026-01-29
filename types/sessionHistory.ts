@@ -1,4 +1,4 @@
-import type { SessionWithDetails } from '@/services/session/types';
+import type { SessionWithDetails } from '@/types/session';
 import type { DrillGoal } from '@/types/workspace';
 
 // ============================================================================

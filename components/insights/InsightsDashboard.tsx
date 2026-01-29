@@ -46,11 +46,10 @@ import { ActivityChart, type ActivityDataPoint } from './components/ActivityChar
 import { PerformanceChart, type ChartDataPoint } from './components/PerformanceChart';
 import { EvidenceSheet } from './EvidenceSheet';
 import { applyFilters, computeContextProfiles, computeInsights, computeOverviewStatus } from './insights.engine';
-import {
+import type {
   ComputedContextProfiles,
   ComputedInsights,
   ContextProfile,
-  DEFAULT_FILTERS,
   EvidenceContext,
   InsightsFilters,
   OverviewStatus,
@@ -59,7 +58,8 @@ import {
   TotalsMetric,
   TrendData,
   WeaknessCard,
-} from './insights.types';
+} from '@/types/insights';
+import { DEFAULT_FILTERS } from '@/constants/insights';
 import { InsightsFilterBar } from './InsightsFilterBar';
 import { ContextSummarySection } from './sections/ContextSummarySection';
 import { DetailedBreakdownSection } from './sections/DetailedBreakdownSection';

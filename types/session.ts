@@ -110,28 +110,6 @@ export interface EngagementParticipant {
 }
 
 // ============================================================================
-// ENGAGEMENT MODE GUARD (MANDATORY)
-// ============================================================================
-
-/**
- * Enforce engagement mode based on drill goal.
- *
- * CANONICAL RULE: Grouping is ALWAYS solo.
- *
- * @param drillGoal - The drill goal (grouping or engagement)
- * @param requested - The requested engagement mode (optional)
- * @returns The enforced engagement mode
- */
-export function enforceEngagementMode(drillGoal: DrillGoal, requested?: EngagementMode): EngagementMode {
-  // Grouping is ALWAYS solo - this is non-negotiable
-  if (drillGoal === 'grouping') {
-    return 'solo';
-  }
-  // For engagement drills, use requested mode or default to solo
-  return requested ?? 'solo';
-}
-
-// ============================================================================
 // WEATHER DATA - Stored with session
 // ============================================================================
 
@@ -243,10 +221,10 @@ export interface BaseSessionConfig {
   // When true, session is created as 'pending' and user must call activateSession()
   start_as_pending?: boolean;
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===================================================================
   // SOLDIER CHOICES - Values chosen by soldier when commander allows flexibility
   // Commander sets rules in training_drills, soldier picks within those constraints
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===================================================================
   /** Actual distance soldier chose (when commander set distance_category or NULL distance_m) */
   soldier_distance_m?: number | null;
   /** Actual bullets soldier chose (when commander left rounds_per_shooter NULL) */
@@ -358,10 +336,10 @@ export interface SessionWithDetails {
   // Engagement (execution unit) - populated when fetched with engagement
   engagement?: Engagement | null;
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===================================================================
   // SOLDIER CHOICES - Values chosen by soldier at execution time
   // These override drill defaults when commander allows flexibility
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===================================================================
   /** Actual distance soldier shot at (when commander set distance_category or NULL distance_m) */
   soldier_distance_m?: number | null;
   /** Actual bullets soldier used (when commander left rounds_per_shooter NULL) */

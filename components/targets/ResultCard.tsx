@@ -1,5 +1,5 @@
 import { useColors } from '@/hooks/ui/useColors';
-import type { DecodedWeather } from '@/services/session/watchTypes';
+import type { DecodedWeather } from '@/types/session.watch';
 import { BUTTON_GRADIENT, BUTTON_GRADIENT_DISABLED } from '@/constants/Colors';
 import type { AnalyzeDocumentResponse, AnalyzeResponse } from '@/types/api';
 import { Ionicons } from '@expo/vector-icons';
@@ -23,7 +23,7 @@ import {
 import ViewShot from 'react-native-view-shot';
 import { DetectionEditor } from './DetectionEditor';
 import { DetectionPreview } from './DetectionPreview';
-import { COLORS, EditableDetection, EditMode, TargetType } from './types';
+import { COLORS, EditableDetection, EditMode, TargetType } from '@/types/targets';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // RESULT CARD

@@ -8,7 +8,7 @@
 import { WeatherCard } from '@/components/session/WeatherDisplay';
 import { useColors } from '@/hooks/ui/useColors';
 import type { GarminBiometrics } from '@/services/garminService';
-import type { DecodedWeather } from '@/services/session/watchTypes';
+import type { DecodedWeather } from '@/types/session.watch';
 import { decodeWeather } from '@/services/session/weatherDecoder';
 import { endSession, saveWatchSessionData, updateSessionHits } from '@/services/sessionService';
 import { useSessionStore } from '@/stores/sessionStore';

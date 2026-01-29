@@ -10,7 +10,7 @@ import { Calendar, Users } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
-import type { TeamTrainingCardProps } from '../UnifiedHomePage.types';
+import type { TeamTrainingCardProps } from '@/types/home';
 
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 

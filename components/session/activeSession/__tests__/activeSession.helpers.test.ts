@@ -21,7 +21,7 @@ import {
   getAccuracyColor,
   isDrillLimitReached,
 } from '../activeSession.helpers';
-import type { DrillProgress } from '../activeSession.types';
+import type { DrillProgress } from '@/types/activeSession';
 
 // ============================================================================
 // TIME FORMATTING TESTS

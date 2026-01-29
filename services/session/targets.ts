@@ -7,7 +7,7 @@ import type {
     SessionTarget,
     SessionTargetWithResults,
     TacticalTargetResult,
-} from './types';
+} from '@/types/session';
 
 /**
  * Get all targets for a session

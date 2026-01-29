@@ -29,7 +29,7 @@ import { usePermissions } from '@/hooks/usePermissions';
 import { supabase } from '@/services/supabase';
 import type { DrillPreset } from '@/services/presetService';
 import { createEngagement } from '@/services/session/participants';
-import type { DrillGoal, EngagementMode } from '@/services/session/types';
+import type { DrillGoal, EngagementMode } from '@/types/session';
 import { deleteSession, getMyActiveSession, getOrCreateSetupSession } from '@/services/sessionService';
 import { getUserWeapon, type UserWeapon } from '@/services/weaponService';
 import { toSessionWeatherData } from '@/services/weather/openWeatherDecoder';

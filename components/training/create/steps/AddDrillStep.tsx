@@ -12,11 +12,11 @@
  */
 
 import { SessionContextStep } from '@/components/session/creation/SessionContextStep';
-import type { SessionContextState, SessionPurpose } from '@/components/session/creation/sessionCreation.types';
+import type { SessionContextState, SessionPurpose } from '@/types/sessionCreation';
 import { RANGE_CATEGORIES } from '@/constants/drill';
 import { useColors } from '@/hooks/ui/useColors';
 import { type RangeCategory, type TrainingDrillItem } from '@/services/drills/drillService';
-import type { ExecutionPolicy } from '@/services/session/types';
+import type { ExecutionPolicy } from '@/types/session';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import {

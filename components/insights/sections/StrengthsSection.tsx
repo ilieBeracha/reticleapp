@@ -23,7 +23,7 @@ import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { AIExplanationBlock, WhyButton } from '../AIExplanationBlock';
 import { useAIExplanations, type ExplanationParams } from '../AIExplanationProvider';
-import type { ConfidenceLevel, StrengthCard } from '../insights.types';
+import type { ConfidenceLevel, StrengthCard } from '@/types/insights';
 
 // ============================================================================
 // PROPS

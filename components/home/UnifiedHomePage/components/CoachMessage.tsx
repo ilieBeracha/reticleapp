@@ -8,7 +8,7 @@
 import { Sparkles } from 'lucide-react-native';
 import { StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import type { CoachMessageProps } from '../UnifiedHomePage.types';
+import type { CoachMessageProps } from '@/types/home';
 
 export function CoachMessage({ message, colors }: CoachMessageProps) {
   return (

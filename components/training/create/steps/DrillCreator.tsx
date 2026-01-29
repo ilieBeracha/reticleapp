@@ -41,7 +41,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import type { NewDrillInstanceConfig, TrainingDrillItem } from '../createTraining.types';
+import type { NewDrillInstanceConfig, TrainingDrillItem } from '@/types/createTraining';
 
 // ============================================================================
 // TYPES

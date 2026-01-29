@@ -4,10 +4,10 @@
  */
 
 import { RANGE_CATEGORIES } from '@/constants/drill';
-import type { RangeCategory } from '@/services/session/types';
+import type { RangeCategory } from '@/types/session';
 import { deriveDetectionConfig, type DetectionConfig } from '@/utils/detectionSensitivity';
 import { ACCURACY_THRESHOLDS, COLORS } from './activeSession.constants';
-import type { DrillProgress, NextTargetPlan } from './activeSession.types';
+import type { DrillProgress, NextTargetPlan } from '@/types/activeSession';
 
 // ============================================================================
 // TIME FORMATTING

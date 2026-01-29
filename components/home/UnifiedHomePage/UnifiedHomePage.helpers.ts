@@ -5,8 +5,8 @@
  * No side effects, state, or React dependencies.
  */
 
-import type { SessionWithDetails } from '@/services/session/types';
-import type { CoachMessageContext, WeeklyStats } from './UnifiedHomePage.types';
+import type { SessionWithDetails } from '@/types/session';
+import type { CoachMessageContext, WeeklyStats } from '@/types/home';
 
 type TFunction = (key: string, options?: any) => string;
 

@@ -4,7 +4,7 @@
  * Hook options and return types for engagement participant subscriptions.
  */
 
-import type { ParticipantRecord } from '../records/participant';
+import type { ParticipantRecord } from '@/hooks/realtime/records/participant';
 
 export interface UseParticipantsRealtimeOptions {
   /** Engagement ID to subscribe to participants for */

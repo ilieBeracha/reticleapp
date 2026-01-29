@@ -33,7 +33,7 @@ import { isInfiniteShots } from '@/utils/drillShots';
 import { useParticipantsRealtime } from '@/hooks/realtime/participants/useParticipantsRealtime';
 import { useSessionRealtime } from '@/hooks/realtime/session/useSessionRealtime';
 import { completeEngagement, getSessionParticipants } from '@/services/session/participants';
-import type { EngagementParticipant } from '@/services/session/types';
+import type { EngagementParticipant } from '@/types/session';
 import { deriveDetectionConfig } from '@/utils/detectionSensitivity';
 import { SHOT_MARKING_ENABLED, TIMER_INTERVAL_MS, VIBRATE_ON_SHOT } from './activeSession.constants';
 import {
@@ -48,7 +48,7 @@ import {
     getEffectiveDistance,
     isDrillLimitReached,
 } from './activeSession.helpers';
-import type { SessionMode, UseActiveSessionParams, UseActiveSessionReturn } from './activeSession.types';
+import type { SessionMode, UseActiveSessionParams, UseActiveSessionReturn } from '@/types/activeSession';
 
 /**
  * Refreshes the appropriate session list based on team membership

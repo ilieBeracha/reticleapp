@@ -19,7 +19,7 @@ import type {
   SessionFeatures,
   SessionInsight,
   UserBaseline,
-} from './types';
+} from '@/types/insights.pipeline';
 
 // ============================================================================
 // DATABASE FUNCTIONS

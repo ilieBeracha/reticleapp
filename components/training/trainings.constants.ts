@@ -3,7 +3,7 @@
  */
 
 import { Crown, Shield, Target } from 'lucide-react-native';
-import type { RoleConfig, StatusConfig } from './trainings.types';
+import type { RoleConfig, StatusConfig } from '@/types/trainings';
 
 // ============================================================================
 // ROLE CONFIGURATION

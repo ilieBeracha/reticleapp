@@ -12,7 +12,7 @@
  * - activeSession.tsx for scan/manual selection (based on drill config)
  */
 
-import type { BaseSessionConfig, DrillConfig } from '@/services/session/types';
+import type { BaseSessionConfig, DrillConfig } from '@/types/session';
 import { getDefaultWeapon } from '@/services/weaponService';
 import { useIsGarminConnected } from '@/stores/garminStore';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -26,7 +26,7 @@ import {
   type SessionCreationState,
   type SessionPurpose,
   type TargetType,
-} from './sessionCreation.types';
+} from '@/types/sessionCreation';
 
 // ============================================================================
 // TYPES

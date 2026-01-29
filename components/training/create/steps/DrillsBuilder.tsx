@@ -14,7 +14,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 
-import type { TrainingDrillItem } from '../createTraining.types';
+import type { TrainingDrillItem } from '@/types/createTraining';
 
 // ============================================================================
 // TYPES

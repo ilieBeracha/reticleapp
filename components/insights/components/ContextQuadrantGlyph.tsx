@@ -19,7 +19,7 @@
 import { useColors } from '@/hooks/ui/useColors';
 import { StyleSheet, Text, View } from 'react-native';
 
-import type { ConfidenceLevel, ContextQuadrant } from '../insights.types';
+import type { ConfidenceLevel, ContextQuadrant } from '@/types/insights';
 
 // ============================================================================
 // PROPS

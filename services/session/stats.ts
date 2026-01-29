@@ -1,4 +1,4 @@
-import type { SessionStats } from './types';
+import type { SessionStats } from '@/types/session';
 import { getSessionTargetsWithResults } from './targets';
 
 /**

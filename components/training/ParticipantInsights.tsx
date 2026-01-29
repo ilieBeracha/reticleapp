@@ -7,7 +7,7 @@
 
 import { useColors } from '@/hooks/ui/useColors';
 import { useTranslation } from 'react-i18next';
-import type { SessionWithDetails } from '@/services/session/types';
+import type { SessionWithDetails } from '@/types/session';
 import {
   AlertTriangle,
   Award,

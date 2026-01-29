@@ -23,8 +23,8 @@ import type {
   EngagementRole,
   EngagementStatus,
   ParticipantState,
-} from './types';
-import { enforceEngagementMode } from './types';
+} from '@/types/session';
+import { enforceEngagementMode } from '@/utils/engagementMode';
 
 // ============================================================================
 // ENGAGEMENT QUERIES

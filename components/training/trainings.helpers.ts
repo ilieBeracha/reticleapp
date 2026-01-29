@@ -6,7 +6,7 @@
 import type { TeamMemberWithProfile, TrainingWithDetails } from '@/types/workspace';
 import { addDays, isSameDay, startOfWeek } from 'date-fns';
 import { DEFAULT_WEEKLY_GOAL, ROLE_CONFIG, STATUS_CONFIG, getRoleConfig as getRoleConfigTranslated, getStatusConfig as getStatusConfigTranslated } from './trainings.constants';
-import type { GroupedTrainings, MemberStats, QuickStats, RoleConfig, StatusConfig, TeamStats } from './trainings.types';
+import type { GroupedTrainings, MemberStats, QuickStats, RoleConfig, StatusConfig, TeamStats } from '@/types/trainings';
 
 // ============================================================================
 // ROLE HELPERS

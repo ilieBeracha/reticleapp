@@ -14,7 +14,7 @@ import type {
   ChannelConfig,
   ChannelStatus,
   UseRealtimeChannelReturn,
-} from './channel.types';
+} from '@/types/realtime.channel';
 
 const RECONNECT_DELAY_MS = 3000;
 const MAX_RECONNECT_ATTEMPTS = 5;

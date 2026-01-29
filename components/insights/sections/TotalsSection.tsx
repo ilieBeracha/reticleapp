@@ -17,7 +17,7 @@ import { TrendingDown, TrendingUp } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-import type { TotalsMetric } from '../insights.types';
+import type { TotalsMetric } from '@/types/insights';
 
 // ============================================================================
 // CONSTANTS

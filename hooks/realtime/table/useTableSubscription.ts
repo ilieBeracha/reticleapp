@@ -18,7 +18,7 @@
 
 import { useCallback, useMemo } from 'react';
 import { useRealtimeChannel } from '../core/channel';
-import type { ChangePayload, UseTableSubscriptionOptions, UseTableSubscriptionReturn } from './table.types';
+import type { ChangePayload, UseTableSubscriptionOptions, UseTableSubscriptionReturn } from '@/types/realtime.table';
 
 export function useTableSubscription<T = Record<string, unknown>>(
   options: UseTableSubscriptionOptions<T>

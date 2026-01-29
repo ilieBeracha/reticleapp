@@ -23,8 +23,8 @@
 import { useCallback, useMemo } from 'react';
 import { useRealtimeChannel } from '../core/channel';
 import type { TeamInvitationRecord, TeamMemberRecord, TeamTrainingRecord } from '../records/team';
-import type { ChangePayload } from '../table/table.types';
-import type { UseTeamRealtimeOptions, UseTeamRealtimeReturn } from './team.types';
+import type { ChangePayload } from '@/types/realtime.table';
+import type { UseTeamRealtimeOptions, UseTeamRealtimeReturn } from '@/types/realtime.team';
 
 export function useTeamRealtime(options: UseTeamRealtimeOptions): UseTeamRealtimeReturn {
   const {

@@ -8,7 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { styles } from '../UnifiedHomePage.styles';
-import type { RecentActivitySectionProps } from '../UnifiedHomePage.types';
+import type { RecentActivitySectionProps } from '@/types/home';
 import { RecentSessionRow } from './RecentSessionRow';
 
 export function RecentActivitySection({ sessions, colors, onSessionPress }: RecentActivitySectionProps) {

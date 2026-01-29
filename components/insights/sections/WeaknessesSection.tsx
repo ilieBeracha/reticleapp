@@ -19,7 +19,7 @@ import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { AIExplanationBlock, WhyButton } from '../AIExplanationBlock';
 import { useAIExplanations, type ExplanationParams } from '../AIExplanationProvider';
-import type { WeaknessCard } from '../insights.types';
+import type { WeaknessCard } from '@/types/insights';
 
 // ============================================================================
 // PROPS

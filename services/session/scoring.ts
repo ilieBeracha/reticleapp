@@ -1,4 +1,4 @@
-import type { SessionDrillConfig, SessionStats } from './types';
+import type { SessionDrillConfig, SessionStats } from '@/types/session';
 
 export interface SessionScore {
   mode: 'accuracy' | 'points' | 'grouping';

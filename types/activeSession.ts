@@ -3,7 +3,7 @@
  */
 
 import type { SessionStats, SessionTargetWithResults, SessionWithDetails } from '@/services/sessionService';
-import type { EngagementParticipant } from '@/services/session/types';
+import type { EngagementParticipant } from '@/types/session';
 
 // ============================================================================
 // DRILL PROGRESS

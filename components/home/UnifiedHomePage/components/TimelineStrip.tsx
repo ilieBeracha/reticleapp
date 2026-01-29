@@ -22,7 +22,7 @@ import Animated, {
   withSpring,
   withTiming,
 } from 'react-native-reanimated';
-import type { Colors } from '../UnifiedHomePage.types';
+import type { Colors } from '@/types/home';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // TYPES

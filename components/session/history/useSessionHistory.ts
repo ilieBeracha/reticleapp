@@ -1,5 +1,5 @@
 import { getRecentSessionsWithStats } from '@/services/session/queries';
-import type { SessionWithDetails } from '@/services/session/types';
+import type { SessionWithDetails } from '@/types/session';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { DEFAULT_FILTERS, DEFAULT_SORT, PAGE_SIZE } from './SessionHistory.constants';
@@ -9,7 +9,7 @@ import type {
   SessionHistoryState,
   SortConfig,
   UseSessionHistoryReturn,
-} from './SessionHistory.types';
+} from '@/types/sessionHistory';
 
 /**
  * Hook for session history with filtering, sorting, search, and pagination

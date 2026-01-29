@@ -16,7 +16,7 @@ import {
   getEngagementParticipants,
   updateParticipantResults,
 } from '@/services/session/participants';
-import type { EngagementParticipant } from '@/services/session/types';
+import type { EngagementParticipant } from '@/types/session';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { Check, ChevronLeft, Minus, Plus, Send, User, Users, X } from 'lucide-react-native';

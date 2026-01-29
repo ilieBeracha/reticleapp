@@ -11,7 +11,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useColors } from '@/hooks/ui/useColors';
 import { getSessionInsights, triggerInsightGeneration, type SessionInsight } from '@/services/insights/insightService';
 import type { ShotDetail } from '@/services/session/timelineService';
-import type { DecodedWeather } from '@/services/session/watchTypes';
+import type { DecodedWeather } from '@/types/session.watch';
 import {
   calculateSessionStats,
   getSessionById,

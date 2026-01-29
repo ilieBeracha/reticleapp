@@ -5,7 +5,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Dimensions, Image, Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { COLORS, Step } from './types';
+import { COLORS, Step } from '@/types/targets';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // CAMERA FLOW

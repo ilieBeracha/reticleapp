@@ -1,6 +1,6 @@
 import { isGroupingGoal } from '@/constants/drill';
 import { useColors } from '@/hooks/ui/useColors';
-import type { SessionWithDetails } from '@/services/session/types';
+import type { SessionWithDetails } from '@/types/session';
 import { activateSession, updateSession } from '@/services/sessionService';
 import { getUserWeapon, type UserWeapon } from '@/services/weaponService';
 import { useGarminStore, useIsGarminConnected } from '@/stores/garminStore';

@@ -1,5 +1,5 @@
-import type { SessionWithDetails } from '@/services/session/types';
-import type { DateRangePreset, SessionFilters, SortConfig } from './SessionHistory.types';
+import type { SessionWithDetails } from '@/types/session';
+import type { DateRangePreset, SessionFilters, SortConfig } from '@/types/sessionHistory';
 import { DATE_RANGE_OPTIONS } from './SessionHistory.constants';
 
 // ============================================================================

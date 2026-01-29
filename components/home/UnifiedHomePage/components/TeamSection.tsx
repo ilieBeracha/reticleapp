@@ -12,7 +12,7 @@ import { Calendar, Users } from 'lucide-react-native';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeInUp } from 'react-native-reanimated';
 import { styles } from '../UnifiedHomePage.styles';
-import type { TeamSectionProps } from '../UnifiedHomePage.types';
+import type { TeamSectionProps } from '@/types/home';
 import { TeamTrainingCard } from './TeamTrainingCard';
 
 export function TeamSection({ trainings, hasTeams, colors, onTrainingPress }: TeamSectionProps) {

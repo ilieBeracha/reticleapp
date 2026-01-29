@@ -4,7 +4,7 @@ import * as Haptics from 'expo-haptics';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { DISTANCE_QUICK_PICKS } from './types';
+import { DISTANCE_QUICK_PICKS } from '@/types/targets';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // DISTANCE INPUT

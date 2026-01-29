@@ -13,7 +13,7 @@ import { Crosshair, Minus, TrendingDown, TrendingUp } from 'lucide-react-native'
 import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import type { Colors } from '../UnifiedHomePage.types';
+import type { Colors } from '@/types/home';
 
 interface WeaponPerformanceCardProps {
   weapon: UserWeapon;

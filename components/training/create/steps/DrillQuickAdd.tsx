@@ -19,7 +19,7 @@ import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { Drill } from '@/types/workspace';
-import type { TrainingDrillItem } from '../createTraining.types';
+import type { TrainingDrillItem } from '@/types/createTraining';
 
 // ============================================================================
 // TYPES

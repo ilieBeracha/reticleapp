@@ -22,9 +22,9 @@
 
 import { useCallback, useMemo } from 'react';
 import { useRealtimeChannel } from '../core/channel';
-import type { ChangePayload } from '../table/table.types';
+import type { ChangePayload } from '@/types/realtime.table';
 import type { SessionRecord, SessionTargetRecord } from '../records/session';
-import type { UseSessionRealtimeOptions, UseSessionRealtimeReturn } from './session.types';
+import type { UseSessionRealtimeOptions, UseSessionRealtimeReturn } from '@/types/realtime.session';
 
 export function useSessionRealtime(options: UseSessionRealtimeOptions): UseSessionRealtimeReturn {
   const {

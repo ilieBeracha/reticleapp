@@ -9,7 +9,7 @@
  * 3. What's my recent activity? (completed sessions)
  */
 
-import type { SessionWithDetails } from '@/services/session/types';
+import type { SessionWithDetails } from '@/types/session';
 import type { DrillGoal, TrainingWithDetails } from '@/types/workspace';
 
 /** Session origin - solo practice or team scheduled */

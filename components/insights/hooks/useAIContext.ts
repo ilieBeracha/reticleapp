@@ -37,8 +37,8 @@ import type {
   AIContextResponse,
   InsightCategory,
   MetricType
-} from '../ai-context.contract';
-import { createAIContextRequest, createFallbackAIResponse } from '../ai-context.contract';
+} from '@/types/ai-context.contract';
+import { createAIContextRequest, createFallbackAIResponse } from '@/utils/ai-context';
 
 // React Native global
 declare const __DEV__: boolean;

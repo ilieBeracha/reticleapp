@@ -3,7 +3,7 @@
  * No React dependencies, no side effects
  */
 
-import type { TrainingDrillItem } from './createTraining.types';
+import type { TrainingDrillItem } from '@/types/createTraining';
 
 // ============================================================================
 // DATE HELPERS

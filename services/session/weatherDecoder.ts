@@ -8,7 +8,7 @@
 //
 // ============================================================================
 
-import type { DecodedWeather, WatchWeatherPayload } from './watchTypes';
+import type { DecodedWeather, WatchWeatherPayload } from '@/types/session.watch';
 
 // ============================================================================
 // CONDITION CATEGORIES (for analytics)
