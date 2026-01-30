@@ -194,8 +194,8 @@ export function SquadInvitationBanner({ trainingId, userId, onInvitationChanged 
     }
 
     // Update state in background after navigation starts
-    // If pending invite, accept it (change state to joined)
-    if (isPendingInvite && !hasStarted) {
+    // If pending invite, accept it (change state to joined) - regardless of session state
+    if (isPendingInvite) {
       updateParticipantState(engagementId, userId, 'joined').catch((err) => {
         console.error('[SquadInvitationBanner] Failed to accept invite:', err);
       });

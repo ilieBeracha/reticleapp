@@ -10,7 +10,7 @@
 
 import { useColors } from '@/hooks/ui/useColors';
 import { getCurrentUserId } from '@/services/authService';
-import { calculateGroupTotals, updateParticipantResults } from '@/services/session/participants';
+import { calculateGroupTotals, updateParticipantResults, updateParticipantState } from '@/services/session/participants';
 import type { EngagementParticipant } from '@/types/session';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
@@ -96,6 +96,7 @@ export function SquadSessionView({
   const [shotCount, setShotCount] = useState(0);
   const [totalHitsCount, setTotalHitsCount] = useState(0);
   const [saving, setSaving] = useState(false);
+  const [acceptLoading, setAcceptLoading] = useState<'accept' | 'decline' | null>(null);
 
   // ─────────────────────────────────────────────────────────────────────────────
   // Get current user
@@ -117,10 +118,44 @@ export function SquadSessionView({
   const shooters = participants.filter((p) => p.role === 'shooter');
   const allShotsSubmitted = shooters.length > 0 && shooters.every((p) => (p.shots_fired || 0) > 0);
   const hasAnyHits = groupTotals.totalHits > 0;
+  const isPendingInvite = myParticipant?.state === 'pending';
 
   // ─────────────────────────────────────────────────────────────────────────────
   // Handlers
   // ─────────────────────────────────────────────────────────────────────────────
+  const handleAcceptInvite = async () => {
+    if (!currentUserId || !engagementId) return;
+    setAcceptLoading('accept');
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    try {
+      await updateParticipantState(engagementId, currentUserId, 'joined');
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      onRefresh();
+    } catch (error) {
+      console.error('[SquadSessionView] Failed to accept invite:', error);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      Alert.alert(t('common.error'), t('session.failedToJoin'));
+    } finally {
+      setAcceptLoading(null);
+    }
+  };
+
+  const handleDeclineInvite = async () => {
+    if (!currentUserId || !engagementId) return;
+    setAcceptLoading('decline');
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    try {
+      await updateParticipantState(engagementId, currentUserId, 'declined');
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      handleClose();
+    } catch (error) {
+      console.error('[SquadSessionView] Failed to decline invite:', error);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    } finally {
+      setAcceptLoading(null);
+    }
+  };
+
   const handleOpenResultsSheet = () => {
     // Pre-fill with existing values if any
     setShotCount(myParticipant?.shots_fired || 0);
@@ -254,6 +289,53 @@ export function SquadSessionView({
         </View>
       )}
 
+      {/* Pending invitation banner */}
+      {isPendingInvite && (
+        <View style={[styles.inviteBanner, { backgroundColor: colors.primary + '10', borderColor: colors.primary }]}>
+          <View style={styles.inviteBannerContent}>
+            <Users size={18} color={colors.primary} />
+            <View style={styles.inviteBannerText}>
+              <Text style={[styles.inviteBannerTitle, { color: colors.text }]}>
+                {t('session.squadInvitation', 'Squad Invitation')}
+              </Text>
+              <Text style={[styles.inviteBannerSubtitle, { color: colors.textMuted }]}>
+                {t('session.invitedToSquad', "You've been invited to this squad session")}
+              </Text>
+            </View>
+          </View>
+          <View style={styles.inviteBannerActions}>
+            <TouchableOpacity
+              style={[styles.inviteDeclineBtn, { borderColor: colors.border }]}
+              onPress={handleDeclineInvite}
+              disabled={acceptLoading !== null}
+            >
+              {acceptLoading === 'decline' ? (
+                <ActivityIndicator size="small" color={colors.textMuted} />
+              ) : (
+                <>
+                  <X size={14} color={colors.red} />
+                  <Text style={[styles.inviteDeclineText, { color: colors.red }]}>{t('common.decline', 'Decline')}</Text>
+                </>
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.inviteAcceptBtn, { backgroundColor: colors.green }]}
+              onPress={handleAcceptInvite}
+              disabled={acceptLoading !== null}
+            >
+              {acceptLoading === 'accept' ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <>
+                  <Check size={14} color="#fff" />
+                  <Text style={styles.inviteAcceptText}>{t('training.acceptAndJoin', 'Accept & Join')}</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+
       {/* ═══════════════════════════════════════════════════════════════════════ */}
       {/* Content                                                                 */}
       {/* ═══════════════════════════════════════════════════════════════════════ */}
@@ -287,84 +369,83 @@ export function SquadSessionView({
         {/* ─────────────────────────────────────────────────────────────────────── */}
         {/* Participants                                                           */}
         {/* ─────────────────────────────────────────────────────────────────────── */}
-        <TouchableOpacity
-          style={[styles.sectionHeader, { backgroundColor: colors.card }]}
-          onPress={() => setShowParticipants(!showParticipants)}
-          activeOpacity={0.7}
-        >
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('session.participants')}</Text>
-          <View style={styles.sectionHeaderRight}>
-            <Text style={[styles.sectionCount, { color: colors.textMuted }]}>{participants.length}</Text>
-            {showParticipants ? (
-              <ChevronUp size={18} color={colors.textMuted} />
-            ) : (
-              <ChevronDown size={18} color={colors.textMuted} />
-            )}
-          </View>
-        </TouchableOpacity>
-
-        {showParticipants && (
-          <Animated.View
-            entering={FadeIn.duration(200)}
-            style={[styles.participantsList, { backgroundColor: colors.card }]}
+        <View style={[styles.participantsCard, { backgroundColor: colors.card }]}>
+          <TouchableOpacity
+            style={styles.sectionHeader}
+            onPress={() => setShowParticipants(!showParticipants)}
+            activeOpacity={0.7}
           >
-            {participants.map((p, idx) => {
-              const isMe = p.user_id === currentUserId;
-              const isOwner = p.user_id === session.user_id;
-              const hasData = (p.shots_fired || 0) > 0;
-              const isShooter = p.role === 'shooter';
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('session.participants')}</Text>
+            <View style={styles.sectionHeaderRight}>
+              <Text style={[styles.sectionCount, { color: colors.textMuted }]}>{participants.length}</Text>
+              {showParticipants ? (
+                <ChevronUp size={18} color={colors.textMuted} />
+              ) : (
+                <ChevronDown size={18} color={colors.textMuted} />
+              )}
+            </View>
+          </TouchableOpacity>
 
-              return (
-                <View
-                  key={p.user_id}
-                  style={[
-                    styles.participantRow,
-                    idx < participants.length - 1 && {
-                      borderBottomWidth: 1,
-                      borderBottomColor: colors.border,
-                    },
-                  ]}
-                >
-                  {/* Avatar */}
-                  <View style={[styles.avatar, { backgroundColor: colors.secondary }]}>
-                    {p.user_avatar_url ? (
-                      <Image source={{ uri: p.user_avatar_url }} style={styles.avatarImage} />
-                    ) : (
-                      <User size={16} color={colors.textMuted} />
-                    )}
-                  </View>
+          {showParticipants && (
+            <Animated.View entering={FadeIn.duration(200)} style={styles.participantsList}>
+              {participants.map((p, idx) => {
+                const isMe = p.user_id === currentUserId;
+                const isOwner = p.user_id === session.user_id;
+                const hasData = (p.shots_fired || 0) > 0;
+                const isShooter = p.role === 'shooter';
 
-                  {/* Info */}
-                  <View style={styles.participantInfo}>
-                    <View style={styles.nameRow}>
-                      <Text style={[styles.participantName, { color: colors.text }]} numberOfLines={1}>
-                        {p.user_full_name || t('common.unknown')}
-                      </Text>
-                      {isMe && (
-                        <View style={[styles.badge, { backgroundColor: colors.primary + '20' }]}>
-                          <Text style={[styles.badgeText, { color: colors.primary }]}>{t('common.you')}</Text>
-                        </View>
+                return (
+                  <View
+                    key={p.user_id}
+                    style={[
+                      styles.participantRow,
+                      idx < participants.length - 1 && {
+                        borderBottomWidth: 1,
+                        borderBottomColor: colors.border,
+                      },
+                    ]}
+                  >
+                    {/* Avatar */}
+                    <View style={[styles.avatar, { backgroundColor: colors.secondary }]}>
+                      {p.user_avatar_url ? (
+                        <Image source={{ uri: p.user_avatar_url }} style={styles.avatarImage} />
+                      ) : (
+                        <User size={16} color={colors.textMuted} />
                       )}
-                      {isOwner && <Crown size={12} color={colors.orange} />}
                     </View>
-                    <Text style={[styles.participantMeta, { color: colors.textMuted }]}>
-                      {!isShooter
-                        ? t('session.spotter')
-                        : hasData
-                          ? t('session.shotsCount', { count: p.shots_fired ?? 0 })
-                          : t('session.notReportedYet')}
-                    </Text>
-                  </View>
 
-                  {/* Status */}
-                  <View style={[styles.statusDot, { backgroundColor: hasData ? colors.green : colors.border }]}>
-                    {hasData && <Check size={10} color="#fff" />}
+                    {/* Info */}
+                    <View style={styles.participantInfo}>
+                      <View style={styles.nameRow}>
+                        <Text style={[styles.participantName, { color: colors.text }]} numberOfLines={1}>
+                          {p.user_full_name || t('common.unknown')}
+                        </Text>
+                        {isMe && (
+                          <View style={[styles.badge, { backgroundColor: colors.primary + '20' }]}>
+                            <Text style={[styles.badgeText, { color: colors.primary }]}>{t('common.you')}</Text>
+                          </View>
+                        )}
+                        {isOwner && <Crown size={12} color={colors.orange} />}
+                      </View>
+                      <Text style={[styles.participantMeta, { color: colors.textMuted }]}>
+                        {!isShooter
+                          ? t('session.spotter')
+                          : hasData
+                            ? t('session.shotsCount', { count: p.shots_fired ?? 0 })
+                            : t('session.notReportedYet')}
+                      </Text>
+                    </View>
+
+                    {/* Status */}
+                    <View style={[styles.statusDot, { backgroundColor: hasData ? colors.green : colors.border }]}>
+                      {hasData && <Check size={10} color="#fff" />}
+                    </View>
                   </View>
-                </View>
-              );
-            })}
-          </Animated.View>
-        )}
+                );
+              })}
+            </Animated.View>
+          )}
+        </View>
 
         {/* ─────────────────────────────────────────────────────────────────────── */}
         {/* My Results                                                             */}
@@ -707,27 +788,89 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 
+  // Invite banner
+  inviteBanner: {
+    marginHorizontal: 16,
+    marginBottom: 8,
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 14,
+    gap: 12,
+  },
+  inviteBannerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  inviteBannerText: {
+    flex: 1,
+    gap: 2,
+  },
+  inviteBannerTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    letterSpacing: -0.2,
+  },
+  inviteBannerSubtitle: {
+    fontSize: 13,
+  },
+  inviteBannerActions: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  inviteDeclineBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  inviteDeclineText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  inviteAcceptBtn: {
+    flex: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    paddingVertical: 10,
+    borderRadius: 10,
+  },
+  inviteAcceptText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#fff',
+  },
+
   // Content
   content: {
     flex: 1,
   },
   contentInner: {
     paddingHorizontal: 16,
+    paddingTop: 8,
     gap: 12,
   },
 
   // Summary
   summaryCard: {
     borderRadius: 14,
-    padding: 16,
+    paddingVertical: 20,
+    paddingHorizontal: 16,
   },
   summaryRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-evenly',
   },
   summaryItem: {
-    flex: 1,
     alignItems: 'center',
+    paddingHorizontal: 8,
   },
   summaryValue: {
     fontSize: 28,
@@ -741,7 +884,13 @@ const styles = StyleSheet.create({
   },
   summaryDivider: {
     width: 1,
-    height: 36,
+    height: 32,
+  },
+
+  // Participants card (wraps header + list)
+  participantsCard: {
+    borderRadius: 14,
+    overflow: 'hidden',
   },
 
   // Section header
@@ -751,7 +900,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 14,
     paddingVertical: 12,
-    borderRadius: 12,
   },
   sectionTitle: {
     fontSize: 15,
@@ -770,8 +918,7 @@ const styles = StyleSheet.create({
 
   // Participants
   participantsList: {
-    borderRadius: 12,
-    overflow: 'hidden',
+    // No border radius - parent participantsCard handles it
   },
   participantRow: {
     flexDirection: 'row',
@@ -849,12 +996,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   myResultsStats: {
-    flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 14,
   },
   myResultsStat: {
-    flex: 1,
     alignItems: 'center',
   },
   myResultsValue: {
@@ -908,9 +1053,11 @@ const styles = StyleSheet.create({
   // Waiting card
   waitingCard: {
     borderRadius: 14,
-    padding: 16,
+    paddingVertical: 24,
+    paddingHorizontal: 20,
     borderWidth: 1,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   waitingText: {
     fontSize: 14,

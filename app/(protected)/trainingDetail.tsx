@@ -550,17 +550,27 @@ function PlannedDrillsList({
   training,
   colors,
   onStartDrill,
+  completedSessions,
+  currentUserId,
   disabled = false,
 }: {
   training: any;
   colors: any;
   onStartDrill: (drill: TrainingDrill) => void;
+  completedSessions: SessionWithDetails[];
+  currentUserId: string | null;
   disabled?: boolean;
 }) {
   const { t } = useTranslation();
   if (!training.drills || training.drills.length === 0) return null;
 
   const canStart = training.status === 'ongoing' && !disabled;
+
+  // Calculate completion count per drill for current user
+  const getCompletedCount = (drillId: string) => {
+    if (!currentUserId) return 0;
+    return completedSessions.filter((s) => s.drill_id === drillId && s.user_id === currentUserId).length;
+  };
 
   return (
     <View style={styles.section}>
@@ -580,6 +590,8 @@ function PlannedDrillsList({
               canStart={canStart}
               isLast={idx === training.drills!.length - 1}
               onStart={() => onStartDrill(drill)}
+              completedCount={getCompletedCount(drill.id)}
+              maxExecutions={drill.max_executions ?? 1}
             />
           ))}
       </View>
@@ -601,6 +613,8 @@ function DrillRow({
   canStart,
   isLast,
   onStart,
+  completedCount,
+  maxExecutions,
 }: {
   drill: any;
   index: number;
@@ -608,10 +622,13 @@ function DrillRow({
   canStart: boolean;
   isLast: boolean;
   onStart: () => void;
+  completedCount: number;
+  maxExecutions: number;
 }) {
   const { t } = useTranslation();
   const isGrouping = drill.drill_goal === 'grouping';
   const goalColor = isGrouping ? colors.blue : colors.orange;
+  const hasReachedLimit = completedCount >= maxExecutions;
 
   // Execution policy display
   const policy = (drill.execution_policy || 'locked') as 'locked' | 'guided' | 'free';
@@ -658,9 +675,16 @@ function DrillRow({
         </Text>
       </View>
       {canStart && (
-        <View style={[styles.startDrillBtn, { backgroundColor: colors.green }]}>
-          <Play size={12} color="#fff" fill="#fff" />
-        </View>
+        hasReachedLimit ? (
+          <View style={[styles.completedBadge, { backgroundColor: colors.green }]}>
+            <CheckCircle2 size={12} color="#fff" />
+            <Text style={styles.completedBadgeText}>{completedCount}/{maxExecutions}</Text>
+          </View>
+        ) : (
+          <View style={[styles.startDrillBtn, { backgroundColor: colors.green }]}>
+            <Play size={12} color="#fff" fill="#fff" />
+          </View>
+        )
       )}
     </TouchableOpacity>
   );
@@ -831,8 +855,8 @@ function TrainingSummaryContent({
                 </View>
               )}
 
-              {/* Squad/Group Session Banners — only for invited participants */}
-              {isInvited && training.id && currentUserId && (
+              {/* Squad/Group Session Banners — shown to all members, components self-manage visibility */}
+              {training.id && currentUserId && (
                 <>
                   <SquadLobbyBanner trainingId={training.id} userId={currentUserId} onLobbyChanged={onRefresh} />
                   <SquadInvitationBanner
@@ -844,7 +868,14 @@ function TrainingSummaryContent({
               )}
 
               {/* Planned Drills */}
-              <PlannedDrillsList training={training} colors={colors} onStartDrill={onStartDrill} disabled={!isInvited} />
+              <PlannedDrillsList
+                training={training}
+                colors={colors}
+                onStartDrill={onStartDrill}
+                completedSessions={completedSessions}
+                currentUserId={currentUserId}
+                disabled={!isInvited}
+              />
 
               {/* Empty State for drills */}
               <EmptyState training={training} completedSessions={completedSessions} colors={colors} />
@@ -1473,6 +1504,19 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  completedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  completedBadgeText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '700',
   },
   drillsHint: { fontSize: 12, textAlign: 'center', marginTop: 8, fontStyle: 'italic' },
 

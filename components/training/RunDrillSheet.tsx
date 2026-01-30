@@ -11,7 +11,7 @@ import { useColors } from '@/hooks/ui/useColors';
 import { requireCurrentUserId } from '@/services/authService';
 import { getOrCreateSetupSession } from '@/services/session/mutations';
 import { createEngagement } from '@/services/session/participants';
-import { getCompletedDrillExecutionCount } from '@/services/session/queries';
+import { getActiveSquadEngagement, getCompletedDrillExecutionCount } from '@/services/session/queries';
 import { getMostRecentUserWeaponId, getUserWeapon, type UserWeapon } from '@/services/weaponService';
 import { useGarminDevice, useIsGarminConnected } from '@/stores/garminStore';
 import type { TrainingDrill } from '@/types/workspace';
@@ -22,6 +22,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
+  Alert,
   Modal,
   Pressable,
   ScrollView,
@@ -110,7 +111,8 @@ export function RunDrillSheet({ visible, onClose, drill, trainingId, teamId }: R
     [distanceCategory]
   );
 
-  const canStart = weapon && !loadingWeapon && !loadingExecutions && !hasReachedLimit;
+  // Allow starting even if limit reached - just show warning
+  const canStart = weapon && !loadingWeapon && !loadingExecutions;
 
   // Pulse animation for ready state
   useEffect(() => {
@@ -203,6 +205,39 @@ export function RunDrillSheet({ visible, onClose, drill, trainingId, teamId }: R
 
     try {
       const userId = await requireCurrentUserId();
+
+      // For squad drills, check if there's already an active engagement for this training
+      if (isSquad) {
+        const existing = await getActiveSquadEngagement(trainingId);
+        if (existing) {
+          // Redirect to existing engagement - must cancel before creating a new one
+          onClose();
+          if (existing.started_at) {
+            router.push({
+              pathname: '/(protected)/activeSession',
+              params: {
+                sessionId: existing.session_id,
+                engagementId: existing.id,
+                engagementMode: existing.engagement_mode,
+                returnTo: 'trainingDetail',
+                returnId: trainingId,
+              },
+            });
+          } else {
+            router.push({
+              pathname: '/(protected)/squadLobby',
+              params: {
+                engagementId: existing.id,
+                sessionId: existing.session_id,
+                trainingId,
+                engagementMode: existing.engagement_mode,
+              },
+            });
+          }
+          setIsStarting(false);
+          return;
+        }
+      }
 
       // Create the session first
       const session = await getOrCreateSetupSession({
@@ -335,9 +370,8 @@ export function RunDrillSheet({ visible, onClose, drill, trainingId, teamId }: R
               >
                 <Zap size={12} color={hasReachedLimit ? colors.orange : colors.green} />
                 <Text style={[styles.progressText, { color: hasReachedLimit ? colors.orange : colors.green }]}>
-                  {hasReachedLimit
-                    ? t('training.limitReached', 'Limit reached')
-                    : `${completedExecutions}/${maxExecutions} ${t('training.completed', 'completed')}`}
+                  {`${completedExecutions}/${maxExecutions} ${t('training.completed', 'completed')}`}
+                  {hasReachedLimit && ` · ${t('training.extraPractice', 'Extra')}`}
                 </Text>
               </Animated.View>
             )}
@@ -557,11 +591,7 @@ export function RunDrillSheet({ visible, onClose, drill, trainingId, teamId }: R
                 style={[
                   styles.actionBtn,
                   {
-                    backgroundColor: hasReachedLimit
-                      ? colors.secondary
-                      : canStart
-                        ? actionColor
-                        : colors.secondary,
+                    backgroundColor: canStart ? actionColor : colors.secondary,
                   },
                 ]}
                 onPress={handleStart}
@@ -577,8 +607,6 @@ export function RunDrillSheet({ visible, onClose, drill, trainingId, teamId }: R
                 <Animated.View style={[styles.actionBtnInner, buttonAnimStyle]}>
                   {isStarting ? (
                     <ActivityIndicator color="#fff" size="small" />
-                  ) : hasReachedLimit ? (
-                    <Text style={[styles.actionText, { color: colors.textMuted }]}>Limit Reached</Text>
                   ) : (
                     <>
                       {isSquad ? (
