@@ -26,7 +26,7 @@ import { finishTraining, startTraining } from '@/services/trainingService';
 import { useTeamStore } from '@/stores/teamStore';
 import type { SessionWithDetails } from '@/types/session';
 import type { TrainingDrill } from '@/types/workspace';
-import { format, formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow } from 'date-fns';
 import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from 'expo-router';
 import {
@@ -34,6 +34,7 @@ import {
   ArrowLeft,
   CheckCircle2,
   Clock,
+  Crown,
   Flag,
   Lock,
   Play,
@@ -329,112 +330,415 @@ function TabBar({
 }
 
 /**
- * Section 5: Summary Card (Metrics)
+ * Results Tab Content
+ * Unified overview + type filter chips + filtered session list
  */
-function SummaryCard({
-  training,
+type ResultsFilter = 'all' | 'squad' | 'grouping' | 'solo';
+
+function ResultsTabContent({
   completedSessions,
   colors,
+  currentUserId,
 }: {
-  training: any;
   completedSessions: SessionWithDetails[];
   colors: any;
+  currentUserId: string | null;
 }) {
   const { t } = useTranslation();
-  if (completedSessions.length === 0) return null;
+  const [activeFilter, setActiveFilter] = useState<ResultsFilter>('all');
+  const [expandedSquadId, setExpandedSquadId] = useState<string | null>(null);
 
-  const totalShots = completedSessions.reduce((sum, s) => sum + (s.stats?.shots_fired || 0), 0);
-  const totalHits = completedSessions.reduce((sum, s) => sum + (s.stats?.hits_total || 0), 0);
-  const avgAccuracy = totalShots > 0 ? Math.round((totalHits / totalShots) * 100) : null;
-  const uniqueShooters = new Set(completedSessions.map((s) => s.user_id)).size;
-  const bestGroupings = completedSessions
+  // Split sessions by type
+  const squadSessions = completedSessions.filter((s) => {
+    const mode = s.engagement?.engagement_mode;
+    return mode === 'squad' || mode === 'group';
+  });
+  const groupingSessions = completedSessions.filter((s) => {
+    const goal = s.engagement?.drill_goal || s.drill_config?.drill_goal;
+    const mode = s.engagement?.engagement_mode;
+    return goal === 'grouping' && mode !== 'squad' && mode !== 'group';
+  });
+  const soloSessions = completedSessions.filter((s) => {
+    const goal = s.engagement?.drill_goal || s.drill_config?.drill_goal;
+    const mode = s.engagement?.engagement_mode;
+    return goal !== 'grouping' && mode !== 'squad' && mode !== 'group';
+  });
+
+  // Compute aggregate stats for the overview card
+  // Solo + grouping stats from session_targets
+  const soloShots = soloSessions.reduce((sum, s) => sum + (s.stats?.shots_fired || 0), 0);
+  const soloHits = soloSessions.reduce((sum, s) => sum + (s.stats?.hits_total || 0), 0);
+  // Squad stats from engagement_participants
+  let squadShots = 0;
+  let squadHits = 0;
+  const allSquadParticipantIds = new Set<string>();
+  squadSessions.forEach((s) => {
+    const joined = s.engagement?.engagement_participants?.filter((p: any) => p.state === 'joined') || [];
+    joined.forEach((p: any) => {
+      allSquadParticipantIds.add(p.user_id);
+      squadShots += p.shots_fired || 0;
+      squadHits += p.hits || 0;
+    });
+  });
+  const totalShots = soloShots + squadShots;
+  const totalHits = soloHits + squadHits;
+  const overallAccuracy = totalShots > 0 ? Math.round((totalHits / totalShots) * 100) : null;
+  const uniqueShooters = new Set([
+    ...completedSessions.map((s) => s.user_id),
+    ...Array.from(allSquadParticipantIds),
+  ]).size;
+
+  // Compute per-type headline stats for filter chips
+  const squadAccuracy = squadShots > 0 ? Math.round((squadHits / squadShots) * 100) : null;
+  const groupingBestGroupings = groupingSessions
     .map((s) => s.stats?.best_dispersion_cm)
     .filter((v): v is number => v !== null && v !== undefined && v > 0);
-  const bestGroup = bestGroupings.length > 0 ? Math.min(...bestGroupings) : null;
+  const groupingBest = groupingBestGroupings.length > 0 ? Math.min(...groupingBestGroupings) : null;
+  const soloAccuracy = soloShots > 0 ? Math.round((soloHits / soloShots) * 100) : null;
+
+  // Filtered sessions
+  const filteredSessions =
+    activeFilter === 'squad'
+      ? squadSessions
+      : activeFilter === 'grouping'
+        ? groupingSessions
+        : activeFilter === 'solo'
+          ? soloSessions
+          : completedSessions;
+
+  // Filter chip data
+  const filters: { key: ResultsFilter; label: string; count: number; color: string; Icon: any; stat: string | null }[] = [
+    {
+      key: 'all',
+      label: t('common.all', 'All'),
+      count: completedSessions.length,
+      color: colors.text,
+      Icon: Trophy,
+      stat: overallAccuracy !== null ? `${overallAccuracy}%` : null,
+    },
+    {
+      key: 'squad',
+      label: t('training.squadType', 'Squad'),
+      count: squadSessions.length,
+      color: colors.primary,
+      Icon: Users,
+      stat: squadAccuracy !== null ? `${squadAccuracy}%` : null,
+    },
+    {
+      key: 'grouping',
+      label: t('training.groupingType', 'Grouping'),
+      count: groupingSessions.length,
+      color: colors.orange,
+      Icon: Target,
+      stat: groupingBest !== null ? `${groupingBest.toFixed(1)}cm` : null,
+    },
+    {
+      key: 'solo',
+      label: t('session.engagement', 'Solo'),
+      count: soloSessions.length,
+      color: colors.green,
+      Icon: CheckCircle2,
+      stat: soloAccuracy !== null ? `${soloAccuracy}%` : null,
+    },
+  ];
+
+  // Only show filter chips that have sessions (always show "All")
+  const visibleFilters = filters.filter((f) => f.key === 'all' || f.count > 0);
+
+  if (completedSessions.length === 0) return null;
 
   return (
-    <View style={[styles.summaryCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-      <View style={[styles.summaryAccent, { backgroundColor: colors.green + '12' }]}>
-        <Trophy size={18} color={colors.green} />
+    <View style={styles.resultsContainer}>
+      {/* Overview Card */}
+      <View style={[styles.overviewCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <View style={styles.overviewTop}>
+          <View style={styles.overviewMainStat}>
+            <Text style={[styles.overviewValue, { color: colors.text }]}>
+              {overallAccuracy !== null ? `${overallAccuracy}%` : `${completedSessions.length}`}
+            </Text>
+            <Text style={[styles.overviewLabel, { color: colors.textMuted }]}>
+              {overallAccuracy !== null ? t('training.accuracy', 'Accuracy') : t('training.sessions', 'Sessions')}
+            </Text>
+          </View>
+          <View style={styles.overviewSecondaryStats}>
+            <View style={styles.overviewStat}>
+              <Text style={[styles.overviewStatValue, { color: colors.text }]}>{totalShots || '—'}</Text>
+              <Text style={[styles.overviewStatLabel, { color: colors.textMuted }]}>{t('session.shots')}</Text>
+            </View>
+            <View style={[styles.overviewStatDivider, { backgroundColor: colors.border }]} />
+            <View style={styles.overviewStat}>
+              <Text style={[styles.overviewStatValue, { color: colors.text }]}>{totalHits || '—'}</Text>
+              <Text style={[styles.overviewStatLabel, { color: colors.textMuted }]}>{t('session.hits')}</Text>
+            </View>
+            <View style={[styles.overviewStatDivider, { backgroundColor: colors.border }]} />
+            <View style={styles.overviewStat}>
+              <Text style={[styles.overviewStatValue, { color: colors.text }]}>{uniqueShooters || '—'}</Text>
+              <Text style={[styles.overviewStatLabel, { color: colors.textMuted }]}>{t('training.shooters')}</Text>
+            </View>
+          </View>
+        </View>
       </View>
-      <Text style={[styles.summaryHeadline, { color: colors.text }]}>
-        {avgAccuracy !== null
-          ? t('training.hitRate', { percent: avgAccuracy })
-          : t('training.sessionsCount', { count: completedSessions.length })}
-      </Text>
-      <Text style={[styles.summarySubtitle, { color: colors.textMuted }]}>
-        {format(new Date(training.scheduled_at), 'MMM d, yyyy')}
-      </Text>
-      <View style={[styles.metricsRow, { borderTopColor: colors.border }]}>
-        <View style={styles.metric}>
-          <Text style={[styles.metricValue, { color: colors.text }]}>{totalShots || '—'}</Text>
-          <Text style={[styles.metricLabel, { color: colors.textMuted }]}>{t('session.shots')}</Text>
+
+      {/* Filter Chips - only show when more than one type exists */}
+      {visibleFilters.length > 2 && (
+        <View style={styles.filterChipsRow}>
+          {visibleFilters.map((f) => {
+            const isActive = activeFilter === f.key;
+            return (
+              <TouchableOpacity
+                key={f.key}
+                style={[
+                  styles.filterChip,
+                  {
+                    backgroundColor: isActive ? f.color + '15' : colors.card,
+                    borderColor: isActive ? f.color + '30' : colors.border,
+                  },
+                ]}
+                onPress={() => setActiveFilter(f.key)}
+                activeOpacity={0.7}
+              >
+                <f.Icon size={12} color={isActive ? f.color : colors.textMuted} />
+                <Text
+                  style={[
+                    styles.filterChipText,
+                    { color: isActive ? f.color : colors.textMuted },
+                  ]}
+                >
+                  {f.label}
+                </Text>
+                <View style={[styles.filterChipCount, { backgroundColor: isActive ? f.color + '20' : colors.secondary }]}>
+                  <Text style={[styles.filterChipCountText, { color: isActive ? f.color : colors.textMuted }]}>
+                    {f.count}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            );
+          })}
         </View>
-        <View style={[styles.metricDivider, { backgroundColor: colors.border }]} />
-        <View style={styles.metric}>
-          <Text style={[styles.metricValue, { color: colors.text }]}>
-            {bestGroup !== null ? `${bestGroup.toFixed(1)}` : '—'}
-          </Text>
-          <Text style={[styles.metricLabel, { color: colors.textMuted }]}>
-            {bestGroup !== null ? t('training.bestCm') : t('session.grouping')}
-          </Text>
-        </View>
-        <View style={[styles.metricDivider, { backgroundColor: colors.border }]} />
-        <View style={styles.metric}>
-          <Text style={[styles.metricValue, { color: colors.text }]}>{uniqueShooters || '—'}</Text>
-          <Text style={[styles.metricLabel, { color: colors.textMuted }]}>{t('training.shooters')}</Text>
-        </View>
+      )}
+
+      {/* Per-type summary strip (shows when a specific filter is active) */}
+      {activeFilter !== 'all' && (
+        <ResultsFilterSummary
+          filter={activeFilter}
+          squadSessions={squadSessions}
+          groupingSessions={groupingSessions}
+          soloSessions={soloSessions}
+          squadShots={squadShots}
+          squadHits={squadHits}
+          squadParticipantCount={allSquadParticipantIds.size}
+          soloShots={soloShots}
+          soloHits={soloHits}
+          groupingBest={groupingBest}
+          groupingTargets={groupingSessions.reduce((sum, s) => sum + (s.stats?.target_count || 0), 0)}
+          colors={colors}
+        />
+      )}
+
+      {/* Session List */}
+      <View style={[styles.sessionsList, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        {filteredSessions.map((s, idx) => {
+          const isSquad = s.engagement?.engagement_mode === 'squad' || s.engagement?.engagement_mode === 'group';
+          if (isSquad) {
+            return (
+              <ExpandableSquadRow
+                key={s.id}
+                session={s}
+                colors={colors}
+                currentUserId={currentUserId}
+                isLast={idx === filteredSessions.length - 1}
+                isExpanded={expandedSquadId === s.id}
+                onToggle={() => setExpandedSquadId(expandedSquadId === s.id ? null : s.id)}
+              />
+            );
+          }
+          return (
+            <SessionRow key={s.id} session={s} colors={colors} isLast={idx === filteredSessions.length - 1} />
+          );
+        })}
       </View>
     </View>
   );
 }
 
 /**
- * Section 6: Completed Sessions List (History)
+ * Per-type summary strip shown when filtering by a specific type
  */
-function CompletedSessionsList({
-  completedSessions,
+function ResultsFilterSummary({
+  filter,
+  squadSessions,
+  groupingSessions,
+  soloSessions,
+  squadShots,
+  squadHits,
+  squadParticipantCount,
+  soloShots,
+  soloHits,
+  groupingBest,
+  groupingTargets,
   colors,
 }: {
-  completedSessions: SessionWithDetails[];
+  filter: ResultsFilter;
+  squadSessions: SessionWithDetails[];
+  groupingSessions: SessionWithDetails[];
+  soloSessions: SessionWithDetails[];
+  squadShots: number;
+  squadHits: number;
+  squadParticipantCount: number;
+  soloShots: number;
+  soloHits: number;
+  groupingBest: number | null;
+  groupingTargets: number;
   colors: any;
 }) {
   const { t } = useTranslation();
-  if (completedSessions.length === 0) return null;
 
-  // Group sessions by user
-  const groupedByUser = new Map<string, { name: string; sessions: SessionWithDetails[] }>();
-  completedSessions.forEach((s) => {
-    const uid = s.user_id;
-    if (!groupedByUser.has(uid)) {
-      groupedByUser.set(uid, { name: (s as any).user_full_name || t('common.unknown'), sessions: [] });
+  const getMetrics = (): { values: { label: string; value: string }[]; color: string } => {
+    if (filter === 'squad') {
+      const acc = squadShots > 0 ? `${Math.round((squadHits / squadShots) * 100)}%` : '—';
+      return {
+        color: colors.primary,
+        values: [
+          { label: t('session.shots'), value: `${squadShots || '—'}` },
+          { label: t('session.hits'), value: `${squadHits || '—'}` },
+          { label: t('training.accuracy', 'Accuracy'), value: acc },
+          { label: t('training.shooters'), value: `${squadParticipantCount || '—'}` },
+        ],
+      };
     }
-    groupedByUser.get(uid)!.sessions.push(s);
-  });
+    if (filter === 'grouping') {
+      return {
+        color: colors.orange,
+        values: [
+          { label: t('training.sessions', 'Sessions'), value: `${groupingSessions.length}` },
+          { label: t('training.bestCm'), value: groupingBest !== null ? `${groupingBest.toFixed(1)}` : '—' },
+          { label: t('training.targets'), value: `${groupingTargets || '—'}` },
+        ],
+      };
+    }
+    // solo
+    const acc = soloShots > 0 ? `${Math.round((soloHits / soloShots) * 100)}%` : '—';
+    return {
+      color: colors.green,
+      values: [
+        { label: t('session.shots'), value: `${soloShots || '—'}` },
+        { label: t('session.hits'), value: `${soloHits || '—'}` },
+        { label: t('training.accuracy', 'Accuracy'), value: acc },
+      ],
+    };
+  };
+
+  const { values, color } = getMetrics();
 
   return (
-    <View style={styles.section}>
-      <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>{t('training.sessionHistorySection')}</Text>
-
-      {Array.from(groupedByUser.entries()).map(([uid, { name, sessions }]) => (
-        <View key={uid} style={styles.userGroup}>
-          {/* User Header */}
-          <View style={styles.userHeader}>
-            <View style={[styles.userAvatar, { backgroundColor: colors.secondary }]}>
-              <Text style={[styles.userAvatarText, { color: colors.textMuted }]}>{name.charAt(0).toUpperCase()}</Text>
-            </View>
-            <Text style={[styles.userName, { color: colors.text }]}>{name}</Text>
-            <Text style={[styles.userCount, { color: colors.textMuted }]}>{sessions.length}</Text>
-          </View>
-
-          {/* Sessions List */}
-          <View style={[styles.sessionsList, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            {sessions.map((s, idx) => (
-              <SessionRow key={s.id} session={s} colors={colors} isLast={idx === sessions.length - 1} />
-            ))}
-          </View>
+    <View style={[styles.filterSummary, { backgroundColor: color + '08', borderColor: color + '20' }]}>
+      {values.map((v) => (
+        <View key={v.label} style={styles.filterSummaryItem}>
+          <Text style={[styles.filterSummaryValue, { color }]}>{v.value}</Text>
+          <Text style={[styles.filterSummaryLabel, { color: colors.textMuted }]}>{v.label}</Text>
         </View>
       ))}
+    </View>
+  );
+}
+
+/**
+ * Expandable squad session row with participant breakdown
+ */
+function ExpandableSquadRow({
+  session,
+  colors,
+  currentUserId,
+  isLast,
+  isExpanded,
+  onToggle,
+}: {
+  session: SessionWithDetails;
+  colors: any;
+  currentUserId: string | null;
+  isLast: boolean;
+  isExpanded: boolean;
+  onToggle: () => void;
+}) {
+  const { t } = useTranslation();
+  const drillName = session.drill_config?.name || session.drill_name || t('session.title');
+  const engagementMode = session.engagement?.engagement_mode;
+  const joined = session.engagement?.engagement_participants?.filter((p: any) => p.state === 'joined') || [];
+  const shots = joined.reduce((sum: number, p: any) => sum + (p.shots_fired || 0), 0);
+  const hits = joined.reduce((sum: number, p: any) => sum + (p.hits || 0), 0);
+  const commanderId = session.user_id;
+
+  return (
+    <View style={[!isLast && { borderBottomWidth: 1, borderBottomColor: colors.border }]}>
+      {/* Tappable header row */}
+      <TouchableOpacity style={styles.sessionRow} onPress={onToggle} activeOpacity={0.6}>
+        <View style={[styles.sessionIcon, { backgroundColor: colors.primary + '15' }]}>
+          <Users size={14} color={colors.primary} />
+        </View>
+        <View style={styles.sessionInfo}>
+          <View style={styles.sessionNameRow}>
+            <Text style={[styles.sessionName, { color: colors.text }]} numberOfLines={1}>
+              {drillName}
+            </Text>
+            <View style={[styles.squadBadge, { backgroundColor: colors.primary + '15' }]}>
+              <Text style={[styles.squadBadgeText, { color: colors.primary }]}>
+                {engagementMode === 'group' ? t('training.groupType') : t('training.squadType')}
+              </Text>
+            </View>
+          </View>
+          <Text style={[styles.sessionMeta, { color: colors.textMuted }]}>
+            {t('training.shootersCount', { count: joined.length })} · {shots} {t('session.shots')}
+            {hits > 0 ? ` · ${hits} ${t('session.hits')}` : ''}
+          </Text>
+        </View>
+        {shots > 0 && hits > 0 && (
+          <Text style={[styles.sessionResult, { color: colors.primary }]}>
+            {Math.round((hits / shots) * 100)}%
+          </Text>
+        )}
+      </TouchableOpacity>
+
+      {/* Expanded participant list */}
+      {isExpanded && (
+        <View style={[styles.participantList, { backgroundColor: colors.background }]}>
+          {joined.map((p: any, idx: number) => {
+            const isMe = p.user_id === currentUserId;
+            const isOwner = p.user_id === commanderId;
+            const pShots = p.shots_fired || 0;
+            const pHits = p.hits || 0;
+            const pAcc = pShots > 0 ? Math.round((pHits / pShots) * 100) : null;
+            return (
+              <View
+                key={p.user_id}
+                style={[
+                  styles.squadParticipantRow,
+                  idx < joined.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.border },
+                ]}
+              >
+                <View style={[styles.userAvatar, { backgroundColor: colors.secondary, width: 26, height: 26, borderRadius: 13 }]}>
+                  <Text style={[styles.userAvatarText, { color: colors.textMuted, fontSize: 10 }]}>
+                    {(p.user_full_name || '?').charAt(0).toUpperCase()}
+                  </Text>
+                </View>
+                <Text style={[styles.squadParticipantName, { color: colors.text }]} numberOfLines={1}>
+                  {p.user_full_name || t('common.unknown')}
+                </Text>
+                {isMe && (
+                  <View style={[styles.squadBadge, { backgroundColor: colors.primary + '20' }]}>
+                    <Text style={[styles.squadBadgeText, { color: colors.primary, fontSize: 9 }]}>{t('common.you')}</Text>
+                  </View>
+                )}
+                {isOwner && <Crown size={11} color={colors.orange} />}
+                <Text style={[styles.squadParticipantShots, { color: colors.textMuted }]}>
+                  {pShots > 0
+                    ? `${pShots} ${t('session.shots')}${pAcc !== null ? ` · ${pAcc}%` : ''}`
+                    : t('session.notReportedYet')}
+                </Text>
+              </View>
+            );
+          })}
+        </View>
+      )}
     </View>
   );
 }
@@ -882,8 +1186,11 @@ function TrainingSummaryContent({
             </>
           ) : (
             <>
-              <SummaryCard training={training} completedSessions={completedSessions} colors={colors} />
-              <CompletedSessionsList completedSessions={completedSessions} colors={colors} />
+              <ResultsTabContent
+                completedSessions={completedSessions}
+                colors={colors}
+                currentUserId={currentUserId}
+              />
               {completedSessions.length === 0 && (
                 <View style={[styles.emptyResults, { borderColor: colors.border }]}>
                   <Text style={[styles.emptyResultsText, { color: colors.textMuted }]}>
@@ -1402,41 +1709,123 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 
-  // Summary Card
-  summaryCard: {
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 24,
+  // Results Tab - Overview Card
+  resultsContainer: { gap: 12 },
+  overviewCard: {
     borderRadius: 16,
     borderWidth: 1,
-    gap: 4,
+    overflow: 'hidden',
   },
-  summaryAccent: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+  overviewTop: {
+    padding: 20,
+    gap: 16,
+  },
+  overviewMainStat: {
+    alignItems: 'center',
+    gap: 2,
+  },
+  overviewValue: {
+    fontSize: 36,
+    fontWeight: '800',
+    letterSpacing: -1,
+  },
+  overviewLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  overviewSecondaryStats: {
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 8,
+    gap: 0,
   },
-  summaryHeadline: { fontSize: 28, fontWeight: '800', letterSpacing: -0.5 },
-  summarySubtitle: { fontSize: 13, marginBottom: 4 },
-  metricsRow: {
-    flexDirection: 'row',
-    alignSelf: 'stretch',
-    marginTop: 16,
-    paddingTop: 16,
-    borderTopWidth: 1,
+  overviewStat: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 2,
   },
-  metric: { flex: 1, alignItems: 'center', gap: 2 },
-  metricValue: { fontSize: 18, fontWeight: '700', letterSpacing: -0.3 },
-  metricLabel: {
+  overviewStatValue: {
+    fontSize: 17,
+    fontWeight: '700',
+    letterSpacing: -0.3,
+  },
+  overviewStatLabel: {
     fontSize: 10,
     fontWeight: '600',
     textTransform: 'uppercase',
     letterSpacing: 0.3,
   },
-  metricDivider: { width: 1, height: 28, alignSelf: 'center' },
+  overviewStatDivider: {
+    width: 1,
+    height: 24,
+    alignSelf: 'center',
+  },
+
+  // Filter Chips
+  filterChipsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    flexWrap: 'wrap',
+  },
+  filterChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  filterChipText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  filterChipCount: {
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: 6,
+    minWidth: 18,
+    alignItems: 'center',
+  },
+  filterChipCountText: {
+    fontSize: 10,
+    fontWeight: '700',
+  },
+
+  // Filter Summary Strip
+  filterSummary: {
+    flexDirection: 'row',
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 4,
+  },
+  filterSummaryItem: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 2,
+  },
+  filterSummaryValue: {
+    fontSize: 16,
+    fontWeight: '700',
+    letterSpacing: -0.3,
+  },
+  filterSummaryLabel: {
+    fontSize: 9,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+  },
+
+  // Participant List (expanded squad rows)
+  participantList: {
+    marginHorizontal: 14,
+    marginBottom: 10,
+    borderRadius: 10,
+    overflow: 'hidden',
+  },
 
   // Sections
   section: { gap: 10 },
@@ -1448,14 +1837,26 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
 
-  // User Groups (for sessions)
-  userGroup: { gap: 8 },
-  userHeader: {
+  // Squad participant rows
+  squadParticipantRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
     gap: 8,
-    paddingHorizontal: 2,
   },
+  squadParticipantName: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '600',
+    letterSpacing: -0.2,
+  },
+  squadParticipantShots: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+
+  // User Avatars
   userAvatar: {
     width: 24,
     height: 24,
@@ -1464,8 +1865,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   userAvatarText: { fontSize: 11, fontWeight: '700' },
-  userName: { flex: 1, fontSize: 13, fontWeight: '600' },
-  userCount: { fontSize: 12, fontWeight: '500' },
 
   // Sessions List
   sessionsList: { borderRadius: 14, borderWidth: 1, overflow: 'hidden' },
