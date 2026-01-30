@@ -12,7 +12,7 @@
  */
 
 import { SessionContextStep } from '@/components/session/creation/SessionContextStep';
-import { RANGE_CATEGORIES } from '@/constants/drill';
+import { DRILL_GOAL, RANGE_CATEGORIES } from '@/constants/drill';
 import { useColors } from '@/hooks/ui/useColors';
 import { type RangeCategory, type TrainingDrillItem } from '@/services/drills/drillService';
 import type { ExecutionPolicy } from '@/types/session';
@@ -363,6 +363,7 @@ function AddSessionSheet({ visible, onClose, onAdd }: AddSessionSheetProps) {
       target_type: context.targetType === 'paper' || context.targetType === 'tactical' ? context.targetType : 'paper',
       execution_policy: executionPolicy,
       engagement_mode: effectiveEngagementMode,
+      max_executions: executionCount,
       config: {
         // Distance: specific value OR range category (soldier picks within range)
         distance_m: hasDistanceCategory ? null : hasDistance ? context.distance : null,
@@ -371,7 +372,7 @@ function AddSessionSheet({ visible, onClose, onAdd }: AddSessionSheetProps) {
         rounds: hasRounds ? context.shotsPlanned : null,
         time_limit_seconds: context.timeLimit,
         position: mapPosition(context.position),
-        strings_count: executionCount,
+        strings_count: 1,
       },
     };
 
@@ -401,330 +402,332 @@ function AddSessionSheet({ visible, onClose, onAdd }: AddSessionSheetProps) {
           <View style={{ width: 40 }} />
         </View>
 
-        {/* Form - Single Step */}
+        {/* Form */}
         <ScrollView
           style={styles.sheetScroll}
           contentContainerStyle={[styles.sheetScrollContent, { paddingBottom: insets.bottom + 100 }]}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          {/* ═══════════════════════════════════════════════════════════════════
-              GOAL: Grouping vs Engagement - Card Selection
-          ═══════════════════════════════════════════════════════════════════ */}
-
-          <View style={styles.goalCards}>
-            <Pressable
-              style={[
-                styles.goalCard,
-                {
-                  backgroundColor: purpose === 'grouping' ? `${colors.primary}15` : colors.card,
-                  borderColor: purpose === 'grouping' ? colors.primary : colors.border,
-                },
-              ]}
-              onPress={() => {
-                Haptics.selectionAsync();
-                handlePurposeSelect('grouping');
-              }}
-            >
-              <View
-                style={[
-                  styles.goalIconWrap,
-                  { backgroundColor: purpose === 'grouping' ? colors.primary : colors.secondary },
-                ]}
-              >
-                <Crosshair size={24} color={purpose === 'grouping' ? '#fff' : colors.textMuted} strokeWidth={1.5} />
-              </View>
-              <Text style={[styles.goalLabel, { color: purpose === 'grouping' ? colors.primary : colors.text }]}>
-                {t('session.grouping')}
-              </Text>
-              <Text style={[styles.goalHint, { color: colors.textMuted }]}>
-                {t('training.measureAccuracy', 'Measure accuracy')}
-              </Text>
-            </Pressable>
-
-            <Pressable
-              style={[
-                styles.goalCard,
-                {
-                  backgroundColor: purpose === 'engagement' ? `${colors.orange}15` : colors.card,
-                  borderColor: purpose === 'engagement' ? colors.orange : colors.border,
-                },
-              ]}
-              onPress={() => {
-                Haptics.selectionAsync();
-                handlePurposeSelect('engagement');
-              }}
-            >
-              <View
-                style={[
-                  styles.goalIconWrap,
-                  { backgroundColor: purpose === 'engagement' ? colors.orange : colors.secondary },
-                ]}
-              >
-                <Target size={24} color={purpose === 'engagement' ? '#fff' : colors.textMuted} strokeWidth={1.5} />
-              </View>
-              <Text style={[styles.goalLabel, { color: purpose === 'engagement' ? colors.orange : colors.text }]}>
-                {t('session.engagement')}
-              </Text>
-              <Text style={[styles.goalHint, { color: colors.textMuted }]}>
-                {t('training.hitOrMiss', 'Hit or miss')}
-              </Text>
-            </Pressable>
-          </View>
-
-          {/* ═══════════════════════════════════════════════════════════════════
-              SETTINGS CARD: Mode + Flexibility in a contained card
-          ═══════════════════════════════════════════════════════════════════ */}
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('training.drillSettings')}</Text>
-          <View style={[styles.settingsCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            {/* Mode toggle - only for engagement */}
-            {purpose === 'engagement' && (
-              <View style={styles.settingsRow}>
-                <View style={styles.settingsLabelWrap}>
-                  <Users size={14} color={colors.textMuted} />
-                  <Text style={[styles.settingsLabel, { color: colors.text }]}>{t('training.mode')}</Text>
-                </View>
-                <View style={[styles.buttonGroup, { backgroundColor: colors.secondary }]}>
-                  <Pressable
-                    style={[styles.groupButton, engagementMode === 'solo' && { backgroundColor: colors.primary }]}
-                    onPress={() => {
-                      Haptics.selectionAsync();
-                      handleEngagementModeSelect('solo');
-                    }}
-                  >
-                    <Text
-                      style={[styles.groupButtonText, { color: engagementMode === 'solo' ? '#fff' : colors.textMuted }]}
-                    >
-                      {t('training.solo')}
-                    </Text>
-                  </Pressable>
-                  <Pressable
-                    style={[styles.groupButton, engagementMode === 'squad' && { backgroundColor: colors.orange }]}
-                    onPress={() => {
-                      Haptics.selectionAsync();
-                      handleEngagementModeSelect('squad');
-                    }}
-                  >
-                    <Text
-                      style={[
-                        styles.groupButtonText,
-                        { color: engagementMode === 'squad' ? '#fff' : colors.textMuted },
-                      ]}
-                    >
-                      {t('training.squadType')}
-                    </Text>
-                  </Pressable>
-                </View>
-              </View>
-            )}
-
-            {/* Flexibility - always visible dropdown */}
-            <View style={styles.flexibilitySubflow}>
-              <View style={styles.settingsLabelWrap}>
-                <Sparkles size={14} color={colors.textMuted} />
-                <Text style={[styles.subflowLabel, { color: colors.textMuted }]}>{t('training.flexibility')}</Text>
-              </View>
+          {/* ── Section: Goal ── */}
+          <View style={styles.formSection}>
+            <Text style={[styles.formSectionLabel, { color: colors.textMuted }]}>
+              {t('training.goal', 'GOAL')}
+            </Text>
+            <View style={[styles.goalSegment, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <Pressable
-                style={[styles.dropdown, { backgroundColor: colors.secondary, borderColor: colors.border }]}
+                style={[
+                  styles.goalSegmentOption,
+                  purpose === 'grouping' && { backgroundColor: colors.primary },
+                ]}
                 onPress={() => {
                   Haptics.selectionAsync();
-                  setFlexDropdownOpen(!flexDropdownOpen);
+                  handlePurposeSelect('grouping');
                 }}
               >
-                {executionPolicy === 'locked' && <Lock size={14} color={colors.blue} />}
-                {executionPolicy === 'guided' && <Sparkles size={14} color={colors.green} />}
-                {executionPolicy === 'free' && <Unlock size={14} color={colors.orange} />}
-                <Text style={[styles.dropdownText, { color: colors.text }]}>
-                  {executionPolicy === 'locked' && t('training.locked')}
-                  {executionPolicy === 'guided' && t('training.guided')}
-                  {executionPolicy === 'free' && t('training.free')}
-                </Text>
-                <ChevronDown
-                  size={14}
-                  color={colors.textMuted}
-                  style={{ transform: [{ rotate: flexDropdownOpen ? '180deg' : '0deg' }] }}
+                <Crosshair
+                  size={16}
+                  color={purpose === 'grouping' ? '#fff' : colors.textMuted}
+                  strokeWidth={2}
                 />
+                <Text
+                  style={[
+                    styles.goalSegmentText,
+                    { color: purpose === 'grouping' ? '#fff' : colors.text },
+                  ]}
+                >
+                  {t('session.grouping')}
+                </Text>
+              </Pressable>
+              <Pressable
+                style={[
+                  styles.goalSegmentOption,
+                  purpose === 'engagement' && { backgroundColor: colors.orange },
+                ]}
+                onPress={() => {
+                  Haptics.selectionAsync();
+                  handlePurposeSelect('engagement');
+                }}
+              >
+                <Target
+                  size={16}
+                  color={purpose === 'engagement' ? '#fff' : colors.textMuted}
+                  strokeWidth={2}
+                />
+                <Text
+                  style={[
+                    styles.goalSegmentText,
+                    { color: purpose === 'engagement' ? '#fff' : colors.text },
+                  ]}
+                >
+                  {t('session.engagement')}
+                </Text>
               </Pressable>
             </View>
-
-            {/* Dropdown options */}
-            {flexDropdownOpen && (
-              <View style={[styles.dropdownOptions, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                <Pressable
-                  style={[
-                    styles.dropdownOption,
-                    executionPolicy === 'locked' && { backgroundColor: `${colors.blue}15` },
-                  ]}
-                  onPress={() => {
-                    Haptics.selectionAsync();
-                    handlePolicySelect('locked');
-                    setFlexDropdownOpen(false);
-                  }}
-                >
-                  <Lock size={16} color={executionPolicy === 'locked' ? colors.blue : colors.textMuted} />
-                  <View style={styles.dropdownOptionContent}>
-                    <Text
-                      style={[
-                        styles.dropdownOptionTitle,
-                        { color: executionPolicy === 'locked' ? colors.blue : colors.text },
-                      ]}
-                    >
-                      {t('training.locked')}
-                    </Text>
-                    <Text style={[styles.dropdownOptionDesc, { color: colors.textMuted }]}>
-                      {t('training.lockedDescription')}
-                    </Text>
-                  </View>
-                </Pressable>
-                <Pressable
-                  style={[
-                    styles.dropdownOption,
-                    executionPolicy === 'guided' && { backgroundColor: `${colors.green}15` },
-                  ]}
-                  onPress={() => {
-                    Haptics.selectionAsync();
-                    handlePolicySelect('guided');
-                    setFlexDropdownOpen(false);
-                  }}
-                >
-                  <Sparkles size={16} color={executionPolicy === 'guided' ? colors.green : colors.textMuted} />
-                  <View style={styles.dropdownOptionContent}>
-                    <Text
-                      style={[
-                        styles.dropdownOptionTitle,
-                        { color: executionPolicy === 'guided' ? colors.green : colors.text },
-                      ]}
-                    >
-                      {t('training.guided')}
-                    </Text>
-                    <Text style={[styles.dropdownOptionDesc, { color: colors.textMuted }]}>
-                      {t('training.guidedDescription')}
-                    </Text>
-                  </View>
-                </Pressable>
-                <Pressable
-                  style={[
-                    styles.dropdownOption,
-                    executionPolicy === 'free' && { backgroundColor: `${colors.orange}15` },
-                  ]}
-                  onPress={() => {
-                    Haptics.selectionAsync();
-                    handlePolicySelect('free');
-                    setFlexDropdownOpen(false);
-                  }}
-                >
-                  <Unlock size={16} color={executionPolicy === 'free' ? colors.orange : colors.textMuted} />
-                  <View style={styles.dropdownOptionContent}>
-                    <Text
-                      style={[
-                        styles.dropdownOptionTitle,
-                        { color: executionPolicy === 'free' ? colors.orange : colors.text },
-                      ]}
-                    >
-                      {t('training.free')}
-                    </Text>
-                    <Text style={[styles.dropdownOptionDesc, { color: colors.textMuted }]}>
-                      {t('training.freeDescription')}
-                    </Text>
-                  </View>
-                </Pressable>
-              </View>
-            )}
           </View>
 
-          {/* ═══════════════════════════════════════════════════════════════════
-              CONFIGURATION: Distance, Shots, Position (for locked/guided solo)
-          ═══════════════════════════════════════════════════════════════════ */}
-          {executionPolicy !== 'free' && effectiveEngagementMode !== 'squad' && (
-            <>
-              {executionPolicy === 'guided' && (
-                <View style={styles.optionalHeader}>
-                  <Text style={[styles.optionalLabel, { color: colors.textMuted }]}>
-                    {t('training.suggestedDefaultsOptional')}
-                  </Text>
-                  <Text style={[styles.optionalHint, { color: colors.textMuted }]}>
-                    {t('training.soldiersCanAdjust')}
-                  </Text>
+          {/* ── Section: Settings ── */}
+          <View style={styles.formSection}>
+            <Text style={[styles.formSectionLabel, { color: colors.textMuted }]}>
+              {t('training.drillSettings', 'SETTINGS')}
+            </Text>
+            <View style={[styles.formSectionCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              {/* Mode toggle - only for engagement */}
+              {purpose === DRILL_GOAL.ENGAGEMENT && (
+                <View style={styles.settingsRow}>
+                  <View style={styles.settingsLabelWrap}>
+                    <Users size={14} color={colors.textMuted} />
+                    <Text style={[styles.settingsLabel, { color: colors.text }]}>{t('training.mode')}</Text>
+                  </View>
+                  <View style={[styles.buttonGroup, { backgroundColor: colors.background }]}>
+                    <Pressable
+                      style={[styles.groupButton, engagementMode === 'solo' && { backgroundColor: colors.primary }]}
+                      onPress={() => {
+                        Haptics.selectionAsync();
+                        handleEngagementModeSelect('solo');
+                      }}
+                    >
+                      <Text
+                        style={[styles.groupButtonText, { color: engagementMode === 'solo' ? '#fff' : colors.textMuted }]}
+                      >
+                        {t('training.solo')}
+                      </Text>
+                    </Pressable>
+                    <Pressable
+                      style={[styles.groupButton, engagementMode === 'squad' && { backgroundColor: colors.orange }]}
+                      onPress={() => {
+                        Haptics.selectionAsync();
+                        handleEngagementModeSelect('squad');
+                      }}
+                    >
+                      <Text
+                        style={[
+                          styles.groupButtonText,
+                          { color: engagementMode === 'squad' ? '#fff' : colors.textMuted },
+                        ]}
+                      >
+                        {t('training.squadType')}
+                      </Text>
+                    </Pressable>
+                  </View>
                 </View>
               )}
-              <SessionContextStep
-                purpose={purpose}
-                context={context}
-                onUpdateContext={handleUpdateContext}
-                onBack={() => {}}
-                hideWeaponSection
-                showRangeCategory
-              />
-            </>
+
+              {/* Divider between mode and flexibility */}
+              {purpose === 'engagement' && (
+                <View style={[styles.fieldDivider, { backgroundColor: colors.border }]} />
+              )}
+
+              {/* Flexibility - always visible dropdown */}
+              <View style={styles.flexibilitySubflow}>
+                <View style={styles.settingsLabelWrap}>
+                  <Sparkles size={14} color={colors.textMuted} />
+                  <Text style={[styles.subflowLabel, { color: colors.textMuted }]}>{t('training.flexibility')}</Text>
+                </View>
+                <Pressable
+                  style={[styles.dropdown, { backgroundColor: colors.background, borderColor: colors.border }]}
+                  onPress={() => {
+                    Haptics.selectionAsync();
+                    setFlexDropdownOpen(!flexDropdownOpen);
+                  }}
+                >
+                  {executionPolicy === 'locked' && <Lock size={14} color={colors.blue} />}
+                  {executionPolicy === 'guided' && <Sparkles size={14} color={colors.green} />}
+                  {executionPolicy === 'free' && <Unlock size={14} color={colors.orange} />}
+                  <Text style={[styles.dropdownText, { color: colors.text }]}>
+                    {executionPolicy === 'locked' && t('training.locked')}
+                    {executionPolicy === 'guided' && t('training.guided')}
+                    {executionPolicy === 'free' && t('training.free')}
+                  </Text>
+                  <ChevronDown
+                    size={14}
+                    color={colors.textMuted}
+                    style={{ transform: [{ rotate: flexDropdownOpen ? '180deg' : '0deg' }] }}
+                  />
+                </Pressable>
+              </View>
+
+              {/* Dropdown options */}
+              {flexDropdownOpen && (
+                <View style={[styles.dropdownOptions, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                  <Pressable
+                    style={[
+                      styles.dropdownOption,
+                      executionPolicy === 'locked' && { backgroundColor: `${colors.blue}15` },
+                    ]}
+                    onPress={() => {
+                      Haptics.selectionAsync();
+                      handlePolicySelect('locked');
+                      setFlexDropdownOpen(false);
+                    }}
+                  >
+                    <Lock size={16} color={executionPolicy === 'locked' ? colors.blue : colors.textMuted} />
+                    <View style={styles.dropdownOptionContent}>
+                      <Text
+                        style={[
+                          styles.dropdownOptionTitle,
+                          { color: executionPolicy === 'locked' ? colors.blue : colors.text },
+                        ]}
+                      >
+                        {t('training.locked')}
+                      </Text>
+                      <Text style={[styles.dropdownOptionDesc, { color: colors.textMuted }]}>
+                        {t('training.lockedDescription')}
+                      </Text>
+                    </View>
+                  </Pressable>
+                  <Pressable
+                    style={[
+                      styles.dropdownOption,
+                      executionPolicy === 'guided' && { backgroundColor: `${colors.green}15` },
+                    ]}
+                    onPress={() => {
+                      Haptics.selectionAsync();
+                      handlePolicySelect('guided');
+                      setFlexDropdownOpen(false);
+                    }}
+                  >
+                    <Sparkles size={16} color={executionPolicy === 'guided' ? colors.green : colors.textMuted} />
+                    <View style={styles.dropdownOptionContent}>
+                      <Text
+                        style={[
+                          styles.dropdownOptionTitle,
+                          { color: executionPolicy === 'guided' ? colors.green : colors.text },
+                        ]}
+                      >
+                        {t('training.guided')}
+                      </Text>
+                      <Text style={[styles.dropdownOptionDesc, { color: colors.textMuted }]}>
+                        {t('training.guidedDescription')}
+                      </Text>
+                    </View>
+                  </Pressable>
+                  <Pressable
+                    style={[
+                      styles.dropdownOption,
+                      executionPolicy === 'free' && { backgroundColor: `${colors.orange}15` },
+                    ]}
+                    onPress={() => {
+                      Haptics.selectionAsync();
+                      handlePolicySelect('free');
+                      setFlexDropdownOpen(false);
+                    }}
+                  >
+                    <Unlock size={16} color={executionPolicy === 'free' ? colors.orange : colors.textMuted} />
+                    <View style={styles.dropdownOptionContent}>
+                      <Text
+                        style={[
+                          styles.dropdownOptionTitle,
+                          { color: executionPolicy === 'free' ? colors.orange : colors.text },
+                        ]}
+                      >
+                        {t('training.free')}
+                      </Text>
+                      <Text style={[styles.dropdownOptionDesc, { color: colors.textMuted }]}>
+                        {t('training.freeDescription')}
+                      </Text>
+                    </View>
+                  </Pressable>
+                </View>
+              )}
+            </View>
+          </View>
+
+          {/* ── Section: Configuration (locked/guided solo) ── */}
+          {executionPolicy !== 'free' && effectiveEngagementMode !== 'squad' && (
+            <View style={styles.formSection}>
+              <Text style={[styles.formSectionLabel, { color: colors.textMuted }]}>
+                {executionPolicy === 'guided'
+                  ? t('training.suggestedDefaultsOptional', 'SUGGESTED DEFAULTS')
+                  : t('training.configuration', 'CONFIGURATION')}
+              </Text>
+              {executionPolicy === 'guided' && (
+                <Text style={[styles.formSectionHint, { color: colors.textMuted }]}>
+                  {t('training.soldiersCanAdjust')}
+                </Text>
+              )}
+              <View style={[styles.formSectionCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <SessionContextStep
+                  purpose={purpose}
+                  context={context}
+                  onUpdateContext={handleUpdateContext}
+                  onBack={() => {}}
+                  hideWeaponSection
+                  showRangeCategory
+                />
+              </View>
+            </View>
           )}
 
-          {/* Squad mode - distance only */}
+          {/* ── Section: Squad distance ── */}
           {effectiveEngagementMode === 'squad' && (
-            <>
-              <View
-                style={[styles.squadNotice, { backgroundColor: colors.primary + '10', borderColor: colors.primary }]}
-              >
-                <Users size={20} color={colors.primary} />
-                <View style={styles.freeNoticeText}>
-                  <Text style={[styles.freeNoticeTitle, { color: colors.text }]}>{t('training.squadSession')}</Text>
-                  <Text style={[styles.freeNoticeDesc, { color: colors.textMuted }]}>
-                    {t('training.squadSessionDescription')}
-                  </Text>
-                </View>
-              </View>
-
-              <View style={styles.squadDistanceSection}>
-                <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>{t('session.distance')}</Text>
-
-                {/* Range category selection (Short / Medium / Long only) */}
-                <View
-                  style={[
-                    styles.distanceRow,
-                    { backgroundColor: colors.card, borderColor: colors.border, marginBottom: 8 },
-                  ]}
-                >
-                  {RANGE_CATEGORIES.map((cat) => {
-                    const isSelected = distanceCategory === cat.value;
-                    const label =
-                      cat.value === 'short'
-                        ? t('training.short')
-                        : cat.value === 'medium'
-                          ? t('training.medium')
-                          : t('training.long');
-                    return (
-                      <TouchableOpacity
-                        key={cat.value}
-                        style={[
-                          styles.distanceOption,
-                          isSelected && [styles.distanceOptionActive, { backgroundColor: colors.primary }],
-                        ]}
-                        onPress={() => {
-                          Haptics.selectionAsync();
-                          setDistanceCategory(cat.value);
-                          handleUpdateContext({ distance: 0 });
-                        }}
-                      >
-                        <Text style={[styles.distanceText, { color: isSelected ? '#fff' : colors.text }]}>{label}</Text>
-                      </TouchableOpacity>
-                    );
-                  })}
+            <View style={styles.formSection}>
+              <Text style={[styles.formSectionLabel, { color: colors.textMuted }]}>
+                {t('training.configuration', 'CONFIGURATION')}
+              </Text>
+              <View style={[styles.formSectionCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <View style={[styles.squadNotice, { backgroundColor: colors.primary + '10' }]}>
+                  <Users size={18} color={colors.primary} />
+                  <View style={styles.freeNoticeText}>
+                    <Text style={[styles.freeNoticeTitle, { color: colors.text }]}>{t('training.squadSession')}</Text>
+                    <Text style={[styles.freeNoticeDesc, { color: colors.textMuted }]}>
+                      {t('training.squadSessionDescription')}
+                    </Text>
+                  </View>
                 </View>
 
-                {/* Show range description when category selected */}
-                {distanceCategory && (
-                  <Text style={[styles.policyDesc, { color: colors.textMuted, marginBottom: 8 }]}>
-                    {distanceCategory === 'short' && t('training.shortRangeDesc')}
-                    {distanceCategory === 'medium' && t('training.mediumRangeDesc')}
-                    {distanceCategory === 'long' && t('training.longRangeDesc')}
-                  </Text>
-                )}
+                <View style={[styles.fieldDivider, { backgroundColor: colors.border }]} />
 
-                {/* Validation message */}
-                {!distanceCategory && (
-                  <Text style={[styles.policyDesc, { color: colors.red }]}>{t('training.selectDistanceRequired')}</Text>
-                )}
+                <View style={styles.squadDistanceSection}>
+                  <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>{t('session.distance')}</Text>
+
+                  <View
+                    style={[
+                      styles.distanceRow,
+                      { backgroundColor: colors.background, borderColor: colors.border, marginBottom: 8 },
+                    ]}
+                  >
+                    {RANGE_CATEGORIES.map((cat) => {
+                      const isSelected = distanceCategory === cat.value;
+                      const label =
+                        cat.value === 'short'
+                          ? t('training.short')
+                          : cat.value === 'medium'
+                            ? t('training.medium')
+                            : t('training.long');
+                      return (
+                        <TouchableOpacity
+                          key={cat.value}
+                          style={[
+                            styles.distanceOption,
+                            isSelected && [styles.distanceOptionActive, { backgroundColor: colors.primary }],
+                          ]}
+                          onPress={() => {
+                            Haptics.selectionAsync();
+                            setDistanceCategory(cat.value);
+                            handleUpdateContext({ distance: 0 });
+                          }}
+                        >
+                          <Text style={[styles.distanceText, { color: isSelected ? '#fff' : colors.text }]}>{label}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+
+                  {distanceCategory && (
+                    <Text style={[styles.policyDesc, { color: colors.textMuted, marginBottom: 0 }]}>
+                      {distanceCategory === 'short' && t('training.shortRangeDesc')}
+                      {distanceCategory === 'medium' && t('training.mediumRangeDesc')}
+                      {distanceCategory === 'long' && t('training.longRangeDesc')}
+                    </Text>
+                  )}
+
+                  {!distanceCategory && (
+                    <Text style={[styles.policyDesc, { color: colors.red }]}>{t('training.selectDistanceRequired')}</Text>
+                  )}
+                </View>
               </View>
-            </>
+            </View>
           )}
 
           {/* Free policy notice - only for solo free mode */}
@@ -740,45 +743,50 @@ function AddSessionSheet({ visible, onClose, onAdd }: AddSessionSheetProps) {
             </View>
           )}
 
-          {/* ═══════════════════════════════════════════════════════════════════
-              EXECUTION COUNT: How many times to run this drill
-          ═══════════════════════════════════════════════════════════════════ */}
-          <View style={styles.executionSection}>
-            <View style={styles.executionHeader}>
-              <Repeat size={16} color={colors.textMuted} />
-              <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>{t('training.executions')}</Text>
-            </View>
-            <View style={[styles.executionRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <TouchableOpacity
-                style={[styles.executionBtn, { opacity: executionCount <= 1 ? 0.3 : 1 }]}
-                onPress={() => {
-                  if (executionCount > 1) {
-                    Haptics.selectionAsync();
-                    setExecutionCount((c) => c - 1);
-                  }
-                }}
-                disabled={executionCount <= 1}
-              >
-                <Minus size={18} color={colors.text} />
-              </TouchableOpacity>
-              <View style={styles.executionValue}>
-                <Text style={[styles.executionNumber, { color: colors.text }]}>{executionCount}</Text>
-                <Text style={[styles.executionLabel, { color: colors.textMuted }]}>
-                  {executionCount === 1 ? t('training.time') : t('training.times')}
+          {/* ── Section: Execution Count ── */}
+          <View style={styles.formSection}>
+            <Text style={[styles.formSectionLabel, { color: colors.textMuted }]}>
+              {t('training.executions', 'EXECUTIONS')}
+            </Text>
+            <View style={[styles.formSectionCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <View style={styles.executionHeader}>
+                <Repeat size={16} color={colors.textMuted} />
+                <Text style={[styles.executionHintText, { color: colors.textMuted }]}>
+                  {t('training.howManyTimes', 'How many times should this drill run?')}
                 </Text>
               </View>
-              <TouchableOpacity
-                style={[styles.executionBtn, { opacity: executionCount >= 10 ? 0.3 : 1 }]}
-                onPress={() => {
-                  if (executionCount < 10) {
-                    Haptics.selectionAsync();
-                    setExecutionCount((c) => c + 1);
-                  }
-                }}
-                disabled={executionCount >= 10}
-              >
-                <Plus size={18} color={colors.text} />
-              </TouchableOpacity>
+              <View style={[styles.executionRow, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                <TouchableOpacity
+                  style={[styles.executionBtn, { opacity: executionCount <= 1 ? 0.3 : 1 }]}
+                  onPress={() => {
+                    if (executionCount > 1) {
+                      Haptics.selectionAsync();
+                      setExecutionCount((c) => c - 1);
+                    }
+                  }}
+                  disabled={executionCount <= 1}
+                >
+                  <Minus size={18} color={colors.text} />
+                </TouchableOpacity>
+                <View style={styles.executionValue}>
+                  <Text style={[styles.executionNumber, { color: colors.text }]}>{executionCount}</Text>
+                  <Text style={[styles.executionLabel, { color: colors.textMuted }]}>
+                    {executionCount === 1 ? t('training.time') : t('training.times')}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  style={[styles.executionBtn, { opacity: executionCount >= 10 ? 0.3 : 1 }]}
+                  onPress={() => {
+                    if (executionCount < 10) {
+                      Haptics.selectionAsync();
+                      setExecutionCount((c) => c + 1);
+                    }
+                  }}
+                  disabled={executionCount >= 10}
+                >
+                  <Plus size={18} color={colors.text} />
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
         </ScrollView>
@@ -914,6 +922,39 @@ export function AddDrillStep({ drills, onAddDrill, onRemoveDrill, onMoveDrill }:
 const styles = StyleSheet.create({
   container: {
     gap: 16,
+  },
+
+  // Form Section Pattern (shared across sheet sections)
+  formSection: {
+    gap: 8,
+    marginBottom: 16,
+  },
+  formSectionLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    paddingHorizontal: 4,
+  },
+  formSectionHint: {
+    fontSize: 12,
+    paddingHorizontal: 4,
+    marginBottom: 2,
+  },
+  formSectionCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 16,
+    overflow: 'hidden',
+  },
+  fieldDivider: {
+    height: 1,
+    marginVertical: 12,
+  },
+  executionHintText: {
+    fontSize: 13,
+    fontWeight: '500',
+    flex: 1,
   },
 
   // Header
@@ -1078,7 +1119,7 @@ const styles = StyleSheet.create({
   },
   sheetScrollContent: {
     paddingHorizontal: 20,
-    paddingTop: 20,
+    paddingTop: 12,
   },
   sheetFooter: {
     paddingHorizontal: 20,
@@ -1219,55 +1260,39 @@ const styles = StyleSheet.create({
     marginBottom: 14,
     opacity: 0.5,
   },
-  goalCards: {
+  goalSegment: {
     flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 16,
-    marginBottom: 24,
-  },
-  goalCard: {
-    width: 140,
-    alignItems: 'center',
-    paddingVertical: 20,
-    paddingHorizontal: 12,
-    borderRadius: 14,
-    borderWidth: 1.5,
-    gap: 6,
-  },
-  goalIconWrap: {
-    width: 48,
-    height: 48,
     borderRadius: 12,
+    borderWidth: 1,
+    padding: 4,
+    gap: 4,
+  },
+  goalSegmentOption: {
+    flex: 1,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    borderRadius: 9,
   },
-  goalLabel: {
-    fontSize: 15,
-    fontWeight: '700',
-    letterSpacing: -0.3,
-  },
-  goalHint: {
-    fontSize: 12,
-    textAlign: 'center',
-    opacity: 0.7,
+  goalSegmentText: {
+    fontSize: 14,
+    fontWeight: '600',
+    letterSpacing: -0.2,
   },
 
-  // Settings Card (Mode + Flexibility)
+  // Settings Card (Mode + Flexibility) - now handled by formSectionCard
   settingsCard: {
     borderRadius: 16,
     borderWidth: 1,
     paddingVertical: 6,
     paddingHorizontal: 4,
-    marginBottom: 24,
   },
   settingsRow: {
-    paddingTop: 8,
-    paddingBottom: 8,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 14,
-    borderTopColor: 'rgba(128,128,128,0.15)',
   },
   settingsLabelWrap: {
     flexDirection: 'row',
@@ -1292,10 +1317,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingTop: 8,
-    paddingBottom: 8,
-    paddingHorizontal: 14,
-    borderTopColor: 'rgba(128,128,128,0.15)',
   },
   subflowLabel: {
     fontSize: 15,
@@ -1386,8 +1407,8 @@ const styles = StyleSheet.create({
   executionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    marginBottom: 12,
+    gap: 8,
+    marginBottom: 14,
   },
   executionRow: {
     flexDirection: 'row',
@@ -1420,15 +1441,13 @@ const styles = StyleSheet.create({
     letterSpacing: 0.3,
   },
 
-  // Squad mode notice
+  // Squad mode notice (inside formSectionCard)
   squadNotice: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 12,
-    padding: 16,
+    padding: 14,
     borderRadius: 12,
-    borderWidth: 1,
-    marginBottom: 20,
   },
 
   // Squad distance section

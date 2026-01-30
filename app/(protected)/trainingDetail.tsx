@@ -11,30 +11,29 @@
  *   - Drills tab: Active session banner, planned drills list
  *   - Results tab: Summary card, completed sessions history
  */
-import { TrainingHero } from '@/components/training/detail/TrainingHero';
 import { TrainingSettingsModal } from '@/components/training/detail/TrainingSettingsModal';
-import { useTrainingDetail } from '@/hooks/training/useTrainingDetail';
 import { RunDrillSheet } from '@/components/training/RunDrillSheet';
 import { SquadInvitationBanner } from '@/components/training/SquadInvitationBanner';
 import { SquadLobbyBanner } from '@/components/training/SquadLobbyBanner';
 import { useAuth } from '@/contexts/AuthContext';
 import { useModals } from '@/contexts/ModalContext';
 import { useTrainingRealtime } from '@/hooks/realtime/training/useTrainingRealtime';
+import { useTrainingDetail } from '@/hooks/training/useTrainingDetail';
 import { useColors } from '@/hooks/ui/useColors';
 import { usePermissions } from '@/hooks/usePermissions';
 import { getTrainingSessionsWithStats } from '@/services/session/queries';
-import type { SessionWithDetails } from '@/types/session';
 import { finishTraining, startTraining } from '@/services/trainingService';
 import { useTeamStore } from '@/stores/teamStore';
+import type { SessionWithDetails } from '@/types/session';
 import type { TrainingDrill } from '@/types/workspace';
 import { format, formatDistanceToNow } from 'date-fns';
 import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from 'expo-router';
-import { t } from 'i18next';
 import {
   AlertCircle,
   ArrowLeft,
   CheckCircle2,
+  Clock,
   Flag,
   Lock,
   Play,
@@ -45,23 +44,47 @@ import {
   Trophy,
   Unlock,
   Users,
+  Zap,
 } from 'lucide-react-native';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import Animated, { interpolate, useAnimatedRef, useAnimatedStyle, useScrollViewOffset } from 'react-native-reanimated';
+import { ActivityIndicator, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import Animated, {
+  Extrapolation,
+  interpolate,
+  useAnimatedRef,
+  useAnimatedStyle,
+  useScrollViewOffset,
+} from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-const HEADER_HEIGHT = 140;
+const HEADER_HEIGHT = 120;
+const COLLAPSE_THRESHOLD = 80;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // SECTION COMPONENTS
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /**
- * Section 1: Header & Navigation
+ * Helper: get status config for training
  */
-function HeaderSection({
+function getTrainingStatusConfig(training: any, colors: any, t: any) {
+  if (training.status === 'ongoing') {
+    return { accentColor: colors.green, label: t('training.live'), Icon: Zap, showDot: true };
+  }
+  if (training.status === 'finished') {
+    return { accentColor: colors.primary, label: t('training.completed'), Icon: CheckCircle2, showDot: false };
+  }
+  if (training.status === 'cancelled') {
+    return { accentColor: colors.red, label: t('training.cancelled'), Icon: null, showDot: false };
+  }
+  return { accentColor: colors.textMuted, label: t('training.planned'), Icon: Clock, showDot: false };
+}
+
+/**
+ * Section 1: Expanded Hero (fades out on scroll)
+ */
+function ExpandedHero({
   training,
   colors,
   insets,
@@ -72,7 +95,7 @@ function HeaderSection({
   onStartTraining,
   onEndTraining,
   isUpdatingStatus,
-  headerAnimatedStyle,
+  heroAnimatedStyle,
 }: {
   training: any;
   colors: any;
@@ -84,16 +107,15 @@ function HeaderSection({
   onStartTraining: () => void;
   onEndTraining: () => void;
   isUpdatingStatus: boolean;
-  headerAnimatedStyle: any;
+  heroAnimatedStyle: any;
 }) {
   const { t } = useTranslation();
   const uniqueShooters = new Set(completedSessions.map((s) => s.user_id)).size;
+  const status = getTrainingStatusConfig(training, colors, t);
 
   return (
-    <Animated.View
-      style={[styles.heroCard, { backgroundColor: colors.card, paddingTop: insets.top + 12 }, headerAnimatedStyle]}
-    >
-      {/* Navigation Row */}
+    <Animated.View style={[styles.heroCard, { paddingTop: insets.top + 8 }, heroAnimatedStyle]}>
+      {/* Nav Row */}
       <View style={styles.navRow}>
         <TouchableOpacity style={[styles.navBtn, { backgroundColor: colors.secondary }]} onPress={onBack}>
           <ArrowLeft size={20} color={colors.text} />
@@ -106,57 +128,163 @@ function HeaderSection({
         )}
       </View>
 
-      {/* Training Hero */}
-      <TrainingHero training={training} colors={colors} onAutoCloseExpired={() => {}} />
-
-      {/* Status Indicators */}
-      <View style={styles.statusBar}>
-        <View style={[styles.statusItem, { backgroundColor: colors.primary + '12' }]}>
-          <Target size={14} color={colors.primary} />
-          <Text style={[styles.statusText, { color: colors.primary }]}>
-            {t('training.completedSessions', { count: completedSessions.length })}
+      {/* Status + Title */}
+      <View style={styles.heroContent}>
+        <View style={[styles.statusBadge, { backgroundColor: status.accentColor + '15' }]}>
+          {status.Icon && <status.Icon size={11} color={status.accentColor} strokeWidth={2.5} />}
+          <Text style={[styles.statusBadgeText, { color: status.accentColor }]}>
+            {status.label.toUpperCase()}
           </Text>
         </View>
-        {uniqueShooters > 0 && (
-          <View style={[styles.statusItem, { backgroundColor: colors.blue + '12' }]}>
-            <Users size={14} color={colors.blue} />
-            <Text style={[styles.statusText, { color: colors.blue }]}>
-              {t('training.shootersCount', { count: uniqueShooters })}
+        <Text style={[styles.heroTitle, { color: colors.text }]} numberOfLines={2}>
+          {training.title}
+        </Text>
+      </View>
+
+      {/* Stats Row + Commander Action */}
+      <View style={styles.heroFooter}>
+        <View style={styles.heroStats}>
+          <View style={[styles.statChip, { backgroundColor: colors.secondary }]}>
+            <Target size={12} color={colors.textMuted} />
+            <Text style={[styles.statChipText, { color: colors.textMuted }]}>
+              {completedSessions.length}
             </Text>
           </View>
-        )}
-        {/* Commander Pill - Start/End Training */}
+          {uniqueShooters > 0 && (
+            <View style={[styles.statChip, { backgroundColor: colors.secondary }]}>
+              <Users size={12} color={colors.textMuted} />
+              <Text style={[styles.statChipText, { color: colors.textMuted }]}>
+                {uniqueShooters}
+              </Text>
+            </View>
+          )}
+        </View>
+
+        {/* Commander Action */}
         {canManageTraining && training.status === 'planned' && (
           <TouchableOpacity
-            style={[styles.commanderPill, { backgroundColor: colors.green }]}
+            style={[styles.commanderBtn, { backgroundColor: colors.green }]}
             onPress={onStartTraining}
             disabled={isUpdatingStatus}
           >
             {isUpdatingStatus ? (
-              <ActivityIndicator size={10} color="#fff" />
+              <ActivityIndicator size={12} color="#fff" />
             ) : (
               <>
-                <Play size={10} color="#fff" fill="#fff" />
-                <Text style={styles.commanderPillText}>{t('training.startTraining')}</Text>
+                <Play size={11} color="#fff" fill="#fff" />
+                <Text style={styles.commanderBtnText}>{t('training.startTraining')}</Text>
               </>
             )}
           </TouchableOpacity>
         )}
         {canManageTraining && training.status === 'ongoing' && (
           <TouchableOpacity
-            style={[styles.commanderPill, { backgroundColor: colors.orange }]}
+            style={[styles.commanderBtn, { backgroundColor: colors.orange }]}
+            onPress={onEndTraining}
+            disabled={isUpdatingStatus}
+          >
+            {isUpdatingStatus ? (
+              <ActivityIndicator size={12} color="#fff" />
+            ) : (
+              <>
+                <Flag size={11} color="#fff" />
+                <Text style={styles.commanderBtnText}>{t('training.endTraining')}</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        )}
+      </View>
+    </Animated.View>
+  );
+}
+
+/**
+ * Sticky Compact Header (fades in on scroll)
+ */
+function StickyHeader({
+  training,
+  colors,
+  insets,
+  canManageTraining,
+  onBack,
+  onStartTraining,
+  onEndTraining,
+  isUpdatingStatus,
+  stickyAnimatedStyle,
+}: {
+  training: any;
+  colors: any;
+  insets: any;
+  canManageTraining: boolean;
+  onBack: () => void;
+  onStartTraining: () => void;
+  onEndTraining: () => void;
+  isUpdatingStatus: boolean;
+  stickyAnimatedStyle: any;
+}) {
+  const { t } = useTranslation();
+  const status = getTrainingStatusConfig(training, colors, t);
+
+  return (
+    <Animated.View
+      style={[
+        styles.stickyBar,
+        {
+          paddingTop: insets.top,
+          backgroundColor: colors.card,
+          borderBottomColor: colors.border,
+        },
+        stickyAnimatedStyle,
+      ]}
+      pointerEvents="box-none"
+    >
+      <View style={styles.stickyContent}>
+        <TouchableOpacity style={[styles.stickyBackBtn, { backgroundColor: colors.secondary }]} onPress={onBack}>
+          <ArrowLeft size={18} color={colors.text} />
+        </TouchableOpacity>
+
+        <View style={styles.stickyCenter}>
+          <Text style={[styles.stickyTitle, { color: colors.text }]} numberOfLines={1}>
+            {training.title}
+          </Text>
+          <View style={[styles.stickyBadge, { backgroundColor: status.accentColor + '18' }]}>
+            {status.Icon && <status.Icon size={9} color={status.accentColor} strokeWidth={2.5} />}
+            <Text style={[styles.stickyBadgeText, { color: status.accentColor }]}>
+              {status.label.toUpperCase()}
+            </Text>
+          </View>
+        </View>
+
+        {/* Commander action in sticky bar */}
+        {canManageTraining && training.status === 'planned' && (
+          <TouchableOpacity
+            style={[styles.stickyAction, { backgroundColor: colors.green }]}
+            onPress={onStartTraining}
+            disabled={isUpdatingStatus}
+          >
+            {isUpdatingStatus ? (
+              <ActivityIndicator size={10} color="#fff" />
+            ) : (
+              <Play size={12} color="#fff" fill="#fff" />
+            )}
+          </TouchableOpacity>
+        )}
+        {canManageTraining && training.status === 'ongoing' && (
+          <TouchableOpacity
+            style={[styles.stickyAction, { backgroundColor: colors.orange }]}
             onPress={onEndTraining}
             disabled={isUpdatingStatus}
           >
             {isUpdatingStatus ? (
               <ActivityIndicator size={10} color="#fff" />
             ) : (
-              <>
-                <Flag size={10} color="#fff" />
-                <Text style={styles.commanderPillText}>{t('training.endTraining')}</Text>
-              </>
+              <Flag size={12} color="#fff" />
             )}
           </TouchableOpacity>
+        )}
+        {/* Spacer when no action button */}
+        {(!canManageTraining || (training.status !== 'planned' && training.status !== 'ongoing')) && (
+          <View style={{ width: 32 }} />
         )}
       </View>
     </Animated.View>
@@ -611,122 +739,137 @@ function TrainingSummaryContent({
   currentUserId: string | null;
   onRefresh: () => void;
 }) {
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<'drills' | 'results'>('drills');
   const scrollRef = useAnimatedRef<Animated.ScrollView>();
   const scrollOffset = useScrollViewOffset(scrollRef);
 
-  const headerAnimatedStyle = useAnimatedStyle(() => ({
+  // Expanded hero: fades & slides out as you scroll
+  const heroAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(scrollOffset.value, [0, COLLAPSE_THRESHOLD], [1, 0], Extrapolation.CLAMP),
     transform: [
       {
         translateY: interpolate(
           scrollOffset.value,
-          [-HEADER_HEIGHT, 0, HEADER_HEIGHT * 0.6],
-          [-HEADER_HEIGHT / 2, 0, HEADER_HEIGHT]
+          [-HEADER_HEIGHT, 0, COLLAPSE_THRESHOLD],
+          [-HEADER_HEIGHT * 0.3, 0, -20],
+          Extrapolation.CLAMP
         ),
       },
-      {
-        scale: interpolate(scrollOffset.value, [-HEADER_HEIGHT, 0, HEADER_HEIGHT], [1.3, 1, 0.95]),
-      },
     ],
-    opacity: interpolate(scrollOffset.value, [0, HEADER_HEIGHT * 0.5], [1, 0]),
+  }));
+
+  // Sticky bar: fades in after scrolling past threshold
+  const stickyAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(scrollOffset.value, [COLLAPSE_THRESHOLD * 0.6, COLLAPSE_THRESHOLD], [0, 1], Extrapolation.CLAMP),
+    pointerEvents: scrollOffset.value > COLLAPSE_THRESHOLD * 0.8 ? 'auto' : 'none',
   }));
 
   return (
-    <Animated.ScrollView
-      ref={scrollRef}
-      style={styles.scroll}
-      contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 40 }]}
-      showsVerticalScrollIndicator={false}
-      scrollEventThrottle={16}
-    >
-      {/* ══════════════════════════════════════════════════════════════════════ */}
-      {/* SECTION 1: Header & Navigation                                        */}
-      {/* ══════════════════════════════════════════════════════════════════════ */}
-      <HeaderSection
+    <View style={{ flex: 1 }}>
+      {/* Sticky Compact Header — positioned above the scroll view */}
+      <StickyHeader
         training={training}
         colors={colors}
         insets={insets}
-        completedSessions={completedSessions}
         canManageTraining={canManageTraining}
         onBack={onBack}
-        onOpenSettings={onOpenSettings}
         onStartTraining={onStartTraining}
         onEndTraining={onEndTraining}
         isUpdatingStatus={isUpdatingStatus}
-        headerAnimatedStyle={headerAnimatedStyle}
+        stickyAnimatedStyle={stickyAnimatedStyle}
       />
 
-      {/* Tab Bar */}
-      <TabBar activeTab={activeTab} onTabChange={setActiveTab} colors={colors} />
+      <Animated.ScrollView
+        ref={scrollRef}
+        style={styles.scroll}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 40 }]}
+        showsVerticalScrollIndicator={false}
+        scrollEventThrottle={16}
+      >
+        {/* Expanded Hero */}
+        <ExpandedHero
+          training={training}
+          colors={colors}
+          insets={insets}
+          completedSessions={completedSessions}
+          canManageTraining={canManageTraining}
+          onBack={onBack}
+          onOpenSettings={onOpenSettings}
+          onStartTraining={onStartTraining}
+          onEndTraining={onEndTraining}
+          isUpdatingStatus={isUpdatingStatus}
+          heroAnimatedStyle={heroAnimatedStyle}
+        />
 
-      <View style={styles.contentContainer}>
-        {activeTab === 'drills' ? (
-          <>
-            {/* Not Invited Banner */}
-            {!isInvited && (
-              <View style={[styles.notInvitedBanner, { backgroundColor: `${colors.orange}10`, borderColor: `${colors.orange}25` }]}>
-                <ShieldAlert size={18} color={colors.orange} strokeWidth={1.5} />
-                <View style={styles.notInvitedInfo}>
-                  <Text style={[styles.notInvitedTitle, { color: colors.text }]}>
-                    {t('training.notInvited', 'Not Invited')}
-                  </Text>
-                  <Text style={[styles.notInvitedText, { color: colors.textMuted }]}>
-                    {t('training.notInvitedDesc', 'You were not selected for this training. Contact your commander for access.')}
+        {/* Tab Bar */}
+        <TabBar activeTab={activeTab} onTabChange={setActiveTab} colors={colors} />
+
+        <View style={styles.contentContainer}>
+          {activeTab === 'drills' ? (
+            <>
+              {/* Not Invited Banner */}
+              {!isInvited && (
+                <View
+                  style={[
+                    styles.notInvitedBanner,
+                    { backgroundColor: `${colors.orange}10`, borderColor: `${colors.orange}25` },
+                  ]}
+                >
+                  <ShieldAlert size={18} color={colors.orange} strokeWidth={1.5} />
+                  <View style={styles.notInvitedInfo}>
+                    <Text style={[styles.notInvitedTitle, { color: colors.text }]}>
+                      {t('training.notInvited', 'Not Invited')}
+                    </Text>
+                    <Text style={[styles.notInvitedText, { color: colors.textMuted }]}>
+                      {t(
+                        'training.notInvitedDesc',
+                        'You were not selected for this training. Contact your commander for access.'
+                      )}
+                    </Text>
+                  </View>
+                </View>
+              )}
+
+              {/* Squad/Group Session Banners — only for invited participants */}
+              {isInvited && training.id && currentUserId && (
+                <>
+                  <SquadLobbyBanner trainingId={training.id} userId={currentUserId} onLobbyChanged={onRefresh} />
+                  <SquadInvitationBanner
+                    trainingId={training.id}
+                    userId={currentUserId}
+                    onInvitationChanged={onRefresh}
+                  />
+                </>
+              )}
+
+              {/* Planned Drills */}
+              <PlannedDrillsList training={training} colors={colors} onStartDrill={onStartDrill} disabled={!isInvited} />
+
+              {/* Empty State for drills */}
+              <EmptyState training={training} completedSessions={completedSessions} colors={colors} />
+            </>
+          ) : (
+            <>
+              <SummaryCard training={training} completedSessions={completedSessions} colors={colors} />
+              <CompletedSessionsList completedSessions={completedSessions} colors={colors} />
+              {completedSessions.length === 0 && (
+                <View style={[styles.emptyResults, { borderColor: colors.border }]}>
+                  <Text style={[styles.emptyResultsText, { color: colors.textMuted }]}>
+                    {t('training.noCompletedSessions')}
                   </Text>
                 </View>
-              </View>
-            )}
+              )}
+            </>
+          )}
+        </View>
 
-            {/* Squad/Group Session Banners — only for invited participants */}
-            {isInvited && training.id && currentUserId && (
-              <>
-                {/* Commander: Return to your lobby */}
-                <SquadLobbyBanner trainingId={training.id} userId={currentUserId} onLobbyChanged={onRefresh} />
-                {/* Participants: Join/Accept/Return to lobby */}
-                <SquadInvitationBanner
-                  trainingId={training.id}
-                  userId={currentUserId}
-                  onInvitationChanged={onRefresh}
-                />
-              </>
-            )}
-
-            {/* Planned Drills - What you can do (read-only if not invited) */}
-            <PlannedDrillsList
-              training={training}
-              colors={colors}
-              onStartDrill={onStartDrill}
-              disabled={!isInvited}
-            />
-
-            {/* Empty State for drills */}
-            <EmptyState training={training} completedSessions={completedSessions} colors={colors} />
-          </>
-        ) : (
-          <>
-            {/* Summary Card - Overall stats */}
-            <SummaryCard training={training} completedSessions={completedSessions} colors={colors} />
-
-            {/* Completed Sessions - History */}
-            <CompletedSessionsList completedSessions={completedSessions} colors={colors} />
-
-            {/* Empty state for results */}
-            {completedSessions.length === 0 && (
-              <View style={[styles.emptyResults, { borderColor: colors.border }]}>
-                <Text style={[styles.emptyResultsText, { color: colors.textMuted }]}>
-                  {t('training.noCompletedSessions')}
-                </Text>
-              </View>
-            )}
-          </>
-        )}
-      </View>
-
-      {/* Footer */}
-      <Text style={[styles.footer, { color: colors.textMuted }]}>
-        {t('training.created')} {formatDistanceToNow(new Date(training.created_at), { addSuffix: true })}
-      </Text>
-    </Animated.ScrollView>
+        {/* Footer */}
+        <Text style={[styles.footer, { color: colors.textMuted }]}>
+          {t('training.created')} {formatDistanceToNow(new Date(training.created_at), { addSuffix: true })}
+        </Text>
+      </Animated.ScrollView>
+    </View>
   );
 }
 
@@ -1068,43 +1211,144 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+
+  // Expanded Hero
   heroCard: {
-    minHeight: HEADER_HEIGHT,
-    paddingHorizontal: 20,
-    paddingBottom: 16,
+    paddingHorizontal: 16,
+    paddingBottom: 12,
   },
-  navRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
+  navRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
   navBtn: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  statusBar: { flexDirection: 'row', gap: 8, marginTop: 12 },
-  statusItem: {
+  heroContent: {
+    gap: 6,
+    marginBottom: 10,
+  },
+  statusBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
+    alignSelf: 'flex-start',
+    gap: 5,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
   },
-  statusText: { fontSize: 12, fontWeight: '600' },
-
-  // Commander Pill (in header)
-  commanderPill: {
+  statusBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1,
+  },
+  heroTitle: {
+    fontSize: 24,
+    fontWeight: '800',
+    letterSpacing: -0.5,
+    lineHeight: 30,
+  },
+  heroFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  heroStats: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  statChip: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
   },
-  commanderPillText: {
-    color: '#fff',
+  statChipText: {
     fontSize: 12,
     fontWeight: '600',
+  },
+  commanderBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 8,
+  },
+  commanderBtnText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+
+  // Sticky Compact Bar
+  stickyBar: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 100,
+    borderBottomWidth: 1,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.06,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 3,
+      },
+    }),
+  },
+  stickyContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    gap: 10,
+  },
+  stickyBackBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stickyCenter: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  stickyTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    letterSpacing: -0.2,
+    flexShrink: 1,
+  },
+  stickyBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  stickyBadgeText: {
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  stickyAction: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
   // Tab Bar

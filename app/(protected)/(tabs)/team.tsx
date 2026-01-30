@@ -1042,7 +1042,7 @@ const unifiedStyles = StyleSheet.create({
   },
   menuItem: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     padding: 12,
     gap: 11,
   },
@@ -1073,7 +1073,7 @@ const unifiedStyles = StyleSheet.create({
   },
   scheduleSectionHeader: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     justifyContent: 'space-between',
     marginLeft: 3,
   },
@@ -1086,7 +1086,7 @@ const unifiedStyles = StyleSheet.create({
   },
   scheduleRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     paddingVertical: 12,
     paddingHorizontal: 12,
     borderRadius: 12,

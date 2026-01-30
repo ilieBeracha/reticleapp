@@ -56,6 +56,7 @@ function buildDrillInsertPayload(drill: CreateTrainingDrillInput, trainingId: st
     start_position: drill.start_position ?? null,
     weapon_category: drill.weapon_category ?? null,
     strings_count: drill.strings_count ?? 1,
+    max_executions: drill.max_executions ?? 1,
     reload_required: drill.reload_required ?? false,
     movement_type: drill.movement_type ?? null,
     movement_distance_m: drill.movement_distance_m ?? null,

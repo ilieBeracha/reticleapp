@@ -244,6 +244,10 @@ export interface TrainingDrill {
   target_exposure_seconds?: number | null;
   movement_distance_m?: number | null;
 
+  // === EXECUTION LIMIT ===
+  /** Max times a soldier can execute this drill. Default 1. Null = unlimited */
+  max_executions?: number | null;
+
   // === INSTANCE-SPECIFIC ===
   instance_notes?: string | null; // Notes specific to this training
   notes?: string | null; // Legacy notes field
@@ -342,6 +346,10 @@ export interface CreateTrainingDrillInput {
   target_size?: TargetSize;
   target_exposure_seconds?: number;
   movement_distance_m?: number;
+
+  // === EXECUTION LIMIT ===
+  /** Max times a soldier can execute this drill. Default 1. Null = unlimited */
+  max_executions?: number;
 
   // === INSTANCE-SPECIFIC ===
   instance_notes?: string;

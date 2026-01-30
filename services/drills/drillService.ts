@@ -111,6 +111,8 @@ export interface TrainingDrillItem {
    * NOTE: For grouping drills, this MUST be 'solo' (enforced by canonical model)
    */
   engagement_mode?: 'solo' | 'squad';
+  /** Max times a soldier can execute this drill. Default 1. */
+  max_executions?: number;
 }
 
 // ============================================================================

@@ -16,7 +16,7 @@ import type { DrillGoal, DrillPreset } from '@/services/presetService';
 import type { Position, RangeCategory, SessionContextState, SessionPurpose } from '@/types/sessionCreation';
 import type { WeaponCategory } from '@/types/workspace';
 import * as Haptics from 'expo-haptics';
-import { Bookmark, ChevronDown, ChevronRight, ChevronUp, Edit3, X } from 'lucide-react-native';
+import { Bookmark, ChevronDown, ChevronUp, Edit3, X } from 'lucide-react-native';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, Modal, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
@@ -379,29 +379,7 @@ export function SessionContextStep({
   return (
     <View style={styles.container}>
       {/* Drill Toggle */}
-      <TouchableOpacity
-        style={styles.drillRow}
-        onPress={() => {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-          setShowDrillPicker(true);
-        }}
-        activeOpacity={0.6}
-      >
-        <Text style={[styles.drillLabel, { color: colors.textMuted }]}>
-          {selectedDrill ? t('session.drill') : t('session.useDrill')}
-        </Text>
-        {selectedDrill ? (
-          <View style={styles.drillSelected}>
-            <Text style={[styles.drillName, { color: colors.text }]}>
-              {selectedDrill.name}
-              {isDrillModified && <Text style={{ color: colors.textMuted }}> {t('session.edited')}</Text>}
-            </Text>
-            <Text style={[styles.drillChange, { color: colors.textMuted }]}>{t('common.change')}</Text>
-          </View>
-        ) : (
-          <ChevronRight size={16} color={colors.textMuted} />
-        )}
-      </TouchableOpacity>
+     
 
       {/* Drill edit controls when drill is selected */}
       {selectedDrill && (
@@ -751,21 +729,14 @@ export function SessionContextStep({
 // ============================================================================
 
 const styles = StyleSheet.create({
-  container: { paddingTop: 8 },
+  container: { },
 
   // Params
-  paramRow: { paddingVertical: 14 },
+  paramRow: {  },
   paramLabel: { fontSize: 13, marginBottom: 10, alignSelf: 'flex-start' },
 
   // Drill row
-  drillRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 14,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(128,128,128,0.2)',
-  },
+  drillRow: {  },
   drillLabel: { fontSize: 15 },
   drillSelected: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1 },
   drillName: { fontSize: 15, fontWeight: '600', flexShrink: 1 },

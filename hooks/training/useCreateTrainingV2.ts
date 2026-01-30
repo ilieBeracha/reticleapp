@@ -330,11 +330,11 @@ export function useCreateTrainingV2({ teamIdParam }: UseCreateTrainingV2Params):
       if (mode === 'all') {
         setSelectedMemberIds([]);
       } else if (mode === 'select') {
-        // Auto-select required members (creator + commanders/owners)
-        setSelectedMemberIds(requiredMemberIds);
+        // Auto-select ALL members when switching from 'all' to 'select'
+        setSelectedMemberIds(members.map((m) => m.user_id));
       }
     },
-    [requiredMemberIds]
+    [members]
   );
 
   const handleToggleMember = useCallback(
@@ -432,6 +432,8 @@ export function useCreateTrainingV2({ teamIdParam }: UseCreateTrainingV2Params):
         time_limit_seconds: d.config.time_limit_seconds ?? undefined,
         strings_count: d.config.strings_count,
         position: d.config.position ?? undefined,
+        // Execution limit - how many times a soldier can run this drill
+        max_executions: d.max_executions ?? 1,
         // Store canonical drill reference in notes for future reference
         notes: d.drill_id ? `canonical:${d.drill_id}` : undefined,
       }));

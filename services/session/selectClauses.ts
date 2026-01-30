@@ -232,7 +232,6 @@ export const SESSION_SELECT_AFTER_CREATE = `
   training_id,
   weapon_id,
   drill_id,
-  drill_template_id,
   custom_drill_config,
   session_mode,
   watch_controlled,
