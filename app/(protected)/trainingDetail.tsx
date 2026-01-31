@@ -11,6 +11,7 @@
  *   - Drills tab: Active session banner, planned drills list
  *   - Results tab: Summary card, completed sessions history
  */
+import { useFocusEffect } from '@react-navigation/native';
 import { TrainingSettingsModal } from '@/components/training/detail/TrainingSettingsModal';
 import { SquadInvitationBanner } from '@/components/training/SquadInvitationBanner';
 import { SquadLobbyBanner } from '@/components/training/SquadLobbyBanner';
@@ -1311,6 +1312,13 @@ export default function TrainingDetailScreen() {
   useEffect(() => {
     if (training?.id) loadCompletedSessions();
   }, [training?.id, loadCompletedSessions]);
+
+  // Refresh completed sessions when screen gains focus (e.g., returning from activeSession)
+  useFocusEffect(
+    useCallback(() => {
+      if (training?.id) loadCompletedSessions();
+    }, [training?.id, loadCompletedSessions])
+  );
 
   // ─────────────────────────────────────────────────────────────────────────────
   // Realtime Subscription - Training Status Changes

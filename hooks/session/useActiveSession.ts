@@ -15,7 +15,7 @@ import type { GarminSessionData } from '@/services/garminService';
 
 import { computeSessionScore } from '@/services/session/scoring';
 import { calculateSessionStats } from '@/services/session/stats';
-import { endSession, saveWatchSessionData, updateSession } from '@/services/session/mutations';
+import { deleteSession, endSession, saveWatchSessionData, updateSession } from '@/services/session/mutations';
 import { getSessionById } from '@/services/session/queries';
 import { getSessionTargetsWithResults } from '@/services/session/targets';
 import type { SessionStats, SessionTargetWithResults, SessionWithDetails } from '@/types/session';
@@ -60,7 +60,8 @@ async function refreshSessionList(
 
 /**
  * Navigates to the appropriate screen after a session ends.
- * Priority: training > watch results > home
+ * For training sessions: go back (user came from trainingDetail)
+ * For standalone sessions: watch results > home
  */
 function navigateAfterSessionEnd(
   trainingId: string | null | undefined,
@@ -68,10 +69,8 @@ function navigateAfterSessionEnd(
   lastSessionData: GarminSessionData | null
 ): void {
   if (trainingId) {
-    router.replace({
-      pathname: '/(protected)/trainingDetail',
-      params: { id: trainingId },
-    });
+    // Simply go back - user came from trainingDetail
+    router.back();
   } else if (lastSessionData) {
     router.replace({
       pathname: '/(protected)/sessionResults',
@@ -770,6 +769,29 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
     // Completion is tracked by participant results, not target scans
     const engagementMode = session?.engagement?.engagement_mode;
     const isSquadOrGroup = engagementMode === 'squad' || engagementMode === 'group';
+
+    // Check if this is a team training session with no data
+    const hasNoTargets = targets.length === 0;
+    const isFromTraining = !!session?.training_id;
+
+    // If team training session with no targets, cancel instead of complete
+    // This allows users to enter/exit without "using up" drill executions
+    if (hasNoTargets && isFromTraining) {
+      setEnding(true);
+      try {
+        console.log('[ActiveSession] Cancelling empty session - no targets recorded');
+        await deleteSession(sessionId!);
+        await refreshSessionList(session?.team_id, loadTeamSessions, loadPersonalSessions);
+        // Simply go back - user came from trainingDetail
+        router.back();
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } catch (error: any) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        Alert.alert('Error', error.message || 'Failed to cancel session');
+        setEnding(false);
+      }
+      return;
+    }
 
     // Common end session logic
     const doEndSession = async () => {

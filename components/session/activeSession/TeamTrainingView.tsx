@@ -259,7 +259,9 @@ export function TeamTrainingView({
             styles.endBtn,
             drillComplete
               ? { backgroundColor: '#10B981' }
-              : { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border },
+              : targets.length === 0
+                ? { backgroundColor: colors.secondary }
+                : { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border },
           ]}
           onPress={onEndSession}
           disabled={ending}
@@ -268,9 +270,17 @@ export function TeamTrainingView({
             <ActivityIndicator size="small" color={drillComplete ? '#fff' : colors.text} />
           ) : (
             <>
-              {drillComplete ? <Check size={18} color="#fff" /> : <Square size={16} color={colors.text} />}
+              {drillComplete ? (
+                <Check size={18} color="#fff" />
+              ) : targets.length === 0 ? null : (
+                <Square size={16} color={colors.text} />
+              )}
               <Text style={[styles.endBtnText, { color: drillComplete ? '#fff' : colors.text }]}>
-                {drillComplete ? t('session.completeAndReturn') : t('session.endExecution')}
+                {drillComplete
+                  ? t('session.completeAndReturn')
+                  : targets.length === 0
+                    ? t('common.exit', 'Exit')
+                    : t('session.endExecution')}
               </Text>
             </>
           )}
