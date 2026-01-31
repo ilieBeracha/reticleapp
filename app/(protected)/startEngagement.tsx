@@ -103,7 +103,7 @@ export default function StartEngagementScreen() {
     position?: string;
     timeLimit?: string;
     drillName?: string;
-    executionPolicy?: 'locked' | 'guided' | 'free';
+    executionPolicy?: 'locked'; // Always locked - simplified
     engagementMode?: 'solo' | 'squad' | 'group';
     distanceCategory?: string;
   }>();
@@ -142,10 +142,8 @@ export default function StartEngagementScreen() {
   // DERIVED VALUES (prefer drillData from DB, fall back to legacy params)
   // ═══════════════════════════════════════════════════════════════════════════
 
-  // Execution Policy - explicit control over configuration freedom
-  // Default to 'free' for solo practice (no drill context)
-  const executionPolicy =
-    (drillData?.execution_policy as 'locked' | 'guided' | 'free') || params.executionPolicy || 'free';
+  // Execution Policy - always locked (soldiers can only change weapon)
+  const executionPolicy: 'locked' = 'locked';
   const drillName = drillData?.name || params.drillName || null;
 
   // Range category (soldier picks exact distance within this range)
@@ -172,9 +170,9 @@ export default function StartEngagementScreen() {
   const hasExplicitDistance = commanderDistance !== null;
   const hasExplicitPosition = commanderPosition !== null;
 
-  // Derived flags from policy
-  const isConfigLocked = executionPolicy === 'locked';
-  const hasPrefilledConfig = executionPolicy === 'locked' || executionPolicy === 'guided';
+  // Derived flags from policy - always locked
+  const isConfigLocked = true;
+  const hasPrefilledConfig = true;
 
   // Goal is ALWAYS locked when coming from a training drill (regardless of policy)
   const isFromTrainingDrill = !!trainingId && (!!drillData || !!params.drillId);
@@ -878,11 +876,11 @@ export default function StartEngagementScreen() {
           ) : (
             <>
               {/* ═══════════════════════════════════════════════════════════════════════════
-                  EDITABLE CONFIG: Normal form (free or guided policy)
+                  EDITABLE CONFIG: Normal configuration form
                   ═══════════════════════════════════════════════════════════════════════════ */}
 
-              {/* Guided Drill Banner */}
-              {executionPolicy === 'guided' && drillName && (
+              {/* Banner removed - always locked */}
+              {false && (
                 <View
                   style={[styles.lockedBanner, { backgroundColor: colors.green + '15', borderColor: colors.green }]}
                 >

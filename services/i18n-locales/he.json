@@ -476,6 +476,7 @@
     "createTraining": "צור אימון",
     "editTraining": "ערוך אימון",
     "trainingDetails": "פרטי אימון",
+    "targets": "מטרות",
     "trainingName": "שם האימון",
     "trainingDescription": "תיאור (אופציונלי)",
     "trainingDescriptionPlaceholder": "הוסף הערות על האימון...",
@@ -1317,7 +1318,9 @@
     "roundsAcrossTargets": "כדורים · {{count}} מטרות",
     "targetNumber": "מטרה {{number}}",
     "auto": "אוטו",
-    "hitsLabel": "פגיעות"
+    "hitsLabel": "פגיעות",
+    "allHit": "הכל פגע",
+    "allMiss": "הכל החטיא"
   },
   "settings": {
     "title": "הגדרות",

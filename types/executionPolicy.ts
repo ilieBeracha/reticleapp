@@ -1,17 +1,16 @@
 /**
  * Execution Policy Types
  *
- * HOW STRICT drill configuration must be followed.
- *
- * This is about config freedom during execution.
- * Training decides strictness, not execution mode.
+ * Drill configuration is always locked - soldiers can only change weapon.
+ * All other parameters are set by commander and cannot be modified.
  */
 
 /**
- * Execution policy - Commander's intent for how strictly a drill must be followed.
+ * Execution policy - Always locked.
+ * Soldiers execute drills EXACTLY as defined by commander.
+ * Only weapon selection is editable.
  *
- * - locked: Military qualification - execute EXACTLY as defined (no editing)
- * - guided: Training drill - defaults provided, adjustments allowed
- * - free: Open practice - drill is just a label, full freedom
+ * @deprecated Legacy types 'guided' and 'free' kept for backward compatibility
+ *             but all new drills use 'locked' only.
  */
 export type ExecutionPolicy = 'locked' | 'guided' | 'free';

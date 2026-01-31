@@ -31,7 +31,6 @@ import type { EngagementParticipant } from '@/types/session';
 import { deriveDetectionConfig } from '@/utils/detectionSensitivity';
 import { SHOT_MARKING_ENABLED, TIMER_INTERVAL_MS, VIBRATE_ON_SHOT } from '@/constants/activeSession';
 import {
-    buildEndSessionMessage,
     buildWatchSessionPayload,
     calculateAccuracy,
     calculateDrillProgress,
@@ -810,38 +809,8 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
       return;
     }
 
-    // Solo/team sessions: show drill requirement dialog
-    const meetsRequirements =
-      !!drillProgress && drillProgress.isComplete && drillProgress.meetsAccuracy && drillProgress.meetsTime;
-    const { title, message } = buildEndSessionMessage(
-      hasDrill,
-      drill,
-      drillProgress,
-      meetsRequirements,
-      totalShots,
-      targets.length,
-      accuracy,
-      elapsedTime
-    );
-
-    const isTraining = !!session?.training_id;
-    let confirmText: string;
-    if (hasDrill && !meetsRequirements) {
-      confirmText = 'End Anyway';
-    } else if (isTraining) {
-      confirmText = 'End Execution';
-    } else {
-      confirmText = 'End Session';
-    }
-
-    Alert.alert(title, message, [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: confirmText,
-        style: 'destructive',
-        onPress: doEndSession,
-      },
-    ]);
+    // Solo/team sessions: end directly without confirmation
+    await doEndSession();
   }, [
     sessionId,
     targets.length,

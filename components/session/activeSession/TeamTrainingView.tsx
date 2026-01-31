@@ -9,13 +9,14 @@
  */
 
 import { TargetCard } from '@/components/session/TargetCard';
+import { WeatherStrip } from '@/components/session/WeatherDisplay';
 import { COLORS } from '@/constants/activeSession';
 import { useColors } from '@/hooks/ui/useColors';
 import type { DrillProgress, WatchState } from '@/types/activeSession';
 import type { SessionDrillConfig, SessionWithDetails } from '@/types/session';
 import { formatDistanceDisplay, formatTime } from '@/utils/activeSession.helpers';
 import { isGroupingSession } from '@/utils/drillGoal';
-import { Camera, Check, Crosshair, Lock, MapPin, Settings, Square, Target, Zap } from 'lucide-react-native';
+import { Camera, Check, ChevronDown, Crosshair, Lock, MapPin, Square, Target, Zap } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
@@ -37,8 +38,12 @@ interface TeamTrainingViewProps {
   onTargetPress: (target: any) => void;
   onEndSession: () => void;
   ending: boolean;
-  /** Opens the drill config sheet (read-only for locked drills) */
-  onOpenConfig?: () => void;
+  /** Opens weapon picker - always available */
+  onWeaponPress?: () => void;
+  /** Weather data */
+  weather?: any;
+  weatherLoading?: boolean;
+  weatherError?: string | null;
 }
 
 export function TeamTrainingView({
@@ -55,7 +60,10 @@ export function TeamTrainingView({
   onTargetPress,
   onEndSession,
   ending,
-  onOpenConfig,
+  onWeaponPress,
+  weather,
+  weatherLoading,
+  weatherError,
 }: TeamTrainingViewProps) {
   const { t } = useTranslation();
   const colors = useColors();
@@ -74,25 +82,38 @@ export function TeamTrainingView({
           </Text>
         </View>
         <View style={styles.headerRight}>
-          {drill?.time_limit_seconds && watchState.isWatchControlled && (
+          {drill?.time_limit_seconds && watchState.isWatchControlled ? (
             <View style={sharedStyles.timerContainer}>
               <View style={[sharedStyles.liveDot, drillProgress?.overTime && { backgroundColor: COLORS.error }]} />
               <Text style={[sharedStyles.timerText, { color: drillProgress?.overTime ? COLORS.error : colors.text }]}>
                 {formatTime(elapsedTime)}
               </Text>
             </View>
+          ) : (
+            <View style={{ width: 36 }} />
           )}
-          {onOpenConfig && (
-            <TouchableOpacity
-              style={[styles.configButton, { backgroundColor: colors.secondary }]}
-              onPress={onOpenConfig}
-            >
-              <Settings size={18} color={colors.textMuted} />
-            </TouchableOpacity>
-          )}
-          {!onOpenConfig && !drill?.time_limit_seconds && <View style={{ width: 36 }} />}
         </View>
       </View>
+
+      {/* Weather */}
+      {(weather || weatherLoading || weatherError) && (
+        <View style={styles.weatherContainer}>
+          {weatherLoading ? (
+            <View style={[styles.weatherLoading, { backgroundColor: colors.card }]}>
+              <ActivityIndicator size="small" color={colors.textMuted} />
+              <Text style={[styles.weatherLoadingText, { color: colors.textMuted }]}>
+                {t('session.loadingWeather')}
+              </Text>
+            </View>
+          ) : weatherError ? (
+            <View style={[styles.weatherLoading, { backgroundColor: colors.card }]}>
+              <Text style={[styles.weatherLoadingText, { color: colors.textMuted }]}>{weatherError}</Text>
+            </View>
+          ) : weather ? (
+            <WeatherStrip weather={weather} />
+          ) : null}
+        </View>
+      )}
 
       {/* Focused drill info card */}
       <View style={styles.focusCard}>
@@ -113,16 +134,9 @@ export function TeamTrainingView({
 
           {/* Drill params - tight horizontal layout */}
           <View style={styles.paramsRow}>
-            {session.weapon_name && (
-              <View style={styles.param}>
-                <Target size={14} color={colors.primary} />
-                <Text style={[styles.paramText, { color: colors.text }]}>{session.weapon_name}</Text>
-              </View>
-            )}
             <View style={styles.param}>
               <MapPin size={14} color={colors.textMuted} />
               <Text style={[styles.paramText, { color: colors.text }]}>
-                {/* Soldier's choice first, then commander's distance/category */}
                 {session.soldier_distance_m
                   ? `${session.soldier_distance_m}m`
                   : formatDistanceDisplay(drill?.distance_m, drill?.distance_category, t)}
@@ -131,11 +145,39 @@ export function TeamTrainingView({
             <View style={styles.param}>
               <Zap size={14} color={colors.textMuted} />
               <Text style={[styles.paramText, { color: colors.text }]}>
-                {/* Soldier's bullets first, then commander's setting */}
                 {session.soldier_bullets ?? drill?.rounds_per_shooter ?? 5} shots
               </Text>
             </View>
           </View>
+
+          {/* Weapon bar - single row */}
+          <TouchableOpacity
+            style={[
+              styles.weaponRow,
+              {
+                backgroundColor: session.weapon_name ? `${colors.primary}08` : `${colors.primary}15`,
+                borderWidth: 1,
+                borderColor: session.weapon_name ? `${colors.primary}30` : colors.primary,
+                borderStyle: session.weapon_name ? 'solid' : 'dashed',
+              },
+            ]}
+            onPress={onWeaponPress}
+            activeOpacity={0.7}
+          >
+            <Target size={14} color={colors.primary} />
+            <Text
+              style={[styles.weaponRowText, { color: session.weapon_name ? colors.text : colors.primary }]}
+              numberOfLines={1}
+            >
+              {session.weapon_name || t('session.selectWeapon', 'Select Weapon')}
+            </Text>
+            <View style={[styles.weaponEditHint, { backgroundColor: `${colors.primary}15` }]}>
+              <Text style={[styles.weaponEditHintText, { color: colors.primary }]}>
+                {t('common.change', 'Change')}
+              </Text>
+              <ChevronDown size={12} color={colors.primary} />
+            </View>
+          </TouchableOpacity>
 
           {/* Progress bar */}
           <View style={styles.progressWrap}>
@@ -210,7 +252,7 @@ export function TeamTrainingView({
         </View>
       )}
 
-      {/* Bottom action - End Execution */}
+      {/* Bottom bar */}
       <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 16, backgroundColor: colors.background }]}>
         <TouchableOpacity
           style={[
@@ -246,12 +288,21 @@ const styles = StyleSheet.create({
     gap: 8,
     minWidth: 36,
   },
-  configButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+  // Weather
+  weatherContainer: {
+    paddingHorizontal: 16,
+    marginBottom: 12,
+  },
+  weatherLoading: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 10,
+  },
+  weatherLoadingText: {
+    fontSize: 13,
   },
   // Focus card
   focusCard: {
@@ -355,6 +406,33 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     letterSpacing: 0.5,
     marginBottom: 10,
+  },
+
+  // Weapon row (in focus card)
+  weaponRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+  },
+  weaponRowText: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  weaponEditHint: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  weaponEditHintText: {
+    fontSize: 11,
+    fontWeight: '600',
   },
 
   // Bottom bar

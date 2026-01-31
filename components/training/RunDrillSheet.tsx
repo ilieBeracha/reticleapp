@@ -93,17 +93,13 @@ export function RunDrillSheet({ visible, onClose, drill, trainingId, teamId }: R
   const minDistance = categoryBounds?.min ?? 1;
   const maxDistance = categoryBounds?.max ?? 1000;
 
-  // Execution policy determines if soldier can modify values
-  // 'locked' = commander's values are strict (no changes allowed)
-  // 'guided' = defaults pre-filled but soldier can adjust
-  // 'free' = full freedom to pick values
-  const executionPolicy = drill?.execution_policy || 'locked';
-  const isLocked = executionPolicy === 'locked';
+  // Execution policy - always locked (soldiers can only change weapon)
+  const isLocked = true;
 
-  // Values are only locked if policy is 'locked' AND a specific value was set
-  const isDistanceLocked = isLocked && drill?.distance_m != null;
-  const isBulletsLocked = isLocked && drill?.rounds_per_shooter != null;
-  const isPositionLocked = isLocked && drill?.position != null;
+  // Values are locked if commander set them
+  const isDistanceLocked = drill?.distance_m != null;
+  const isBulletsLocked = drill?.rounds_per_shooter != null;
+  const isPositionLocked = drill?.position != null;
 
   const quickDistances = useMemo(
     () => (distanceCategory ? QUICK_DISTANCES[distanceCategory] : [25, 50, 100, 200]),
@@ -344,11 +340,7 @@ export function RunDrillSheet({ visible, onClose, drill, trainingId, teamId }: R
                     { color: isLocked ? colors.textMuted : colors.green },
                   ]}
                 >
-                  {executionPolicy === 'locked'
-                    ? t('training.policyLocked', 'Locked')
-                    : executionPolicy === 'guided'
-                      ? t('training.policyGuided', 'Adjustable')
-                      : t('training.policyFree', 'Free')}
+                  {t('training.policyLocked', 'Locked')}
                 </Text>
               </View>
             </Animated.View>

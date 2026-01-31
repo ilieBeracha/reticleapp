@@ -15,15 +15,27 @@
  * 8. Solo           → SoloSessionView (full features)
  */
 
-import { PAPER_TYPE } from '@/constants/drill';
 import { useColors } from '@/hooks/ui/useColors';
 import { useOpenWeather } from '@/hooks/useOpenWeather';
+import { updateSession } from '@/services/session/mutations';
 import { supabase } from '@/services/supabase';
+import { getUserWeapons, markWeaponUsed, type UserWeapon } from '@/services/weaponService';
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { Check, Crosshair, X } from 'lucide-react-native';
+import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { DrillConfigSheet } from '@/components/session/activeSession/DrillConfigSheet';
@@ -33,11 +45,11 @@ import { SoloSessionView } from '@/components/session/activeSession/SoloSessionV
 import { SquadSessionView } from '@/components/session/activeSession/SquadSessionView';
 import { TeamTrainingView } from '@/components/session/activeSession/TeamTrainingView';
 import { styles } from '@/components/session/activeSession/activeSession.styles';
-import { useActiveSession } from '@/hooks/session/useActiveSession';
 import { WatchFailedView } from '@/components/session/activeSession/watch/WatchFailedView';
 import { WatchPreviewView } from '@/components/session/activeSession/watch/WatchPreviewView';
 import { WatchStartingView } from '@/components/session/activeSession/watch/WatchStartingView';
 import { WatchWaitingView } from '@/components/session/activeSession/watch/WatchWaitingView';
+import { useActiveSession } from '@/hooks/session/useActiveSession';
 
 export default function ActiveSessionScreen() {
   const insets = useSafeAreaInsets();
@@ -95,6 +107,153 @@ export default function ActiveSessionScreen() {
   const [showConfigSheet, setShowConfigSheet] = useState(false);
   const handleOpenConfig = () => setShowConfigSheet(true);
   const handleCloseConfig = () => setShowConfigSheet(false);
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // WEAPON SELECTION
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  const [weapons, setWeapons] = useState<UserWeapon[]>([]);
+  const [showWeaponPicker, setShowWeaponPicker] = useState(false);
+  const [changingWeapon, setChangingWeapon] = useState(false);
+
+  // Load weapons when session is available
+  useEffect(() => {
+    if (!session?.id) return;
+
+    const loadWeapons = async () => {
+      try {
+        const userWeapons = await getUserWeapons();
+        setWeapons(userWeapons);
+      } catch (err) {
+        console.error('[ActiveSession] Failed to load weapons:', err);
+      }
+    };
+
+    loadWeapons();
+  }, [session?.id]);
+
+  const handleWeaponChange = useCallback(
+    async (weaponId: string) => {
+      if (!session?.id || weaponId === session.weapon_id) {
+        setShowWeaponPicker(false);
+        return;
+      }
+
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      setChangingWeapon(true);
+
+      try {
+        await updateSession(session.id, { weapon_id: weaponId });
+        // Mark weapon as used (non-blocking)
+        markWeaponUsed(weaponId).catch(console.warn);
+        await handleRefresh();
+      } catch (err) {
+        console.error('[ActiveSession] Failed to change weapon:', err);
+      } finally {
+        setChangingWeapon(false);
+        setShowWeaponPicker(false);
+      }
+    },
+    [session?.id, session?.weapon_id, handleRefresh]
+  );
+
+  const handleOpenWeaponPicker = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setShowWeaponPicker(true);
+  }, []);
+
+  const handleCloseWeaponPicker = useCallback(() => {
+    setShowWeaponPicker(false);
+  }, []);
+
+  // Weapon picker modal JSX (inline to avoid component recreation)
+  const weaponPickerModal = showWeaponPicker ? (
+    <Modal
+      visible={true}
+      animationType="fade"
+      transparent
+      onRequestClose={handleCloseWeaponPicker}
+    >
+      <Pressable style={localStyles.pickerOverlay} onPress={handleCloseWeaponPicker}>
+        <Pressable
+          style={[localStyles.pickerSheet, { backgroundColor: colors.background }]}
+          onPress={(e) => e.stopPropagation()}
+        >
+          <View style={[localStyles.pickerHeader, { backgroundColor: colors.card }]}>
+            <View style={[localStyles.pickerHandle, { backgroundColor: colors.border }]} />
+            <TouchableOpacity
+              style={[localStyles.pickerCloseBtn, { backgroundColor: colors.secondary }]}
+              onPress={handleCloseWeaponPicker}
+            >
+              <X size={16} color={colors.textMuted} />
+            </TouchableOpacity>
+            <View style={localStyles.pickerTitleRow}>
+              <Crosshair size={16} color={colors.textMuted} />
+              <Text style={[localStyles.pickerTitle, { color: colors.text }]}>
+                {t('session.selectWeapon', 'Select Weapon')}
+              </Text>
+            </View>
+          </View>
+
+          <ScrollView
+            style={localStyles.pickerScroll}
+            contentContainerStyle={[localStyles.pickerContent, { paddingBottom: insets.bottom + 20 }]}
+            showsVerticalScrollIndicator={false}
+          >
+            {weapons.length === 0 ? (
+              <View style={localStyles.emptyWeapons}>
+                <Text style={[localStyles.emptyWeaponsText, { color: colors.textMuted }]}>
+                  {t('session.noWeapons', 'No weapons found')}
+                </Text>
+              </View>
+            ) : (
+              weapons.map((weapon) => {
+                const isSelected = weapon.id === session?.weapon_id;
+                return (
+                  <TouchableOpacity
+                    key={weapon.id}
+                    style={[
+                      localStyles.weaponItem,
+                      {
+                        backgroundColor: isSelected ? `${colors.primary}15` : colors.card,
+                        borderColor: isSelected ? colors.primary : colors.border,
+                      },
+                    ]}
+                    onPress={() => handleWeaponChange(weapon.id)}
+                    disabled={changingWeapon}
+                  >
+                    <View style={[localStyles.weaponIcon, { backgroundColor: `${colors.primary}12` }]}>
+                      <Crosshair size={18} color={colors.primary} />
+                    </View>
+                    <View style={localStyles.weaponInfo}>
+                      <Text
+                        style={[
+                          localStyles.weaponName,
+                          { color: isSelected ? colors.primary : colors.text },
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {weapon.name}
+                      </Text>
+                      {weapon.caliber && (
+                        <Text style={[localStyles.weaponCaliber, { color: colors.textMuted }]}>
+                          {weapon.caliber}
+                        </Text>
+                      )}
+                    </View>
+                    {isSelected && <Check size={20} color={colors.primary} />}
+                    {changingWeapon && weapon.id === session?.weapon_id && (
+                      <ActivityIndicator size="small" color={colors.primary} />
+                    )}
+                  </TouchableOpacity>
+                );
+              })
+            )}
+          </ScrollView>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  ) : null;
 
   // ═══════════════════════════════════════════════════════════════════════════
   // LOADING STATE
@@ -171,30 +330,14 @@ export default function ActiveSessionScreen() {
   // PENDING STATE → SessionPrepView
   // ═══════════════════════════════════════════════════════════════════════════
 
-  const drillExecutionPolicy = session.drill_config?.execution_policy;
-  const isConfigLocked = drillExecutionPolicy === 'locked';
-
+  // Drill config is always locked - soldiers can only change weapon
   if (session.status === 'pending') {
     return (
       <SessionPrepView
         session={session}
         insets={insets}
         onSessionActivated={() => handleRefresh()}
-        onBack={
-          isConfigLocked
-            ? undefined
-            : () => {
-                router.replace({
-                  pathname: '/(protected)/startEngagement',
-                  params: {
-                    purpose: session.drill_config?.drill_goal || PAPER_TYPE.GROUPING,
-                    distance: String(session.drill_config?.distance_m || 25),
-                    shots: String(session.drill_config?.rounds_per_shooter || 5),
-                    executionPolicy: drillExecutionPolicy || 'free',
-                  },
-                });
-              }
-        }
+        onBack={undefined}
         onClose={handleClose}
       />
     );
@@ -353,17 +496,12 @@ export default function ActiveSessionScreen() {
           onTargetPress={handleTargetPress}
           onEndSession={handleEndSession}
           ending={ending}
-          onOpenConfig={hasDrill ? handleOpenConfig : undefined}
+          onWeaponPress={handleOpenWeaponPicker}
+          weather={weather}
+          weatherLoading={weatherLoading}
+          weatherError={weatherError}
         />
-        {hasDrill && (
-          <DrillConfigSheet
-            visible={showConfigSheet}
-            onClose={handleCloseConfig}
-            session={session}
-            drill={drill}
-            onSessionUpdated={handleRefresh}
-          />
-        )}
+        {weaponPickerModal}
       </>
     );
   }
@@ -371,9 +509,6 @@ export default function ActiveSessionScreen() {
   // ═══════════════════════════════════════════════════════════════════════════
   // SOLO SESSION (default)
   // ═══════════════════════════════════════════════════════════════════════════
-
-  // Config is editable for 'guide' or 'free' execution policies
-  const isConfigEditable = !isConfigLocked;
 
   return (
     <>
@@ -392,16 +527,16 @@ export default function ActiveSessionScreen() {
         weather={weather}
         weatherLoading={weatherLoading}
         weatherError={weatherError}
-        isConfigEditable={isConfigEditable}
+        isConfigEditable={false}
         onRefresh={handleRefresh}
         onScanRoute={handleScanRoute}
         onManualRoute={handleManualRoute}
         onTargetPress={handleTargetPress}
         onEndSession={handleEndSession}
         onClose={handleClose}
-        onOpenConfig={hasDrill ? handleOpenConfig : undefined}
+        onOpenConfig={handleOpenConfig}
       />
-      {hasDrill && (
+      {showConfigSheet && (
         <DrillConfigSheet
           visible={showConfigSheet}
           onClose={handleCloseConfig}
@@ -438,6 +573,96 @@ const localStyles = StyleSheet.create({
   },
   exitSecondaryText: {
     fontSize: 14,
+    fontWeight: '500',
+  },
+  // Weapon picker modal styles
+  pickerOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'flex-end',
+  },
+  pickerSheet: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    maxHeight: '70%',
+  },
+  pickerHeader: {
+    alignItems: 'center',
+    paddingTop: 12,
+    paddingBottom: 16,
+    paddingHorizontal: 20,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+  },
+  pickerHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    marginBottom: 16,
+  },
+  pickerCloseBtn: {
+    position: 'absolute',
+    right: 16,
+    top: 16,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pickerTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  pickerTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    letterSpacing: -0.3,
+  },
+  pickerScroll: {
+    flexGrow: 1,
+    flexShrink: 1,
+  },
+  pickerContent: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    gap: 8,
+  },
+  emptyWeapons: {
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  emptyWeaponsText: {
+    fontSize: 14,
+  },
+  weaponItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  weaponIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  weaponInfo: {
+    flex: 1,
+    gap: 2,
+  },
+  weaponName: {
+    fontSize: 15,
+    fontWeight: '700',
+    letterSpacing: -0.2,
+  },
+  weaponCaliber: {
+    fontSize: 12,
     fontWeight: '500',
   },
 });

@@ -481,6 +481,7 @@
     "trainingDescriptionPlaceholder": "Add notes about this training...",
     "scheduledFor": "Scheduled For",
     "assignedTo": "Assigned To",
+    "targets": "Targets",
     "participants": "Participants",
     "participantsCount": "{{count}} participants",
     "drills": "Drills",
@@ -1318,7 +1319,9 @@
     "roundsAcrossTargets": "rounds · {{count}} targets",
     "targetNumber": "Target {{number}}",
     "auto": "auto",
-    "hitsLabel": "Hits"
+    "hitsLabel": "Hits",
+    "allHit": "All hit",
+    "allMiss": "All miss"
   },
   "settings": {
     "title": "Settings",

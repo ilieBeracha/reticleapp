@@ -23,7 +23,7 @@ import { usePermissions } from '@/hooks/usePermissions';
 import { requireCurrentUserId } from '@/services/authService';
 import { getOrCreateSetupSession } from '@/services/session/mutations';
 import { createEngagement } from '@/services/session/participants';
-import { getActiveSquadEngagement, getTrainingSessionsWithStats } from '@/services/session/queries';
+import { getActiveSquadEngagement, getMyActiveSessionForTraining, getTrainingSessionsWithStats } from '@/services/session/queries';
 import { finishTraining, startTraining } from '@/services/trainingService';
 import { getMyMostRecentWeaponId } from '@/services/weaponService';
 import { useGarminStore } from '@/stores/garminStore';
@@ -882,6 +882,7 @@ function PlannedDrillsList({
   completedSessions,
   currentUserId,
   disabled = false,
+  startingDrillId = null,
 }: {
   training: any;
   colors: any;
@@ -889,6 +890,7 @@ function PlannedDrillsList({
   completedSessions: SessionWithDetails[];
   currentUserId: string | null;
   disabled?: boolean;
+  startingDrillId?: string | null;
 }) {
   const { t } = useTranslation();
   if (!training.drills || training.drills.length === 0) return null;
@@ -916,11 +918,12 @@ function PlannedDrillsList({
               drill={drill}
               index={idx}
               colors={colors}
-              canStart={canStart}
+              canStart={canStart && !startingDrillId}
               isLast={idx === training.drills!.length - 1}
               onStart={() => onStartDrill(drill)}
               completedCount={getCompletedCount(drill.id)}
               maxExecutions={drill.max_executions ?? 1}
+              isLoading={startingDrillId === drill.id}
             />
           ))}
       </View>
@@ -944,6 +947,7 @@ function DrillRow({
   onStart,
   completedCount,
   maxExecutions,
+  isLoading = false,
 }: {
   drill: any;
   index: number;
@@ -953,20 +957,15 @@ function DrillRow({
   onStart: () => void;
   completedCount: number;
   maxExecutions: number;
+  isLoading?: boolean;
 }) {
   const { t } = useTranslation();
   const isGrouping = drill.drill_goal === 'grouping';
   const goalColor = isGrouping ? colors.blue : colors.orange;
   const hasReachedLimit = completedCount >= maxExecutions;
 
-  // Execution policy display
-  const policy = (drill.execution_policy || 'locked') as 'locked' | 'guided' | 'free';
-  const policyConfigs = {
-    locked: { Icon: Lock, color: colors.blue, label: t('training.locked') },
-    guided: { Icon: Sparkles, color: colors.green, label: t('training.guided') },
-    free: { Icon: Unlock, color: colors.orange, label: t('training.free') },
-  };
-  const policyConfig = policyConfigs[policy];
+  // Execution policy - always locked (soldiers can only change weapon)
+  const policyConfig = { Icon: Lock, color: colors.blue, label: t('training.locked') };
 
   return (
     <TouchableOpacity
@@ -1003,11 +1002,15 @@ function DrillRow({
             ` · ${t('training.soldierChooses')}`}
         </Text>
       </View>
-      {canStart && (
-        hasReachedLimit ? (
+      {(canStart || isLoading) && (
+        hasReachedLimit && !isLoading ? (
           <View style={[styles.completedBadge, { backgroundColor: colors.green }]}>
             <CheckCircle2 size={12} color="#fff" />
             <Text style={styles.completedBadgeText}>{completedCount}/{maxExecutions}</Text>
+          </View>
+        ) : isLoading ? (
+          <View style={[styles.startDrillBtn, { backgroundColor: colors.green }]}>
+            <ActivityIndicator size={12} color="#fff" />
           </View>
         ) : (
           <View style={[styles.startDrillBtn, { backgroundColor: colors.green }]}>
@@ -1076,6 +1079,7 @@ function TrainingSummaryContent({
   isUpdatingStatus,
   currentUserId,
   onRefresh,
+  startingDrillId,
 }: {
   training: any;
   colors: any;
@@ -1091,6 +1095,7 @@ function TrainingSummaryContent({
   isUpdatingStatus: boolean;
   currentUserId: string | null;
   onRefresh: () => void;
+  startingDrillId: string | null;
 }) {
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<'drills' | 'results'>('drills');
@@ -1204,6 +1209,7 @@ function TrainingSummaryContent({
                 completedSessions={completedSessions}
                 currentUserId={currentUserId}
                 disabled={!isInvited}
+                startingDrillId={startingDrillId}
               />
 
               {/* Empty State for drills */}
@@ -1414,7 +1420,7 @@ export default function TrainingDetailScreen() {
 
   // ─────────────────────────────────────────────────────────────────────────────
   // Drill Start Handler - Creates session with defaults and navigates directly
-  // Optimized: runs independent queries in parallel
+  // Optimized: runs independent queries in parallel, single auth call
   // ─────────────────────────────────────────────────────────────────────────────
   const handleStartDrill = useCallback(
     async (drill: TrainingDrill) => {
@@ -1423,12 +1429,16 @@ export default function TrainingDetailScreen() {
       setStartingDrillId(drill.id);
 
       try {
+        // Get user ID once - avoid redundant auth calls throughout the flow
+        const userId = await requireCurrentUserId();
+
         // Run ALL independent queries in parallel for speed
+        // Pass userId to queries that need it to avoid redundant auth calls
         const isSquad = drill.engagement_mode === 'squad';
-        const [userId, existingEngagement, weaponId] = await Promise.all([
-          requireCurrentUserId(),
+        const [existingEngagement, weaponId, existingTrainingSession] = await Promise.all([
           isSquad ? getActiveSquadEngagement(training.id) : Promise.resolve(null),
           getMyMostRecentWeaponId(), // Uses RLS, no userId needed
+          getMyActiveSessionForTraining(training.id, userId),
         ]);
 
         // If squad has existing engagement, navigate there
@@ -1458,6 +1468,12 @@ export default function TrainingDetailScreen() {
           return;
         }
 
+        // FAST PATH: reuse existing training session for same drill (instant "go back + retry")
+        if (!isSquad && existingTrainingSession && (!drill.id || existingTrainingSession.drill_id === drill.id)) {
+          router.push({ pathname: '/(protected)/activeSession', params: { sessionId: existingTrainingSession.id } });
+          return;
+        }
+
         // Check weapon
         if (!weaponId) {
           Alert.alert(t('training.noWeapon', 'No Weapon'), t('training.configureWeaponFirst', 'Please configure a weapon first.'));
@@ -1467,7 +1483,7 @@ export default function TrainingDetailScreen() {
         // Check watch connectivity (sync - no await needed)
         const isWatchConnected = useGarminStore.getState().status === 'CONNECTED';
 
-        // Create session with drill defaults
+        // Create session with drill defaults — pass pre-fetched data to avoid redundant queries
         const newSession = await getOrCreateSetupSession({
           weapon_id: weaponId,
           team_id: training.team_id || undefined,
@@ -1477,7 +1493,7 @@ export default function TrainingDetailScreen() {
           soldier_distance_m: drill.distance_m ?? null,
           soldier_bullets: drill.rounds_per_shooter ?? null,
           soldier_position: drill.position ?? null,
-        });
+        }, { prefetchedTrainingSession: existingTrainingSession, userId });
 
         // Squad → create engagement and go to lobby
         if (isSquad) {
@@ -1569,6 +1585,7 @@ export default function TrainingDetailScreen() {
         isUpdatingStatus={isUpdatingStatus}
         currentUserId={session?.user?.id || null}
         onRefresh={loadCompletedSessions}
+        startingDrillId={startingDrillId}
       />
 
       <TrainingSettingsModal

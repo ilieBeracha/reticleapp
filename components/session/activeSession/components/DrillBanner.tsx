@@ -39,6 +39,10 @@ export function DrillBanner({
   const colors = useColors();
   const { t } = useTranslation();
 
+  // Always show drill parameters - config is always locked
+  const showDistance = drill.distance_m || drill.distance_category || session.soldier_distance_m;
+  const showShots = isTacticalDrill && drill.rounds_per_shooter;
+
   return (
     <View style={styles.container}>
       <View style={[styles.inner, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -60,34 +64,35 @@ export function DrillBanner({
                   <Text style={[styles.reqText, { color: colors.primary, fontWeight: '600' }]}>{weaponName}</Text>
                 </View>
               )}
-              <View style={styles.reqItem}>
-                <MapPin size={12} color={colors.textMuted} />
-                <Text style={[styles.reqText, { color: colors.text }]}>
-                  {/* Soldier's choice first, then commander's distance/category */}
-                  {session.soldier_distance_m
-                    ? `${session.soldier_distance_m}m`
-                    : formatDistanceDisplay(drill.distance_m, drill.distance_category, t)}
-                </Text>
-              </View>
-              <View style={styles.reqItem}>
-                {isTacticalDrill ? (
-                  <>
-                    <Zap size={12} color={colors.textMuted} />
-                    <Text style={[styles.reqText, { color: colors.text }]}>
-                      {t('session.shotsPerRound', {
-                        shots: drillProgress?.bulletsPerRound ?? drill.rounds_per_shooter,
-                      })}
-                    </Text>
-                  </>
-                ) : (
-                  <>
-                    <Camera size={12} color={colors.textMuted} />
-                    <Text style={[styles.reqText, { color: colors.text }]}>
-                      {t('session.scanMax', { max: formatMaxShots(drill.rounds_per_shooter) })}
-                    </Text>
-                  </>
-                )}
-              </View>
+              {showDistance && (
+                <View style={styles.reqItem}>
+                  <MapPin size={12} color={colors.textMuted} />
+                  <Text style={[styles.reqText, { color: colors.text }]}>
+                    {/* Soldier's choice first, then commander's distance/category */}
+                    {session.soldier_distance_m
+                      ? `${session.soldier_distance_m}m`
+                      : formatDistanceDisplay(drill.distance_m, drill.distance_category, t)}
+                  </Text>
+                </View>
+              )}
+              {showShots && (
+                <View style={styles.reqItem}>
+                  <Zap size={12} color={colors.textMuted} />
+                  <Text style={[styles.reqText, { color: colors.text }]}>
+                    {t('session.shotsPerRound', {
+                      shots: drillProgress?.bulletsPerRound ?? drill.rounds_per_shooter,
+                    })}
+                  </Text>
+                </View>
+              )}
+              {isGroupingDrill && (
+                <View style={styles.reqItem}>
+                  <Camera size={12} color={colors.textMuted} />
+                  <Text style={[styles.reqText, { color: colors.text }]}>
+                    {t('session.scanMode', 'Scan Target')}
+                  </Text>
+                </View>
+              )}
               {drill.time_limit_seconds && (
                 <View style={styles.reqItem}>
                   <Clock size={12} color={drillProgress?.overTime ? COLORS.error : colors.textMuted} />

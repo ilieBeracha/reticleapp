@@ -1,17 +1,19 @@
 /**
  * DrillConfigSheet
  *
- * Config panel for active session - shows drill parameters.
- * Locked sessions show read-only data.
- * Guided/Free sessions allow soldier to adjust distance, bullets, position.
+ * Config panel for active session - weapon selection + drill parameters.
+ * Weapon can ALWAYS be changed (even when locked).
+ * When locked: drill params (distance, bullets, position) are read-only.
+ * When guided/free: soldier can adjust drill params.
  */
 
 import { POSITIONS, QUICK_DISTANCES, RANGE_CATEGORIES, RANGE_LABELS, type RangeCategory } from '@/constants/drill';
 import { useColors } from '@/hooks/ui/useColors';
 import { updateSession } from '@/services/session/mutations';
+import { getUserWeapons, markWeaponUsed, type UserWeapon } from '@/services/weaponService';
 import type { SessionDrillConfig, SessionWithDetails } from '@/types/session';
 import * as Haptics from 'expo-haptics';
-import { Lock, MapPin, Minus, Plus, Settings, Target, X, Zap } from 'lucide-react-native';
+import { ChevronDown, Crosshair, Lock, MapPin, Minus, Plus, Settings, X, Zap } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -41,17 +43,23 @@ export function DrillConfigSheet({ visible, onClose, session, drill, onSessionUp
   const insets = useSafeAreaInsets();
   const { t } = useTranslation();
 
-  const executionPolicy = drill?.execution_policy || 'locked';
-  const isLocked = executionPolicy === 'locked';
+  // Config is always locked - soldiers can only change weapon
+  const isLocked = true;
   const isGrouping = drill?.drill_goal === 'grouping';
 
-  // Soldier values (editable state)
+  // Weapon state (only editable item)
+  const [weapons, setWeapons] = useState<UserWeapon[]>([]);
+  const [selectedWeaponId, setSelectedWeaponId] = useState<string | null>(null);
+  const [loadingWeapons, setLoadingWeapons] = useState(true);
+  const [showWeaponPicker, setShowWeaponPicker] = useState(false);
+
+  // Soldier values - read only display
   const [distance, setDistance] = useState(25);
   const [bullets, setBullets] = useState(5);
   const [position, setPosition] = useState<string>('standing');
   const [saving, setSaving] = useState(false);
 
-  // Track if changes were made
+  // Track if changes were made (weapon only)
   const [hasChanges, setHasChanges] = useState(false);
 
   const distanceCategory = drill?.distance_category as RangeCategory | null;
@@ -59,33 +67,64 @@ export function DrillConfigSheet({ visible, onClose, session, drill, onSessionUp
   const minDistance = categoryBounds?.min ?? 1;
   const maxDistance = categoryBounds?.max ?? 1000;
 
-  const isDistanceLocked = isLocked && drill?.distance_m != null;
-  const isBulletsLocked = isLocked && drill?.rounds_per_shooter != null;
-  const isPositionLocked = isLocked && drill?.position != null;
+  // All config values are locked
+  const isDistanceLocked = true;
+  const isBulletsLocked = true;
+  const isPositionLocked = true;
 
   const quickDistances = useMemo(
     () => (distanceCategory ? QUICK_DISTANCES[distanceCategory] : [25, 50, 100, 200]),
     [distanceCategory]
   );
 
-  // Initialize from session values (soldier choices first, then drill defaults)
+  const selectedWeapon = useMemo(
+    () => weapons.find((w) => w.id === selectedWeaponId),
+    [weapons, selectedWeaponId]
+  );
+
+  // Load weapons
   useEffect(() => {
     if (!visible) return;
 
-    setDistance(
-      session.soldier_distance_m ?? drill?.distance_m ?? 25
-    );
-    setBullets(
-      session.soldier_bullets ?? drill?.rounds_per_shooter ?? 5
-    );
-    setPosition(
-      session.soldier_position ?? drill?.position ?? 'standing'
-    );
+    const loadWeapons = async () => {
+      setLoadingWeapons(true);
+      try {
+        const userWeapons = await getUserWeapons();
+        setWeapons(userWeapons);
+      } catch (err) {
+        console.error('[DrillConfigSheet] Failed to load weapons:', err);
+      } finally {
+        setLoadingWeapons(false);
+      }
+    };
+
+    loadWeapons();
+  }, [visible]);
+
+  // Initialize from session values
+  useEffect(() => {
+    if (!visible) return;
+
+    // Weapon
+    setSelectedWeaponId(session.weapon_id || null);
+
+    // Drill params (soldier choices first, then drill defaults)
+    setDistance(session.soldier_distance_m ?? drill?.distance_m ?? 25);
+    setBullets(session.soldier_bullets ?? drill?.rounds_per_shooter ?? 5);
+    setPosition(session.soldier_position ?? drill?.position ?? 'standing');
     setHasChanges(false);
   }, [visible, session, drill]);
 
+  const handleWeaponSelect = useCallback((weaponId: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setSelectedWeaponId(weaponId);
+    setShowWeaponPicker(false);
+    setHasChanges(true);
+  }, []);
+
   const handleDistanceChange = useCallback(
     (delta: number) => {
+      if (isLocked) return;
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       setDistance((prev) => {
         const newVal = Math.max(minDistance, Math.min(maxDistance, prev + delta));
@@ -93,19 +132,34 @@ export function DrillConfigSheet({ visible, onClose, session, drill, onSessionUp
         return newVal;
       });
     },
-    [minDistance, maxDistance]
+    [isLocked, minDistance, maxDistance]
   );
 
   const handleSave = useCallback(async () => {
-    if (!hasChanges || isLocked) return;
+    if (!hasChanges) {
+      onClose();
+      return;
+    }
 
     setSaving(true);
     try {
-      await updateSession(session.id, {
-        soldier_distance_m: distance,
-        soldier_bullets: bullets,
-        soldier_position: position,
-      });
+      const updates: Parameters<typeof updateSession>[1] = {};
+
+      // Weapon can always be changed
+      if (selectedWeaponId && selectedWeaponId !== session.weapon_id) {
+        updates.weapon_id = selectedWeaponId;
+        // Mark weapon as used (non-blocking)
+        markWeaponUsed(selectedWeaponId).catch(console.warn);
+      }
+
+      // Drill params only if not locked
+      if (!isLocked) {
+        updates.soldier_distance_m = distance;
+        updates.soldier_bullets = bullets;
+        updates.soldier_position = position;
+      }
+
+      await updateSession(session.id, updates);
       onSessionUpdated();
       onClose();
     } catch (err) {
@@ -113,7 +167,7 @@ export function DrillConfigSheet({ visible, onClose, session, drill, onSessionUp
     } finally {
       setSaving(false);
     }
-  }, [hasChanges, isLocked, session.id, distance, bullets, position, onSessionUpdated, onClose]);
+  }, [hasChanges, isLocked, session.id, session.weapon_id, selectedWeaponId, distance, bullets, position, onSessionUpdated, onClose]);
 
   return (
     <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
@@ -130,35 +184,20 @@ export function DrillConfigSheet({ visible, onClose, session, drill, onSessionUp
             <Animated.View entering={FadeInDown.duration(300)} style={styles.titleRow}>
               <Settings size={16} color={colors.textMuted} />
               <Text style={[styles.title, { color: colors.text }]}>
-                {t('session.drillConfig', 'Drill Config')}
+                {t('session.sessionConfig', 'Session Config')}
               </Text>
             </Animated.View>
 
-            {/* Policy badge */}
+            {/* Policy badge - always locked */}
             <View
               style={[
                 styles.policyBadge,
-                {
-                  backgroundColor: isLocked ? `${colors.textMuted}12` : `${colors.green}12`,
-                },
+                { backgroundColor: `${colors.textMuted}12` },
               ]}
             >
-              {isLocked ? (
-                <Lock size={11} color={colors.textMuted} />
-              ) : (
-                <Zap size={11} color={colors.green} />
-              )}
-              <Text
-                style={[
-                  styles.policyText,
-                  { color: isLocked ? colors.textMuted : colors.green },
-                ]}
-              >
-                {executionPolicy === 'locked'
-                  ? t('training.policyLocked', 'Locked')
-                  : executionPolicy === 'guided'
-                    ? t('training.policyGuided', 'Adjustable')
-                    : t('training.policyFree', 'Free')}
+              <Lock size={11} color={colors.textMuted} />
+              <Text style={[styles.policyText, { color: colors.textMuted }]}>
+                {t('training.policyLocked', 'Locked')}
               </Text>
             </View>
           </View>
@@ -168,22 +207,72 @@ export function DrillConfigSheet({ visible, onClose, session, drill, onSessionUp
             contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 100 }]}
             showsVerticalScrollIndicator={false}
           >
-            {/* Weapon (always read-only) */}
-            <Animated.View
-              entering={FadeInDown.duration(300).delay(50)}
-              style={[styles.weaponCard, { backgroundColor: colors.card, borderColor: colors.border }]}
-            >
-              <View style={[styles.weaponIcon, { backgroundColor: `${colors.primary}12` }]}>
-                <Target size={16} color={colors.primary} />
-              </View>
-              <View style={styles.weaponInfo}>
-                <Text style={[styles.weaponLabel, { color: colors.textMuted }]}>
+            {/* Weapon Selection (ALWAYS editable) */}
+            <Animated.View entering={FadeInDown.duration(300).delay(50)} style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Crosshair size={14} color={colors.textMuted} />
+                <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>
                   {t('session.weapon', 'Weapon')}
                 </Text>
-                <Text style={[styles.weaponName, { color: colors.text }]} numberOfLines={1}>
-                  {session.weapon_name || t('session.noWeapon', 'No weapon')}
-                </Text>
               </View>
+
+              {loadingWeapons ? (
+                <View style={[styles.weaponCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                  <ActivityIndicator size="small" color={colors.textMuted} />
+                </View>
+              ) : (
+                <TouchableOpacity
+                  style={[styles.weaponCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+                  onPress={() => setShowWeaponPicker(!showWeaponPicker)}
+                  activeOpacity={0.7}
+                >
+                  <View style={[styles.weaponIcon, { backgroundColor: `${colors.primary}12` }]}>
+                    <Crosshair size={16} color={colors.primary} />
+                  </View>
+                  <View style={styles.weaponInfo}>
+                    <Text style={[styles.weaponName, { color: colors.text }]} numberOfLines={1}>
+                      {selectedWeapon?.name || t('session.selectWeapon', 'Select Weapon')}
+                    </Text>
+                    {selectedWeapon?.caliber && (
+                      <Text style={[styles.weaponCaliber, { color: colors.textMuted }]}>
+                        {selectedWeapon.caliber}
+                      </Text>
+                    )}
+                  </View>
+                  <ChevronDown size={18} color={colors.textMuted} />
+                </TouchableOpacity>
+              )}
+
+              {/* Weapon Picker */}
+              {showWeaponPicker && weapons.length > 0 && (
+                <View style={[styles.weaponPickerContainer, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                  {weapons.map((weapon) => (
+                    <TouchableOpacity
+                      key={weapon.id}
+                      style={[
+                        styles.weaponPickerItem,
+                        selectedWeaponId === weapon.id && { backgroundColor: `${colors.primary}12` },
+                      ]}
+                      onPress={() => handleWeaponSelect(weapon.id)}
+                    >
+                      <Text
+                        style={[
+                          styles.weaponPickerName,
+                          { color: selectedWeaponId === weapon.id ? colors.primary : colors.text },
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {weapon.name}
+                      </Text>
+                      {weapon.caliber && (
+                        <Text style={[styles.weaponPickerCaliber, { color: colors.textMuted }]}>
+                          {weapon.caliber}
+                        </Text>
+                      )}
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
             </Animated.View>
 
             {/* Distance */}
@@ -193,15 +282,15 @@ export function DrillConfigSheet({ visible, onClose, session, drill, onSessionUp
                 <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>
                   {t('session.distance', 'Distance')}
                 </Text>
-                {isDistanceLocked && <Lock size={11} color={colors.textMuted} />}
-                {!isDistanceLocked && distanceCategory && (
+                {(isLocked || isDistanceLocked) && <Lock size={11} color={colors.textMuted} />}
+                {!isLocked && distanceCategory && (
                   <Text style={[styles.rangeLabel, { color: colors.blue }]}>{RANGE_LABELS[distanceCategory]}</Text>
                 )}
               </View>
 
-              {isDistanceLocked ? (
+              {isLocked ? (
                 <View style={[styles.lockedValue, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                  <Text style={[styles.lockedValueText, { color: colors.text }]}>{drill?.distance_m}m</Text>
+                  <Text style={[styles.lockedValueText, { color: colors.text }]}>{drill?.distance_m ?? session.soldier_distance_m ?? 25}m</Text>
                   <Text style={[styles.lockedHint, { color: colors.textMuted }]}>
                     {t('training.lockedValue', 'Locked')}
                   </Text>
@@ -274,12 +363,12 @@ export function DrillConfigSheet({ visible, onClose, session, drill, onSessionUp
                   <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>
                     {t('session.rounds', 'Rounds')}
                   </Text>
-                  {isBulletsLocked && <Lock size={11} color={colors.textMuted} />}
+                  {(isLocked || isBulletsLocked) && <Lock size={11} color={colors.textMuted} />}
                 </View>
 
-                {isBulletsLocked ? (
+                {isLocked ? (
                   <View style={[styles.lockedValue, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                    <Text style={[styles.lockedValueText, { color: colors.text }]}>{drill?.rounds_per_shooter}</Text>
+                    <Text style={[styles.lockedValueText, { color: colors.text }]}>{drill?.rounds_per_shooter ?? session.soldier_bullets ?? 5}</Text>
                     <Text style={[styles.lockedHint, { color: colors.textMuted }]}>
                       {t('training.lockedValue', 'Locked')}
                     </Text>
@@ -318,13 +407,13 @@ export function DrillConfigSheet({ visible, onClose, session, drill, onSessionUp
                 <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>
                   {t('session.position', 'Position')}
                 </Text>
-                {isPositionLocked && <Lock size={11} color={colors.textMuted} />}
+                {(isLocked || isPositionLocked) && <Lock size={11} color={colors.textMuted} />}
               </View>
 
-              {isPositionLocked ? (
+              {isLocked ? (
                 <View style={[styles.lockedValue, { backgroundColor: colors.card, borderColor: colors.border }]}>
                   <Text style={[styles.lockedValueText, { color: colors.text }]}>
-                    {POSITIONS.find((p) => p.value === drill?.position)?.label || drill?.position}
+                    {POSITIONS.find((p) => p.value === (drill?.position ?? session.soldier_position))?.label || drill?.position || session.soldier_position || 'Standing'}
                   </Text>
                   <Text style={[styles.lockedHint, { color: colors.textMuted }]}>
                     {t('training.lockedValue', 'Locked')}
@@ -360,34 +449,32 @@ export function DrillConfigSheet({ visible, onClose, session, drill, onSessionUp
             </Animated.View>
           </ScrollView>
 
-          {/* Save button (only for non-locked with changes) */}
-          {!isLocked && (
-            <View style={[styles.footer, { backgroundColor: colors.background, paddingBottom: insets.bottom + 12 }]}>
-              <TouchableOpacity
-                style={[
-                  styles.saveBtn,
-                  {
-                    backgroundColor: hasChanges ? colors.text : colors.secondary,
-                  },
-                ]}
-                onPress={hasChanges ? handleSave : onClose}
-                disabled={saving}
-              >
-                {saving ? (
-                  <ActivityIndicator color={colors.background} size="small" />
-                ) : (
-                  <Text
-                    style={[
-                      styles.saveBtnText,
-                      { color: hasChanges ? colors.background : colors.textMuted },
-                    ]}
-                  >
-                    {hasChanges ? t('common.save', 'Save') : t('common.close', 'Close')}
-                  </Text>
-                )}
-              </TouchableOpacity>
-            </View>
-          )}
+          {/* Save button */}
+          <View style={[styles.footer, { backgroundColor: colors.background, paddingBottom: insets.bottom + 12 }]}>
+            <TouchableOpacity
+              style={[
+                styles.saveBtn,
+                {
+                  backgroundColor: hasChanges ? colors.text : colors.secondary,
+                },
+              ]}
+              onPress={handleSave}
+              disabled={saving}
+            >
+              {saving ? (
+                <ActivityIndicator color={colors.background} size="small" />
+              ) : (
+                <Text
+                  style={[
+                    styles.saveBtnText,
+                    { color: hasChanges ? colors.background : colors.textMuted },
+                  ]}
+                >
+                  {hasChanges ? t('common.save', 'Save') : t('common.close', 'Close')}
+                </Text>
+              )}
+            </TouchableOpacity>
+          </View>
         </Pressable>
       </Pressable>
     </Modal>
@@ -461,6 +548,25 @@ const styles = StyleSheet.create({
     paddingTop: 16,
     gap: 20,
   },
+  section: {
+    gap: 10,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  sectionTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+  },
+  rangeLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    marginLeft: 'auto',
+  },
   weaponCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -481,35 +587,34 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: 2,
   },
-  weaponLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
   weaponName: {
     fontSize: 15,
     fontWeight: '700',
     letterSpacing: -0.2,
   },
-  section: {
-    gap: 10,
+  weaponCaliber: {
+    fontSize: 12,
+    fontWeight: '500',
   },
-  sectionHeader: {
+  weaponPickerContainer: {
+    borderRadius: 12,
+    borderWidth: 1,
+    overflow: 'hidden',
+    marginTop: 4,
+  },
+  weaponPickerItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    paddingHorizontal: 14,
   },
-  sectionTitle: {
-    fontSize: 12,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
-  },
-  rangeLabel: {
-    fontSize: 11,
+  weaponPickerName: {
+    fontSize: 14,
     fontWeight: '600',
-    marginLeft: 'auto',
+  },
+  weaponPickerCaliber: {
+    fontSize: 12,
   },
   counter: {
     flexDirection: 'row',

@@ -8,15 +8,11 @@ export type { DrillGoal };
 // ============================================================================
 
 /**
- * Execution Policy - Commander's intent for how strictly a drill must be followed.
+ * Execution Policy - Always locked. Soldiers execute exactly as commander defined.
+ * Only weapon selection is editable.
  *
- * This is NOT about whether execution happens.
- * Training decides how strict execution is.
- *
- * @example
- * - locked: Military qualification - execute EXACTLY as defined
- * - guided: Training drill - defaults provided, adjustments allowed
- * - free: Open practice - drill is just a label, full freedom
+ * @deprecated Legacy types 'guided' and 'free' kept for backward compatibility
+ *             but all new drills use 'locked' only.
  */
 export type ExecutionPolicy = 'locked' | 'guided' | 'free';
 

@@ -90,13 +90,8 @@ function SessionCard({ session, index, total, onRemove, onMove, colors }: Sessio
       ? t('training.squadEngagement')
       : t('session.engagement');
 
-  // Execution policy display
-  const policy = session.execution_policy || 'locked';
-  const policyConfig = {
-    locked: { icon: Lock, color: colors.blue, label: t('training.locked') },
-    guided: { icon: Sparkles, color: colors.green, label: t('training.guided') },
-    free: { icon: Unlock, color: colors.orange, label: t('training.free') },
-  }[policy];
+  // Execution policy display - always locked (soldiers can only change weapon)
+  const policyConfig = { icon: Lock, color: colors.blue, label: t('training.locked') };
   const PolicyIcon = policyConfig.icon;
 
   // Engagement mode icon
@@ -238,7 +233,8 @@ function AddSessionSheet({ visible, onClose, onAdd }: AddSessionSheetProps) {
   const [drillName, setDrillName] = useState('');
   const [purpose, setPurpose] = useState<SessionPurpose>('grouping');
   const [engagementMode, setEngagementMode] = useState<'solo' | 'squad'>('solo');
-  const [executionPolicy, setExecutionPolicy] = useState<ExecutionPolicy>('locked');
+  // Always locked - soldiers can only change weapon
+  const executionPolicy: ExecutionPolicy = 'locked';
   const [context, setContext] = useState<SessionContextState>(EMPTY_CONTEXT);
   const [distanceCategory, setDistanceCategory] = useState<RangeCategory | null>(null);
   const [targetCount, setTargetCount] = useState(1);
@@ -256,17 +252,12 @@ function AddSessionSheet({ visible, onClose, onAdd }: AddSessionSheetProps) {
     }
   }, []);
 
-  const handlePolicySelect = useCallback((p: ExecutionPolicy) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setExecutionPolicy(p);
-  }, []);
+  // Policy is always 'locked' - no selection needed
+  // Soldiers can only change weapon, all other drill params are set by commander
 
   const handleEngagementModeSelect = useCallback((mode: 'solo' | 'squad') => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setEngagementMode(mode);
-    if (mode === 'squad') {
-      setExecutionPolicy('locked');
-    }
   }, []);
 
   const handleUpdateContext = useCallback((partial: Partial<SessionContextState>) => {
@@ -277,7 +268,6 @@ function AddSessionSheet({ visible, onClose, onAdd }: AddSessionSheetProps) {
     setDrillName('');
     setPurpose('grouping');
     setEngagementMode('solo');
-    setExecutionPolicy('locked');
     setContext(EMPTY_CONTEXT);
     setDistanceCategory(null);
     setTargetCount(1);
@@ -369,7 +359,6 @@ function AddSessionSheet({ visible, onClose, onAdd }: AddSessionSheetProps) {
     setDrillName('');
     setPurpose('grouping');
     setEngagementMode('solo');
-    setExecutionPolicy('locked');
     setContext(EMPTY_CONTEXT);
     setDistanceCategory(null);
     setTargetCount(1);
@@ -492,75 +481,7 @@ function AddSessionSheet({ visible, onClose, onAdd }: AddSessionSheetProps) {
                 </>
               )}
 
-              {/* Flexibility */}
-              <View style={styles.formRow}>
-                <View style={styles.formRowLabel}>
-                  <Sparkles size={14} color={colors.textMuted} />
-                  <Text style={[styles.formRowText, { color: colors.text }]}>{t('training.flexibility')}</Text>
-                </View>
-                <View style={[styles.inlineSegment, { backgroundColor: colors.background }]}>
-                  <Pressable
-                    style={[
-                      styles.inlineOption,
-                      executionPolicy === 'locked' && { backgroundColor: colors.blue },
-                    ]}
-                    onPress={() => {
-                      Haptics.selectionAsync();
-                      handlePolicySelect('locked');
-                    }}
-                  >
-                    <Lock size={11} color={executionPolicy === 'locked' ? '#fff' : colors.textMuted} />
-                    <Text
-                      style={[
-                        styles.inlineOptionText,
-                        { color: executionPolicy === 'locked' ? '#fff' : colors.textMuted },
-                      ]}
-                    >
-                      {t('training.locked')}
-                    </Text>
-                  </Pressable>
-                  <Pressable
-                    style={[
-                      styles.inlineOption,
-                      executionPolicy === 'guided' && { backgroundColor: colors.green },
-                    ]}
-                    onPress={() => {
-                      Haptics.selectionAsync();
-                      handlePolicySelect('guided');
-                    }}
-                  >
-                    <Sparkles size={11} color={executionPolicy === 'guided' ? '#fff' : colors.textMuted} />
-                    <Text
-                      style={[
-                        styles.inlineOptionText,
-                        { color: executionPolicy === 'guided' ? '#fff' : colors.textMuted },
-                      ]}
-                    >
-                      {t('training.guided')}
-                    </Text>
-                  </Pressable>
-                  <Pressable
-                    style={[
-                      styles.inlineOption,
-                      executionPolicy === 'free' && { backgroundColor: colors.orange },
-                    ]}
-                    onPress={() => {
-                      Haptics.selectionAsync();
-                      handlePolicySelect('free');
-                    }}
-                  >
-                    <Unlock size={11} color={executionPolicy === 'free' ? '#fff' : colors.textMuted} />
-                    <Text
-                      style={[
-                        styles.inlineOptionText,
-                        { color: executionPolicy === 'free' ? '#fff' : colors.textMuted },
-                      ]}
-                    >
-                      {t('training.free')}
-                    </Text>
-                  </Pressable>
-                </View>
-              </View>
+              {/* Policy is always 'locked' - soldiers can only change weapon */}
 
               {/* Target count + Repetitions (engagement only) */}
               {purpose === 'engagement' && (
@@ -628,13 +549,11 @@ function AddSessionSheet({ visible, onClose, onAdd }: AddSessionSheetProps) {
             </View>
           </View>
 
-          {/* ── Configuration (locked/guided solo) ── */}
-          {executionPolicy !== 'free' && effectiveEngagementMode !== 'squad' && (
+          {/* ── Configuration (solo) ── */}
+          {effectiveEngagementMode !== 'squad' && (
             <View style={styles.formSection}>
               <Text style={[styles.formLabel, { color: colors.textMuted }]}>
-                {executionPolicy === 'guided'
-                  ? t('training.suggestedDefaultsOptional')
-                  : t('training.configuration')}
+                {t('training.configuration')}
               </Text>
               <View style={[styles.formCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
                 <SessionContextStep
@@ -651,7 +570,7 @@ function AddSessionSheet({ visible, onClose, onAdd }: AddSessionSheetProps) {
           )}
 
           {/* ── Squad configuration ── */}
-          {effectiveEngagementMode === 'squad' && executionPolicy !== 'free' && (
+          {effectiveEngagementMode === 'squad' && (
             <View style={styles.formSection}>
               <Text style={[styles.formLabel, { color: colors.textMuted }]}>
                 {t('training.configuration')}
@@ -682,29 +601,6 @@ function AddSessionSheet({ visible, onClose, onAdd }: AddSessionSheetProps) {
             </View>
           )}
 
-          {/* Free mode notice */}
-          {executionPolicy === 'free' && effectiveEngagementMode !== 'squad' && (
-            <View
-              style={[
-                styles.notice,
-                {
-                  backgroundColor: `${colors.orange}10`,
-                  borderColor: colors.orange,
-                  borderWidth: 1,
-                  borderRadius: 12,
-                  padding: 16,
-                },
-              ]}
-            >
-              <Unlock size={18} color={colors.orange} />
-              <View style={styles.noticeContent}>
-                <Text style={[styles.noticeTitle, { color: colors.text }]}>{t('training.fullFreedomMode')}</Text>
-                <Text style={[styles.noticeDesc, { color: colors.textMuted }]}>
-                  {t('training.fullFreedomDescription')}
-                </Text>
-              </View>
-            </View>
-          )}
         </ScrollView>
 
         {/* Footer */}

@@ -163,14 +163,6 @@ export function SoloSessionView({
         />
       )}
 
-      {/* Weapon bar (if no drill) */}
-      {!hasDrill && session.weapon_name && (
-        <View style={[styles.weaponBar, { backgroundColor: colors.card }]}>
-          <Target size={14} color={colors.primary} />
-          <Text style={[styles.weaponBarText, { color: colors.text }]}>{session.weapon_name}</Text>
-        </View>
-      )}
-
       {/* Hero target */}
       {targets.length > 0 && (
         <Animated.View entering={FadeIn.duration(300)} style={styles.heroContainer}>
@@ -285,21 +277,6 @@ const styles = StyleSheet.create({
   },
   weatherLoadingText: {
     fontSize: 13,
-  },
-  weaponBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    marginHorizontal: 16,
-    marginBottom: 12,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 10,
-  },
-  weaponBarText: {
-    fontSize: 14,
-    fontWeight: '600',
   },
   heroContainer: {
     paddingHorizontal: 16,

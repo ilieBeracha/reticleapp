@@ -138,13 +138,23 @@ export async function getUserDefaultWeaponId(): Promise<string | null> {
 
 /**
  * Get user's active session for a specific training (if any)
+ * @param trainingId - The training ID to check
+ * @param userId - Optional pre-fetched user ID to avoid redundant auth calls
  */
-export async function getMyActiveSessionForTraining(trainingId: string): Promise<SessionWithDetails | null> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+export async function getMyActiveSessionForTraining(
+  trainingId: string,
+  userId?: string
+): Promise<SessionWithDetails | null> {
+  // Use provided userId or fetch from auth (for backward compatibility)
+  let effectiveUserId = userId;
+  if (!effectiveUserId) {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    effectiveUserId = user?.id;
+  }
 
-  if (!user) {
+  if (!effectiveUserId) {
     return null;
   }
 
@@ -153,7 +163,7 @@ export async function getMyActiveSessionForTraining(trainingId: string): Promise
     .select(SESSION_SELECT_WITH_WEAPON)
 
     .eq('training_id', trainingId)
-    .eq('user_id', user.id)
+    .eq('user_id', effectiveUserId)
     .eq('status', SESSION_STATUS.ACTIVE)
     .maybeSingle();
 
@@ -232,20 +242,26 @@ export async function getMyActivePersonalSession(): Promise<SessionWithDetails |
 /**
  * Get ALL active sessions for the current user (not just the most recent).
  * Used for orphan detection and single-session enforcement.
+ * @param userId - Optional pre-fetched user ID to avoid redundant auth calls
  */
-export async function getMyActiveSessionsAll(): Promise<SessionWithDetails[]> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+export async function getMyActiveSessionsAll(userId?: string): Promise<SessionWithDetails[]> {
+  // Use provided userId or fetch from auth (for backward compatibility)
+  let effectiveUserId = userId;
+  if (!effectiveUserId) {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    effectiveUserId = user?.id;
+  }
 
-  if (!user) {
+  if (!effectiveUserId) {
     return [];
   }
 
   const { data, error } = await supabase
     .from('sessions')
     .select(SESSION_SELECT_WITH_WEAPON)
-    .eq('user_id', user.id)
+    .eq('user_id', effectiveUserId)
     .eq('status', SESSION_STATUS.ACTIVE)
     .order('started_at', { ascending: false });
 

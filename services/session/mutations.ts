@@ -85,7 +85,14 @@ export interface SetupSessionParams {
  * Currently creates a new session each time, but could be extended
  * to reuse sessions with matching setup parameters.
  */
-export async function getOrCreateSetupSession(params: SetupSessionParams): Promise<SessionWithDetails> {
+export async function getOrCreateSetupSession(
+  params: SetupSessionParams,
+  options?: {
+    prefetchedTrainingSession?: SessionWithDetails | null;
+    /** Pre-fetched user ID to avoid redundant auth calls */
+    userId?: string;
+  },
+): Promise<SessionWithDetails> {
   // Convert setup params to BaseSessionConfig
   const config: BaseSessionConfig = {
     weapon_id: params.weapon_id,
@@ -103,9 +110,7 @@ export async function getOrCreateSetupSession(params: SetupSessionParams): Promi
     soldier_position: params.soldier_position ?? null,
   };
 
-  // For now, delegate to createSession
-  // Future: Could check for existing matching session and reuse
-  return createSession(config);
+  return createSession(config, options);
 }
 
 /**
@@ -127,104 +132,114 @@ export async function getOrCreateSetupSession(params: SetupSessionParams): Promi
  * - Sessions older than 24h are auto-cancelled (no data saved)
  * - This prevents orphaned sessions from accumulating
  */
-export async function createSession(params: CreateSessionParams | BaseSessionConfig): Promise<SessionWithDetails> {
+export async function createSession(
+  params: CreateSessionParams | BaseSessionConfig,
+  options?: {
+    prefetchedTrainingSession?: SessionWithDetails | null;
+    /** Pre-fetched user ID to avoid redundant auth calls */
+    userId?: string;
+  },
+): Promise<SessionWithDetails> {
   // Normalize to BaseSessionConfig
   const config = normalizeToBaseConfig(params);
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // Use provided userId or fetch from auth
+  let userId = options?.userId;
+  if (!userId) {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    userId = user?.id;
+  }
 
-  if (!user) {
+  if (!userId) {
     throw new Error('Not authenticated');
   }
 
   // =========================================================================
-  // SINGLE ACTIVE SESSION ENFORCEMENT
+  // FAST PATH: For training sessions, try reusing an existing active session
+  // before any cleanup. Handles the common "go back + re-enter" case instantly.
+  // Uses pre-fetched data when available (avoids redundant DB roundtrip).
   // =========================================================================
-  // Before creating a new session, handle any existing active sessions.
-  // This prevents orphaned sessions from accumulating.
-  const existingActiveSessions = await getMyActiveSessionsAll();
-
-  if (existingActiveSessions.length > 0) {
-    console.log(`[createSession] Found ${existingActiveSessions.length} existing active session(s), cleaning up...`);
-
-    for (const existingSession of existingActiveSessions) {
-      // Sessions older than 24h are stale - cancel them (don't count as completed)
-      if (shouldAutoCancelSession(existingSession)) {
-        console.log(`[createSession] Auto-cancelling stale session ${existingSession.id} (>24h old)`);
-        await supabase
-          .from('sessions')
-          .update({
-            status: SESSION_STATUS.CANCELLED,
-            ended_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', existingSession.id);
-      } else {
-        // Recent sessions - end them properly (mark as completed)
-        console.log(`[createSession] Auto-ending active session ${existingSession.id}`);
-        await supabase
-          .from('sessions')
-          .update({
-            status: SESSION_STATUS.COMPLETED,
-            ended_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', existingSession.id);
+  if (config.training_id) {
+    const existingSession =
+      options?.prefetchedTrainingSession !== undefined
+        ? options.prefetchedTrainingSession
+        : await getMyActiveSessionForTraining(config.training_id, userId);
+    if (existingSession) {
+      if (!config.drill_id || existingSession.drill_id === config.drill_id) {
+        // Same drill (or unspecified) → reuse immediately, no cleanup needed
+        return existingSession;
       }
+      // Different drill → end old session before creating new one
+      await supabase
+        .from('sessions')
+        .update({
+          status: SESSION_STATUS.COMPLETED,
+          ended_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', existingSession.id);
     }
   }
 
-  // DRILL-FIRST: Every session must have a drill source
+  // =========================================================================
+  // SINGLE ACTIVE SESSION ENFORCEMENT + DRILL VALIDATION (parallelized)
+  // =========================================================================
   const hasCustomConfig =
     config.drill_config && config.drill_config.distance_m > 0 && config.drill_config.rounds_per_shooter > 0;
 
+  // Run cleanup check and drill validation in parallel — they're independent reads
+  const needsDrillOwnershipCheck = config.training_id && config.drill_id;
+  const needsDrillCountCheck = config.training_id && !config.drill_id && !hasCustomConfig;
+
+  const [existingActiveSessions, drillCheckResult] = await Promise.all([
+    getMyActiveSessionsAll(userId),
+    needsDrillOwnershipCheck
+      ? supabase.from('training_drills').select('training_id').eq('id', config.drill_id!).single()
+      : needsDrillCountCheck
+        ? supabase.from('training_drills').select('*', { count: 'exact', head: true }).eq('training_id', config.training_id!)
+        : Promise.resolve(null),
+  ]);
+
+  // Process cleanup results
+  if (existingActiveSessions.length > 0) {
+    console.log(`[createSession] Found ${existingActiveSessions.length} existing active session(s), cleaning up...`);
+
+    await Promise.all(
+      existingActiveSessions.map((existingSession) => {
+        const shouldCancel = shouldAutoCancelSession(existingSession);
+        console.log(
+          `[createSession] ${shouldCancel ? 'Auto-cancelling stale' : 'Auto-ending'} session ${existingSession.id}`
+        );
+        return supabase
+          .from('sessions')
+          .update({
+            status: shouldCancel ? SESSION_STATUS.CANCELLED : SESSION_STATUS.COMPLETED,
+            ended_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', existingSession.id);
+      })
+    );
+  }
+
+  // DRILL-FIRST: Every session must have a drill source
   if (!config.drill_id && !config.drill_template_id && !hasCustomConfig) {
     throw new Error('A drill configuration is required. Use custom drill, training drill, or drill template.');
   }
 
-  // If joining a training, enforce drill-driven sessions and avoid drill mismatches
-  if (config.training_id) {
-    const existingSession = await getMyActiveSessionForTraining(config.training_id);
-
-    // If there's already an active session for this training, only allow:
-    // - continuing it (no drill specified), or
-    // - continuing it if the requested drill matches
-    if (existingSession) {
-      if (!config.drill_id || existingSession.drill_id === config.drill_id) {
-        return existingSession;
-      }
-
-      const existingLabel = existingSession.drill_name || existingSession.training_title || 'this training';
-      throw new Error(
-        `You already have an active session for "${existingLabel}". End it before starting a different drill.`
-      );
+  // Process drill validation results (queries already ran in parallel above)
+  if (needsDrillOwnershipCheck && drillCheckResult) {
+    const { data: drillRow, error: drillError } = drillCheckResult as { data: { training_id: string } | null; error: any };
+    if (drillError) throw drillError;
+    if (drillRow?.training_id !== config.training_id) {
+      throw new Error('Selected drill does not belong to this training.');
     }
-
-    // No active session yet: if this training has drills, require selecting a drill
-    // (unless user provided a custom drill_config — that's a custom session within the training)
-    if (!config.drill_id && !hasCustomConfig) {
-      const { count, error: drillsCountError } = await supabase
-        .from('training_drills')
-        .select('*', { count: 'exact', head: true })
-        .eq('training_id', config.training_id);
-
-      if (!drillsCountError && (count ?? 0) > 0) {
-        throw new Error('This training uses drills. Start your session from a specific drill.');
-      }
-    } else if (config.drill_id) {
-      // Validate drill belongs to training (prevents mixing drills across trainings)
-      const { data: drillRow, error: drillError } = await supabase
-        .from('training_drills')
-        .select('training_id')
-        .eq('id', config.drill_id)
-        .single();
-
-      if (drillError) throw drillError;
-      if (drillRow?.training_id !== config.training_id) {
-        throw new Error('Selected drill does not belong to this training.');
-      }
+  } else if (needsDrillCountCheck && drillCheckResult) {
+    const { count, error: drillsCountError } = drillCheckResult as { count: number | null; error: any };
+    if (!drillsCountError && (count ?? 0) > 0) {
+      throw new Error('This training uses drills. Start your session from a specific drill.');
     }
   }
 
@@ -261,7 +276,7 @@ export async function createSession(params: CreateSessionParams | BaseSessionCon
   const { data, error } = await supabase
     .from('sessions')
     .insert({
-      user_id: user.id,
+      user_id: userId,
       team_id: config.team_id,
       training_id: config.training_id,
       weapon_id: config.weapon_id, // Link to user's weapon profile
@@ -404,6 +419,8 @@ export async function updateSession(
     soldier_bullets?: number | null;
     /** Soldier's chosen position (when commander allows flexibility) */
     soldier_position?: string | null;
+    /** Change weapon for session (always allowed) */
+    weapon_id?: string;
   }
 ) {
   const updatePayload: Record<string, any> = {
@@ -440,6 +457,10 @@ export async function updateSession(
 
   if (typeof updates.soldier_position !== 'undefined') {
     updatePayload.soldier_position = updates.soldier_position;
+  }
+
+  if (typeof updates.weapon_id !== 'undefined') {
+    updatePayload.weapon_id = updates.weapon_id;
   }
 
   // Return a fully-hydrated session payload so callers don't lose drill context after updates.
