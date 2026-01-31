@@ -83,6 +83,10 @@ export interface DrillConfig {
   target_count?: number | null;
   /** Measurement scope: individual or collective */
   measurement_scope?: 'individual' | 'collective' | null;
+  /** Available from date (for squad drills with date range) */
+  available_from?: string | null;
+  /** Available until date (for squad drills with date range) */
+  available_until?: string | null;
 }
 
 /**

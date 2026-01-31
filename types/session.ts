@@ -396,6 +396,34 @@ export interface CreateTargetParams {
 }
 
 // ============================================================================
+// MISS ANALYZER - Normalized miss point data
+// ============================================================================
+
+/**
+ * A single miss point in normalized coordinates.
+ * Used by the Miss Analyzer to record where shots missed the target.
+ *
+ * Coordinate system:
+ * - Center of target = (0, 0)
+ * - x: -1 (far left) to +1 (far right)
+ * - y: -1 (far below center) to +1 (far above center)
+ * - distance: 0 (dead center) to 1 (edge of target)
+ * - angle_deg: compass bearing, 0 = up (12 o'clock), clockwise
+ *
+ * Resolution-independent — no pixel values stored.
+ */
+export interface MissPoint {
+  /** Horizontal offset from center: -1 (left) to +1 (right) */
+  x: number;
+  /** Vertical offset from center: -1 (below) to +1 (above) */
+  y: number;
+  /** Normalized radial distance from center: 0 to 1 */
+  distance: number;
+  /** Compass bearing in degrees: 0 = up, 90 = right, 180 = down, 270 = left */
+  angle_deg: number;
+}
+
+// ============================================================================
 // TARGET RESULTS
 // ============================================================================
 
@@ -418,6 +446,11 @@ export interface PaperTargetResult {
    * If null for scanned targets: don't show accuracy (it would always be ~100%)
    */
   actual_shots_declared: number | null;
+  /**
+   * Miss Analyzer data: array of normalized miss coordinates.
+   * NULL = not analyzed. [] = analyzed, no misses recorded.
+   */
+  miss_points?: MissPoint[] | null;
 }
 
 export interface TacticalTargetResult {
@@ -428,6 +461,11 @@ export interface TacticalTargetResult {
   is_stage_cleared: boolean;
   time_seconds: number | null;
   notes: string | null;
+  /**
+   * Miss Analyzer data: array of normalized miss coordinates.
+   * NULL = not analyzed. [] = analyzed, no misses recorded.
+   */
+  miss_points?: MissPoint[] | null;
 }
 
 export interface CreatePaperResultParams {
@@ -443,6 +481,8 @@ export interface CreatePaperResultParams {
   notes?: string | null;
   /** Optional user-declared actual shots for scanned targets */
   actual_shots_declared?: number | null;
+  /** Miss Analyzer: normalized miss coordinates */
+  miss_points?: MissPoint[] | null;
 }
 
 export interface CreateTacticalResultParams {
@@ -452,6 +492,8 @@ export interface CreateTacticalResultParams {
   is_stage_cleared?: boolean;
   time_seconds?: number | null;
   notes?: string | null;
+  /** Miss Analyzer: normalized miss coordinates */
+  miss_points?: MissPoint[] | null;
 }
 
 export interface SessionTargetWithResults extends SessionTarget {

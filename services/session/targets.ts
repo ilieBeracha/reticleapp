@@ -3,6 +3,7 @@ import type {
     CreatePaperResultParams,
     CreateTacticalResultParams,
     CreateTargetParams,
+    MissPoint,
     PaperTargetResult,
     SessionTarget,
     SessionTargetWithResults,
@@ -107,9 +108,7 @@ export async function savePaperTargetResult(params: CreatePaperResultParams): Pr
   if (existing) {
     console.log('[SessionService] Updating existing paper result:', existing.id);
     // Update existing result
-    const { data, error } = await supabase
-      .from('paper_target_results')
-      .update({
+    const updatePayload: Record<string, any> = {
         paper_type: params.paper_type,
         bullets_fired: params.bullets_fired,
         hits_total: params.hits_total ?? null,
@@ -120,7 +119,13 @@ export async function savePaperTargetResult(params: CreatePaperResultParams): Pr
         scanned_image_url: params.scanned_image_url ?? null,
         notes: params.notes ?? null,
         actual_shots_declared: params.actual_shots_declared ?? null,
-      })
+    };
+    if (params.miss_points !== undefined) {
+      updatePayload.miss_points = params.miss_points;
+    }
+    const { data, error } = await supabase
+      .from('paper_target_results')
+      .update(updatePayload)
       .eq('id', existing.id)
       .select()
       .single();
@@ -135,21 +140,25 @@ export async function savePaperTargetResult(params: CreatePaperResultParams): Pr
 
   console.log('[SessionService] Inserting new paper result');
   // Insert new result
+  const insertPayload: Record<string, any> = {
+    session_target_id: params.session_target_id,
+    paper_type: params.paper_type,
+    bullets_fired: params.bullets_fired,
+    hits_total: params.hits_total ?? null,
+    hits_inside_scoring: params.hits_inside_scoring ?? null,
+    dispersion_cm: params.dispersion_cm ?? null,
+    offset_right_cm: params.offset_right_cm ?? null,
+    offset_up_cm: params.offset_up_cm ?? null,
+    scanned_image_url: params.scanned_image_url ?? null,
+    notes: params.notes ?? null,
+    actual_shots_declared: params.actual_shots_declared ?? null,
+  };
+  if (params.miss_points !== undefined) {
+    insertPayload.miss_points = params.miss_points;
+  }
   const { data, error } = await supabase
     .from('paper_target_results')
-    .insert({
-      session_target_id: params.session_target_id,
-      paper_type: params.paper_type,
-      bullets_fired: params.bullets_fired,
-      hits_total: params.hits_total ?? null,
-      hits_inside_scoring: params.hits_inside_scoring ?? null,
-      dispersion_cm: params.dispersion_cm ?? null,
-      offset_right_cm: params.offset_right_cm ?? null,
-      offset_up_cm: params.offset_up_cm ?? null,
-      scanned_image_url: params.scanned_image_url ?? null,
-      notes: params.notes ?? null,
-      actual_shots_declared: params.actual_shots_declared ?? null,
-    })
+    .insert(insertPayload)
     .select()
     .single();
 
@@ -207,17 +216,25 @@ export async function saveTacticalTargetResult(params: CreateTacticalResultParam
     .eq('session_target_id', params.session_target_id)
     .single();
 
+  // Build update/insert payload
+  const payload: Record<string, unknown> = {
+    bullets_fired: params.bullets_fired,
+    hits: params.hits,
+    is_stage_cleared: params.is_stage_cleared ?? false,
+    time_seconds: params.time_seconds ?? null,
+    notes: params.notes ?? null,
+  };
+
+  // Only include miss_points if explicitly provided (to avoid overwriting with undefined)
+  if (params.miss_points !== undefined) {
+    payload.miss_points = params.miss_points;
+  }
+
   if (existing) {
     // Update existing result
     const { data, error } = await supabase
       .from('tactical_target_results')
-      .update({
-        bullets_fired: params.bullets_fired,
-        hits: params.hits,
-        is_stage_cleared: params.is_stage_cleared ?? false,
-        time_seconds: params.time_seconds ?? null,
-        notes: params.notes ?? null,
-      })
+      .update(payload)
       .eq('id', existing.id)
       .select()
       .single();
@@ -231,11 +248,7 @@ export async function saveTacticalTargetResult(params: CreateTacticalResultParam
     .from('tactical_target_results')
     .insert({
       session_target_id: params.session_target_id,
-      bullets_fired: params.bullets_fired,
-      hits: params.hits,
-      is_stage_cleared: params.is_stage_cleared ?? false,
-      time_seconds: params.time_seconds ?? null,
-      notes: params.notes ?? null,
+      ...payload,
     })
     .select()
     .single();
@@ -574,5 +587,35 @@ export async function updateSessionTarget(
   const { data, error } = await supabase.from('session_targets').update(updates).eq('id', targetId).select().single();
 
   if (error) throw error;
+  return data;
+}
+
+// ============================================================================
+// MISS ANALYZER - Save miss points to an existing paper_target_result
+// ============================================================================
+
+/**
+ * Save miss points for a paper target result (Miss Analyzer).
+ * Updates the `miss_points` JSONB column on an existing paper_target_result row.
+ *
+ * @param paperResultId - The paper_target_results.id to update
+ * @param missPoints - Array of normalized MissPoint objects (or null to clear)
+ * @returns The updated PaperTargetResult
+ */
+export async function saveMissPoints(
+  paperResultId: string,
+  missPoints: MissPoint[] | null
+): Promise<PaperTargetResult> {
+  const { data, error } = await supabase
+    .from('paper_target_results')
+    .update({ miss_points: missPoints })
+    .eq('id', paperResultId)
+    .select()
+    .single();
+
+  if (error) {
+    console.error('[Targets] Error saving miss points:', error);
+    throw error;
+  }
   return data;
 }

@@ -11,7 +11,7 @@
  *   - Drills tab: Active session banner, planned drills list
  *   - Results tab: Summary card, completed sessions history
  */
-import { useFocusEffect } from '@react-navigation/native';
+import { MissMarker } from '@/components/targets/MissMarker';
 import { TrainingSettingsModal } from '@/components/training/detail/TrainingSettingsModal';
 import { SquadInvitationBanner } from '@/components/training/SquadInvitationBanner';
 import { SquadLobbyBanner } from '@/components/training/SquadLobbyBanner';
@@ -25,12 +25,14 @@ import { requireCurrentUserId } from '@/services/authService';
 import { getOrCreateSetupSession } from '@/services/session/mutations';
 import { createEngagement } from '@/services/session/participants';
 import { getActiveSquadEngagement, getMyActiveSessionForTraining, getTrainingSessionsWithStats } from '@/services/session/queries';
+import { saveMissPoints } from '@/services/session/targets';
 import { finishTraining, startTraining } from '@/services/trainingService';
 import { getMyMostRecentWeaponId } from '@/services/weaponService';
 import { useGarminStore } from '@/stores/garminStore';
 import { useTeamStore } from '@/stores/teamStore';
-import type { SessionWithDetails } from '@/types/session';
+import type { MissPoint, SessionWithDetails } from '@/types/session';
 import type { TrainingDrill } from '@/types/workspace';
+import { useFocusEffect } from '@react-navigation/native';
 import { formatDistanceToNow } from 'date-fns';
 import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -39,22 +41,21 @@ import {
   ArrowLeft,
   CheckCircle2,
   Clock,
+  Crosshair,
   Crown,
   Flag,
   Lock,
   Play,
   Settings,
   ShieldAlert,
-  Sparkles,
   Target,
   Trophy,
-  Unlock,
   Users,
-  Zap,
+  Zap
 } from 'lucide-react-native';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, Alert, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Modal, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, {
   Extrapolation,
   interpolate,
@@ -344,10 +345,12 @@ function ResultsTabContent({
   completedSessions,
   colors,
   currentUserId,
+  onMarkMisses,
 }: {
   completedSessions: SessionWithDetails[];
   colors: any;
   currentUserId: string | null;
+  onMarkMisses?: (session: SessionWithDetails) => void;
 }) {
   const { t } = useTranslation();
   const [activeFilter, setActiveFilter] = useState<ResultsFilter>('all');
@@ -558,7 +561,7 @@ function ResultsTabContent({
             );
           }
           return (
-            <SessionRow key={s.id} session={s} colors={colors} isLast={idx === filteredSessions.length - 1} />
+            <SessionRow key={s.id} session={s} colors={colors} isLast={idx === filteredSessions.length - 1} onMarkMisses={onMarkMisses} />
           );
         })}
       </View>
@@ -772,7 +775,17 @@ function ExpandableSquadRow({
 /**
  * Single Session Row (for completed sessions)
  */
-function SessionRow({ session, colors, isLast }: { session: SessionWithDetails; colors: any; isLast: boolean }) {
+function SessionRow({
+  session,
+  colors,
+  isLast,
+  onMarkMisses,
+}: {
+  session: SessionWithDetails;
+  colors: any;
+  isLast: boolean;
+  onMarkMisses?: (session: SessionWithDetails) => void;
+}) {
   const { t } = useTranslation();
   const drillName = session.drill_config?.name || session.drill_name || t('session.title');
   // Check both drill_config and engagement for drill_goal (engagement is authoritative)
@@ -869,6 +882,16 @@ function SessionRow({ session, colors, isLast }: { session: SessionWithDetails; 
         // Solo engagement: show accuracy %
         <Text style={[styles.sessionResult, { color: colors.green }]}>{accuracy}%</Text>
       ) : null}
+      {/* Miss Analyzer trigger: show when no hit data and not squad */}
+      {!isSquadOrGroup && hits === 0 && accuracy === null && onMarkMisses && (
+        <TouchableOpacity
+          style={[styles.missAnalyzerBtn, { backgroundColor: colors.red + '12' }]}
+          onPress={() => onMarkMisses(session)}
+          activeOpacity={0.7}
+        >
+          <Crosshair size={14} color={colors.red} />
+        </TouchableOpacity>
+      )}
     </View>
   );
 }
@@ -1103,6 +1126,72 @@ function TrainingSummaryContent({
   const scrollRef = useAnimatedRef<Animated.ScrollView>();
   const scrollOffset = useScrollViewOffset(scrollRef);
 
+  // Miss Analyzer state
+  const [missAnalyzerSession, setMissAnalyzerSession] = useState<SessionWithDetails | null>(null);
+  const [isSavingMisses, setIsSavingMisses] = useState(false);
+
+  const handleOpenMissAnalyzer = useCallback((session: SessionWithDetails) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setMissAnalyzerSession(session);
+  }, []);
+
+  const handleCloseMissAnalyzer = useCallback(() => {
+    setMissAnalyzerSession(null);
+  }, []);
+
+  const handleSaveMisses = useCallback(async (points: MissPoint[]) => {
+    if (!missAnalyzerSession) return;
+    setIsSavingMisses(true);
+    try {
+      // For now, save miss points by creating/updating a paper_target_result
+      // The session's first paper target result gets the miss data
+      // This is a simplified flow — real sessions may have multiple targets
+      const sessionId = missAnalyzerSession.id;
+
+      // Import getSessionTargetsWithResults at top
+      const { getSessionTargetsWithResults } = await import('@/services/session/targets');
+      const targets = await getSessionTargetsWithResults(sessionId);
+
+      // Find the first paper target result, or create one
+      const paperTarget = targets.find(t => t.paper_result);
+      if (paperTarget?.paper_result?.id) {
+        await saveMissPoints(paperTarget.paper_result.id, points);
+      } else {
+        // No paper result exists — create a target + result with miss data
+        const { addSessionTarget, savePaperTargetResult } = await import('@/services/session/targets');
+
+        let targetId: string;
+        if (targets.length > 0) {
+          targetId = targets[0].id;
+        } else {
+          const newTarget = await addSessionTarget({
+            session_id: sessionId,
+            target_type: 'paper',
+            distance_m: missAnalyzerSession.drill_config?.distance_m ?? null,
+          });
+          targetId = newTarget.id;
+        }
+
+        await savePaperTargetResult({
+          session_target_id: targetId,
+          paper_type: 'engagement',
+          bullets_fired: missAnalyzerSession.drill_config?.rounds_per_shooter ?? points.length,
+          hits_total: 0,
+          miss_points: points,
+        });
+      }
+
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setMissAnalyzerSession(null);
+      onRefresh();
+    } catch (error) {
+      console.error('[TrainingDetail] Failed to save miss points:', error);
+      Alert.alert(t('common.error', 'Error'), t('missAnalyzer.saveFailed', 'Failed to save miss data'));
+    } finally {
+      setIsSavingMisses(false);
+    }
+  }, [missAnalyzerSession, onRefresh, t]);
+
   // Expanded hero: fades & slides out as you scroll
   const heroAnimatedStyle = useAnimatedStyle(() => ({
     opacity: interpolate(scrollOffset.value, [0, COLLAPSE_THRESHOLD], [1, 0], Extrapolation.CLAMP),
@@ -1222,6 +1311,7 @@ function TrainingSummaryContent({
                 completedSessions={completedSessions}
                 colors={colors}
                 currentUserId={currentUserId}
+                onMarkMisses={handleOpenMissAnalyzer}
               />
               {completedSessions.length === 0 && (
                 <View style={[styles.emptyResults, { borderColor: colors.border }]}>
@@ -1239,6 +1329,27 @@ function TrainingSummaryContent({
           {t('training.created')} {formatDistanceToNow(new Date(training.created_at), { addSuffix: true })}
         </Text>
       </Animated.ScrollView>
+
+      {/* Miss Analyzer Modal */}
+      <Modal
+        visible={!!missAnalyzerSession}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={handleCloseMissAnalyzer}
+      >
+        <View style={[styles.missAnalyzerModal, { backgroundColor: colors.background }]}>
+          <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }}>
+            {missAnalyzerSession && (
+              <MissMarker
+                onSave={handleSaveMisses}
+                onCancel={handleCloseMissAnalyzer}
+                isSaving={isSavingMisses}
+                maxPoints={missAnalyzerSession.drill_config?.rounds_per_shooter ?? undefined}
+              />
+            )}
+          </ScrollView>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -2079,5 +2190,17 @@ const styles = StyleSheet.create({
     paddingVertical: 24,
     paddingHorizontal: 16,
     opacity: 0.5,
+  },
+
+  // Miss Analyzer
+  missAnalyzerBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  missAnalyzerModal: {
+    flex: 1,
   },
 });

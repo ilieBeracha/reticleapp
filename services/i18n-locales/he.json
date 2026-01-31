@@ -204,6 +204,13 @@
     "worst": "הגרוע ביותר",
     "selectWeapon": "בחר נשק",
     "selectDistance": "בחר מרחק",
+    "setDistance": "הגדר מרחק",
+    "setYourDistance": "הגדר את המרחק שלך",
+    "selectDistanceInRange": "בחר מרחק בין {{min}} מ׳ ל-{{max}} מ׳",
+    "distanceBelowRange": "מתחת לטווח המומלץ ({{min}} מ׳)",
+    "distanceAboveRange": "מעל הטווח המומלץ ({{max}} מ׳)",
+    "quickSelect": "בחירה מהירה",
+    "orEnterCustom": "או הזן ידנית",
     "selectPosition": "בחר תנוחה",
     "readyToStart": "מוכן להתחלה",
     "inProgress": "בתהליך",
@@ -526,6 +533,7 @@
     "failedUpdateSettings": "נכשל בעדכון ההגדרות",
     "groupEngagement": "מקצה קבוצה",
     "squadEngagement": "מקצה חוליה",
+
     "joinSession": "הצטרף לאימון",
     "viewProgress": "צפה בהתקדמות",
     "acceptAndJoin": "קבל והצטרף",
@@ -582,6 +590,8 @@
     "distanceRange": "טווח מרחק",
     "tapForExact": "לחץ למדויק",
     "tapForRange": "לחץ לטווח",
+    "useExactMeters": "מטרים מדויקים",
+    "useRange": "טווח",
     "exactMode": "מדויק",
     "rangeMode": "טווח",
     "accuracyNote": "* דיוק מחושב רק ממפגשי יחיד/צוות",
@@ -1320,7 +1330,21 @@
     "auto": "אוטו",
     "hitsLabel": "פגיעות",
     "allHit": "הכל פגע",
-    "allMiss": "הכל החטיא"
+    "allMiss": "הכל החטיא",
+    "missMarkerHint": "{{count}} החטאות - תסמן לאן הלכו"
+  },
+  "missAnalyzer": {
+    "title": "סמן החטאות",
+    "subtitle": "הקש היכן הכדורים החטיאו את המטרה",
+    "subtitle2": "מרכז = מטרה. הקש להראות לאן הלכו ההחטאות.",
+    "subtitle3": "הקש לאן הלך כל כדור",
+    "legendTarget": "מטרה (פגיעות)",
+    "legendMiss": "החטאות",
+    "legendHint": "ירוק = אזור פגיעה • הקש בחוץ להחטאות",
+    "tapToMark": "הקש מחוץ למטרה לסמן החטאה",
+    "pointsMarked": "{{count}} החטאה סומנה",
+    "pointsMarked_plural": "{{count}} החטאות סומנו",
+    "pointsOfMax": "{{count}} / {{max}} החטאות סומנו"
   },
   "settings": {
     "title": "הגדרות",

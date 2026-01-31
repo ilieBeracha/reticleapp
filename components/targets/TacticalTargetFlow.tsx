@@ -1,15 +1,18 @@
+import { BUTTON_GRADIENT, BUTTON_GRADIENT_DISABLED } from '@/constants/Colors';
 import { PAPER_TYPE } from '@/constants/drill';
 import { addTargetWithPaperResult, addTargetWithTacticalResult } from '@/services/session/mutations';
-import { BUTTON_GRADIENT, BUTTON_GRADIENT_DISABLED } from '@/constants/Colors';
+import type { MissPoint } from '@/types/session';
+import { COLORS } from '@/types/targets';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { ArrowLeft, Check, ChevronRight, Crosshair, Minus, Plus, Ruler, Target, Timer } from 'lucide-react-native';
+import { ArrowLeft, Check, ChevronRight, Crosshair, Minus, Plus, Ruler, Target, Timer, X } from 'lucide-react-native';
 import React, { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
   Alert,
+  Modal,
   ScrollView,
   StyleSheet,
   Switch,
@@ -18,7 +21,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { COLORS } from '@/types/targets';
+import { MissMarker } from './MissMarker';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // DISTANCE CATEGORIES
@@ -323,6 +326,12 @@ interface TacticalTargetFlowProps {
   participantId?: string;
   /** Multi-target: number of targets for this drill (rounds = shared pool across all) */
   targetCount?: number;
+  /** Distance range when commander set a category (soldier picks exact distance) */
+  distanceRange?: {
+    category: 'short' | 'medium' | 'long';
+    min: number;
+    max: number;
+  };
   onComplete?: () => void;
   onCancel?: () => void;
 }
@@ -337,6 +346,7 @@ export function TacticalTargetFlow({
   showTimeInput = true,
   participantId,
   targetCount = 1,
+  distanceRange,
   onComplete,
   onCancel,
 }: TacticalTargetFlowProps) {
@@ -353,6 +363,14 @@ export function TacticalTargetFlow({
   const [distance, setDistance] = useState(defaultDistance);
   const [bullets, setBullets] = useState(defaultBullets);
 
+  const categoryLabel = distanceRange?.category === 'short'
+    ? t('training.short')
+    : distanceRange?.category === 'medium'
+      ? t('training.medium')
+      : distanceRange?.category === 'long'
+        ? t('training.long')
+        : '';
+
   // Results state
   const [hits, setHits] = useState(0);
   const [groupSizeCm, setGroupSizeCm] = useState(''); // For grouping mode
@@ -361,8 +379,14 @@ export function TacticalTargetFlow({
   const [stageCleared, setStageCleared] = useState(false);
   const [notes, setNotes] = useState('');
 
+  // Miss Marker modal state (pops up after save if there are misses)
+  const [showMissMarker, setShowMissMarker] = useState(false);
+
   // Multi-target state
   const isMultiTarget = targetCount > 1;
+
+  // Calculate miss count for single-target engagement (must be after isMultiTarget)
+  const missCount = !isGrouping && !isMultiTarget ? bullets - hits : 0;
   const [targetResults, setTargetResults] = useState<Array<{ shots_fired: number; hits: number }>>(() => {
     if (targetCount <= 1) return [];
     // Distribute evenly, last target gets remainder (auto-derived)
@@ -438,38 +462,19 @@ export function TacticalTargetFlow({
     setStep('results');
   }, [distance, bullets, t]);
 
-  const handleSave = useCallback(async () => {
-    if (!sessionId) {
-      Alert.alert(t('common.error'), t('target.sessionIdMissing'));
-      return;
-    }
-
-    // Note: hits can be 0 (completely missed) - that's a valid result
-
-    if (isGrouping && !groupSizeCm) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-      Alert.alert(t('target.missingGroupSizeTitle'), t('target.missingGroupSizeMessage'));
-      return;
-    }
-
-    if (isGrouping && groupingShots < 2) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-      Alert.alert(t('target.missingShotsTitle'), t('target.missingShotsMessage'));
-      return;
-    }
-
+  // Actually save the target (called after miss marking or if no misses)
+  const doSave = useCallback(async (finalMissPoints: MissPoint[]) => {
     setSaving(true);
 
     try {
       if (isGrouping) {
         // For grouping: Use paper target with dispersion
-        // groupingShots = how many shots are in the group (entered manually)
         await addTargetWithPaperResult({
           session_id: sessionId,
           distance_m: distance,
           lane_number: null,
           planned_shots: groupingShots,
-          participant_id: participantId, // For squad sessions
+          participant_id: participantId,
           paper_type: PAPER_TYPE.GROUPING,
           bullets_fired: groupingShots,
           dispersion_cm: parseFloat(groupSizeCm),
@@ -510,6 +515,7 @@ export function TacticalTargetFlow({
           is_stage_cleared: stageCleared,
           time_seconds: time ? parseFloat(time) : null,
           result_notes: notes || null,
+          miss_points: finalMissPoints.length > 0 ? finalMissPoints : null,
         });
       }
 
@@ -545,6 +551,37 @@ export function TacticalTargetFlow({
     onComplete,
     t,
   ]);
+
+  // Handle save button press - check for misses first
+  const handleSave = useCallback(() => {
+    if (!sessionId) {
+      Alert.alert(t('common.error'), t('target.sessionIdMissing'));
+      return;
+    }
+
+    // Validation
+    if (isGrouping && !groupSizeCm) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      Alert.alert(t('target.missingGroupSizeTitle'), t('target.missingGroupSizeMessage'));
+      return;
+    }
+
+    if (isGrouping && groupingShots < 2) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      Alert.alert(t('target.missingShotsTitle'), t('target.missingShotsMessage'));
+      return;
+    }
+
+    // For single-target engagement with misses, show MissMarker first
+    if (missCount > 0) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      setShowMissMarker(true);
+      return;
+    }
+
+    // No misses or grouping/multi-target mode - save directly
+    doSave([]);
+  }, [sessionId, isGrouping, groupSizeCm, groupingShots, missCount, doSave, t]);
 
   // ═══════════════════════════════════════════════════════════════════════════
   // SETUP STEP
@@ -683,6 +720,52 @@ export function TacticalTargetFlow({
           <Text style={styles.closeBtnText}>✕</Text>
         </TouchableOpacity>
       </View>
+
+      {/* Distance Range Selector - when commander set a category */}
+      {distanceRange && (
+        <View style={styles.distanceRangeSection}>
+          <View style={styles.distanceRangeHeader}>
+            <Ruler size={16} color={COLORS.primary} />
+            <Text style={styles.distanceRangeTitle}>{t('session.selectDistance')}</Text>
+            <View style={styles.distanceRangeBadge}>
+              <Text style={styles.distanceRangeBadgeText}>{categoryLabel}</Text>
+            </View>
+          </View>
+          <Text style={styles.distanceRangeHint}>
+            {distanceRange.min}m – {distanceRange.max}m
+          </Text>
+          <View style={styles.distanceRangeStepper}>
+            <TouchableOpacity
+              style={[styles.distanceStepBtn, distance <= distanceRange.min && styles.distanceStepBtnDisabled]}
+              onPress={() => {
+                if (distance > distanceRange.min) {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  setDistance(Math.max(distanceRange.min, distance - 50));
+                }
+              }}
+              disabled={distance <= distanceRange.min}
+            >
+              <Minus size={24} color={distance <= distanceRange.min ? COLORS.textDim : COLORS.white} />
+            </TouchableOpacity>
+            <View style={styles.distanceValueContainer}>
+              <Text style={styles.distanceValue}>{distance}</Text>
+              <Text style={styles.distanceUnit}>m</Text>
+            </View>
+            <TouchableOpacity
+              style={[styles.distanceStepBtn, distance >= distanceRange.max && styles.distanceStepBtnDisabled]}
+              onPress={() => {
+                if (distance < distanceRange.max) {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  setDistance(Math.min(distanceRange.max, distance + 50));
+                }
+              }}
+              disabled={distance >= distanceRange.max}
+            >
+              <Plus size={24} color={distance >= distanceRange.max ? COLORS.textDim : COLORS.white} />
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
 
       {/* Hits Stepper OR Group Size Input */}
       {isGrouping ? (
@@ -890,6 +973,13 @@ export function TacticalTargetFlow({
         // ENGAGEMENT: Show simple hits stepper
         <View style={styles.hitsSection}>
           <HitsStepper value={hits} onChange={setHits} bulletsFired={bullets} />
+
+          {/* Hint: miss marker will pop up if there are misses */}
+          {missCount > 0 && (
+            <Text style={styles.missHint}>
+              {t('target.missMarkerHint', { count: missCount, defaultValue: `${missCount} misses - you'll mark where they went` })}
+            </Text>
+          )}
         </View>
       )}
 
@@ -1022,6 +1112,45 @@ export function TacticalTargetFlow({
       )}
 
       <View style={{ height: 30 }} />
+
+      {/* Miss Marker Modal - elegant bottom sheet */}
+      <Modal
+        visible={showMissMarker}
+        animationType="slide"
+        transparent
+        onRequestClose={() => {
+          setShowMissMarker(false);
+          doSave([]);
+        }}
+      >
+        <View style={styles.missMarkerOverlay}>
+          <TouchableOpacity 
+            style={styles.missMarkerBackdrop} 
+            activeOpacity={1} 
+            onPress={() => {
+              setShowMissMarker(false);
+              doSave([]);
+            }} 
+          />
+          <View style={styles.missMarkerSheet}>
+            <View style={styles.missMarkerHandle}>
+              <View style={styles.missMarkerHandleBar} />
+            </View>
+            <MissMarker
+              initialPoints={[]}
+              onSave={(points) => {
+                setShowMissMarker(false);
+                doSave(points);
+              }}
+              onCancel={() => {
+                setShowMissMarker(false);
+                doSave([]);
+              }}
+              maxPoints={missCount}
+            />
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
@@ -1111,6 +1240,79 @@ const styles = StyleSheet.create({
   distanceChipText: { fontSize: 14, fontWeight: '600', color: COLORS.textMuted },
   distanceChipTextSelected: { color: COLORS.white },
 
+  // Distance Range Selector
+  distanceRangeSection: {
+    backgroundColor: COLORS.card,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: `${COLORS.primary}40`,
+  },
+  distanceRangeHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 4,
+  },
+  distanceRangeTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: COLORS.white,
+    flex: 1,
+  },
+  distanceRangeBadge: {
+    backgroundColor: `${COLORS.primary}20`,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  distanceRangeBadgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: COLORS.primary,
+    textTransform: 'capitalize',
+  },
+  distanceRangeHint: {
+    fontSize: 12,
+    color: COLORS.textDim,
+    marginBottom: 12,
+  },
+  distanceRangeStepper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 20,
+  },
+  distanceStepBtn: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: COLORS.cardHover,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.borderLight,
+  },
+  distanceStepBtnDisabled: {
+    opacity: 0.4,
+  },
+  distanceValueContainer: {
+    alignItems: 'center',
+    minWidth: 100,
+  },
+  distanceValue: {
+    fontSize: 40,
+    fontWeight: '700',
+    color: COLORS.white,
+    fontVariant: ['tabular-nums'],
+  },
+  distanceUnit: {
+    fontSize: 14,
+    color: COLORS.textMuted,
+    marginTop: -4,
+  },
+
   // Hits Section
   hitsSection: {
     backgroundColor: COLORS.card,
@@ -1119,6 +1321,41 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     borderWidth: 1,
     borderColor: COLORS.border,
+  },
+
+  // Miss Marker
+  missHint: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: COLORS.textMuted,
+    textAlign: 'center',
+    marginTop: 16,
+    opacity: 0.7,
+  },
+  missMarkerOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  missMarkerBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  missMarkerSheet: {
+    backgroundColor: COLORS.background,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingBottom: 34,
+  },
+  missMarkerHandle: {
+    alignItems: 'center',
+    paddingTop: 12,
+    paddingBottom: 4,
+  },
+  missMarkerHandleBar: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: COLORS.border,
   },
 
   // Card

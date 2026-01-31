@@ -689,19 +689,38 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
     const bulletsForEngagement =
       !isGrouping && hasDrill ? nextTargetPlan?.nextBullets || drill?.rounds_per_shooter : undefined;
 
+    // Distance range params when commander set a category (short/mid/long)
+    const distanceRangeParams: Record<string, string> = {};
+    if (drill?.distance_category) {
+      distanceRangeParams.distanceCategory = drill.distance_category;
+      // Set range bounds based on category
+      if (drill.distance_category === 'short') {
+        distanceRangeParams.distanceMin = '5';
+        distanceRangeParams.distanceMax = '300';
+      } else if (drill.distance_category === 'medium') {
+        distanceRangeParams.distanceMin = '300';
+        distanceRangeParams.distanceMax = '600';
+      } else if (drill.distance_category === 'long') {
+        distanceRangeParams.distanceMin = '600';
+        distanceRangeParams.distanceMax = '1000';
+      }
+    }
+
     router.push({
       pathname: '/(protected)/tacticalTarget',
       params: {
         sessionId,
         distance: distance.toString(),
-        // Lock distance when config is locked
-        ...(lockedConfig ? { locked: '1' } : {}),
+        // Lock distance when config is locked AND no distance category (exact distance set)
+        ...(lockedConfig && !drill?.distance_category ? { locked: '1' } : {}),
         // Pass bullets for engagement drills (limits hits input)
         ...(bulletsForEngagement ? { bullets: String(bulletsForEngagement) } : {}),
         ...(isGrouping ? { isGrouping: '1' } : {}),
         showTimeInput: session?.watch_controlled ? '0' : '1',
         // Multi-target: number of targets for this drill
         ...((drill?.target_count ?? 1) > 1 ? { targetCount: String(drill!.target_count) } : {}),
+        // Distance range params
+        ...distanceRangeParams,
       },
     });
   }, [

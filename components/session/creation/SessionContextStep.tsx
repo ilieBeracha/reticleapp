@@ -269,7 +269,8 @@ export function SessionContextStep({
   const shotsLabel = targetCount > 1 ? t('session.totalShotsLabel') : t('session.bullets');
   const colors = useColors();
   const [showAdvanced, setShowAdvanced] = useState(false);
-  const [useRangeMode, setUseRangeMode] = useState(false);
+  // Default to range mode (short/mid/long) - commander can switch to exact meters if needed
+  const [useRangeMode, setUseRangeMode] = useState(showRangeCategory);
   const [showDrillPicker, setShowDrillPicker] = useState(false);
   const [showPresetForm, setShowPresetForm] = useState(false);
   const [isEditingDrill, setIsEditingDrill] = useState(false);
@@ -491,7 +492,7 @@ export function SessionContextStep({
                   }}
                 >
                   <Text style={[styles.fieldSwitchText, { color: colors.textMuted }]}>
-                    {useRangeMode ? t('training.tapForExact') : t('training.tapForRange')}
+                    {useRangeMode ? t('training.useExactMeters') : t('training.useRange')}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -499,16 +500,7 @@ export function SessionContextStep({
               <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>{t('session.distance')}</Text>
             )}
 
-            {!useRangeMode && (
-              <PillPicker
-                options={distancePresets.slice(0, 4)}
-                selected={context.distance}
-                onSelect={(d) => onUpdateContext({ distance: d, distanceCategory: null })}
-                allowCustom
-                customSuffix="m"
-              />
-            )}
-
+            {/* Range categories (default for training) */}
             {useRangeMode && showRangeCategory && (
               <>
                 <View style={styles.pillsRow}>
@@ -548,6 +540,17 @@ export function SessionContextStep({
                   </Text>
                 )}
               </>
+            )}
+
+            {/* Exact meters (alternative option) */}
+            {!useRangeMode && (
+              <PillPicker
+                options={distancePresets.slice(0, 4)}
+                selected={context.distance}
+                onSelect={(d) => onUpdateContext({ distance: d, distanceCategory: null })}
+                allowCustom
+                customSuffix="m"
+              />
             )}
           </View>
 

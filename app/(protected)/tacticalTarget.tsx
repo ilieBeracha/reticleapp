@@ -9,9 +9,22 @@ import { useLocalSearchParams } from 'expo-router';
  * For engagement: Shows hits counter
  * For grouping: Shows group size (cm) input
  * participantId is used for squad sessions to associate the target with a specific participant
+ * distanceCategory/distanceMin/distanceMax are used when commander set a range instead of exact distance
  */
 export default function TacticalTargetSheet() {
-  const { sessionId, distance, bullets, locked, isGrouping, showTimeInput, participantId, targetCount } = useLocalSearchParams<{
+  const {
+    sessionId,
+    distance,
+    bullets,
+    locked,
+    isGrouping,
+    showTimeInput,
+    participantId,
+    targetCount,
+    distanceCategory,
+    distanceMin,
+    distanceMax,
+  } = useLocalSearchParams<{
     sessionId: string;
     distance?: string;
     bullets?: string;
@@ -22,6 +35,12 @@ export default function TacticalTargetSheet() {
     participantId?: string;
     /** Multi-target: number of targets for this drill */
     targetCount?: string;
+    /** Distance category when commander set a range (short/medium/long) */
+    distanceCategory?: string;
+    /** Min distance in meters for the range */
+    distanceMin?: string;
+    /** Max distance in meters for the range */
+    distanceMax?: string;
   }>();
 
   if (!sessionId) {
@@ -39,6 +58,15 @@ export default function TacticalTargetSheet() {
       showTimeInput={showTimeInput !== '0'}
       participantId={participantId}
       targetCount={targetCount ? parseInt(targetCount) : 1}
+      distanceRange={
+        distanceCategory && distanceMin && distanceMax
+          ? {
+              category: distanceCategory as 'short' | 'medium' | 'long',
+              min: parseInt(distanceMin),
+              max: parseInt(distanceMax),
+            }
+          : undefined
+      }
     />
   );
 }

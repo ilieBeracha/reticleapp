@@ -873,6 +873,8 @@ export async function addTargetWithTacticalResult(params: {
   is_stage_cleared?: boolean;
   time_seconds?: number | null;
   result_notes?: string | null;
+  /** Miss Analyzer: normalized miss coordinates */
+  miss_points?: Array<{ x: number; y: number; distance: number; angle_deg: number }> | null;
 }): Promise<SessionTargetWithResults> {
   await enforceDrillLimitsForNewTarget({
     sessionId: params.session_id,
@@ -900,6 +902,7 @@ export async function addTargetWithTacticalResult(params: {
     is_stage_cleared: params.is_stage_cleared,
     time_seconds: params.time_seconds,
     notes: params.result_notes,
+    miss_points: params.miss_points,
   });
 
   return {

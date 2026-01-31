@@ -162,6 +162,20 @@ export default function ActiveSessionScreen() {
     setShowWeaponPicker(true);
   }, []);
 
+  // Distance selection handler for team training (when commander set a range)
+  const handleDistanceSet = useCallback(
+    async (distance: number) => {
+      if (!session?.id) return;
+      try {
+        await updateSession(session.id, { soldier_distance_m: distance });
+        await handleRefresh();
+      } catch (err) {
+        console.error('[ActiveSession] Failed to set distance:', err);
+      }
+    },
+    [session?.id, handleRefresh]
+  );
+
   const handleCloseWeaponPicker = useCallback(() => {
     setShowWeaponPicker(false);
   }, []);
@@ -492,11 +506,12 @@ export default function ActiveSessionScreen() {
           watchState={watchState}
           canAddTarget={canAddTarget}
           onScanRoute={handleScanRoute}
-          onManualRoute={handleManualRoute}
           onTargetPress={handleTargetPress}
           onEndSession={handleEndSession}
+          onRefresh={handleRefresh}
           ending={ending}
           onWeaponPress={handleOpenWeaponPicker}
+          onDistanceSet={handleDistanceSet}
           weather={weather}
           weatherLoading={weatherLoading}
           weatherError={weatherError}

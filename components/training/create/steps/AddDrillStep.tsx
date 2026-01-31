@@ -13,12 +13,14 @@
 
 import { SessionContextStep } from '@/components/session/creation/SessionContextStep';
 import { useColors } from '@/hooks/ui/useColors';
-import { type RangeCategory, type TrainingDrillItem } from '@/services/drills/drillService';
+import { type TrainingDrillItem } from '@/services/drills/drillService';
 import type { ExecutionPolicy } from '@/types/session';
 import type { SessionContextState, SessionPurpose } from '@/types/sessionCreation';
 import { Ionicons } from '@expo/vector-icons';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import * as Haptics from 'expo-haptics';
 import {
+  Calendar,
   ChevronDown,
   ChevronUp,
   Crosshair,
@@ -26,12 +28,10 @@ import {
   Minus,
   Plus,
   Repeat,
-  Sparkles,
   Target,
   Trash2,
-  Unlock,
   User,
-  Users,
+  Users
 } from 'lucide-react-native';
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -158,6 +158,8 @@ function SessionCard({ session, index, total, onRemove, onMove, colors }: Sessio
                 !session.config?.distance_category &&
                 session.config?.rounds == null &&
                 ` · ${t('training.soldierChooses')}`}
+              {session.config?.available_from && session.config?.available_until &&
+                ` · ${new Date(session.config.available_from).toLocaleDateString()} → ${new Date(session.config.available_until).toLocaleDateString()}`}
             </Text>
           </View>
           <View style={styles.sessionActions}>
@@ -236,10 +238,15 @@ function AddSessionSheet({ visible, onClose, onAdd }: AddSessionSheetProps) {
   // Always locked - soldiers can only change weapon
   const executionPolicy: ExecutionPolicy = 'locked';
   const [context, setContext] = useState<SessionContextState>(EMPTY_CONTEXT);
-  const [distanceCategory, setDistanceCategory] = useState<RangeCategory | null>(null);
   const [targetCount, setTargetCount] = useState(1);
   const [maxExecutions, setMaxExecutions] = useState(1);
   const [validationError, setValidationError] = useState<string | null>(null);
+
+  // Date range for squad engagement
+  const [availableFrom, setAvailableFrom] = useState<Date | null>(null);
+  const [availableUntil, setAvailableUntil] = useState<Date | null>(null);
+  const [showFromPicker, setShowFromPicker] = useState(false);
+  const [showUntilPicker, setShowUntilPicker] = useState(false);
 
   const effectiveEngagementMode = purpose === 'grouping' ? 'solo' : engagementMode;
 
@@ -269,10 +276,13 @@ function AddSessionSheet({ visible, onClose, onAdd }: AddSessionSheetProps) {
     setPurpose('grouping');
     setEngagementMode('solo');
     setContext(EMPTY_CONTEXT);
-    setDistanceCategory(null);
     setTargetCount(1);
     setMaxExecutions(1);
     setValidationError(null);
+    setAvailableFrom(null);
+    setAvailableUntil(null);
+    setShowFromPicker(false);
+    setShowUntilPicker(false);
     onClose();
   }, [onClose]);
 
@@ -287,8 +297,8 @@ function AddSessionSheet({ visible, onClose, onAdd }: AddSessionSheetProps) {
 
   const handleSubmit = useCallback(() => {
     const hasDistance = context.distance > 0;
-    const effectiveDistanceCategory = effectiveEngagementMode === 'squad' ? distanceCategory : context.distanceCategory;
-    const hasDistanceCategory = effectiveDistanceCategory !== null;
+    // Use context.distanceCategory for both modes - SessionContextStep handles the UI
+    const hasDistanceCategory = context.distanceCategory !== null;
     const hasRounds = context.shotsPlanned > 0;
     const hasPosition = context.position && context.position !== 'any';
 
@@ -320,9 +330,9 @@ function AddSessionSheet({ visible, onClose, onAdd }: AddSessionSheetProps) {
       const nameParts = [purpose === 'grouping' ? t('session.grouping') : t('session.engagement')];
       if (hasDistanceCategory) {
         const catLabel =
-          effectiveDistanceCategory === 'short'
+          context.distanceCategory === 'short'
             ? t('training.shortRange')
-            : effectiveDistanceCategory === 'medium'
+            : context.distanceCategory === 'medium'
               ? t('training.mediumRange')
               : t('training.longRange');
         nameParts.push(catLabel);
@@ -345,13 +355,15 @@ function AddSessionSheet({ visible, onClose, onAdd }: AddSessionSheetProps) {
       max_executions: maxExecutions,
       config: {
         distance_m: hasDistanceCategory ? null : hasDistance ? context.distance : null,
-        distance_category: hasDistanceCategory ? effectiveDistanceCategory : null,
+        distance_category: hasDistanceCategory ? context.distanceCategory : null,
         rounds: hasRounds ? context.shotsPlanned : null,
         time_limit_seconds: context.timeLimit,
         position: mapPosition(context.position),
         strings_count: 1,
         target_count: purpose === 'engagement' ? targetCount : null,
         measurement_scope: effectiveEngagementMode === 'squad' ? 'collective' : 'individual',
+        available_from: effectiveEngagementMode === 'squad' && availableFrom ? availableFrom.toISOString() : null,
+        available_until: effectiveEngagementMode === 'squad' && availableUntil ? availableUntil.toISOString() : null,
       },
     };
 
@@ -360,12 +372,13 @@ function AddSessionSheet({ visible, onClose, onAdd }: AddSessionSheetProps) {
     setPurpose('grouping');
     setEngagementMode('solo');
     setContext(EMPTY_CONTEXT);
-    setDistanceCategory(null);
     setTargetCount(1);
     setMaxExecutions(1);
     setValidationError(null);
+    setAvailableFrom(null);
+    setAvailableUntil(null);
     onClose();
-  }, [drillName, purpose, context, distanceCategory, targetCount, maxExecutions, executionPolicy, effectiveEngagementMode, onAdd, onClose, t]);
+  }, [drillName, purpose, context, targetCount, maxExecutions, executionPolicy, effectiveEngagementMode, availableFrom, availableUntil, onAdd, onClose, t]);
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={handleClose}>
@@ -587,6 +600,38 @@ function AddSessionSheet({ visible, onClose, onAdd }: AddSessionSheetProps) {
                     </Text>
                   </View>
                 </View>
+
+                {/* Date Range */}
+                <View style={[styles.formDivider, { backgroundColor: colors.border }]} />
+                <View style={styles.dateRangeSection}>
+                  <View style={styles.dateRangeHeader}>
+                    <Calendar size={14} color={colors.textMuted} />
+                    <Text style={[styles.formRowText, { color: colors.text }]}>{t('training.availabilityPeriod')}</Text>
+                  </View>
+                  <Text style={[styles.dateRangeHint, { color: colors.textMuted }]}>{t('training.availabilityPeriodHint')}</Text>
+                  <View style={styles.dateRow}>
+                    <TouchableOpacity
+                      style={[styles.dateBtn, { backgroundColor: colors.background, borderColor: availableFrom ? colors.primary : colors.border }]}
+                      onPress={() => setShowFromPicker(true)}
+                    >
+                      <Text style={[styles.dateBtnLabel, { color: colors.textMuted }]}>{t('training.from')}</Text>
+                      <Text style={[styles.dateBtnValue, { color: availableFrom ? colors.text : colors.textMuted }]}>
+                        {availableFrom ? availableFrom.toLocaleDateString() : t('training.notSet')}
+                      </Text>
+                    </TouchableOpacity>
+                    <Text style={[styles.dateSeparator, { color: colors.textMuted }]}>→</Text>
+                    <TouchableOpacity
+                      style={[styles.dateBtn, { backgroundColor: colors.background, borderColor: availableUntil ? colors.primary : colors.border }]}
+                      onPress={() => setShowUntilPicker(true)}
+                    >
+                      <Text style={[styles.dateBtnLabel, { color: colors.textMuted }]}>{t('training.until')}</Text>
+                      <Text style={[styles.dateBtnValue, { color: availableUntil ? colors.text : colors.textMuted }]}>
+                        {availableUntil ? availableUntil.toLocaleDateString() : t('training.notSet')}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
                 <View style={[styles.formDivider, { backgroundColor: colors.border }]} />
                 <SessionContextStep
                   purpose={purpose}
@@ -599,6 +644,38 @@ function AddSessionSheet({ visible, onClose, onAdd }: AddSessionSheetProps) {
                 />
               </View>
             </View>
+          )}
+
+          {/* Date Pickers */}
+          {showFromPicker && (
+            <DatePickerModal
+              visible={showFromPicker}
+              onClose={() => setShowFromPicker(false)}
+              title={t('training.selectStartDate')}
+              value={availableFrom || new Date()}
+              onChange={(date) => {
+                setAvailableFrom(date);
+                // If end date is before start date, clear it
+                if (availableUntil && date > availableUntil) {
+                  setAvailableUntil(null);
+                }
+              }}
+              minimumDate={new Date()}
+              colors={colors}
+              bottomInset={insets.bottom}
+            />
+          )}
+          {showUntilPicker && (
+            <DatePickerModal
+              visible={showUntilPicker}
+              onClose={() => setShowUntilPicker(false)}
+              title={t('training.selectEndDate')}
+              value={availableUntil || availableFrom || new Date()}
+              onChange={setAvailableUntil}
+              minimumDate={availableFrom || new Date()}
+              colors={colors}
+              bottomInset={insets.bottom}
+            />
           )}
 
         </ScrollView>
@@ -616,6 +693,63 @@ function AddSessionSheet({ visible, onClose, onAdd }: AddSessionSheetProps) {
           </TouchableOpacity>
         </View>
       </View>
+    </Modal>
+  );
+}
+
+// ============================================================================
+// DATE PICKER MODAL
+// ============================================================================
+
+function DatePickerModal({
+  visible,
+  onClose,
+  title,
+  value,
+  onChange,
+  minimumDate,
+  colors,
+  bottomInset,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  title: string;
+  value: Date;
+  onChange: (date: Date) => void;
+  minimumDate?: Date;
+  colors: ReturnType<typeof useColors>;
+  bottomInset: number;
+}) {
+  const { t } = useTranslation();
+
+  if (!visible) return null;
+
+  return (
+    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
+      <Pressable style={styles.pickerOverlay} onPress={onClose}>
+        <Pressable style={[styles.pickerSheet, { backgroundColor: colors.card }]} onPress={(e) => e.stopPropagation()}>
+          <View style={[styles.pickerHandle, { backgroundColor: colors.border }]} />
+          <View style={styles.pickerHeader}>
+            <TouchableOpacity onPress={onClose} style={styles.pickerHeaderBtn} hitSlop={8}>
+              <Text style={[styles.pickerCancel, { color: colors.textMuted }]}>{t('common.cancel')}</Text>
+            </TouchableOpacity>
+            <Text style={[styles.pickerTitle, { color: colors.text }]}>{title}</Text>
+            <TouchableOpacity onPress={onClose} style={styles.pickerHeaderBtn} hitSlop={8}>
+              <Text style={[styles.pickerDone, { color: colors.primary }]}>{t('common.done')}</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={[styles.pickerDivider, { backgroundColor: colors.border }]} />
+          <DateTimePicker
+            value={value}
+            mode="date"
+            display="spinner"
+            onChange={(_, date) => date && onChange(date)}
+            minimumDate={minimumDate}
+            style={styles.picker}
+          />
+          <View style={{ height: bottomInset + 8 }} />
+        </Pressable>
+      </Pressable>
     </Modal>
   );
 }
@@ -1066,6 +1200,94 @@ const styles = StyleSheet.create({
   noticeDesc: {
     fontSize: 13,
     lineHeight: 18,
+  },
+
+  // Date range
+  dateRangeSection: {
+    gap: 8,
+  },
+  dateRangeHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  dateRangeHint: {
+    fontSize: 12,
+    marginBottom: 4,
+  },
+  dateRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  dateBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: 'center',
+  },
+  dateBtnLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+    marginBottom: 2,
+  },
+  dateBtnValue: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  dateSeparator: {
+    fontSize: 16,
+  },
+
+  // Date picker modal
+  pickerOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  pickerSheet: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+  },
+  pickerHandle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginTop: 10,
+    marginBottom: 6,
+  },
+  pickerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  pickerHeaderBtn: {
+    minWidth: 60,
+  },
+  pickerCancel: {
+    fontSize: 16,
+  },
+  pickerTitle: {
+    fontSize: 17,
+    fontWeight: '600',
+  },
+  pickerDone: {
+    fontSize: 16,
+    fontWeight: '600',
+    textAlign: 'right',
+  },
+  pickerDivider: {
+    height: StyleSheet.hairlineWidth,
+  },
+  picker: {
+    height: 200,
   },
 });
 
