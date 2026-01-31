@@ -1657,3 +1657,22 @@ export async function getMostRecentUserWeaponId(userId: string): Promise<string 
 
   return data?.[0]?.id ?? null;
 }
+
+/**
+ * Get the current user's most recent weapon ID.
+ * Uses RLS - no userId parameter needed. Can run in parallel with auth check.
+ */
+export async function getMyMostRecentWeaponId(): Promise<string | null> {
+  const { data, error } = await supabase
+    .from('user_weapons')
+    .select('id')
+    .order('updated_at', { ascending: false })
+    .limit(1);
+
+  if (error) {
+    console.error('[weaponService] getMyMostRecentWeaponId error:', error);
+    throw error;
+  }
+
+  return data?.[0]?.id ?? null;
+}

@@ -38,6 +38,8 @@ interface SessionContextStepProps {
   hideWeaponSection?: boolean;
   /** Show range category option (short/medium/long) for training configuration */
   showRangeCategory?: boolean;
+  /** When > 1, relabels "Bullets" to "Total Shots" to indicate shared pool */
+  targetCount?: number;
 }
 
 // ============================================================================
@@ -79,45 +81,41 @@ function PillPicker({
   };
 
   return (
-    <View style={styles.pillsContainer}>
-      {/* Preset options */}
-      <View style={styles.pillsPresets}>
-        {options.map((opt) => {
-          // Only show as active if we have a value and it matches
-          const active = hasValue && opt === selected && !editing;
-          return (
-            <TouchableOpacity
-              key={opt}
-              style={[
-                styles.pill,
-                { backgroundColor: active ? colors.text : colors.card },
-                editing && { opacity: 0.5 },
-              ]}
-              disabled={editing}
-              onPress={() => {
-                Haptics.selectionAsync();
-                onSelect(opt);
-                setEditing(false);
-              }}
-            >
-              <Text style={[styles.pillText, { color: active ? colors.background : colors.text }]}>
-                {opt}
-                {customSuffix}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
+    <View style={styles.pillsRow}>
+      {options.map((opt) => {
+        const active = hasValue && opt === selected && !editing;
+        return (
+          <TouchableOpacity
+            key={opt}
+            style={[
+              styles.chip,
+              { borderColor: active ? colors.primary : colors.border },
+              active && { backgroundColor: colors.primary },
+              editing && { opacity: 0.5 },
+            ]}
+            disabled={editing}
+            onPress={() => {
+              Haptics.selectionAsync();
+              onSelect(opt);
+              setEditing(false);
+            }}
+          >
+            <Text style={[styles.chipText, { color: active ? '#fff' : colors.text }]}>
+              {opt}
+              {customSuffix}
+            </Text>
+          </TouchableOpacity>
+        );
+      })}
 
-      {/* Custom input - pushed to the right */}
       {allowCustom &&
         (editing ? (
           <View
-            style={[styles.pill, styles.pillInputContainer, { backgroundColor: colors.card, borderColor: colors.text }]}
+            style={[styles.chip, styles.chipInput, { borderColor: colors.primary }]}
           >
             <TextInput
               ref={inputRef}
-              style={[styles.pillInputText, { color: colors.text }]}
+              style={[styles.chipInputText, { color: colors.text }]}
               value={customText}
               onChangeText={setCustomText}
               onBlur={handleCustomSubmit}
@@ -126,11 +124,15 @@ function PillPicker({
               autoFocus
               selectTextOnFocus
             />
-            {customSuffix ? <Text style={[styles.pillInputSuffix, { color: colors.text }]}>{customSuffix}</Text> : null}
+            {customSuffix ? <Text style={[styles.chipInputSuffix, { color: colors.text }]}>{customSuffix}</Text> : null}
           </View>
         ) : (
           <TouchableOpacity
-            style={[styles.pill, { backgroundColor: isCustom ? colors.text : colors.card }]}
+            style={[
+              styles.chip,
+              { borderColor: isCustom ? colors.primary : colors.border },
+              isCustom && { backgroundColor: colors.primary },
+            ]}
             onPress={() => {
               setCustomText(hasValue ? String(selected) : '');
               setEditing(true);
@@ -138,8 +140,8 @@ function PillPicker({
           >
             <Text
               style={[
-                styles.pillText,
-                { color: isCustom ? colors.background : hasValue ? colors.text : colors.textMuted },
+                styles.chipText,
+                { color: isCustom ? '#fff' : hasValue ? colors.text : colors.textMuted },
               ]}
             >
               {isCustom
@@ -185,38 +187,38 @@ function TimePillPicker({
   };
 
   return (
-    <View style={styles.pillsContainer}>
-      {/* Preset options */}
-      <View style={styles.pillsPresets}>
-        {options.map((opt) => {
-          const active = opt === selected && !editing;
-          return (
-            <TouchableOpacity
-              key={String(opt)}
-              style={[styles.pill, { backgroundColor: active ? colors.text : colors.card }]}
-              onPress={() => {
-                Haptics.selectionAsync();
-                onSelect(opt);
-                setEditing(false);
-              }}
-            >
-              <Text style={[styles.pillText, { color: active ? colors.background : colors.text }]}>
-                {formatTime(opt)}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
+    <View style={styles.pillsRow}>
+      {options.map((opt) => {
+        const active = opt === selected && !editing;
+        return (
+          <TouchableOpacity
+            key={String(opt)}
+            style={[
+              styles.chip,
+              { borderColor: active ? colors.primary : colors.border },
+              active && { backgroundColor: colors.primary },
+            ]}
+            onPress={() => {
+              Haptics.selectionAsync();
+              onSelect(opt);
+              setEditing(false);
+            }}
+          >
+            <Text style={[styles.chipText, { color: active ? '#fff' : colors.text }]}>
+              {formatTime(opt)}
+            </Text>
+          </TouchableOpacity>
+        );
+      })}
 
-      {/* Custom input - pushed to the right */}
       {allowCustom &&
         (editing ? (
           <View
-            style={[styles.pill, styles.pillInputContainer, { backgroundColor: colors.card, borderColor: colors.text }]}
+            style={[styles.chip, styles.chipInput, { borderColor: colors.primary }]}
           >
             <TextInput
               ref={inputRef}
-              style={[styles.pillInputText, { color: colors.text }]}
+              style={[styles.chipInputText, { color: colors.text }]}
               value={customText}
               onChangeText={setCustomText}
               onBlur={handleCustomSubmit}
@@ -225,17 +227,21 @@ function TimePillPicker({
               autoFocus
               selectTextOnFocus
             />
-            <Text style={[styles.pillInputSuffix, { color: colors.text }]}>s</Text>
+            <Text style={[styles.chipInputSuffix, { color: colors.text }]}>s</Text>
           </View>
         ) : (
           <TouchableOpacity
-            style={[styles.pill, { backgroundColor: isCustom ? colors.text : colors.card }]}
+            style={[
+              styles.chip,
+              { borderColor: isCustom ? colors.primary : colors.border },
+              isCustom && { backgroundColor: colors.primary },
+            ]}
             onPress={() => {
               setCustomText(String(selected));
               setEditing(true);
             }}
           >
-            <Text style={[styles.pillText, { color: isCustom ? colors.background : colors.text }]}>
+            <Text style={[styles.chipText, { color: isCustom ? '#fff' : colors.text }]}>
               {isCustom ? formatTime(selected) : t('common.other')}
             </Text>
           </TouchableOpacity>
@@ -257,8 +263,10 @@ export function SessionContextStep({
   selectedDrillId,
   onDrillChange,
   showRangeCategory = false,
+  targetCount = 1,
 }: SessionContextStepProps) {
   const { t } = useTranslation();
+  const shotsLabel = targetCount > 1 ? t('session.totalShotsLabel') : t('session.bullets');
   const colors = useColors();
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [useRangeMode, setUseRangeMode] = useState(false);
@@ -378,9 +386,6 @@ export function SessionContextStep({
 
   return (
     <View style={styles.container}>
-      {/* Drill Toggle */}
-     
-
       {/* Drill edit controls when drill is selected */}
       {selectedDrill && (
         <>
@@ -419,8 +424,8 @@ export function SessionContextStep({
           {/* Editable params when editing */}
           {isEditingDrill && (
             <>
-              <View style={styles.paramRow}>
-                <Text style={[styles.paramLabel, { color: colors.textMuted }]}>{t('session.distance')}</Text>
+              <View style={styles.field}>
+                <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>{t('session.distance')}</Text>
                 <PillPicker
                   options={distancePresets.slice(0, 4)}
                   selected={context.distance}
@@ -432,8 +437,8 @@ export function SessionContextStep({
 
               {/* Only show bullets for engagement - grouping gets count from scan */}
               {purpose !== 'grouping' && (
-                <View style={styles.paramRow}>
-                  <Text style={[styles.paramLabel, { color: colors.textMuted }]}>{t('session.bullets')}</Text>
+                <View style={styles.field}>
+                  <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>{shotsLabel}</Text>
                   <PillPicker
                     options={shotsPresets.slice(0, 4)}
                     selected={context.shotsPlanned}
@@ -443,8 +448,8 @@ export function SessionContextStep({
                 </View>
               )}
 
-              <View style={styles.paramRow}>
-                <Text style={[styles.paramLabel, { color: colors.textMuted }]}>{t('session.timeLimit')}</Text>
+              <View style={styles.field}>
+                <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>{t('session.timeLimit')}</Text>
                 <TimePillPicker
                   options={TIME_PRESETS}
                   selected={context.timeLimit ?? 60}
@@ -459,7 +464,7 @@ export function SessionContextStep({
             <View style={styles.drillSummary}>
               <Text style={[styles.drillSummaryText, { color: colors.textMuted }]}>
                 {context.distance}m
-                {purpose !== 'grouping' ? ` • ${context.shotsPlanned} ${t('session.bullets').toLowerCase()}` : ''}
+                {purpose !== 'grouping' ? ` • ${context.shotsPlanned} ${shotsLabel.toLowerCase()}` : ''}
                 {context.timeLimit ? ` • ${formatTime(context.timeLimit)}` : ''}
               </Text>
             </View>
@@ -470,32 +475,30 @@ export function SessionContextStep({
       {/* Custom params if no drill */}
       {!selectedDrill && (
         <>
-          <View style={styles.paramRow}>
-            {/* Tappable label to toggle between exact/range - only when showRangeCategory */}
+          {/* ── Distance ── */}
+          <View style={styles.field}>
             {showRangeCategory ? (
-              <TouchableOpacity
-                style={styles.distanceLabelRow}
-                onPress={() => {
-                  Haptics.selectionAsync();
-                  setUseRangeMode(!useRangeMode);
-                  // Clear selection when switching
-                  onUpdateContext({ distance: 0, distanceCategory: null });
-                }}
-              >
-                <Text style={[styles.paramLabel, { color: colors.textMuted, marginBottom: 0 }]}>
+              <View style={styles.fieldHeader}>
+                <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>
                   {useRangeMode ? t('training.distanceRange') : t('session.distance')}
                 </Text>
-                <View style={[styles.distanceModeBadge, { backgroundColor: colors.card }]}>
-                  <Text style={[styles.distanceModeBadgeText, { color: colors.textMuted }]}>
+                <TouchableOpacity
+                  style={[styles.fieldSwitch, { backgroundColor: `${colors.textMuted}15` }]}
+                  onPress={() => {
+                    Haptics.selectionAsync();
+                    setUseRangeMode(!useRangeMode);
+                    onUpdateContext({ distance: 0, distanceCategory: null });
+                  }}
+                >
+                  <Text style={[styles.fieldSwitchText, { color: colors.textMuted }]}>
                     {useRangeMode ? t('training.tapForExact') : t('training.tapForRange')}
                   </Text>
-                </View>
-              </TouchableOpacity>
+                </TouchableOpacity>
+              </View>
             ) : (
-              <Text style={[styles.paramLabel, { color: colors.textMuted }]}>{t('session.distance')}</Text>
+              <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>{t('session.distance')}</Text>
             )}
 
-            {/* Exact distance picker */}
             {!useRangeMode && (
               <PillPicker
                 options={distancePresets.slice(0, 4)}
@@ -506,10 +509,9 @@ export function SessionContextStep({
               />
             )}
 
-            {/* Range category picker */}
             {useRangeMode && showRangeCategory && (
               <>
-                <View style={styles.rangeModeRow}>
+                <View style={styles.pillsRow}>
                   {RANGE_CATEGORIES.map((cat) => {
                     const isSelected = context.distanceCategory === cat.value;
                     const label =
@@ -521,24 +523,25 @@ export function SessionContextStep({
                     return (
                       <TouchableOpacity
                         key={cat.value}
-                        style={[styles.rangeModeBtn, { backgroundColor: isSelected ? colors.text : colors.card }]}
+                        style={[
+                          styles.chip,
+                          { borderColor: isSelected ? colors.primary : colors.border },
+                          isSelected && { backgroundColor: colors.primary },
+                        ]}
                         onPress={() => {
                           Haptics.selectionAsync();
                           onUpdateContext({ distanceCategory: cat.value as RangeCategory, distance: 0 });
                         }}
                       >
-                        <Text
-                          style={[styles.rangeModeBtnText, { color: isSelected ? colors.background : colors.text }]}
-                        >
+                        <Text style={[styles.chipText, { color: isSelected ? '#fff' : colors.text }]}>
                           {label}
                         </Text>
                       </TouchableOpacity>
                     );
                   })}
                 </View>
-                {/* Range description */}
                 {context.distanceCategory && (
-                  <Text style={[styles.rangeHint, { color: colors.textMuted }]}>
+                  <Text style={[styles.fieldHint, { color: colors.textMuted }]}>
                     {context.distanceCategory === 'short' && t('training.shortRangeDesc')}
                     {context.distanceCategory === 'medium' && t('training.mediumRangeDesc')}
                     {context.distanceCategory === 'long' && t('training.longRangeDesc')}
@@ -548,10 +551,38 @@ export function SessionContextStep({
             )}
           </View>
 
-          {/* Only show bullets for engagement - grouping gets count from scan */}
+          {/* ── Position ── */}
+          <View style={styles.field}>
+            <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>{t('session.position')}</Text>
+            <View style={styles.pillsRow}>
+              {positionOptions.map((opt) => {
+                const active = context.position === opt.value;
+                return (
+                  <TouchableOpacity
+                    key={opt.value}
+                    style={[
+                      styles.chip,
+                      { borderColor: active ? colors.primary : colors.border },
+                      active && { backgroundColor: colors.primary },
+                    ]}
+                    onPress={() => {
+                      Haptics.selectionAsync();
+                      onUpdateContext({ position: opt.value });
+                    }}
+                  >
+                    <Text style={[styles.chipText, { color: active ? '#fff' : colors.text }]}>
+                      {opt.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+
+          {/* ── Shots (engagement only) ── */}
           {purpose !== 'grouping' && (
-            <View style={styles.paramRow}>
-              <Text style={[styles.paramLabel, { color: colors.textMuted }]}>{t('session.bullets')}</Text>
+            <View style={styles.field}>
+              <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>{shotsLabel}</Text>
               <PillPicker
                 options={shotsPresets.slice(0, 4)}
                 selected={context.shotsPlanned}
@@ -561,32 +592,11 @@ export function SessionContextStep({
             </View>
           )}
 
-          {/* Position - always visible */}
-          <View style={styles.paramRow}>
-            <Text style={[styles.paramLabel, { color: colors.textMuted }]}>{t('session.position')}</Text>
-            <View style={styles.pills}>
-              {positionOptions.map((opt) => {
-                const active = context.position === opt.value;
-                return (
-                  <TouchableOpacity
-                    key={opt.value}
-                    style={[styles.pill, { backgroundColor: active ? colors.text : colors.card }]}
-                    onPress={() => {
-                      Haptics.selectionAsync();
-                      onUpdateContext({ position: opt.value });
-                    }}
-                  >
-                    <Text style={[styles.pillText, { color: active ? colors.background : colors.text }]}>
-                      {opt.label}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          </View>
-
-          {/* Advanced toggle */}
-          <TouchableOpacity style={styles.advancedToggle} onPress={() => setShowAdvanced(!showAdvanced)}>
+          {/* ── Advanced ── */}
+          <TouchableOpacity
+            style={[styles.advancedToggle, { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }]}
+            onPress={() => setShowAdvanced(!showAdvanced)}
+          >
             <Text style={[styles.advancedText, { color: colors.textMuted }]}>
               {showAdvanced ? t('session.lessOptions') : t('session.moreOptions')}
             </Text>
@@ -598,13 +608,11 @@ export function SessionContextStep({
           </TouchableOpacity>
 
           {showAdvanced && (
-            <>
+            <View style={styles.advancedContent}>
               {/* Time Limit Toggle */}
               <View style={styles.toggleRow}>
                 <View style={styles.toggleLabel}>
-                  <Text style={[styles.paramLabel, { color: colors.text, marginBottom: 0 }]}>
-                    {t('session.timeLimit')}
-                  </Text>
+                  <Text style={[styles.toggleTitle, { color: colors.text }]}>{t('session.timeLimit')}</Text>
                   <Text style={[styles.toggleHint, { color: colors.textMuted }]}>{t('session.setCountdownTimer')}</Text>
                 </View>
                 <Switch
@@ -618,23 +626,18 @@ export function SessionContextStep({
                 />
               </View>
 
-              {/* Time picker - only show when enabled */}
               {context.timeLimit !== null && (
-                <View style={[styles.paramRow, { paddingTop: 0 }]}>
-                  <TimePillPicker
-                    options={TIME_PRESETS}
-                    selected={context.timeLimit}
-                    onSelect={(t) => onUpdateContext({ timeLimit: t })}
-                  />
-                </View>
+                <TimePillPicker
+                  options={TIME_PRESETS}
+                  selected={context.timeLimit}
+                  onSelect={(t) => onUpdateContext({ timeLimit: t })}
+                />
               )}
 
               {/* Stress Drill Toggle */}
               <View style={styles.toggleRow}>
                 <View style={styles.toggleLabel}>
-                  <Text style={[styles.paramLabel, { color: colors.text, marginBottom: 0 }]}>
-                    {t('session.stressDrill')}
-                  </Text>
+                  <Text style={[styles.toggleTitle, { color: colors.text }]}>{t('session.stressDrill')}</Text>
                   <Text style={[styles.toggleHint, { color: colors.textMuted }]}>
                     {t('session.stressDrillDescription')}
                   </Text>
@@ -650,20 +653,18 @@ export function SessionContextStep({
                 />
               </View>
 
-              <View style={styles.notesRow}>
-                <TextInput
-                  style={[
-                    styles.notesInput,
-                    { backgroundColor: colors.card, borderColor: colors.border, color: colors.text },
-                  ]}
-                  placeholder={t('session.sessionNotes')}
-                  placeholderTextColor={colors.textMuted}
-                  value={context.notes}
-                  onChangeText={(notes) => onUpdateContext({ notes })}
-                  multiline
-                />
-              </View>
-            </>
+              <TextInput
+                style={[
+                  styles.notesInput,
+                  { backgroundColor: colors.background, borderColor: colors.border, color: colors.text },
+                ]}
+                placeholder={t('session.sessionNotes')}
+                placeholderTextColor={colors.textMuted}
+                value={context.notes}
+                onChangeText={(notes) => onUpdateContext({ notes })}
+                multiline
+              />
+            </View>
           )}
         </>
       )}
@@ -729,18 +730,77 @@ export function SessionContextStep({
 // ============================================================================
 
 const styles = StyleSheet.create({
-  container: { },
+  container: {
+    gap: 18,
+  },
 
-  // Params
-  paramRow: {  },
-  paramLabel: { fontSize: 13, marginBottom: 10, alignSelf: 'flex-start' },
+  // Each form field: label + control
+  field: {
+    gap: 10,
+  },
+  fieldLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+  },
+  fieldHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  fieldSwitch: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  fieldSwitchText: {
+    fontSize: 11,
+    fontWeight: '500',
+  },
+  fieldHint: {
+    fontSize: 12,
+    marginTop: -2,
+  },
 
-  // Drill row
-  drillRow: {  },
-  drillLabel: { fontSize: 15 },
-  drillSelected: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1 },
-  drillName: { fontSize: 15, fontWeight: '600', flexShrink: 1 },
-  drillChange: { fontSize: 13 },
+  // Chips (outlined style)
+  pillsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    alignItems: 'center',
+  },
+  chip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  chipText: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  chipInput: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderRadius: 8,
+    gap: 2,
+    paddingHorizontal: 12,
+  },
+  chipInputText: {
+    fontSize: 14,
+    fontWeight: '600',
+    minWidth: 32,
+    textAlign: 'center',
+    paddingVertical: 0,
+  },
+  chipInputSuffix: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+
+  // Drill controls
   drillActions: { flexDirection: 'row', gap: 8, paddingVertical: 12 },
   drillActionBtn: {
     flexDirection: 'row',
@@ -754,46 +814,39 @@ const styles = StyleSheet.create({
   drillSummary: { paddingVertical: 8 },
   drillSummaryText: { fontSize: 14 },
 
-  // Pills
-  pillsContainer: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  pillsPresets: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  pills: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  pill: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20 },
-  pillText: { fontSize: 14, fontWeight: '500' },
-  pillInputContainer: { flexDirection: 'row', alignItems: 'center', borderWidth: 1.5, gap: 2, paddingHorizontal: 12 },
-  pillInputText: { fontSize: 14, fontWeight: '600', minWidth: 32, textAlign: 'center', paddingVertical: 0 },
-  pillInputSuffix: { fontSize: 13, fontWeight: '500' },
-
-  // Range category mode
-  rangeModeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  rangeModeBtn: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8 },
-  rangeModeBtnText: { fontSize: 13, fontWeight: '600' },
-  rangeHint: { fontSize: 12, marginTop: 8 },
-  distanceLabelRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    marginBottom: 10,
-  },
-  distanceModeBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  distanceModeBadgeText: { fontSize: 11 },
-
   // Advanced
-  advancedToggle: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: 12 },
+  advancedToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    paddingTop: 14,
+    marginTop: -4,
+  },
   advancedText: { fontSize: 13 },
+  advancedContent: {
+    gap: 16,
+  },
 
-  // Toggle row
-  toggleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 14 },
-  toggleLabel: { flex: 1 },
-  toggleHint: { fontSize: 12, marginTop: 2 },
+  // Toggle rows
+  toggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  toggleLabel: { flex: 1, gap: 2, marginRight: 12 },
+  toggleTitle: { fontSize: 14, fontWeight: '600' },
+  toggleHint: { fontSize: 12 },
 
   // Notes
-  notesRow: { paddingVertical: 8 },
-  notesInput: { borderWidth: 1, borderRadius: 10, padding: 12, fontSize: 14, minHeight: 60, textAlignVertical: 'top' },
+  notesInput: {
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 12,
+    fontSize: 14,
+    minHeight: 60,
+    textAlignVertical: 'top',
+  },
 
   // Modal header
   modalHeader: {

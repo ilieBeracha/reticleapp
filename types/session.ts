@@ -84,6 +84,16 @@ export type ParticipantState = 'pending' | 'joined' | 'declined' | 'left';
  */
 export type EngagementRole = 'shooter' | 'spotter';
 
+/** Per-target result entry for multi-target engagements */
+export interface TargetResultEntry {
+  target_number: number;
+  shots_fired: number;
+  hits: number;
+}
+
+/** Measurement scope: who owns the results */
+export type MeasurementScope = 'individual' | 'collective';
+
 /**
  * A participant in a squad engagement.
  *
@@ -104,6 +114,8 @@ export interface EngagementParticipant {
   /** Participant's contribution to group totals */
   shots_fired?: number | null;
   hits?: number | null;
+  /** Per-target results for multi-target engagements. NULL when target_count=1 */
+  target_results?: TargetResultEntry[] | null;
   /** Joined from user profile */
   user_full_name?: string | null;
   user_avatar_url?: string | null;
@@ -295,6 +307,10 @@ export interface SessionDrillConfig {
    * 'free' = full freedom (open practice)
    */
   execution_policy?: 'locked' | 'guided' | 'free' | null;
+  /** Max times a soldier can execute this drill */
+  max_executions?: number | null;
+  /** Measurement scope: individual or collective */
+  measurement_scope?: 'individual' | 'collective' | null;
 }
 
 /** Aggregated session statistics (computed from targets) */

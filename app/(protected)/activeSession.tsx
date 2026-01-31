@@ -26,6 +26,7 @@ import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { DrillConfigSheet } from '@/components/session/activeSession/DrillConfigSheet';
 import { GroupSessionView } from '@/components/session/activeSession/GroupSessionView';
 import { SessionPrepView } from '@/components/session/activeSession/SessionPrepView';
 import { SoloSessionView } from '@/components/session/activeSession/SoloSessionView';
@@ -89,6 +90,11 @@ export default function ActiveSessionScreen() {
       if (user) setCurrentUserId(user.id);
     });
   }, []);
+
+  // Config sheet state
+  const [showConfigSheet, setShowConfigSheet] = useState(false);
+  const handleOpenConfig = () => setShowConfigSheet(true);
+  const handleCloseConfig = () => setShowConfigSheet(false);
 
   // ═══════════════════════════════════════════════════════════════════════════
   // LOADING STATE
@@ -332,21 +338,33 @@ export default function ActiveSessionScreen() {
 
   if (isTeamTraining) {
     return (
-      <TeamTrainingView
-        session={session}
-        targets={targets}
-        insets={insets}
-        elapsedTime={elapsedTime}
-        drill={drill}
-        drillProgress={drillProgress}
-        watchState={watchState}
-        canAddTarget={canAddTarget}
-        onScanRoute={handleScanRoute}
-        onManualRoute={handleManualRoute}
-        onTargetPress={handleTargetPress}
-        onEndSession={handleEndSession}
-        ending={ending}
-      />
+      <>
+        <TeamTrainingView
+          session={session}
+          targets={targets}
+          insets={insets}
+          elapsedTime={elapsedTime}
+          drill={drill}
+          drillProgress={drillProgress}
+          watchState={watchState}
+          canAddTarget={canAddTarget}
+          onScanRoute={handleScanRoute}
+          onManualRoute={handleManualRoute}
+          onTargetPress={handleTargetPress}
+          onEndSession={handleEndSession}
+          ending={ending}
+          onOpenConfig={hasDrill ? handleOpenConfig : undefined}
+        />
+        {hasDrill && (
+          <DrillConfigSheet
+            visible={showConfigSheet}
+            onClose={handleCloseConfig}
+            session={session}
+            drill={drill}
+            onSessionUpdated={handleRefresh}
+          />
+        )}
+      </>
     );
   }
 
@@ -354,29 +372,45 @@ export default function ActiveSessionScreen() {
   // SOLO SESSION (default)
   // ═══════════════════════════════════════════════════════════════════════════
 
+  // Config is editable for 'guide' or 'free' execution policies
+  const isConfigEditable = !isConfigLocked;
+
   return (
-    <SoloSessionView
-      session={session}
-      targets={targets}
-      insets={insets}
-      elapsedTime={elapsedTime}
-      drill={drill}
-      hasDrill={hasDrill}
-      drillProgress={drillProgress}
-      watchState={watchState}
-      canAddTarget={canAddTarget}
-      refreshing={refreshing}
-      ending={ending}
-      weather={weather}
-      weatherLoading={weatherLoading}
-      weatherError={weatherError}
-      onRefresh={handleRefresh}
-      onScanRoute={handleScanRoute}
-      onManualRoute={handleManualRoute}
-      onTargetPress={handleTargetPress}
-      onEndSession={handleEndSession}
-      onClose={handleClose}
-    />
+    <>
+      <SoloSessionView
+        session={session}
+        targets={targets}
+        insets={insets}
+        elapsedTime={elapsedTime}
+        drill={drill}
+        hasDrill={hasDrill}
+        drillProgress={drillProgress}
+        watchState={watchState}
+        canAddTarget={canAddTarget}
+        refreshing={refreshing}
+        ending={ending}
+        weather={weather}
+        weatherLoading={weatherLoading}
+        weatherError={weatherError}
+        isConfigEditable={isConfigEditable}
+        onRefresh={handleRefresh}
+        onScanRoute={handleScanRoute}
+        onManualRoute={handleManualRoute}
+        onTargetPress={handleTargetPress}
+        onEndSession={handleEndSession}
+        onClose={handleClose}
+        onOpenConfig={hasDrill ? handleOpenConfig : undefined}
+      />
+      {hasDrill && (
+        <DrillConfigSheet
+          visible={showConfigSheet}
+          onClose={handleCloseConfig}
+          session={session}
+          drill={drill}
+          onSessionUpdated={handleRefresh}
+        />
+      )}
+    </>
   );
 }
 

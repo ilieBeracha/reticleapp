@@ -227,6 +227,11 @@ export interface TrainingDrill {
    * 'squad' = squad participation allowed (engagement only) */
   engagement_mode?: 'solo' | 'squad' | null;
 
+  /** Measurement scope for engagement drills:
+   * 'individual' = each participant records own results (default)
+   * 'collective' = squad records one shared result */
+  measurement_scope?: 'individual' | 'collective' | null;
+
   // === INSTANCE CONFIGURATION (variable per training) ===
   /** Distance in meters. Null = soldier chooses at execution time */
   distance_m?: number | null;
@@ -329,6 +334,13 @@ export interface CreateTrainingDrillInput {
    * 'squad' = squad participation allowed (engagement only)
    * Default: 'solo' */
   engagement_mode?: 'solo' | 'squad';
+
+  // === MEASUREMENT SCOPE ===
+  /** Who owns the results:
+   * 'individual' = each shooter records own results (default)
+   * 'collective' = one shared result for the group (commander enters)
+   * Default: 'individual' */
+  measurement_scope?: 'individual' | 'collective';
 
   // === INSTANCE CONFIGURATION (variable per training) ===
   /** Distance in meters. Null/undefined = soldier chooses at execution time */

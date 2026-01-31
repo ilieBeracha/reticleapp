@@ -137,7 +137,7 @@ export function TrainingDetailsStep({
       {/* ── Section: Basic Info ── */}
       <View style={styles.formSection}>
         <Text style={[styles.formSectionLabel, { color: colors.textMuted }]}>
-          {t('training.basicInfo', 'BASIC INFO')}
+          {t('training.basicInfo')}
         </Text>
         <View style={[styles.formSectionCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <View style={styles.formField}>
@@ -181,7 +181,7 @@ export function TrainingDetailsStep({
       {hasTeam && (
         <Animated.View entering={FadeIn.duration(200)} style={styles.formSection}>
           <Text style={[styles.formSectionLabel, { color: colors.textMuted }]}>
-            {t('training.participants', 'PARTICIPANTS')}
+            {t('training.participants')}
           </Text>
           <View style={[styles.formSectionCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
             {/* Entire Team toggle row */}
@@ -196,10 +196,10 @@ export function TrainingDetailsStep({
               <Users size={18} color={colors.text} strokeWidth={1.5} />
               <View style={styles.entireTeamContent}>
                 <Text style={[styles.entireTeamTitle, { color: colors.text }]}>
-                  {t('training.entireTeam', 'Entire Team')}
+                  {t('training.entireTeam')}
                 </Text>
                 <Text style={[styles.entireTeamSubtitle, { color: colors.textMuted }]}>
-                  {t('training.allMembersIncluded', '{{count}} members included', { count: members.length })}
+                  {t('training.allMembersIncluded', { count: members.length })}
                 </Text>
               </View>
               <View
@@ -223,8 +223,8 @@ export function TrainingDetailsStep({
                 {/* Selection summary */}
                 <Text style={[styles.selectionSummary, { color: colors.textMuted }]}>
                   {selectedMemberIds.length === 0
-                    ? t('training.selectAtLeastOne', 'Select at least one member')
-                    : t('training.xOfYMembers', '{{selected}} of {{total}} members', {
+                    ? t('training.selectAtLeastOne')
+                    : t('training.xOfYMembers', {
                         selected: selectedMemberIds.length,
                         total: members.length,
                       })}
@@ -275,14 +275,14 @@ export function TrainingDetailsStep({
                               </Text>
                               {isCurrentUser && (
                                 <Text style={[styles.youBadge, { color: colors.primary }]}>
-                                  {t('training.you', '(You)')}
+                                  {t('training.you')}
                                 </Text>
                               )}
                               {isRequired && (
                                 <View style={[styles.requiredBadge, { backgroundColor: `${colors.primary}15` }]}>
                                   <Lock size={9} color={colors.primary} strokeWidth={2.5} />
                                   <Text style={[styles.requiredBadgeText, { color: colors.primary }]}>
-                                    {t('training.required', 'Required')}
+                                    {t('training.required')}
                                   </Text>
                                 </View>
                               )}
@@ -317,7 +317,7 @@ export function TrainingDetailsStep({
       {/* ── Section: Schedule ── */}
       <View style={styles.formSection}>
         <Text style={[styles.formSectionLabel, { color: colors.textMuted }]}>
-          {t('training.schedule', 'SCHEDULE')}
+          {t('training.schedule')}
         </Text>
         <View style={[styles.formSectionCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <TouchableOpacity style={styles.scheduleHeader} onPress={handleToggleSchedule} activeOpacity={0.7}>
@@ -379,7 +379,7 @@ export function TrainingDetailsStep({
 
 const styles = StyleSheet.create({
   container: {
-    gap: 24,
+    gap: 20,
   },
 
   // Form Section Pattern
@@ -394,9 +394,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
   formSectionCard: {
-    borderRadius: 16,
+    borderRadius: 14,
     borderWidth: 1,
-    padding: 16,
+    padding: 14,
     overflow: 'hidden',
   },
 
@@ -414,9 +414,9 @@ const styles = StyleSheet.create({
     marginVertical: 14,
   },
   nameInput: {
-    height: 46,
-    borderWidth: 1.5,
-    borderRadius: 12,
+    height: 42,
+    borderWidth: 1,
+    borderRadius: 10,
     paddingHorizontal: 16,
     fontSize: 15,
     fontWeight: '500',
@@ -424,8 +424,8 @@ const styles = StyleSheet.create({
   },
   textArea: {
     minHeight: 90,
-    borderWidth: 1.5,
-    borderRadius: 12,
+    borderWidth: 1,
+    borderRadius: 10,
     paddingHorizontal: 14,
     paddingTop: 12,
     fontSize: 15,
@@ -502,7 +502,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 14,
-    borderRadius: 12,
+    borderRadius: 10,
     gap: 8,
   },
   scheduleBtnText: {

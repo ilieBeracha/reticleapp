@@ -116,7 +116,6 @@ export default function CreateTrainingScreen() {
   // ─────────────────────────────────────────────────────────────────────────
 
   const stepLabels = [t('training.details'), t('training.drills')];
-  const totalSteps = 2;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -149,22 +148,17 @@ export default function CreateTrainingScreen() {
           <View style={styles.headerButtonPlaceholder} />
         </View>
 
-        {/* Progress indicator - minimal pill style */}
+        {/* Progress indicator - centered dot segments */}
         <View style={styles.progressContainer}>
-          <View style={[styles.progressTrack, { backgroundColor: colors.border }]}>
+          {[1, 2].map((s) => (
             <View
+              key={s}
               style={[
-                styles.progressFill,
-                {
-                  backgroundColor: colors.text,
-                  width: `${(currentStep / totalSteps) * 100}%`,
-                },
+                styles.progressDot,
+                { backgroundColor: s <= currentStep ? colors.text : colors.border },
               ]}
             />
-          </View>
-          <Text style={[styles.progressText, { color: colors.textMuted }]}>
-            {currentStep}/{totalSteps}
-          </Text>
+          ))}
         </View>
       </View>
 
@@ -364,46 +358,35 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    height: 44,
+    height: 40,
   },
   headerButton: {
-    width: 32,
-    height: 32,
+    width: 30,
+    height: 30,
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
   headerButtonPlaceholder: {
-    width: 32,
+    width: 30,
   },
   headerTitle: {
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: '600',
     letterSpacing: -0.2,
   },
 
-  // Progress - minimal bar
+  // Progress - centered dot segments
   progressContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginTop: 8,
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: 6,
   },
-  progressTrack: {
-    flex: 1,
+  progressDot: {
+    width: 24,
     height: 3,
     borderRadius: 1.5,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    borderRadius: 1.5,
-  },
-  progressText: {
-    fontSize: 11,
-    fontWeight: '600',
-    minWidth: 24,
-    textAlign: 'right',
   },
 
   // ScrollView
@@ -437,11 +420,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    height: 50,
-    borderRadius: 12,
+    height: 44,
+    borderRadius: 10,
   },
   actionText: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
     letterSpacing: -0.2,
   },

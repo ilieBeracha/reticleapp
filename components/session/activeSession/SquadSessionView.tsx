@@ -10,8 +10,8 @@
 
 import { useColors } from '@/hooks/ui/useColors';
 import { getCurrentUserId } from '@/services/authService';
-import { calculateGroupTotals, updateParticipantResults, updateParticipantState } from '@/services/session/participants';
-import type { EngagementParticipant } from '@/types/session';
+import { calculateGroupTotals, updateEngagementResults, updateParticipantResults, updateParticipantState } from '@/services/session/participants';
+import type { EngagementParticipant, TargetResultEntry } from '@/types/session';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import {
@@ -58,6 +58,8 @@ interface SquadSessionViewProps {
       drill_goal?: string;
       distance_m?: number;
       rounds_per_shooter?: number;
+      target_count?: number | null;
+      measurement_scope?: string | null;
     } | null;
     training_id?: string | null;
   };
@@ -97,6 +99,7 @@ export function SquadSessionView({
   const [totalHitsCount, setTotalHitsCount] = useState(0);
   const [saving, setSaving] = useState(false);
   const [acceptLoading, setAcceptLoading] = useState<'accept' | 'decline' | null>(null);
+  const [targetResults, setTargetResults] = useState<TargetResultEntry[]>([]);
 
   // ─────────────────────────────────────────────────────────────────────────────
   // Get current user
@@ -119,6 +122,26 @@ export function SquadSessionView({
   const allShotsSubmitted = shooters.length > 0 && shooters.every((p) => (p.shots_fired || 0) > 0);
   const hasAnyHits = groupTotals.totalHits > 0;
   const isPendingInvite = myParticipant?.state === 'pending';
+
+  // Multi-target and collective scope
+  const measurementScope = session.drill_config?.measurement_scope || 'individual';
+  const isCollective = measurementScope === 'collective';
+  const targetCount = session.drill_config?.target_count || 1;
+  const isMultiTarget = targetCount > 1;
+
+  // Shared shots pool: rounds = total across all targets, NOT per target
+  const totalPlannedShots = session.drill_config?.rounds_per_shooter || 0;
+  const hasGlobalPool = isMultiTarget && totalPlannedShots > 0;
+  // Pool computations for multi-target (recomputed as targetResults state changes)
+  const nonLastShotsSum = hasGlobalPool
+    ? targetResults.filter(r => r.target_number !== targetCount).reduce((sum, r) => sum + r.shots_fired, 0)
+    : 0;
+  const remainingForLastTarget = hasGlobalPool ? Math.max(0, totalPlannedShots - nonLastShotsSum) : 0;
+
+  // For collective scope: only commander enters/sees results
+  const showMyResults = !isCollective || isCommander;
+  const resultsLabel = isCollective ? t('session.squadResults', 'Squad Results') : t('session.yourShots');
+  const enterLabel = isCollective ? t('session.enterSquadResults', 'Enter Squad Results') : t('session.enterYourShots');
 
   // ─────────────────────────────────────────────────────────────────────────────
   // Handlers
@@ -159,6 +182,21 @@ export function SquadSessionView({
   const handleOpenResultsSheet = () => {
     // Pre-fill with existing values if any
     setShotCount(myParticipant?.shots_fired || 0);
+    // Initialize per-target results
+    if (isMultiTarget) {
+      const existing = myParticipant?.target_results;
+      if (existing && Array.isArray(existing)) {
+        setTargetResults(existing as TargetResultEntry[]);
+      } else {
+        setTargetResults(
+          Array.from({ length: targetCount }, (_, i) => ({
+            target_number: i + 1,
+            shots_fired: 0,
+            hits: 0,
+          }))
+        );
+      }
+    }
     setShowResultsSheet(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   };
@@ -175,8 +213,35 @@ export function SquadSessionView({
 
     setSaving(true);
     try {
-      // Save shots only (hits = 0 for individual entry)
-      await updateParticipantResults(engagementId, currentUserId, shotCount, 0);
+      if (isMultiTarget) {
+        // Normalize: last target gets remaining shots from the shared pool
+        let finalResults = targetResults;
+        if (hasGlobalPool) {
+          const nonLastSum = targetResults
+            .filter(r => r.target_number !== targetCount)
+            .reduce((sum, r) => sum + r.shots_fired, 0);
+          const remaining = Math.max(0, totalPlannedShots - nonLastSum);
+          finalResults = targetResults.map(r =>
+            r.target_number === targetCount
+              ? { ...r, shots_fired: remaining, hits: Math.min(r.hits, remaining) }
+              : r
+          );
+        }
+        await updateEngagementResults({
+          engagementId,
+          userId: currentUserId,
+          targetCount,
+          targetResults: finalResults,
+        });
+      } else {
+        await updateEngagementResults({
+          engagementId,
+          userId: currentUserId,
+          targetCount: 1,
+          shotsFired: shotCount,
+          hits: 0,
+        });
+      }
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setShowResultsSheet(false);
       onRefresh();
@@ -450,10 +515,10 @@ export function SquadSessionView({
         {/* ─────────────────────────────────────────────────────────────────────── */}
         {/* My Results                                                             */}
         {/* ─────────────────────────────────────────────────────────────────────── */}
-        {!isViewOnly && hasSubmitted && (
+        {!isViewOnly && hasSubmitted && showMyResults && (
           <View style={[styles.myResultsCard, { backgroundColor: colors.card }]}>
             <View style={styles.myResultsHeader}>
-              <Text style={[styles.myResultsTitle, { color: colors.text }]}>{t('session.yourShots')}</Text>
+              <Text style={[styles.myResultsTitle, { color: colors.text }]}>{resultsLabel}</Text>
               <View style={[styles.checkBadge, { backgroundColor: colors.green + '15' }]}>
                 <Check size={12} color={colors.green} />
               </View>
@@ -476,7 +541,7 @@ export function SquadSessionView({
         {/* ─────────────────────────────────────────────────────────────────────── */}
         {/* Add Shots Button (if not submitted yet)                                */}
         {/* ─────────────────────────────────────────────────────────────────────── */}
-        {!isViewOnly && !hasSubmitted && myParticipant?.role === 'shooter' && (
+        {!isViewOnly && !hasSubmitted && showMyResults && myParticipant?.role === 'shooter' && (
           <TouchableOpacity
             style={[styles.addResultsCard, { backgroundColor: colors.primary }]}
             onPress={handleOpenResultsSheet}
@@ -484,7 +549,7 @@ export function SquadSessionView({
           >
             <Target size={24} color="#fff" />
             <View style={styles.addResultsText}>
-              <Text style={styles.addResultsTitle}>{t('session.enterYourShots')}</Text>
+              <Text style={styles.addResultsTitle}>{enterLabel}</Text>
               <Text style={styles.addResultsSubtitle}>{t('session.recordShotsFired')}</Text>
             </View>
             <Plus size={20} color="#fff" />
@@ -571,58 +636,195 @@ export function SquadSessionView({
               {/* Handle */}
               <View style={[styles.sheetHandle, { backgroundColor: colors.border }]} />
 
-              <Text style={[styles.sheetTitle, { color: colors.text }]}>{t('session.enterYourShots')}</Text>
+              <Text style={[styles.sheetTitle, { color: colors.text }]}>{enterLabel}</Text>
 
-              {/* Shots Counter */}
-              <View style={styles.counterSection}>
-                <Text style={[styles.counterLabel, { color: colors.textMuted }]}>{t('session.shotsFired')}</Text>
-                <View style={styles.counterRow}>
-                  <TouchableOpacity
-                    style={[styles.counterBtn, { backgroundColor: colors.secondary }]}
-                    onPress={() => adjustShots(-1)}
-                    disabled={shotCount <= 0}
-                  >
-                    <Minus size={22} color={shotCount <= 0 ? colors.textMuted : colors.text} />
-                  </TouchableOpacity>
-                  <View style={styles.counterValue}>
-                    <Text style={[styles.counterNumber, { color: colors.text }]}>{shotCount}</Text>
-                  </View>
-                  <TouchableOpacity
-                    style={[styles.counterBtn, { backgroundColor: colors.secondary }]}
-                    onPress={() => adjustShots(1)}
-                  >
-                    <Plus size={22} color={colors.text} />
-                  </TouchableOpacity>
+              {/* Counter Section */}
+              {isMultiTarget ? (
+                <View style={styles.counterSection}>
+                  {/* Pool header: show total rounds shared across targets */}
+                  {hasGlobalPool && (
+                    <View style={{ alignItems: 'center', marginBottom: 12, padding: 10, backgroundColor: colors.secondary, borderRadius: 10 }}>
+                      <Text style={{ color: colors.text, fontSize: 16, fontWeight: '700' }}>
+                        {t('session.totalRoundsCount', { count: totalPlannedShots, defaultValue: `${totalPlannedShots} rounds` })}
+                      </Text>
+                      <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 2 }}>
+                        {t('session.sharedAcrossTargets', { count: targetCount, defaultValue: `Shared across ${targetCount} targets` })}
+                      </Text>
+                    </View>
+                  )}
+                  <Text style={[styles.counterLabel, { color: colors.textMuted }]}>
+                    {t('session.perTargetResults', 'PER-TARGET RESULTS')}
+                  </Text>
+                  {Array.from({ length: targetCount }, (_, i) => i + 1).map((targetNum) => {
+                    const isLastTarget = hasGlobalPool && targetNum === targetCount;
+                    // For non-last targets: cap at what the shared pool allows
+                    const otherNonLastShots = hasGlobalPool
+                      ? targetResults
+                          .filter(r => r.target_number !== targetNum && r.target_number !== targetCount)
+                          .reduce((sum, r) => sum + r.shots_fired, 0)
+                      : 0;
+                    const maxShotsForTarget = hasGlobalPool
+                      ? Math.max(0, totalPlannedShots - otherNonLastShots)
+                      : Number.MAX_SAFE_INTEGER;
+
+                    const tr = targetResults.find((r) => r.target_number === targetNum) || {
+                      target_number: targetNum,
+                      shots_fired: 0,
+                      hits: 0,
+                    };
+                    // Last target: derive shots from remaining pool
+                    const displayedShots = isLastTarget ? remainingForLastTarget : tr.shots_fired;
+                    const displayedHits = isLastTarget ? Math.min(tr.hits, remainingForLastTarget) : tr.hits;
+
+                    return (
+                      <View key={targetNum} style={{ backgroundColor: colors.secondary, borderRadius: 12, padding: 12, marginBottom: 8 }}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                          <Text style={{ color: colors.text, fontWeight: '600', fontSize: 14 }}>
+                            {t('session.targetNumber', { number: targetNum, defaultValue: `Target ${targetNum}` })}
+                          </Text>
+                          {isLastTarget && (
+                            <Text style={{ color: colors.textMuted, fontSize: 11, fontStyle: 'italic' }}>
+                              {t('session.remainingShots', 'Remaining shots')}
+                            </Text>
+                          )}
+                        </View>
+                        <View style={{ flexDirection: 'row', gap: 16 }}>
+                          {/* Shots column */}
+                          <View style={{ flex: 1, alignItems: 'center' }}>
+                            <Text style={{ color: colors.textMuted, fontSize: 11, marginBottom: 4 }}>
+                              {t('session.shotsFired')}
+                            </Text>
+                            {isLastTarget ? (
+                              <Text style={{ color: colors.text, fontSize: 20, fontWeight: '700', opacity: 0.6 }}>
+                                {displayedShots}
+                              </Text>
+                            ) : (
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                <TouchableOpacity
+                                  onPress={() => {
+                                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                    setTargetResults((prev) => prev.map((r) =>
+                                      r.target_number === targetNum
+                                        ? { ...r, shots_fired: Math.max(0, r.shots_fired - 1), hits: Math.min(r.hits, Math.max(0, r.shots_fired - 1)) }
+                                        : r
+                                    ));
+                                  }}
+                                  disabled={tr.shots_fired <= 0}
+                                >
+                                  <Minus size={16} color={tr.shots_fired <= 0 ? colors.border : colors.textMuted} />
+                                </TouchableOpacity>
+                                <Text style={{ color: colors.text, fontSize: 20, fontWeight: '700', minWidth: 30, textAlign: 'center' }}>
+                                  {tr.shots_fired}
+                                </Text>
+                                <TouchableOpacity
+                                  onPress={() => {
+                                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                    setTargetResults((prev) => prev.map((r) =>
+                                      r.target_number === targetNum
+                                        ? { ...r, shots_fired: Math.min(r.shots_fired + 1, maxShotsForTarget) }
+                                        : r
+                                    ));
+                                  }}
+                                  disabled={hasGlobalPool && tr.shots_fired >= maxShotsForTarget}
+                                >
+                                  <Plus size={16} color={hasGlobalPool && tr.shots_fired >= maxShotsForTarget ? colors.border : colors.text} />
+                                </TouchableOpacity>
+                              </View>
+                            )}
+                          </View>
+                          {/* Hits column */}
+                          <View style={{ flex: 1, alignItems: 'center' }}>
+                            <Text style={{ color: colors.textMuted, fontSize: 11, marginBottom: 4 }}>
+                              {t('session.hits')}
+                            </Text>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                              <TouchableOpacity
+                                onPress={() => {
+                                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                  setTargetResults((prev) => prev.map((r) =>
+                                    r.target_number === targetNum
+                                      ? { ...r, hits: Math.max(0, r.hits - 1) }
+                                      : r
+                                  ));
+                                }}
+                                disabled={displayedHits <= 0}
+                              >
+                                <Minus size={16} color={displayedHits <= 0 ? colors.border : colors.textMuted} />
+                              </TouchableOpacity>
+                              <Text style={{ color: colors.green, fontSize: 20, fontWeight: '700', minWidth: 30, textAlign: 'center' }}>
+                                {displayedHits}
+                              </Text>
+                              <TouchableOpacity
+                                onPress={() => {
+                                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                  setTargetResults((prev) => prev.map((r) =>
+                                    r.target_number === targetNum
+                                      ? { ...r, hits: Math.min(displayedShots, r.hits + 1) }
+                                      : r
+                                  ));
+                                }}
+                                disabled={displayedHits >= displayedShots}
+                              >
+                                <Plus size={16} color={displayedHits >= displayedShots ? colors.border : colors.text} />
+                              </TouchableOpacity>
+                            </View>
+                          </View>
+                        </View>
+                      </View>
+                    );
+                  })}
                 </View>
-                {/* Quick add */}
-                <View style={styles.quickAdd}>
-                  {[5, 10, 20, 30].map((n) => (
+              ) : (
+                <View style={styles.counterSection}>
+                  <Text style={[styles.counterLabel, { color: colors.textMuted }]}>{t('session.shotsFired')}</Text>
+                  <View style={styles.counterRow}>
                     <TouchableOpacity
-                      key={n}
-                      style={[styles.quickAddBtn, { backgroundColor: colors.secondary }]}
-                      onPress={() => {
-                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                        setShotCount(shotCount + n);
-                      }}
+                      style={[styles.counterBtn, { backgroundColor: colors.secondary }]}
+                      onPress={() => adjustShots(-1)}
+                      disabled={shotCount <= 0}
                     >
-                      <Text style={[styles.quickAddText, { color: colors.text }]}>+{n}</Text>
+                      <Minus size={22} color={shotCount <= 0 ? colors.textMuted : colors.text} />
                     </TouchableOpacity>
-                  ))}
+                    <View style={styles.counterValue}>
+                      <Text style={[styles.counterNumber, { color: colors.text }]}>{shotCount}</Text>
+                    </View>
+                    <TouchableOpacity
+                      style={[styles.counterBtn, { backgroundColor: colors.secondary }]}
+                      onPress={() => adjustShots(1)}
+                    >
+                      <Plus size={22} color={colors.text} />
+                    </TouchableOpacity>
+                  </View>
+                  {/* Quick add */}
+                  <View style={styles.quickAdd}>
+                    {[5, 10, 20, 30].map((n) => (
+                      <TouchableOpacity
+                        key={n}
+                        style={[styles.quickAddBtn, { backgroundColor: colors.secondary }]}
+                        onPress={() => {
+                          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                          setShotCount(shotCount + n);
+                        }}
+                      >
+                        <Text style={[styles.quickAddText, { color: colors.text }]}>+{n}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
                 </View>
-              </View>
+              )}
 
               {/* Save Button */}
               <TouchableOpacity
-                style={[styles.saveBtn, { backgroundColor: shotCount > 0 ? colors.green : colors.secondary }]}
+                style={[styles.saveBtn, { backgroundColor: (isMultiTarget ? targetResults.some((r) => r.shots_fired > 0) : shotCount > 0) ? colors.green : colors.secondary }]}
                 onPress={handleSaveResults}
-                disabled={saving || shotCount <= 0}
+                disabled={saving || (isMultiTarget ? targetResults.every((r) => r.shots_fired === 0) : shotCount <= 0)}
               >
                 {saving ? (
                   <ActivityIndicator color="#fff" />
                 ) : (
                   <>
-                    <Check size={18} color={shotCount > 0 ? '#fff' : colors.textMuted} />
-                    <Text style={[styles.saveBtnText, { color: shotCount > 0 ? '#fff' : colors.textMuted }]}>
+                    <Check size={18} color={(isMultiTarget ? targetResults.some((r) => r.shots_fired > 0) : shotCount > 0) ? '#fff' : colors.textMuted} />
+                    <Text style={[styles.saveBtnText, { color: (isMultiTarget ? targetResults.some((r) => r.shots_fired > 0) : shotCount > 0) ? '#fff' : colors.textMuted }]}>
                       Save Shots
                     </Text>
                   </>

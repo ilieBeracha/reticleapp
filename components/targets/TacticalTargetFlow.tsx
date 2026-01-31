@@ -321,6 +321,8 @@ interface TacticalTargetFlowProps {
   showTimeInput?: boolean;
   /** For squad sessions: associates target with specific participant */
   participantId?: string;
+  /** Multi-target: number of targets for this drill (rounds = shared pool across all) */
+  targetCount?: number;
   onComplete?: () => void;
   onCancel?: () => void;
 }
@@ -334,6 +336,7 @@ export function TacticalTargetFlow({
   isGrouping = false,
   showTimeInput = true,
   participantId,
+  targetCount = 1,
   onComplete,
   onCancel,
 }: TacticalTargetFlowProps) {
@@ -357,6 +360,59 @@ export function TacticalTargetFlow({
   const [time, setTime] = useState('');
   const [stageCleared, setStageCleared] = useState(false);
   const [notes, setNotes] = useState('');
+
+  // Multi-target state
+  const isMultiTarget = targetCount > 1;
+  const [targetResults, setTargetResults] = useState<Array<{ shots_fired: number; hits: number }>>(() => {
+    if (targetCount <= 1) return [];
+    // Distribute evenly, last target gets remainder (auto-derived)
+    const perTarget = Math.floor(defaultBullets / targetCount);
+    return Array.from({ length: targetCount }, (_, i) => ({
+      shots_fired: i === targetCount - 1 ? defaultBullets - perTarget * (targetCount - 1) : perTarget,
+      hits: 0,
+    }));
+  });
+
+  // Pool computed values (only meaningful for multi-target)
+  const nonLastShotsSum = isMultiTarget
+    ? targetResults.slice(0, -1).reduce((sum, r) => sum + r.shots_fired, 0)
+    : 0;
+  const lastTargetShots = isMultiTarget ? Math.max(0, bullets - nonLastShotsSum) : 0;
+
+  // Max shots a non-last target can take (pool minus all OTHER non-last targets)
+  const maxShotsForTarget = useCallback(
+    (index: number) => {
+      const othersSum = targetResults
+        .slice(0, -1)
+        .reduce((sum, r, j) => (j !== index ? sum + r.shots_fired : sum), 0);
+      return Math.max(0, bullets - othersSum);
+    },
+    [targetResults, bullets],
+  );
+
+  const updateTargetResult = useCallback(
+    (index: number, field: 'shots_fired' | 'hits', value: number) => {
+      setTargetResults((prev) => {
+        const next = [...prev];
+        next[index] = { ...next[index], [field]: value };
+        // Ensure hits don't exceed shots_fired
+        if (field === 'shots_fired' && next[index].hits > value) {
+          next[index] = { ...next[index], hits: value };
+        }
+        // If non-last target changed shots, clamp last target's hits to new remaining
+        if (field === 'shots_fired' && index < next.length - 1) {
+          const newNonLastSum = next.slice(0, -1).reduce((sum, r) => sum + r.shots_fired, 0);
+          const newLastShots = Math.max(0, bullets - newNonLastSum);
+          const lastIdx = next.length - 1;
+          if (next[lastIdx].hits > newLastShots) {
+            next[lastIdx] = { ...next[lastIdx], hits: newLastShots };
+          }
+        }
+        return next;
+      });
+    },
+    [bullets],
+  );
 
   const handleClose = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -419,18 +475,38 @@ export function TacticalTargetFlow({
           dispersion_cm: parseFloat(groupSizeCm),
           result_notes: notes || null,
         });
+      } else if (isMultiTarget) {
+        // Multi-target engagement: save each target with shared pool
+        const finalResults = targetResults.map((r, i) => ({
+          shots_fired: i === targetCount - 1 ? lastTargetShots : r.shots_fired,
+          hits: r.hits,
+        }));
+
+        for (let i = 0; i < finalResults.length; i++) {
+          await addTargetWithTacticalResult({
+            session_id: sessionId,
+            distance_m: distance,
+            lane_number: null,
+            planned_shots: finalResults[i].shots_fired,
+            participant_id: participantId,
+            bullets_fired: finalResults[i].shots_fired,
+            hits: finalResults[i].hits,
+            is_stage_cleared: i === finalResults.length - 1 ? stageCleared : false,
+            time_seconds: i === finalResults.length - 1 ? (time ? parseFloat(time) : null) : null,
+            result_notes: i === finalResults.length - 1 ? (notes || null) : null,
+            target_data: { target_number: i + 1 },
+          });
+        }
       } else {
-        // For engagement: Use tactical target
-        // bullets_fired = how many shots fired (from drill config)
-        // hits = how many actually hit the target
+        // Single-target engagement
         await addTargetWithTacticalResult({
           session_id: sessionId,
           distance_m: distance,
           lane_number: null,
-          planned_shots: bullets, // From drill config
-          participant_id: participantId, // For squad sessions
-          bullets_fired: bullets, // How many were actually fired
-          hits: hits, // How many hit
+          planned_shots: bullets,
+          participant_id: participantId,
+          bullets_fired: bullets,
+          hits: hits,
           is_stage_cleared: stageCleared,
           time_seconds: time ? parseFloat(time) : null,
           result_notes: notes || null,
@@ -458,6 +534,11 @@ export function TacticalTargetFlow({
     groupSizeCm,
     groupingShots,
     isGrouping,
+    isMultiTarget,
+    targetResults,
+    targetCount,
+    lastTargetShots,
+    participantId,
     time,
     stageCleared,
     notes,
@@ -701,6 +782,109 @@ export function TacticalTargetFlow({
               ))}
             </View>
           </View>
+        </View>
+      ) : isMultiTarget ? (
+        // MULTI-TARGET ENGAGEMENT: shared pool across targets
+        <View style={multiStyles.section}>
+          {/* Pool header */}
+          <View style={multiStyles.poolHeader}>
+            <Text style={multiStyles.poolTitle}>
+              {bullets} {t('target.roundsAcrossTargets', { count: targetCount })}
+            </Text>
+            <View style={multiStyles.poolBar}>
+              <View
+                style={[
+                  multiStyles.poolBarFill,
+                  { width: `${Math.min(100, (nonLastShotsSum / Math.max(1, bullets)) * 100)}%` },
+                ]}
+              />
+            </View>
+            <Text style={multiStyles.poolSubtext}>
+              {nonLastShotsSum} allocated · {lastTargetShots} remaining
+            </Text>
+          </View>
+
+          {/* Per-target cards */}
+          {targetResults.map((result, index) => {
+            const isLast = index === targetCount - 1;
+            const currentShots = isLast ? lastTargetShots : result.shots_fired;
+            const maxShots = isLast ? lastTargetShots : maxShotsForTarget(index);
+
+            return (
+              <View key={index} style={[multiStyles.targetCard, isLast && multiStyles.targetCardLast]}>
+                <Text style={multiStyles.targetCardTitle}>
+                  {t('target.targetNumber', { number: index + 1 })}{isLast ? ` (${t('target.auto')})` : ''}
+                </Text>
+
+                {/* Shots fired row */}
+                <View style={multiStyles.targetRow}>
+                  <Text style={multiStyles.targetRowLabel}>{t('target.shots')}</Text>
+                  {isLast ? (
+                    <Text style={multiStyles.targetAutoValue}>{lastTargetShots}</Text>
+                  ) : (
+                    <View style={multiStyles.targetStepperRow}>
+                      <TouchableOpacity
+                        style={[multiStyles.targetStepperBtn, result.shots_fired <= 0 && multiStyles.targetStepperBtnDisabled]}
+                        onPress={() => {
+                          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                          updateTargetResult(index, 'shots_fired', Math.max(0, result.shots_fired - 1));
+                        }}
+                        disabled={result.shots_fired <= 0}
+                      >
+                        <Minus size={16} color={result.shots_fired <= 0 ? COLORS.textDim : COLORS.white} />
+                      </TouchableOpacity>
+                      <Text style={multiStyles.targetStepperValue}>{result.shots_fired}</Text>
+                      <TouchableOpacity
+                        style={[multiStyles.targetStepperBtn, result.shots_fired >= maxShots && multiStyles.targetStepperBtnDisabled]}
+                        onPress={() => {
+                          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                          updateTargetResult(index, 'shots_fired', Math.min(maxShots, result.shots_fired + 1));
+                        }}
+                        disabled={result.shots_fired >= maxShots}
+                      >
+                        <Plus size={16} color={result.shots_fired >= maxShots ? COLORS.textDim : COLORS.white} />
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </View>
+
+                {/* Hits row */}
+                <View style={multiStyles.targetRow}>
+                  <Text style={multiStyles.targetRowLabel}>{t('target.hitsLabel')}</Text>
+                  <View style={multiStyles.targetStepperRow}>
+                    <TouchableOpacity
+                      style={[multiStyles.targetStepperBtn, result.hits <= 0 && multiStyles.targetStepperBtnDisabled]}
+                      onPress={() => {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                        updateTargetResult(index, 'hits', Math.max(0, result.hits - 1));
+                      }}
+                      disabled={result.hits <= 0}
+                    >
+                      <Minus size={16} color={result.hits <= 0 ? COLORS.textDim : COLORS.white} />
+                    </TouchableOpacity>
+                    <Text style={multiStyles.targetStepperValue}>{result.hits}</Text>
+                    <TouchableOpacity
+                      style={[multiStyles.targetStepperBtn, result.hits >= currentShots && multiStyles.targetStepperBtnDisabled]}
+                      onPress={() => {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                        updateTargetResult(index, 'hits', Math.min(currentShots, result.hits + 1));
+                      }}
+                      disabled={result.hits >= currentShots}
+                    >
+                      <Plus size={16} color={result.hits >= currentShots ? COLORS.textDim : COLORS.white} />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                {/* Accuracy */}
+                {currentShots > 0 && (
+                  <Text style={multiStyles.targetAccuracy}>
+                    {Math.round((result.hits / currentShots) * 100)}%
+                  </Text>
+                )}
+              </View>
+            );
+          })}
         </View>
       ) : (
         // ENGAGEMENT: Show simple hits stepper
@@ -1222,6 +1406,113 @@ const styles = StyleSheet.create({
   submitBtnText: { fontSize: 16, fontWeight: '700', color: '#fff' },
   cancelBtn: { alignItems: 'center', paddingVertical: 12 },
   cancelBtnText: { fontSize: 14, fontWeight: '600', color: COLORS.textMuted },
+});
+
+// Multi-target styles
+const multiStyles = StyleSheet.create({
+  section: {
+    marginBottom: 16,
+  },
+  poolHeader: {
+    backgroundColor: COLORS.card,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    alignItems: 'center',
+  },
+  poolTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.white,
+    marginBottom: 8,
+  },
+  poolBar: {
+    width: '100%',
+    height: 6,
+    backgroundColor: COLORS.borderLight,
+    borderRadius: 3,
+    marginBottom: 8,
+    overflow: 'hidden',
+  },
+  poolBarFill: {
+    height: '100%',
+    backgroundColor: COLORS.primary,
+    borderRadius: 3,
+  },
+  poolSubtext: {
+    fontSize: 12,
+    color: COLORS.textDim,
+  },
+  targetCard: {
+    backgroundColor: COLORS.card,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  targetCardLast: {
+    borderColor: `${COLORS.primary}40`,
+    backgroundColor: `${COLORS.primary}08`,
+  },
+  targetCardTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: COLORS.white,
+    marginBottom: 12,
+  },
+  targetRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  targetRowLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: COLORS.textMuted,
+    width: 50,
+  },
+  targetStepperRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  targetStepperBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: COLORS.cardHover,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  targetStepperBtnDisabled: {
+    opacity: 0.3,
+  },
+  targetStepperValue: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: COLORS.white,
+    minWidth: 40,
+    textAlign: 'center',
+    fontVariant: ['tabular-nums'],
+  },
+  targetAutoValue: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: COLORS.textDim,
+    minWidth: 40,
+    textAlign: 'center',
+    fontVariant: ['tabular-nums'],
+  },
+  targetAccuracy: {
+    fontSize: 12,
+    color: COLORS.textMuted,
+    textAlign: 'right',
+    marginTop: 4,
+  },
 });
 
 export default TacticalTargetFlow;

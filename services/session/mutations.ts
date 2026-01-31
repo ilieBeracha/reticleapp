@@ -398,6 +398,12 @@ export async function updateSession(
     watch_controlled?: boolean;
     /** Update custom drill config (e.g., to save detection_sensitivity) */
     custom_drill_config?: Record<string, any>;
+    /** Soldier's chosen distance (when commander allows flexibility) */
+    soldier_distance_m?: number | null;
+    /** Soldier's chosen bullets (when commander allows flexibility) */
+    soldier_bullets?: number | null;
+    /** Soldier's chosen position (when commander allows flexibility) */
+    soldier_position?: string | null;
   }
 ) {
   const updatePayload: Record<string, any> = {
@@ -422,6 +428,18 @@ export async function updateSession(
 
   if (typeof updates.custom_drill_config !== 'undefined') {
     updatePayload.custom_drill_config = updates.custom_drill_config;
+  }
+
+  if (typeof updates.soldier_distance_m !== 'undefined') {
+    updatePayload.soldier_distance_m = updates.soldier_distance_m;
+  }
+
+  if (typeof updates.soldier_bullets !== 'undefined') {
+    updatePayload.soldier_bullets = updates.soldier_bullets;
+  }
+
+  if (typeof updates.soldier_position !== 'undefined') {
+    updatePayload.soldier_position = updates.soldier_position;
   }
 
   // Return a fully-hydrated session payload so callers don't lose drill context after updates.

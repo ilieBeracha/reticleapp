@@ -11,7 +11,7 @@ import { useLocalSearchParams } from 'expo-router';
  * participantId is used for squad sessions to associate the target with a specific participant
  */
 export default function TacticalTargetSheet() {
-  const { sessionId, distance, bullets, locked, isGrouping, showTimeInput, participantId } = useLocalSearchParams<{
+  const { sessionId, distance, bullets, locked, isGrouping, showTimeInput, participantId, targetCount } = useLocalSearchParams<{
     sessionId: string;
     distance?: string;
     bullets?: string;
@@ -20,6 +20,8 @@ export default function TacticalTargetSheet() {
     showTimeInput?: string;
     /** For squad sessions: associates target with specific participant */
     participantId?: string;
+    /** Multi-target: number of targets for this drill */
+    targetCount?: string;
   }>();
 
   if (!sessionId) {
@@ -36,6 +38,7 @@ export default function TacticalTargetSheet() {
       isGrouping={isGrouping === '1'}
       showTimeInput={showTimeInput !== '0'}
       participantId={participantId}
+      targetCount={targetCount ? parseInt(targetCount) : 1}
     />
   );
 }

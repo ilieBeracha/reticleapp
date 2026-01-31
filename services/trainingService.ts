@@ -42,6 +42,8 @@ function buildDrillInsertPayload(drill: CreateTrainingDrillInput, trainingId: st
     execution_policy: drill.execution_policy || 'locked',
     // Engagement mode - solo or squad (grouping is always solo)
     engagement_mode: drill.engagement_mode || 'solo',
+    // Measurement scope - individual or collective (null = individual default)
+    measurement_scope: drill.measurement_scope ?? null,
     time_limit_seconds: drill.time_limit_seconds ?? null,
     par_time_seconds: drill.par_time_seconds ?? null,
     scoring_mode: drill.scoring_mode ?? null,

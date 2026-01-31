@@ -44,7 +44,7 @@ export const SESSION_SELECT_WITH_WEAPON = `
   profiles:user_id(full_name),
   teams:team_id(name),
   trainings:training_id(title),
-  training_drills:drill_id(id, name, drill_goal, target_type, execution_policy, distance_m, distance_category, rounds_per_shooter, position, max_executions),
+  training_drills:drill_id(id, name, drill_goal, target_type, execution_policy, distance_m, distance_category, rounds_per_shooter, position, max_executions, measurement_scope, target_count),
   drill_templates:drill_template_id(id, name, drill_goal, target_type, distance_m, rounds_per_shooter, position),
   user_weapons:weapon_id(name, caliber, category),
   engagement:engagements(
@@ -58,7 +58,8 @@ export const SESSION_SELECT_WITH_WEAPON = `
       state,
       role,
       shots_fired,
-      hits
+      hits,
+      target_results
     )
   )
 `;
@@ -91,7 +92,7 @@ export const SESSION_SELECT_MINIMAL = `
   profiles:user_id(full_name),
   teams:team_id(name),
   trainings:training_id(title),
-  training_drills:drill_id(id, name, drill_goal, target_type, execution_policy, distance_m, distance_category, rounds_per_shooter, position, max_executions),
+  training_drills:drill_id(id, name, drill_goal, target_type, execution_policy, distance_m, distance_category, rounds_per_shooter, position, max_executions, measurement_scope, target_count),
   drill_templates:drill_template_id(id, name, drill_goal, target_type, distance_m, rounds_per_shooter, position),
   engagement:engagements(
     id,
@@ -104,7 +105,8 @@ export const SESSION_SELECT_MINIMAL = `
       state,
       role,
       shots_fired,
-      hits
+      hits,
+      target_results
     )
   )
 `;
@@ -170,7 +172,9 @@ export const SESSION_SELECT_WITH_FULL_DRILL = `
     category,
     instructions,
     safety_notes,
-    max_executions
+    max_executions,
+    measurement_scope,
+    target_count
   ),
   drill_templates:drill_template_id(
     id,
@@ -215,7 +219,8 @@ export const SESSION_SELECT_WITH_FULL_DRILL = `
       state,
       role,
       shots_fired,
-      hits
+      hits,
+      target_results
     )
   )
 `;

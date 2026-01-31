@@ -15,7 +15,6 @@
 import { InviteParticipantsPanel } from '@/components/session/creation/InviteParticipantsPanel';
 import { useParticipantsRealtime } from '@/hooks/realtime/participants/useParticipantsRealtime';
 import { useColors } from '@/hooks/ui/useColors';
-import { supabase } from '@/services/supabase';
 import { notifySquadEngagementInvites, notifySquadEngagementStarting } from '@/services/pushService';
 import { updateSession } from '@/services/session/mutations';
 import {
@@ -29,6 +28,7 @@ import {
   startEngagement,
   updateParticipantRole,
 } from '@/services/session/participants';
+import { supabase } from '@/services/supabase';
 import type { Engagement, EngagementParticipant, EngagementRole } from '@/types/session';
 import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from 'expo-router';

@@ -662,6 +662,8 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
         showTimeInput: session?.watch_controlled ? '0' : '1',
         // Pass distance category so soldier can adjust within range
         ...(drill?.distance_category ? { distanceCategory: drill.distance_category } : {}),
+        // Multi-target: number of targets for this drill
+        ...((drill?.target_count ?? 1) > 1 ? { targetCount: String(drill!.target_count) } : {}),
       },
     });
   }, [
@@ -700,6 +702,8 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
         ...(bulletsForEngagement ? { bullets: String(bulletsForEngagement) } : {}),
         ...(isGrouping ? { isGrouping: '1' } : {}),
         showTimeInput: session?.watch_controlled ? '0' : '1',
+        // Multi-target: number of targets for this drill
+        ...((drill?.target_count ?? 1) > 1 ? { targetCount: String(drill!.target_count) } : {}),
       },
     });
   }, [

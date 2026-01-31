@@ -22,7 +22,9 @@ import type {
   EngagementParticipant,
   EngagementRole,
   EngagementStatus,
+  MeasurementScope,
   ParticipantState,
+  TargetResultEntry,
 } from '@/types/session';
 import { enforceEngagementMode } from '@/utils/engagementMode';
 
@@ -177,7 +179,7 @@ export async function getEngagementParticipants(engagementId: string): Promise<E
   // Get participants with their contribution (shots/hits) and role
   const { data: participants, error } = await supabase
     .from('engagement_participants')
-    .select('id, engagement_id, user_id, state, role, joined_at, created_at, shots_fired, hits')
+    .select('id, engagement_id, user_id, state, role, joined_at, created_at, shots_fired, hits, target_results')
     .eq('engagement_id', engagementId)
     .order('created_at', { ascending: true });
 
@@ -203,6 +205,7 @@ export async function getEngagementParticipants(engagementId: string): Promise<E
       created_at: row.created_at,
       shots_fired: row.shots_fired || null,
       hits: row.hits || null,
+      target_results: row.target_results || null,
       user_full_name: profile?.full_name || null,
       user_avatar_url: profile?.avatar_url || null,
     };
@@ -334,9 +337,10 @@ export async function addParticipant(
         joined_at: null, // Reset joined_at
         shots_fired: null, // Reset results
         hits: null,
+        target_results: null,
       })
       .eq('id', existing.id)
-      .select('id, engagement_id, user_id, state, role, joined_at, created_at, shots_fired, hits')
+      .select('id, engagement_id, user_id, state, role, joined_at, created_at, shots_fired, hits, target_results')
       .single();
     data = result.data;
     error = result.error;
@@ -350,7 +354,7 @@ export async function addParticipant(
         state: 'pending', // Start as pending, user must accept
         role,
       })
-      .select('id, engagement_id, user_id, state, role, joined_at, created_at, shots_fired, hits')
+      .select('id, engagement_id, user_id, state, role, joined_at, created_at, shots_fired, hits, target_results')
       .single();
     data = result.data;
     error = result.error;
@@ -372,6 +376,7 @@ export async function addParticipant(
     created_at: data.created_at,
     shots_fired: data.shots_fired || null,
     hits: data.hits || null,
+    target_results: data.target_results || null,
     user_full_name: profile?.full_name || null,
     user_avatar_url: profile?.avatar_url || null,
   };
@@ -398,7 +403,7 @@ export async function updateParticipantState(
     .update(updateData)
     .eq('engagement_id', engagementId)
     .eq('user_id', userId)
-    .select('id, engagement_id, user_id, state, role, joined_at, created_at, shots_fired, hits')
+    .select('id, engagement_id, user_id, state, role, joined_at, created_at, shots_fired, hits, target_results')
     .single();
 
   if (error) throw error;
@@ -416,6 +421,7 @@ export async function updateParticipantState(
     created_at: data.created_at,
     shots_fired: data.shots_fired || null,
     hits: data.hits || null,
+    target_results: data.target_results || null,
     user_full_name: profile?.full_name || null,
     user_avatar_url: profile?.avatar_url || null,
   };
@@ -451,7 +457,7 @@ export async function updateParticipantRole(
     .update({ role })
     .eq('engagement_id', engagementId)
     .eq('user_id', userId)
-    .select('id, engagement_id, user_id, state, role, joined_at, created_at, shots_fired, hits')
+    .select('id, engagement_id, user_id, state, role, joined_at, created_at, shots_fired, hits, target_results')
     .single();
 
   if (error) throw error;
@@ -469,6 +475,7 @@ export async function updateParticipantRole(
     created_at: data.created_at,
     shots_fired: data.shots_fired || null,
     hits: data.hits || null,
+    target_results: data.target_results || null,
     user_full_name: profile?.full_name || null,
     user_avatar_url: profile?.avatar_url || null,
   };
@@ -492,7 +499,7 @@ export async function updateParticipantResults(
     })
     .eq('engagement_id', engagementId)
     .eq('user_id', userId)
-    .select('id, engagement_id, user_id, state, role, joined_at, created_at, shots_fired, hits')
+    .select('id, engagement_id, user_id, state, role, joined_at, created_at, shots_fired, hits, target_results')
     .single();
 
   if (error) throw error;
@@ -510,6 +517,7 @@ export async function updateParticipantResults(
     created_at: data.created_at,
     shots_fired: data.shots_fired || null,
     hits: data.hits || null,
+    target_results: data.target_results || null,
     user_full_name: profile?.full_name || null,
     user_avatar_url: profile?.avatar_url || null,
   };
@@ -589,6 +597,96 @@ export function calculateGroupTotals(participants: EngagementParticipant[]): {
     accuracy: totalShotsFired > 0 ? Math.round((totalHits / totalShotsFired) * 100) : 0,
     submittedCount,
     totalCount: participants.length,
+  };
+}
+
+/**
+ * Compute aggregate totals from per-target results.
+ * Used when target_count > 1 to derive shots_fired and hits from target_results.
+ */
+export function computeAggregateTotals(targetResults: TargetResultEntry[]): {
+  shots_fired: number;
+  hits: number;
+} {
+  return targetResults.reduce(
+    (acc, t) => ({
+      shots_fired: acc.shots_fired + (t.shots_fired || 0),
+      hits: acc.hits + (t.hits || 0),
+    }),
+    { shots_fired: 0, hits: 0 }
+  );
+}
+
+/**
+ * Update engagement results for a participant.
+ * Handles both single-target and multi-target scenarios.
+ *
+ * Rules:
+ * - If targetCount > 1: require targetResults, compute aggregates
+ * - If targetCount === 1: use shotsFired + hits directly, target_results = null
+ * - For collective scope: results go on the commander's participant row
+ */
+export async function updateEngagementResults(params: {
+  engagementId: string;
+  userId: string;
+  targetCount: number;
+  targetResults?: TargetResultEntry[] | null;
+  shotsFired?: number;
+  hits?: number;
+}): Promise<EngagementParticipant> {
+  const { engagementId, userId, targetCount, targetResults, shotsFired, hits } = params;
+
+  let finalShotsFired: number;
+  let finalHits: number;
+  let finalTargetResults: TargetResultEntry[] | null = null;
+
+  if (targetCount > 1 && targetResults && targetResults.length > 0) {
+    // Multi-target: compute aggregates from per-target results
+    const aggregates = computeAggregateTotals(targetResults);
+    finalShotsFired = aggregates.shots_fired;
+    finalHits = aggregates.hits;
+    finalTargetResults = targetResults;
+  } else {
+    // Single-target: use direct values
+    finalShotsFired = shotsFired ?? 0;
+    finalHits = hits ?? 0;
+    finalTargetResults = null;
+  }
+
+  const { data, error } = await supabase
+    .from('engagement_participants')
+    .update({
+      shots_fired: finalShotsFired,
+      hits: finalHits,
+      target_results: finalTargetResults,
+    })
+    .eq('engagement_id', engagementId)
+    .eq('user_id', userId)
+    .select('id, engagement_id, user_id, state, role, joined_at, created_at, shots_fired, hits, target_results')
+    .single();
+
+  if (error) throw error;
+
+  // Get profile for this user
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('full_name, avatar_url')
+    .eq('id', userId)
+    .single();
+
+  return {
+    id: data.id,
+    engagement_id: data.engagement_id,
+    user_id: data.user_id,
+    state: data.state,
+    role: data.role || 'shooter',
+    joined_at: data.joined_at,
+    created_at: data.created_at,
+    shots_fired: data.shots_fired || null,
+    hits: data.hits || null,
+    target_results: data.target_results || null,
+    user_full_name: profile?.full_name || null,
+    user_avatar_url: profile?.avatar_url || null,
   };
 }
 

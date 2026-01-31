@@ -12,7 +12,6 @@
  *   - Results tab: Summary card, completed sessions history
  */
 import { TrainingSettingsModal } from '@/components/training/detail/TrainingSettingsModal';
-import { RunDrillSheet } from '@/components/training/RunDrillSheet';
 import { SquadInvitationBanner } from '@/components/training/SquadInvitationBanner';
 import { SquadLobbyBanner } from '@/components/training/SquadLobbyBanner';
 import { useAuth } from '@/contexts/AuthContext';
@@ -21,8 +20,13 @@ import { useTrainingRealtime } from '@/hooks/realtime/training/useTrainingRealti
 import { useTrainingDetail } from '@/hooks/training/useTrainingDetail';
 import { useColors } from '@/hooks/ui/useColors';
 import { usePermissions } from '@/hooks/usePermissions';
-import { getTrainingSessionsWithStats } from '@/services/session/queries';
+import { requireCurrentUserId } from '@/services/authService';
+import { getOrCreateSetupSession } from '@/services/session/mutations';
+import { createEngagement } from '@/services/session/participants';
+import { getActiveSquadEngagement, getTrainingSessionsWithStats } from '@/services/session/queries';
 import { finishTraining, startTraining } from '@/services/trainingService';
+import { getMyMostRecentWeaponId } from '@/services/weaponService';
+import { useGarminStore } from '@/stores/garminStore';
 import { useTeamStore } from '@/stores/teamStore';
 import type { SessionWithDetails } from '@/types/session';
 import type { TrainingDrill } from '@/types/workspace';
@@ -49,7 +53,7 @@ import {
 } from 'lucide-react-native';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, {
   Extrapolation,
   interpolate,
@@ -667,6 +671,8 @@ function ExpandableSquadRow({
   const shots = joined.reduce((sum: number, p: any) => sum + (p.shots_fired || 0), 0);
   const hits = joined.reduce((sum: number, p: any) => sum + (p.hits || 0), 0);
   const commanderId = session.user_id;
+  const measurementScope = session.drill_config?.measurement_scope;
+  const isCollective = measurementScope === 'collective';
 
   return (
     <View style={[!isLast && { borderBottomWidth: 1, borderBottomColor: colors.border }]}>
@@ -701,39 +707,58 @@ function ExpandableSquadRow({
       {/* Expanded participant list */}
       {isExpanded && (
         <View style={[styles.participantList, { backgroundColor: colors.background }]}>
+          {isCollective && (
+            <View style={{ paddingHorizontal: 12, paddingVertical: 6 }}>
+              <Text style={{ color: colors.primary, fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                {t('session.collectiveResults', 'Collective Results')}
+              </Text>
+            </View>
+          )}
           {joined.map((p: any, idx: number) => {
             const isMe = p.user_id === currentUserId;
             const isOwner = p.user_id === commanderId;
             const pShots = p.shots_fired || 0;
             const pHits = p.hits || 0;
             const pAcc = pShots > 0 ? Math.round((pHits / pShots) * 100) : null;
+            const hasTargetResults = p.target_results && Array.isArray(p.target_results) && p.target_results.length > 1;
             return (
               <View
                 key={p.user_id}
                 style={[
-                  styles.squadParticipantRow,
                   idx < joined.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.border },
                 ]}
               >
-                <View style={[styles.userAvatar, { backgroundColor: colors.secondary, width: 26, height: 26, borderRadius: 13 }]}>
-                  <Text style={[styles.userAvatarText, { color: colors.textMuted, fontSize: 10 }]}>
-                    {(p.user_full_name || '?').charAt(0).toUpperCase()}
+                <View style={styles.squadParticipantRow}>
+                  <View style={[styles.userAvatar, { backgroundColor: colors.secondary, width: 26, height: 26, borderRadius: 13 }]}>
+                    <Text style={[styles.userAvatarText, { color: colors.textMuted, fontSize: 10 }]}>
+                      {(p.user_full_name || '?').charAt(0).toUpperCase()}
+                    </Text>
+                  </View>
+                  <Text style={[styles.squadParticipantName, { color: colors.text }]} numberOfLines={1}>
+                    {p.user_full_name || t('common.unknown')}
+                  </Text>
+                  {isMe && (
+                    <View style={[styles.squadBadge, { backgroundColor: colors.primary + '20' }]}>
+                      <Text style={[styles.squadBadgeText, { color: colors.primary, fontSize: 9 }]}>{t('common.you')}</Text>
+                    </View>
+                  )}
+                  {isOwner && <Crown size={11} color={colors.orange} />}
+                  <Text style={[styles.squadParticipantShots, { color: colors.textMuted }]}>
+                    {pShots > 0
+                      ? `${pShots} ${t('session.shots')}${pAcc !== null ? ` · ${pAcc}%` : ''}`
+                      : t('session.notReportedYet')}
                   </Text>
                 </View>
-                <Text style={[styles.squadParticipantName, { color: colors.text }]} numberOfLines={1}>
-                  {p.user_full_name || t('common.unknown')}
-                </Text>
-                {isMe && (
-                  <View style={[styles.squadBadge, { backgroundColor: colors.primary + '20' }]}>
-                    <Text style={[styles.squadBadgeText, { color: colors.primary, fontSize: 9 }]}>{t('common.you')}</Text>
+                {/* Per-target breakdown (if multi-target) */}
+                {hasTargetResults && (
+                  <View style={{ paddingLeft: 38, paddingBottom: 6, paddingRight: 12 }}>
+                    {p.target_results.map((tr: any) => (
+                      <Text key={tr.target_number} style={{ color: colors.textMuted, fontSize: 11, paddingVertical: 1 }}>
+                        {t('session.targetNumber', { number: tr.target_number, defaultValue: `Target ${tr.target_number}` })}: {tr.shots_fired} {t('session.shots')} / {tr.hits} {t('session.hits')}
+                      </Text>
+                    ))}
                   </View>
                 )}
-                {isOwner && <Crown size={11} color={colors.orange} />}
-                <Text style={[styles.squadParticipantShots, { color: colors.textMuted }]}>
-                  {pShots > 0
-                    ? `${pShots} ${t('session.shots')}${pAcc !== null ? ` · ${pAcc}%` : ''}`
-                    : t('session.notReportedYet')}
-                </Text>
               </View>
             );
           })}
@@ -1231,9 +1256,8 @@ export default function TrainingDetailScreen() {
   const [showSettings, setShowSettings] = useState(false);
   const [completedSessions, setCompletedSessions] = useState<SessionWithDetails[]>([]);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
-  // Start drill sheet state
-  const [selectedDrill, setSelectedDrill] = useState<TrainingDrill | null>(null);
-  const [showStartDrillSheet, setShowStartDrillSheet] = useState(false);
+  // Starting drill loading state (drill ID that's currently being started)
+  const [startingDrillId, setStartingDrillId] = useState<string | null>(null);
 
   const isMountedRef = useRef(true);
 
@@ -1389,22 +1413,103 @@ export default function TrainingDetailScreen() {
   }, [training?.id, isUpdatingStatus, setTraining]);
 
   // ─────────────────────────────────────────────────────────────────────────────
-  // Drill Start Handler - Opens bottom sheet instead of navigating
+  // Drill Start Handler - Creates session with defaults and navigates directly
+  // Optimized: runs independent queries in parallel
   // ─────────────────────────────────────────────────────────────────────────────
   const handleStartDrill = useCallback(
-    (drill: TrainingDrill) => {
-      if (!training?.id || !isInvited) return;
+    async (drill: TrainingDrill) => {
+      if (!training?.id || !isInvited || startingDrillId) return;
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      setSelectedDrill(drill);
-      setShowStartDrillSheet(true);
-    },
-    [training?.id, isInvited]
-  );
+      setStartingDrillId(drill.id);
 
-  const handleCloseStartDrillSheet = useCallback(() => {
-    setShowStartDrillSheet(false);
-    setSelectedDrill(null);
-  }, []);
+      try {
+        // Run ALL independent queries in parallel for speed
+        const isSquad = drill.engagement_mode === 'squad';
+        const [userId, existingEngagement, weaponId] = await Promise.all([
+          requireCurrentUserId(),
+          isSquad ? getActiveSquadEngagement(training.id) : Promise.resolve(null),
+          getMyMostRecentWeaponId(), // Uses RLS, no userId needed
+        ]);
+
+        // If squad has existing engagement, navigate there
+        if (existingEngagement) {
+          if (existingEngagement.started_at) {
+            router.push({
+              pathname: '/(protected)/activeSession',
+              params: {
+                sessionId: existingEngagement.session_id,
+                engagementId: existingEngagement.id,
+                engagementMode: existingEngagement.engagement_mode,
+                returnTo: 'trainingDetail',
+                returnId: training.id,
+              },
+            });
+          } else {
+            router.push({
+              pathname: '/(protected)/squadLobby',
+              params: {
+                engagementId: existingEngagement.id,
+                sessionId: existingEngagement.session_id,
+                trainingId: training.id,
+                engagementMode: existingEngagement.engagement_mode,
+              },
+            });
+          }
+          return;
+        }
+
+        // Check weapon
+        if (!weaponId) {
+          Alert.alert(t('training.noWeapon', 'No Weapon'), t('training.configureWeaponFirst', 'Please configure a weapon first.'));
+          return;
+        }
+
+        // Check watch connectivity (sync - no await needed)
+        const isWatchConnected = useGarminStore.getState().status === 'CONNECTED';
+
+        // Create session with drill defaults
+        const newSession = await getOrCreateSetupSession({
+          weapon_id: weaponId,
+          team_id: training.team_id || undefined,
+          training_id: training.id,
+          drill_id: drill.id,
+          watch_controlled: isWatchConnected,
+          soldier_distance_m: drill.distance_m ?? null,
+          soldier_bullets: drill.rounds_per_shooter ?? null,
+          soldier_position: drill.position ?? null,
+        });
+
+        // Squad → create engagement and go to lobby
+        if (isSquad) {
+          const engagement = await createEngagement({
+            sessionId: newSession.id,
+            shooterId: userId,
+            drillGoal: drill.drill_goal || 'engagement',
+            trainingId: training.id,
+            requestedMode: 'squad',
+            status: 'pending',
+          });
+          router.push({
+            pathname: '/(protected)/squadLobby',
+            params: {
+              engagementId: engagement.id,
+              trainingId: training.id,
+              engagementMode: 'squad',
+            },
+          });
+        } else {
+          // Solo → go directly to active session
+          router.push({ pathname: '/(protected)/activeSession', params: { sessionId: newSession.id } });
+        }
+      } catch (err) {
+        console.error('[TrainingDetail] Failed to start drill:', err);
+        Alert.alert(t('common.error', 'Error'), t('training.startDrillFailed', 'Failed to start drill. Please try again.'));
+      } finally {
+        setStartingDrillId(null);
+      }
+    },
+    [training?.id, training?.team_id, isInvited, startingDrillId, t]
+  );
 
   // ─────────────────────────────────────────────────────────────────────────────
   // Loading State
@@ -1474,16 +1579,6 @@ export default function TrainingDetailScreen() {
         colors={colors}
       />
 
-      {/* Run Drill Sheet - soldier picks values and runs drill (only for invited participants) */}
-      {isInvited && (
-        <RunDrillSheet
-          visible={showStartDrillSheet}
-          onClose={handleCloseStartDrillSheet}
-          drill={selectedDrill}
-          trainingId={training.id}
-          teamId={training.team_id || ''}
-        />
-      )}
     </View>
   );
 }

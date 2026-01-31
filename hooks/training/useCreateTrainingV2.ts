@@ -20,17 +20,17 @@ import { Alert, Keyboard } from 'react-native';
 import { useAuth } from '@/contexts/AuthContext';
 
 import {
-  createTeamPreset,
-  getDrillsGroupedByCategory,
-  getTeamPresets,
-  type CanonicalDrill,
-  type DrillCategory,
-  type DrillConfig,
-  type TeamDrillPreset,
-  type TrainingDrillItem,
+    createTeamPreset,
+    getDrillsGroupedByCategory,
+    getTeamPresets,
+    type CanonicalDrill,
+    type DrillCategory,
+    type DrillConfig,
+    type TeamDrillPreset,
+    type TrainingDrillItem,
 } from '@/services/drills/drillService';
-import { createTraining } from '@/services/trainingService';
 import { getTeamMembers } from '@/services/teamService';
+import { createTraining } from '@/services/trainingService';
 import { useTeamStore } from '@/stores/teamStore';
 import { useTrainingStore } from '@/stores/trainingStore';
 import type { ParticipantMode } from '@/types/createTraining';
@@ -428,12 +428,16 @@ export function useCreateTrainingV2({ teamIdParam }: UseCreateTrainingV2Params):
         // Config values - null means soldier chooses at execution time
         distance_m: d.config.distance_m,
         distance_category: d.config.distance_category ?? null,
+        // rounds = total shots across ALL targets (NOT per target)
         rounds_per_shooter: d.config.rounds,
         time_limit_seconds: d.config.time_limit_seconds ?? undefined,
         strings_count: d.config.strings_count,
         position: d.config.position ?? undefined,
         // Execution limit - how many times a soldier can run this drill
         max_executions: d.max_executions ?? 1,
+        // Multi-target and measurement scope (from config)
+        target_count: d.config.target_count ?? 1,
+        measurement_scope: d.config.measurement_scope ?? undefined,
         // Store canonical drill reference in notes for future reference
         notes: d.drill_id ? `canonical:${d.drill_id}` : undefined,
       }));

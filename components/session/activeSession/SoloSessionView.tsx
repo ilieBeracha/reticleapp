@@ -17,7 +17,7 @@ import type { DrillProgress, WatchState } from '@/types/activeSession';
 import type { SessionDrillConfig, SessionWithDetails } from '@/types/session';
 import { formatTime } from '@/utils/activeSession.helpers';
 import { isGroupingSession } from '@/utils/drillGoal';
-import { Camera, Check, Crosshair, Square, Target, X } from 'lucide-react-native';
+import { Camera, Check, Crosshair, Settings, Square, Target, X } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
@@ -42,12 +42,16 @@ interface SoloSessionViewProps {
   weather: any;
   weatherLoading: boolean;
   weatherError: string | null;
+  /** Whether config can be edited (free/guide mode vs locked) */
+  isConfigEditable?: boolean;
   onRefresh: () => void;
   onScanRoute: () => void;
   onManualRoute: () => void;
   onTargetPress: (target: any) => void;
   onEndSession: () => void;
   onClose: () => void;
+  /** Opens the drill config sheet */
+  onOpenConfig?: () => void;
 }
 
 export function SoloSessionView({
@@ -65,12 +69,14 @@ export function SoloSessionView({
   weather,
   weatherLoading,
   weatherError,
+  isConfigEditable = false,
   onRefresh,
   onScanRoute,
   onManualRoute,
   onTargetPress,
   onEndSession,
   onClose,
+  onOpenConfig,
 }: SoloSessionViewProps) {
   const { t } = useTranslation();
   const colors = useColors();
@@ -102,16 +108,25 @@ export function SoloSessionView({
           </Text>
         </View>
 
-        {drill?.time_limit_seconds && watchState.isWatchControlled ? (
-          <View style={sharedStyles.timerContainer}>
-            <View style={[sharedStyles.liveDot, drillProgress?.overTime && { backgroundColor: COLORS.error }]} />
-            <Text style={[sharedStyles.timerText, { color: drillProgress?.overTime ? COLORS.error : colors.text }]}>
-              {formatTime(elapsedTime)}
-            </Text>
-          </View>
-        ) : (
-          <View style={{ width: 36 }} />
-        )}
+        <View style={styles.headerRight}>
+          {drill?.time_limit_seconds && watchState.isWatchControlled && (
+            <View style={sharedStyles.timerContainer}>
+              <View style={[sharedStyles.liveDot, drillProgress?.overTime && { backgroundColor: COLORS.error }]} />
+              <Text style={[sharedStyles.timerText, { color: drillProgress?.overTime ? COLORS.error : colors.text }]}>
+                {formatTime(elapsedTime)}
+              </Text>
+            </View>
+          )}
+          {hasDrill && onOpenConfig && (
+            <TouchableOpacity
+              style={[styles.configButton, { backgroundColor: colors.secondary }]}
+              onPress={onOpenConfig}
+            >
+              <Settings size={18} color={isConfigEditable ? colors.primary : colors.textMuted} />
+            </TouchableOpacity>
+          )}
+          {!hasDrill && !onOpenConfig && <View style={{ width: 36 }} />}
+        </View>
       </View>
 
       {/* Weather */}
@@ -243,6 +258,19 @@ export function SoloSessionView({
 }
 
 const styles = StyleSheet.create({
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    minWidth: 36,
+  },
+  configButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   weatherContainer: {
     paddingHorizontal: 16,
     marginBottom: 12,

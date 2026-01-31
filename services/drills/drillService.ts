@@ -79,6 +79,10 @@ export interface DrillConfig {
   time_limit_seconds?: number | null;
   position?: ShootingPosition | null;
   strings_count: number;
+  /** Number of targets (default 1, only for engagement drills) */
+  target_count?: number | null;
+  /** Measurement scope: individual or collective */
+  measurement_scope?: 'individual' | 'collective' | null;
 }
 
 /**

@@ -15,7 +15,7 @@ import type { DrillProgress, WatchState } from '@/types/activeSession';
 import type { SessionDrillConfig, SessionWithDetails } from '@/types/session';
 import { formatDistanceDisplay, formatTime } from '@/utils/activeSession.helpers';
 import { isGroupingSession } from '@/utils/drillGoal';
-import { Camera, Check, Crosshair, Lock, MapPin, Square, Target, Zap } from 'lucide-react-native';
+import { Camera, Check, Crosshair, Lock, MapPin, Settings, Square, Target, Zap } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
@@ -37,6 +37,8 @@ interface TeamTrainingViewProps {
   onTargetPress: (target: any) => void;
   onEndSession: () => void;
   ending: boolean;
+  /** Opens the drill config sheet (read-only for locked drills) */
+  onOpenConfig?: () => void;
 }
 
 export function TeamTrainingView({
@@ -53,6 +55,7 @@ export function TeamTrainingView({
   onTargetPress,
   onEndSession,
   ending,
+  onOpenConfig,
 }: TeamTrainingViewProps) {
   const { t } = useTranslation();
   const colors = useColors();
@@ -70,16 +73,25 @@ export function TeamTrainingView({
             {session.drill_name || 'Drill'}
           </Text>
         </View>
-        {drill?.time_limit_seconds && watchState.isWatchControlled ? (
-          <View style={sharedStyles.timerContainer}>
-            <View style={[sharedStyles.liveDot, drillProgress?.overTime && { backgroundColor: COLORS.error }]} />
-            <Text style={[sharedStyles.timerText, { color: drillProgress?.overTime ? COLORS.error : colors.text }]}>
-              {formatTime(elapsedTime)}
-            </Text>
-          </View>
-        ) : (
-          <View style={{ width: 36 }} />
-        )}
+        <View style={styles.headerRight}>
+          {drill?.time_limit_seconds && watchState.isWatchControlled && (
+            <View style={sharedStyles.timerContainer}>
+              <View style={[sharedStyles.liveDot, drillProgress?.overTime && { backgroundColor: COLORS.error }]} />
+              <Text style={[sharedStyles.timerText, { color: drillProgress?.overTime ? COLORS.error : colors.text }]}>
+                {formatTime(elapsedTime)}
+              </Text>
+            </View>
+          )}
+          {onOpenConfig && (
+            <TouchableOpacity
+              style={[styles.configButton, { backgroundColor: colors.secondary }]}
+              onPress={onOpenConfig}
+            >
+              <Settings size={18} color={colors.textMuted} />
+            </TouchableOpacity>
+          )}
+          {!onOpenConfig && !drill?.time_limit_seconds && <View style={{ width: 36 }} />}
+        </View>
       </View>
 
       {/* Focused drill info card */}
@@ -227,6 +239,20 @@ export function TeamTrainingView({
 }
 
 const styles = StyleSheet.create({
+  // Header
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    minWidth: 36,
+  },
+  configButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   // Focus card
   focusCard: {
     paddingHorizontal: 16,
