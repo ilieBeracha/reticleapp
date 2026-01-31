@@ -266,14 +266,23 @@ function UnifiedTeamTab({
   const { t } = useTranslation();
   const progressPct = Math.min(100, (teamStats.totalShots / teamStats.weeklyGoal) * 100);
 
-  // Schedule data
+  // Schedule data - sorted: active first, then by closest scheduled time
   const grouped = useMemo(() => groupTrainingsByTimeframe(trainings), [trainings]);
-  const upcomingTrainings = useMemo(
-    () => [...grouped.live, ...grouped.today, ...grouped.tomorrow, ...grouped.thisWeek, ...grouped.upcoming],
-    [grouped]
-  );
+  const upcomingTrainings = useMemo(() => {
+    const allUpcoming = [...grouped.live, ...grouped.today, ...grouped.tomorrow, ...grouped.thisWeek, ...grouped.upcoming];
+    // Sort: ongoing/active first, then by scheduled_at (closest to now first)
+    return allUpcoming.sort((a, b) => {
+      // Active trainings always first
+      if (a.status === 'ongoing' && b.status !== 'ongoing') return -1;
+      if (b.status === 'ongoing' && a.status !== 'ongoing') return 1;
+      // Then sort by scheduled time (closest first)
+      return new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime();
+    });
+  }, [grouped]);
   const pastTrainings = useMemo(() => grouped.past.filter((t) => t.status === 'finished'), [grouped.past]);
+  const [showAllUpcoming, setShowAllUpcoming] = useState(false);
   const [showAllPast, setShowAllPast] = useState(false);
+  const INITIAL_TRAININGS_COUNT = 3;
 
   const getTimeLabel = (training: TrainingWithDetails) => {
     const date = new Date(training.scheduled_at);
@@ -612,11 +621,16 @@ function UnifiedTeamTab({
       <View style={unifiedStyles.scheduleSection}>
         <View style={unifiedStyles.scheduleSectionHeader}>
           <Text style={[unifiedStyles.menuSectionTitle, { color: colors.textMuted }]}>{t('training.schedule')}</Text>
-          {canSchedule && (
-            <TouchableOpacity onPress={onCreateTraining} activeOpacity={0.7}>
-              <Plus size={17} color={colors.textMuted} strokeWidth={2.5} />
-            </TouchableOpacity>
-          )}
+          <View style={unifiedStyles.scheduleSectionHeaderRight}>
+            {upcomingTrainings.length > 0 && (
+              <Text style={[unifiedStyles.scheduleCount, { color: colors.textMuted }]}>{upcomingTrainings.length}</Text>
+            )}
+            {canSchedule && (
+              <TouchableOpacity onPress={onCreateTraining} activeOpacity={0.7}>
+                <Plus size={17} color={colors.textMuted} strokeWidth={2.5} />
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
 
         {upcomingTrainings.length === 0 ? (
@@ -627,45 +641,61 @@ function UnifiedTeamTab({
             </Text>
           </View>
         ) : (
-          <View style={unifiedStyles.scheduleList}>
-            {upcomingTrainings.map((training) => {
-              const isLive = training.status === 'ongoing';
-              return (
-                <TouchableOpacity
-                  key={training.id}
-                  style={[
-                    unifiedStyles.scheduleRow,
-                    { backgroundColor: colors.card, borderColor: isLive ? colors.indigo + '40' : colors.border },
-                  ]}
-                  onPress={() => onTrainingPress(training)}
-                  activeOpacity={0.7}
-                >
-                  <View
-                    style={[
-                      unifiedStyles.scheduleTimeBadge,
-                      { backgroundColor: isLive ? colors.indigo : colors.secondary },
-                    ]}
-                  >
-                    {isLive && <PulseDot color="#fff" />}
-                    <Text style={[unifiedStyles.scheduleTimeText, { color: isLive ? '#fff' : colors.textMuted }]}>
-                      {getTimeLabel(training)}
-                    </Text>
+          <>
+            <View style={[unifiedStyles.scheduleCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              {(showAllUpcoming ? upcomingTrainings : upcomingTrainings.slice(0, INITIAL_TRAININGS_COUNT)).map((training, index, arr) => {
+                const isLive = training.status === 'ongoing';
+                const isLast = index === arr.length - 1;
+                return (
+                  <View key={training.id}>
+                    <TouchableOpacity
+                      style={[
+                        unifiedStyles.scheduleRowConnected,
+                        isLive && { backgroundColor: colors.indigo + '08' },
+                      ]}
+                      onPress={() => onTrainingPress(training)}
+                      activeOpacity={0.7}
+                    >
+                      <View
+                        style={[
+                          unifiedStyles.scheduleTimeBadge,
+                          { backgroundColor: isLive ? colors.indigo : colors.secondary },
+                        ]}
+                      >
+                        {isLive && <PulseDot color="#fff" />}
+                        <Text style={[unifiedStyles.scheduleTimeText, { color: isLive ? '#fff' : colors.textMuted }]}>
+                          {getTimeLabel(training)}
+                        </Text>
+                      </View>
+                      <View style={{ flex: 1, gap: 2 }}>
+                        <Text style={[unifiedStyles.scheduleRowTitle, { color: colors.text }]} numberOfLines={1}>
+                          {training.title}
+                        </Text>
+                        {(training.drill_count ?? 0) > 0 && (
+                          <Text style={[unifiedStyles.scheduleRowMeta, { color: colors.textMuted }]}>
+                            {training.drill_count} drill{training.drill_count !== 1 ? 's' : ''}
+                          </Text>
+                        )}
+                      </View>
+                      <ChevronRight size={16} color={colors.border} />
+                    </TouchableOpacity>
+                    {!isLast && <View style={[unifiedStyles.scheduleDivider, { backgroundColor: colors.border }]} />}
                   </View>
-                  <View style={{ flex: 1, gap: 2 }}>
-                    <Text style={[unifiedStyles.scheduleRowTitle, { color: colors.text }]} numberOfLines={1}>
-                      {training.title}
-                    </Text>
-                    {(training.drill_count ?? 0) > 0 && (
-                      <Text style={[unifiedStyles.scheduleRowMeta, { color: colors.textMuted }]}>
-                        {training.drill_count} drill{training.drill_count !== 1 ? 's' : ''}
-                      </Text>
-                    )}
-                  </View>
-                  <ChevronRight size={16} color={colors.border} />
-                </TouchableOpacity>
-              );
-            })}
-          </View>
+                );
+              })}
+            </View>
+            {upcomingTrainings.length > INITIAL_TRAININGS_COUNT && (
+              <TouchableOpacity
+                style={[unifiedStyles.showMoreBtn, { borderColor: colors.border }]}
+                onPress={() => setShowAllUpcoming(!showAllUpcoming)}
+                activeOpacity={0.7}
+              >
+                <Text style={[unifiedStyles.showMoreText, { color: colors.textMuted }]}>
+                  {showAllUpcoming ? t('common.showLess') : t('training.viewAll', { count: upcomingTrainings.length })}
+                </Text>
+              </TouchableOpacity>
+            )}
+          </>
         )}
       </View>
 
@@ -1077,12 +1107,22 @@ const unifiedStyles = StyleSheet.create({
     justifyContent: 'space-between',
     marginLeft: 3,
   },
+  scheduleSectionHeaderRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
   scheduleCount: {
     fontSize: 13,
     fontWeight: '500',
   },
   scheduleList: {
     gap: 8,
+  },
+  scheduleCard: {
+    borderRadius: 12,
+    borderWidth: 1,
+    overflow: 'hidden',
   },
   scheduleRow: {
     flexDirection: 'row',
@@ -1092,6 +1132,17 @@ const unifiedStyles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     gap: 12,
+  },
+  scheduleRowConnected: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    gap: 12,
+  },
+  scheduleDivider: {
+    height: StyleSheet.hairlineWidth,
+    marginLeft: 12,
   },
   scheduleTimeBadge: {
     flexDirection: 'row',
