@@ -123,6 +123,7 @@ export function TeamTrainingView({
   const [groupSizeCm, setGroupSizeCm] = useState('');
   const [groupingShots, setGroupingShots] = useState(5);
   const [saving, setSaving] = useState(false);
+  const [firstShotHit, setFirstShotHit] = useState<boolean | null>(null);
 
   // Miss Marker modal state (pops up after save if there are misses)
   const [showMissMarker, setShowMissMarker] = useState(false);
@@ -144,6 +145,7 @@ export function TeamTrainingView({
     setHits(0);
     setGroupSizeCm('');
     setGroupingShots(5);
+    setFirstShotHit(null);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setShowSheet(true);
   }, [lastTargetDistance]);
@@ -198,6 +200,7 @@ export function TeamTrainingView({
           time_seconds: null,
           result_notes: null,
           miss_points: finalMissPoints.length > 0 ? finalMissPoints : null,
+          first_shot_hit: firstShotHit,
         });
       }
 
@@ -222,6 +225,7 @@ export function TeamTrainingView({
     groupSizeCm,
     bullets,
     hits,
+    firstShotHit,
     onDistanceSet,
     onRefresh,
     closeSheet,
@@ -617,6 +621,39 @@ export function TeamTrainingView({
                     ))}
                 </View>
 
+                {/* First Shot Hit toggle */}
+                <View style={[styles.firstShotRow, { borderTopColor: colors.border }]}>
+                  <Text style={[styles.firstShotLabel, { color: colors.text }]}>
+                    {t('target.firstShotHit', 'First Shot Hit?')}
+                  </Text>
+                  <View style={styles.firstShotOptions}>
+                    <TouchableOpacity
+                      style={[
+                        styles.firstShotBtn,
+                        { backgroundColor: colors.secondary },
+                        firstShotHit === true && { backgroundColor: `${colors.green}20`, borderColor: colors.green, borderWidth: 1 },
+                      ]}
+                      onPress={() => { Haptics.selectionAsync(); setFirstShotHit(firstShotHit === true ? null : true); }}
+                    >
+                      <Text style={[styles.firstShotBtnText, { color: firstShotHit === true ? colors.green : colors.textMuted }]}>
+                        {t('common.yes', 'Yes')}
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[
+                        styles.firstShotBtn,
+                        { backgroundColor: colors.secondary },
+                        firstShotHit === false && { backgroundColor: `${COLORS.error}20`, borderColor: COLORS.error, borderWidth: 1 },
+                      ]}
+                      onPress={() => { Haptics.selectionAsync(); setFirstShotHit(firstShotHit === false ? null : false); }}
+                    >
+                      <Text style={[styles.firstShotBtnText, { color: firstShotHit === false ? COLORS.error : colors.textMuted }]}>
+                        {t('common.no', 'No')}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
                 {/* Hint: miss marker will pop up if there are misses */}
                 {missCount > 0 && (
                   <Text style={[styles.missHint, { color: colors.textMuted }]}>
@@ -773,6 +810,13 @@ const styles = StyleSheet.create({
   quickRow: { flexDirection: 'row', justifyContent: 'center', gap: 8 },
   quickBtn: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 16 },
   quickText: { fontSize: 14, fontWeight: '600' },
+
+  // First shot hit
+  firstShotRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 14, borderTopWidth: 1, marginTop: 14, width: '100%' },
+  firstShotLabel: { fontSize: 14, fontWeight: '600' },
+  firstShotOptions: { flexDirection: 'row', gap: 8 },
+  firstShotBtn: { paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10 },
+  firstShotBtnText: { fontSize: 14, fontWeight: '600' },
 
   // Save button
   saveBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, height: 50, borderRadius: 12 },

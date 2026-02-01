@@ -230,6 +230,11 @@ export async function saveTacticalTargetResult(params: CreateTacticalResultParam
     payload.miss_points = params.miss_points;
   }
 
+  // Only include first_shot_hit if explicitly provided
+  if (params.first_shot_hit !== undefined) {
+    payload.first_shot_hit = params.first_shot_hit;
+  }
+
   if (existing) {
     // Update existing result
     const { data, error } = await supabase

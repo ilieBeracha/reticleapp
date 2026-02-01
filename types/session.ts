@@ -466,6 +466,11 @@ export interface TacticalTargetResult {
    * NULL = not analyzed. [] = analyzed, no misses recorded.
    */
   miss_points?: MissPoint[] | null;
+  /**
+   * Whether the first shot was a hit.
+   * NULL = not tracked, true = hit, false = miss.
+   */
+  first_shot_hit?: boolean | null;
 }
 
 export interface CreatePaperResultParams {
@@ -494,6 +499,8 @@ export interface CreateTacticalResultParams {
   notes?: string | null;
   /** Miss Analyzer: normalized miss coordinates */
   miss_points?: MissPoint[] | null;
+  /** Whether the first shot was a hit */
+  first_shot_hit?: boolean | null;
 }
 
 export interface SessionTargetWithResults extends SessionTarget {

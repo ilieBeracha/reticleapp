@@ -875,6 +875,8 @@ export async function addTargetWithTacticalResult(params: {
   result_notes?: string | null;
   /** Miss Analyzer: normalized miss coordinates */
   miss_points?: Array<{ x: number; y: number; distance: number; angle_deg: number }> | null;
+  /** Whether the first shot was a hit */
+  first_shot_hit?: boolean | null;
 }): Promise<SessionTargetWithResults> {
   await enforceDrillLimitsForNewTarget({
     sessionId: params.session_id,
@@ -903,6 +905,7 @@ export async function addTargetWithTacticalResult(params: {
     time_seconds: params.time_seconds,
     notes: params.result_notes,
     miss_points: params.miss_points,
+    first_shot_hit: params.first_shot_hit,
   });
 
   return {

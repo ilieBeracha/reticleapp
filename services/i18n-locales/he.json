@@ -6,6 +6,7 @@
     "delete": "מחק",
     "edit": "ערוך",
     "done": "סיום",
+    "exit": "יציאה",
     "close": "סגור",
     "confirm": "אישור",
     "back": "חזור",
@@ -1331,7 +1332,8 @@
     "hitsLabel": "פגיעות",
     "allHit": "הכל פגע",
     "allMiss": "הכל החטיא",
-    "missMarkerHint": "{{count}} החטאות - תסמן לאן הלכו"
+    "missMarkerHint": "{{count}} החטאות - תסמן לאן הלכו",
+    "firstShotHit": "ירייה ראשונה פגעה?"
   },
   "missAnalyzer": {
     "title": "סמן החטאות",

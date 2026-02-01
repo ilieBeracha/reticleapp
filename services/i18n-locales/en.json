@@ -10,6 +10,7 @@
     "confirm": "Confirm",
     "back": "Back",
     "next": "Next",
+    "exit": "Exit",
     "loading": "Loading...",
     "error": "Error",
     "success": "Success",
@@ -1338,7 +1339,8 @@
     "hitsLabel": "Hits",
     "allHit": "All hit",
     "allMiss": "All miss",
-    "missMarkerHint": "{{count}} misses - you'll mark where they went"
+    "missMarkerHint": "{{count}} misses - you'll mark where they went",
+    "firstShotHit": "First Shot Hit?"
   },
   "missAnalyzer": {
     "title": "Mark Misses",
