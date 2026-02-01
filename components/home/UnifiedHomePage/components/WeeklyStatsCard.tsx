@@ -37,6 +37,22 @@ function getNormalizedDispersionAt100mCm(session: WeeklyStatsCardProps['sessions
   return dispersionCm * (100 / distanceM);
 }
 
+/** Check if session is solo engagement (not grouping, not squad/group mode) */
+function isSoloEngagement(session: WeeklyStatsCardProps['sessionsData'][number]): boolean {
+  return (
+    session.session_mode === 'solo' &&
+    session.drill_config?.drill_goal === 'engagement'
+  );
+}
+
+/** Calculate median of an array of numbers */
+function median(values: number[]): number | null {
+  if (values.length === 0) return null;
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+}
+
 export function WeeklyStatsCard({ stats, streak, colors, sessionsData }: WeeklyStatsCardProps) {
   const { t } = useTranslation();
   const scale = useSharedValue(1);
@@ -99,8 +115,11 @@ export function WeeklyStatsCard({ stats, streak, colors, sessionsData }: WeeklyS
     let shots = 0;
     let hits = 0;
     let totalTimeMs = 0;
-    let dispersionAt100mSum = 0;
-    let dispersionAt100mCount = 0;
+    const dispersionAt100mValues: number[] = [];
+
+    // For accuracy: only count solo engagement sessions
+    let soloEngagementShots = 0;
+    let soloEngagementHits = 0;
 
     completedSessions.forEach((session) => {
       const sShots = session.stats?.shots_fired ?? 0;
@@ -109,24 +128,32 @@ export function WeeklyStatsCard({ stats, streak, colors, sessionsData }: WeeklyS
       hits += sHits;
       totalTimeMs += getSessionDurationMs(session);
 
+      // Only count accuracy from solo engagement sessions
+      if (isSoloEngagement(session)) {
+        soloEngagementShots += sShots;
+        soloEngagementHits += sHits;
+      }
+
       const d100 = getNormalizedDispersionAt100mCm(session);
       if (d100 != null) {
-        dispersionAt100mSum += d100;
-        dispersionAt100mCount++;
+        dispersionAt100mValues.push(d100);
       }
     });
 
-    const accuracy = shots > 0 ? Math.round((hits / shots) * 100) : null;
+    // Accuracy only from solo engagement sessions
+    const accuracy = soloEngagementShots > 0 ? Math.round((soloEngagementHits / soloEngagementShots) * 100) : null;
     const totalTimeMinutes = totalTimeMs > 0 ? Math.round(totalTimeMs / 60000) : 0;
-    const avgGroupAt100m =
-      dispersionAt100mCount > 0 ? `${(dispersionAt100mSum / dispersionAt100mCount).toFixed(1)}cm` : '—';
+    
+    // Median group at 100m (instead of average)
+    const medianDispersion = median(dispersionAt100mValues);
+    const medianGroupAt100m = medianDispersion != null ? `${medianDispersion.toFixed(1)}cm` : '—';
 
     return {
       sessions: completedSessions.length,
       shots,
       accuracy,
       totalTimeMinutes,
-      avgGroupAt100m,
+      medianGroupAt100m,
     };
   }, [completedSessions]);
 
@@ -178,8 +205,8 @@ export function WeeklyStatsCard({ stats, streak, colors, sessionsData }: WeeklyS
         />
         <StatItem
           icon={<Crosshair size={14} color={colors.orange} />}
-          value={viewStats.avgGroupAt100m}
-          label={t('session.avgAt100m')}
+          value={viewStats.medianGroupAt100m}
+          label={t('session.medianAt100m')}
           colors={colors}
         />
         <StatItem

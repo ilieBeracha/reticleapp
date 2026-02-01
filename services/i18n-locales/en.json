@@ -235,6 +235,7 @@
     "manualEntryPreferred": "Manual entry preferred",
     "bestGroup": "Best Group",
     "avgAt100m": "Avg @ 100m",
+    "medianAt100m": "Med @ 100m",
     "holes": "Holes",
     "holesDetected": "Holes detected",
     "targets": "Targets",
