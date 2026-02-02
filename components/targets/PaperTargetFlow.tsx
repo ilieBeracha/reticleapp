@@ -212,7 +212,21 @@ export function PaperTargetFlow({
             : null;
 
         const finalImageBase64 = editedImageBase64 || result?.annotated_image_base64;
-        const groupSizeCm = result?.overall_stats_mm?.max_pair?.distance_cm ?? null;
+
+        // Recalculate grouping from FINAL (edited) detections, not the original server result
+        let groupSizeCm: number | null = null;
+        if (finalDetections.length >= 2 && result?.scale_info?.cm_per_pixel) {
+          let maxDistance = 0;
+          for (let i = 0; i < finalDetections.length; i++) {
+            for (let j = i + 1; j < finalDetections.length; j++) {
+              const dx = finalDetections[i].center[0] - finalDetections[j].center[0];
+              const dy = finalDetections[i].center[1] - finalDetections[j].center[1];
+              const distance = Math.sqrt(dx * dx + dy * dy);
+              if (distance > maxDistance) maxDistance = distance;
+            }
+          }
+          groupSizeCm = maxDistance * result.scale_info.cm_per_pixel;
+        }
 
         // Upload image to Supabase Storage instead of storing base64 in DB
         let scannedImageUrl: string | null = null;

@@ -1,12 +1,13 @@
 import { BaseAvatar } from '@/components/shared/Avatar';
 import { useAuth } from '@/contexts/AuthContext';
 import { useColors } from '@/hooks/ui/useColors';
+import { useNotificationRealtime } from '@/hooks/realtime/notification/useNotificationRealtime';
 import { useAppContext } from '@/hooks/useAppContext';
 import { getUnreadCount } from '@/services/notifications';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { Bell } from 'lucide-react-native';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 interface HeaderProps {
@@ -24,24 +25,26 @@ interface HeaderProps {
 export function Header({ onNotificationPress }: HeaderProps) {
   const colors = useColors();
   const { fullName, avatarUrl } = useAppContext();
-  const { profileAvatarUrl } = useAuth();
+  const { user, profileAvatarUrl } = useAuth();
   const [notificationCount, setNotificationCount] = useState(0);
 
-  // Fetch unread notification count from history
+  // Fetch initial unread count on mount
   useEffect(() => {
-    const fetchCount = async () => {
-      try {
-        const count = await getUnreadCount();
-        setNotificationCount(count);
-      } catch (error) {
-        console.error('Failed to get notification count:', error);
-      }
-    };
-
-    fetchCount();
-    const interval = setInterval(fetchCount, 10000);
-    return () => clearInterval(interval);
+    getUnreadCount()
+      .then((count) => setNotificationCount(count))
+      .catch((error) => console.error('Failed to get notification count:', error));
   }, []);
+
+  // Increment count in real-time when a new notification arrives
+  const handleNewNotification = useCallback(() => {
+    console.log('[Header] Realtime notification received, incrementing badge');
+    setNotificationCount((c) => c + 1);
+  }, []);
+
+  useNotificationRealtime({
+    userId: user?.id,
+    onNewNotification: handleNewNotification,
+  });
 
   const handleNotificationPress = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);

@@ -1,4 +1,6 @@
+import { useAuth } from '@/contexts/AuthContext';
 import { useColors } from '@/hooks/ui/useColors';
+import { useNotificationRealtime } from '@/hooks/realtime/notification/useNotificationRealtime';
 import {
   clearNotificationHistory,
   deleteNotificationFromHistory,
@@ -44,10 +46,29 @@ const getTypeConfig = (t: ReturnType<typeof useTranslation>['t']) => ({
 export default function NotificationsSheet() {
   const colors = useColors();
   const { t } = useTranslation();
+  const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [notifications, setNotifications] = useState<NotificationHistoryItem[]>([]);
   const TYPE_CONFIG = getTypeConfig(t);
+
+  // Live-prepend new notifications and mark them read immediately (user is viewing)
+  const handleNewNotification = useCallback(
+    async (notification: NotificationHistoryItem) => {
+      setNotifications((prev) => [{ ...notification, read: true }, ...prev]);
+      try {
+        await markNotificationRead(notification.id);
+      } catch (error) {
+        console.error('Failed to mark realtime notification as read:', error);
+      }
+    },
+    []
+  );
+
+  useNotificationRealtime({
+    userId: user?.id,
+    onNewNotification: handleNewNotification,
+  });
 
   const loadNotifications = useCallback(async () => {
     try {

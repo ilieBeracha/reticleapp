@@ -44,6 +44,7 @@ Deno.serve(async (req) => {
   }
 
   try {
+    console.log('[EDGE-FN] send-push-notification v2 invoked');
     const payload: PushNotificationPayload = await req.json();
     const { type, team_id, user_ids, exclude_user_id, title, body, data } = payload;
 
@@ -85,6 +86,29 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ success: true, sent: 0, message: 'No users to notify' }), {
         headers: { 'Content-Type': 'application/json' },
       });
+    }
+
+    // Insert notification_history records for all recipients
+    const historyRecords = targetUserIds.map((userId) => ({
+      user_id: userId,
+      title,
+      body,
+      type: getHistoryType(type),
+      screen: (data?.screen as string) || null,
+      reference_id: (data?.id as string) || null,
+    }));
+
+    console.log('[HISTORY] Inserting', historyRecords.length, 'records. Sample:', JSON.stringify(historyRecords[0]));
+
+    const { data: historyData, error: historyError } = await supabase
+      .from('notification_history')
+      .insert(historyRecords)
+      .select();
+
+    if (historyError) {
+      console.error('[HISTORY] INSERT FAILED:', JSON.stringify(historyError));
+    } else {
+      console.log('[HISTORY] SUCCESS: inserted', historyData?.length, 'rows');
     }
 
     // Get push tokens for target users
@@ -168,6 +192,13 @@ Deno.serve(async (req) => {
     });
   }
 });
+
+function getHistoryType(type: string): string {
+  if (type.startsWith('training')) return 'training';
+  if (type.startsWith('squad_engagement')) return 'session';
+  if (type === 'team_invite' || type === 'member_joined') return 'team';
+  return 'default';
+}
 
 function getChannelId(type: string): string {
   switch (type) {
