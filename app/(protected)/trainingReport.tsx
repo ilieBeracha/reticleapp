@@ -29,9 +29,7 @@ import {
   AlertCircle,
   ArrowLeft,
   ArrowRight,
-  Calendar,
   CheckCircle2,
-  Clock,
   CloudRain,
   FileDown,
   FileText,
@@ -42,7 +40,6 @@ import {
   Target,
   Thermometer,
   Trophy,
-  Users,
   Wind,
   XCircle,
 } from 'lucide-react-native';
@@ -85,94 +82,135 @@ interface TrainingWithDrills {
     drill_goal?: 'grouping' | 'engagement';
     distance_m?: number;
     rounds_per_shooter?: number;
+    weapon_category?: string | null;
+    category?: string | null;
+    position?: string | null;
+    target_type?: string | null;
   }>;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// HEADER STATS CARD
+// REPORT FIELD
 // ═══════════════════════════════════════════════════════════════════════════
 
-function TrainingOverviewCard({
-  training,
-  sessionCount,
+function ReportField({
+  label,
+  value,
   colors,
 }: {
-  training: TrainingWithDrills;
-  sessionCount: number;
+  label: string;
+  value: string | null;
   colors: ReturnType<typeof useColors>;
 }) {
   const { t } = useTranslation();
-  const duration = useMemo(() => {
-    if (!training.started_at || !training.ended_at) return null;
-    const start = new Date(training.started_at);
-    const end = new Date(training.ended_at);
-    const mins = Math.round((end.getTime() - start.getTime()) / 60000);
-    if (mins < 60) return `${mins}m`;
-    const hours = Math.floor(mins / 60);
-    const remainingMins = mins % 60;
-    return remainingMins > 0 ? `${hours}h ${remainingMins}m` : `${hours}h`;
-  }, [training.started_at, training.ended_at]);
+  return (
+    <View style={styles.reportField}>
+      <Text style={[styles.reportFieldLabel, { color: colors.textMuted }]}>{label}</Text>
+      <Text
+        style={[
+          styles.reportFieldValue,
+          { color: value ? colors.text : colors.textMuted },
+          !value && styles.reportFieldNoData,
+        ]}
+      >
+        {value || t('training.noDataAvailable')}
+      </Text>
+    </View>
+  );
+}
 
-  const statusConfig = {
-    planned: { label: t('training.status.planned'), color: colors.textMuted, icon: Clock },
-    ongoing: { label: t('training.status.ongoing'), color: '#10B981', icon: Target },
-    finished: { label: t('training.status.finished'), color: '#10B981', icon: CheckCircle2 },
-    cancelled: { label: t('training.status.cancelled'), color: colors.destructive, icon: XCircle },
-  };
+// ═══════════════════════════════════════════════════════════════════════════
+// DRILL FLOW CARD
+// ═══════════════════════════════════════════════════════════════════════════
 
-  const { label, color, icon: Icon } = statusConfig[training.status];
+function DrillFlowCard({
+  drill,
+  index,
+  sessions,
+  colors,
+}: {
+  drill: TrainingWithDrills['drills'][0];
+  index: number;
+  sessions: SessionWithDetails[];
+  colors: ReturnType<typeof useColors>;
+}) {
+  const { t } = useTranslation();
+  const drillSessions = sessions.filter(
+    (s) => s.drill_name === drill.name || (drill.id && s.drill_id === drill.id)
+  );
+  const completedCount = drillSessions.filter((s) => s.status === 'completed').length;
+  const totalShots = drillSessions.reduce((sum, s) => sum + (s.stats?.shots_fired || 0), 0);
+  const totalHits = drillSessions.reduce((sum, s) => sum + (s.stats?.hits_total || 0), 0);
+  const avgAccuracy = totalShots > 0 ? Math.round((totalHits / totalShots) * 100) : null;
 
   return (
-    <Animated.View entering={FadeInDown.duration(300)}>
-      <View style={[styles.overviewCard, { backgroundColor: colors.card }]}>
-        {/* Status Badge */}
-        <View style={[styles.statusBadge, { backgroundColor: color + '15' }]}>
-          <Icon size={14} color={color} />
-          <Text style={[styles.statusText, { color }]}>{label}</Text>
+    <View style={[styles.drillFlowCard, { backgroundColor: colors.card }]}>
+      <View style={styles.drillFlowHeader}>
+        <View style={[styles.drillIndex, { backgroundColor: colors.primary + '15' }]}>
+          <Text style={[styles.drillIndexText, { color: colors.primary }]}>{index + 1}</Text>
         </View>
-
-        {/* Title */}
-        <Text style={[styles.trainingTitle, { color: colors.text }]}>{training.title}</Text>
-
-        {/* Date & Team */}
-        <View style={styles.metaRow}>
-          <Calendar size={14} color={colors.textMuted} />
-          <Text style={[styles.metaText, { color: colors.textMuted }]}>
-            {format(new Date(training.scheduled_at), 'EEE, MMM d, yyyy')}
+        <View style={styles.drillFlowInfo}>
+          <Text style={[styles.drillFlowName, { color: colors.text }]}>{drill.name}</Text>
+          <Text style={[styles.drillFlowMeta, { color: colors.textMuted }]}>
+            {drill.drill_goal === 'grouping' ? t('training.groupingType') : t('training.engagementType')}
+            {drill.distance_m ? ` · ${drill.distance_m}m` : ''}
+            {drill.rounds_per_shooter ? ` · ${drill.rounds_per_shooter} ${t('training.rounds').toLowerCase()}` : ''}
+            {drill.position ? ` · ${drill.position}` : ''}
           </Text>
-          {training.team?.name && (
-            <>
-              <View style={[styles.metaDot, { backgroundColor: colors.border }]} />
-              <Users size={14} color={colors.textMuted} />
-              <Text style={[styles.metaText, { color: colors.textMuted }]}>{training.team.name}</Text>
-            </>
-          )}
-        </View>
-
-        {/* Quick Stats */}
-        <View style={[styles.quickStats, { borderTopColor: colors.border }]}>
-          <View style={styles.quickStat}>
-            <Text style={[styles.quickStatValue, { color: colors.text }]}>{training.drills.length}</Text>
-            <Text style={[styles.quickStatLabel, { color: colors.textMuted }]}>{t('training.drills')}</Text>
-          </View>
-          <View style={[styles.quickStatDivider, { backgroundColor: colors.border }]} />
-          <View style={styles.quickStat}>
-            <Text style={[styles.quickStatValue, { color: colors.text }]}>{sessionCount}</Text>
-            <Text style={[styles.quickStatLabel, { color: colors.textMuted }]}>{t('training.sessions')}</Text>
-          </View>
-          {duration && (
-            <>
-              <View style={[styles.quickStatDivider, { backgroundColor: colors.border }]} />
-              <View style={styles.quickStat}>
-                <Text style={[styles.quickStatValue, { color: colors.text }]}>{duration}</Text>
-                <Text style={[styles.quickStatLabel, { color: colors.textMuted }]}>{t('training.duration')}</Text>
-              </View>
-            </>
-          )}
         </View>
       </View>
-    </Animated.View>
+      {completedCount > 0 && (
+        <View style={[styles.drillFlowStats, { borderTopColor: colors.border }]}>
+          <Text style={[styles.drillFlowStatText, { color: colors.textMuted }]}>
+            {t('training.completedSessions', { count: completedCount })}
+          </Text>
+          {avgAccuracy !== null && (
+            <Text
+              style={[
+                styles.drillFlowStatText,
+                { color: avgAccuracy >= 70 ? '#10B981' : avgAccuracy >= 50 ? '#F59E0B' : '#EF4444' },
+              ]}
+            >
+              {avgAccuracy}%
+            </Text>
+          )}
+          {totalShots > 0 && (
+            <Text style={[styles.drillFlowStatText, { color: colors.textMuted }]}>
+              {totalShots} {t('training.totalShots').toLowerCase()}
+            </Text>
+          )}
+        </View>
+      )}
+    </View>
   );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// HELPER FUNCTIONS
+// ═══════════════════════════════════════════════════════════════════════════
+
+function getTimeOfDay(dateStr: string | null | undefined): 'day' | 'night' | null {
+  if (!dateStr) return null;
+  const hour = new Date(dateStr).getHours();
+  return hour >= 6 && hour < 18 ? 'day' : 'night';
+}
+
+function getWeaponLabel(category: string | undefined | null): string | null {
+  switch (category) {
+    case 'rifle':
+    case 'carbine':
+      return 'M4';
+    case 'precision_rifle':
+      return 'Sniper';
+    case 'pistol':
+      return 'Pistol';
+    case 'shotgun':
+      return 'Shotgun';
+    case 'smg':
+      return 'SMG';
+    default:
+      return null;
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -526,6 +564,87 @@ export default function TrainingReportScreen() {
     return isCreator || (canManageByRole && activeTeamMatchesTraining);
   }, [training, session?.user?.id, canManageByRole, activeTeamId]);
 
+  // Derived report data
+  const timeOfDay = useMemo(() => {
+    if (!training) return null;
+    return getTimeOfDay(training.started_at || training.scheduled_at);
+  }, [training]);
+
+  const forceComposition = useMemo(() => {
+    if (!training || sessions.length === 0) return null;
+    const uniqueUsers = new Set(sessions.map((s) => s.user_id));
+    const count = uniqueUsers.size;
+    if (training.team?.name) {
+      return t('training.reportSoldiersFromTeam', { count, team: training.team.name });
+    }
+    return t('training.reportSoldiers', { count });
+  }, [sessions, training, t]);
+
+  const trainingType = useMemo(() => {
+    if (!training || training.drills.length === 0) return null;
+    const weaponTypes = new Set<string>();
+    for (const drill of training.drills) {
+      const label = getWeaponLabel(drill.weapon_category);
+      if (label) weaponTypes.add(label);
+    }
+    return weaponTypes.size > 0 ? Array.from(weaponTypes).join(' / ') : null;
+  }, [training]);
+
+  const subType = useMemo(() => {
+    if (!training || training.drills.length === 0) return null;
+    const categories = new Set<string>();
+    for (const drill of training.drills) {
+      if (drill.category) {
+        categories.add(drill.category.charAt(0).toUpperCase() + drill.category.slice(1));
+      }
+    }
+    return categories.size > 0 ? Array.from(categories).join(' / ') : null;
+  }, [training]);
+
+  const improvementAreas = useMemo(() => {
+    if (sessions.length === 0) return null;
+    const drillPerf = new Map<string, { shots: number; hits: number; name: string }>();
+    for (const s of sessions) {
+      if (!s.stats || !s.drill_name) continue;
+      const existing = drillPerf.get(s.drill_name) || { shots: 0, hits: 0, name: s.drill_name };
+      existing.shots += s.stats.shots_fired;
+      existing.hits += s.stats.hits_total;
+      drillPerf.set(s.drill_name, existing);
+    }
+    const areas: string[] = [];
+    for (const [, perf] of drillPerf) {
+      if (perf.shots > 0) {
+        const accuracy = Math.round((perf.hits / perf.shots) * 100);
+        if (accuracy < 60) {
+          areas.push(`${perf.name} (${accuracy}%)`);
+        }
+      }
+    }
+    return areas.length > 0 ? areas.join('\n') : null;
+  }, [sessions]);
+
+  const maintainAreas = useMemo(() => {
+    if (sessions.length === 0) return null;
+    const drillPerf = new Map<string, { shots: number; hits: number; name: string }>();
+    for (const s of sessions) {
+      if (!s.stats || !s.drill_name) continue;
+      const existing = drillPerf.get(s.drill_name) || { shots: 0, hits: 0, name: s.drill_name };
+      existing.shots += s.stats.shots_fired;
+      existing.hits += s.stats.hits_total;
+      drillPerf.set(s.drill_name, existing);
+    }
+    const areas: string[] = [];
+    for (const [, perf] of drillPerf) {
+      if (perf.shots > 0) {
+        const accuracy = Math.round((perf.hits / perf.shots) * 100);
+        if (accuracy >= 80) {
+          areas.push(`${perf.name} (${accuracy}%)`);
+        }
+      }
+    }
+    return areas.length > 0 ? areas.join('\n') : null;
+  }, [sessions]);
+
   // Load data
   const loadData = useCallback(async () => {
     if (!params.trainingId) {
@@ -649,28 +768,53 @@ export default function TrainingReportScreen() {
 
   // Generate shareable report text
   const generateReportText = useCallback(() => {
-    if (!training || sessions.length === 0) return '';
+    if (!training) return '';
 
     const uniqueUsers = new Set(sessions.map((s) => s.user_id));
-    const completedSessions = sessions.filter((s) => s.status === 'completed');
     const totalShots = sessions.reduce((sum, s) => sum + (s.stats?.shots_fired || 0), 0);
     const totalHits = sessions.reduce((sum, s) => sum + (s.stats?.hits_total || 0), 0);
     const avgAccuracy = totalShots > 0 ? Math.round((totalHits / totalShots) * 100) : 0;
+    const tod = getTimeOfDay(training.started_at || training.scheduled_at);
+    const na = t('training.noDataAvailable');
 
-    return `📊 Training Report: ${training.title}
-━━━━━━━━━━━━━━━━━━━━━
-📅 ${format(new Date(training.scheduled_at), 'EEE, MMM d, yyyy')}
-${training.team?.name ? `👥 Team: ${training.team.name}` : ''}
+    const lines = [
+      `${t('training.trainingReport')}: ${training.title}`,
+      '━━━━━━━━━━━━━━━━━━━━━',
+      '',
+      `${t('training.reportDate')}: ${format(new Date(training.scheduled_at), 'EEE, MMM d, yyyy')}`,
+      `${t('training.reportLocation')}: ${na}`,
+      `${t('training.reportTrainingOfficer')}: ${training.creator?.full_name || na}`,
+      `${t('training.reportTime')}: ${tod ? t(`training.report${tod === 'day' ? 'Day' : 'Night'}`) : na}`,
+      `${t('training.reportForceComposition')}: ${uniqueUsers.size > 0 ? `${uniqueUsers.size} ${training.team?.name ? `(${training.team.name})` : ''}` : na}`,
+      `${t('training.reportTrainingType')}: ${trainingType || na}`,
+      `${t('training.reportSubType')}: ${subType || na}`,
+      '',
+      `${t('training.reportTrainingFlow')}:`,
+      ...(training.drills.length > 0
+        ? training.drills.map(
+            (d, i) =>
+              `  ${i + 1}. ${d.name}${d.distance_m ? ` (${d.distance_m}m)` : ''}${d.rounds_per_shooter ? ` - ${d.rounds_per_shooter} rounds` : ''}`
+          )
+        : [`  ${na}`]),
+      '',
+      ...(totalShots > 0
+        ? [
+            `${t('training.teamPerformance')}:`,
+            `  ${avgAccuracy}% ${t('training.teamAccuracy')}`,
+            `  ${totalShots} ${t('training.totalShots')}`,
+            '',
+          ]
+        : []),
+      `${t('training.reportImprovementAreas')}:\n${improvementAreas || `  ${na}`}`,
+      `${t('training.reportMaintainAreas')}:\n${maintainAreas || `  ${na}`}`,
+      `${t('training.reportLessonsLearned')}:\n  ${na}`,
+      `${t('training.reportNextFocus')}:\n  ${na}`,
+      '',
+      'Generated by ReticleIQ',
+    ];
 
-📈 Summary:
-• ${uniqueUsers.size} Participants
-• ${training.drills.length} Drills
-• ${completedSessions.length} Sessions Completed
-• ${totalShots} Total Shots
-• ${avgAccuracy}% Team Accuracy
-
-Generated by ReticleIQ`;
-  }, [training, sessions]);
+    return lines.join('\n');
+  }, [training, sessions, trainingType, subType, improvementAreas, maintainAreas, t]);
 
   const handleShareText = useCallback(async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -828,38 +972,102 @@ Generated by ReticleIQ`;
         keyboardShouldPersistTaps="handled"
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.text} />}
       >
-        {/* Training Overview */}
-        <TrainingOverviewCard training={training} sessionCount={sessions.length} colors={colors} />
+        {/* Report Title */}
+        <Animated.View entering={FadeInDown.duration(300)}>
+          <View style={[styles.reportTitleCard, { backgroundColor: colors.card }]}>
+            <Text style={[styles.reportTitleText, { color: colors.text }]}>{training.title}</Text>
+            {training.team?.name && (
+              <Text style={[styles.reportTeamText, { color: colors.textMuted }]}>{training.team.name}</Text>
+            )}
+          </View>
+        </Animated.View>
+
+        {/* Structured Report Fields */}
+        <Animated.View entering={FadeInDown.delay(50).duration(300)}>
+          <View style={[styles.reportCard, { backgroundColor: colors.card }]}>
+            <ReportField
+              label={t('training.reportDate')}
+              value={format(new Date(training.scheduled_at), 'EEE, MMM d, yyyy')}
+              colors={colors}
+            />
+            <View style={[styles.fieldDivider, { backgroundColor: colors.border }]} />
+            <ReportField label={t('training.reportLocation')} value={null} colors={colors} />
+            <View style={[styles.fieldDivider, { backgroundColor: colors.border }]} />
+            <ReportField
+              label={t('training.reportTrainingOfficer')}
+              value={training.creator?.full_name || null}
+              colors={colors}
+            />
+            <View style={[styles.fieldDivider, { backgroundColor: colors.border }]} />
+            <ReportField
+              label={t('training.reportTime')}
+              value={timeOfDay ? t(`training.report${timeOfDay === 'day' ? 'Day' : 'Night'}`) : null}
+              colors={colors}
+            />
+            <View style={[styles.fieldDivider, { backgroundColor: colors.border }]} />
+            <ReportField
+              label={t('training.reportForceComposition')}
+              value={forceComposition}
+              colors={colors}
+            />
+            <View style={[styles.fieldDivider, { backgroundColor: colors.border }]} />
+            <ReportField
+              label={t('training.reportTrainingType')}
+              value={trainingType}
+              colors={colors}
+            />
+            <View style={[styles.fieldDivider, { backgroundColor: colors.border }]} />
+            <ReportField label={t('training.reportSubType')} value={subType} colors={colors} />
+          </View>
+        </Animated.View>
+
+        {/* Training Flow and Drills */}
+        <Animated.View entering={FadeInDown.delay(100).duration(300)}>
+          <View style={styles.sectionHeader}>
+            <Target size={16} color={colors.textMuted} />
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>
+              {t('training.reportTrainingFlow')}
+            </Text>
+          </View>
+          {training.drills.length > 0 ? (
+            <View style={styles.drillsFlowList}>
+              {training.drills.map((drill, index) => (
+                <DrillFlowCard
+                  key={drill.id}
+                  drill={drill}
+                  index={index}
+                  sessions={sessions}
+                  colors={colors}
+                />
+              ))}
+            </View>
+          ) : (
+            <View style={[styles.reportCard, { backgroundColor: colors.card }]}>
+              <Text style={[styles.noDataText, { color: colors.textMuted }]}>
+                {t('training.noDataAvailable')}
+              </Text>
+            </View>
+          )}
+        </Animated.View>
 
         {/* Weather Conditions */}
-        {weather && weather.sessionsWithWeather > 0 && <WeatherConditionsCard weather={weather} colors={colors} />}
+        {weather && weather.sessionsWithWeather > 0 && (
+          <WeatherConditionsCard weather={weather} colors={colors} />
+        )}
 
         {/* Biometrics Summary */}
         {biometrics && biometrics.sessionsWithBiometrics > 0 && (
           <BiometricsSummaryCard biometrics={biometrics} colors={colors} />
         )}
 
-        {/* No Sessions State */}
-        {!hasSessions && (
-          <Animated.View entering={FadeIn.delay(100).duration(300)}>
-            <View style={[styles.emptyState, { backgroundColor: colors.card }]}>
-              <View style={[styles.emptyIcon, { backgroundColor: colors.secondary }]}>
-                <Users size={24} color={colors.textMuted} />
-              </View>
-              <Text style={[styles.emptyTitle, { color: colors.text }]}>{t('training.noParticipantData')}</Text>
-              <Text style={[styles.emptyDesc, { color: colors.textMuted }]}>
-                {training.status === 'planned' ? t('training.notStartedYet') : t('training.noSessionsRecorded')}
-              </Text>
-            </View>
-          </Animated.View>
-        )}
-
-        {/* Standards Verdicts - only show if there are verdicts with actual standards */}
+        {/* Standards Verdicts */}
         {(() => {
-          const evaluatedVerdicts = Array.from(verdicts.entries()).filter(([_, v]) => v.base_standard_id);
+          const evaluatedVerdicts = Array.from(verdicts.entries()).filter(
+            ([, v]) => v.base_standard_id
+          );
           if (!hasSessions || evaluatedVerdicts.length === 0) return null;
 
-          const passedCount = evaluatedVerdicts.filter(([_, v]) => v.passed).length;
+          const passedCount = evaluatedVerdicts.filter(([, v]) => v.passed).length;
           const failedCount = evaluatedVerdicts.length - passedCount;
           const passRate = Math.round((passedCount / evaluatedVerdicts.length) * 100);
 
@@ -867,24 +1075,38 @@ Generated by ReticleIQ`;
             <Animated.View entering={FadeIn.delay(50).duration(300)} style={styles.insightsSection}>
               <View style={styles.sectionHeader}>
                 <CheckCircle2 size={16} color={colors.textMuted} />
-                <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('training.performanceStandards')}</Text>
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                  {t('training.performanceStandards')}
+                </Text>
               </View>
 
-              {/* Summary Card */}
               <View style={[styles.standardsSummary, { backgroundColor: colors.card }]}>
                 <View style={styles.standardsSummaryRow}>
                   <View style={styles.standardsStat}>
-                    <Text style={[styles.standardsStatValue, { color: colors.green }]}>{passedCount}</Text>
-                    <Text style={[styles.standardsStatLabel, { color: colors.textMuted }]}>{t('training.passed')}</Text>
+                    <Text style={[styles.standardsStatValue, { color: colors.green }]}>
+                      {passedCount}
+                    </Text>
+                    <Text style={[styles.standardsStatLabel, { color: colors.textMuted }]}>
+                      {t('training.passed')}
+                    </Text>
                   </View>
                   <View style={[styles.standardsDivider, { backgroundColor: colors.border }]} />
                   <View style={styles.standardsStat}>
-                    <Text style={[styles.standardsStatValue, { color: colors.red }]}>{failedCount}</Text>
-                    <Text style={[styles.standardsStatLabel, { color: colors.textMuted }]}>{t('training.failed')}</Text>
+                    <Text style={[styles.standardsStatValue, { color: colors.red }]}>
+                      {failedCount}
+                    </Text>
+                    <Text style={[styles.standardsStatLabel, { color: colors.textMuted }]}>
+                      {t('training.failed')}
+                    </Text>
                   </View>
                   <View style={[styles.standardsDivider, { backgroundColor: colors.border }]} />
                   <View style={styles.standardsStat}>
-                    <Text style={[styles.standardsStatValue, { color: passRate >= 50 ? colors.green : colors.red }]}>
+                    <Text
+                      style={[
+                        styles.standardsStatValue,
+                        { color: passRate >= 50 ? colors.green : colors.red },
+                      ]}
+                    >
                       {passRate}%
                     </Text>
                     <Text style={[styles.standardsStatLabel, { color: colors.textMuted }]}>
@@ -894,12 +1116,12 @@ Generated by ReticleIQ`;
                 </View>
               </View>
 
-              {/* Individual Verdicts */}
               <View style={styles.verdictsGrid}>
                 {evaluatedVerdicts.map(([sessionId, verdict]) => {
-                  const session = sessions.find((s) => s.id === sessionId);
-                  const participantName = session?.user_full_name || t('common.unknown');
-                  const drillName = session?.drill_name || session?.drill_config?.name || t('training.unknownDrill');
+                  const s = sessions.find((sess) => sess.id === sessionId);
+                  const participantName = s?.user_full_name || t('common.unknown');
+                  const drillName =
+                    s?.drill_name || s?.drill_config?.name || t('training.unknownDrill');
 
                   return (
                     <View
@@ -914,17 +1136,27 @@ Generated by ReticleIQ`;
                     >
                       <View style={styles.verdictCardHeader}>
                         <View style={styles.verdictCardInfo}>
-                          <Text style={[styles.verdictCardName, { color: colors.text }]} numberOfLines={1}>
+                          <Text
+                            style={[styles.verdictCardName, { color: colors.text }]}
+                            numberOfLines={1}
+                          >
                             {participantName}
                           </Text>
-                          <Text style={[styles.verdictCardDrill, { color: colors.textMuted }]} numberOfLines={1}>
+                          <Text
+                            style={[styles.verdictCardDrill, { color: colors.textMuted }]}
+                            numberOfLines={1}
+                          >
                             {drillName}
                           </Text>
                         </View>
                         <View
                           style={[
                             styles.verdictBadge,
-                            { backgroundColor: verdict.passed ? colors.green + '20' : colors.red + '20' },
+                            {
+                              backgroundColor: verdict.passed
+                                ? colors.green + '20'
+                                : colors.red + '20',
+                            },
                           ]}
                         >
                           {verdict.passed ? (
@@ -933,14 +1165,16 @@ Generated by ReticleIQ`;
                             <XCircle size={14} color={colors.red} />
                           )}
                           <Text
-                            style={[styles.verdictBadgeText, { color: verdict.passed ? colors.green : colors.red }]}
+                            style={[
+                              styles.verdictBadgeText,
+                              { color: verdict.passed ? colors.green : colors.red },
+                            ]}
                           >
                             {verdict.passed ? t('training.pass') : t('training.fail')}
                           </Text>
                         </View>
                       </View>
 
-                      {/* Metrics Row */}
                       <View style={styles.verdictMetrics}>
                         {verdict.effective_grouping_cm && (
                           <Text style={[styles.verdictMetric, { color: colors.textMuted }]}>
@@ -966,15 +1200,48 @@ Generated by ReticleIQ`;
           <Animated.View entering={FadeIn.delay(100).duration(300)} style={styles.insightsSection}>
             <View style={styles.sectionHeader}>
               <Trophy size={16} color={colors.textMuted} />
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('training.participantPerformance')}</Text>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                {t('training.participantPerformance')}
+              </Text>
             </View>
             <ParticipantInsights teamSessions={sessions} drills={training.drills} />
           </Animated.View>
         )}
 
+        {/* Assessment Fields */}
+        <Animated.View entering={FadeIn.delay(150).duration(300)}>
+          <View style={[styles.reportCard, { backgroundColor: colors.card }]}>
+            <ReportField
+              label={t('training.reportImprovementAreas')}
+              value={improvementAreas}
+              colors={colors}
+            />
+            <View style={[styles.fieldDivider, { backgroundColor: colors.border }]} />
+            <ReportField
+              label={t('training.reportMaintainAreas')}
+              value={maintainAreas}
+              colors={colors}
+            />
+            <View style={[styles.fieldDivider, { backgroundColor: colors.border }]} />
+            <ReportField
+              label={t('training.reportLessonsLearned')}
+              value={null}
+              colors={colors}
+            />
+            <View style={[styles.fieldDivider, { backgroundColor: colors.border }]} />
+            <ReportField
+              label={t('training.reportNextFocus')}
+              value={null}
+              colors={colors}
+            />
+          </View>
+        </Animated.View>
+
         {/* Footer */}
         <Text style={[styles.footer, { color: colors.textMuted }]}>
-          {t('training.reportGenerated', { time: formatDistanceToNow(new Date(), { addSuffix: true }) })}
+          {t('training.reportGenerated', {
+            time: formatDistanceToNow(new Date(), { addSuffix: true }),
+          })}
         </Text>
       </ScrollView>
 
@@ -1080,66 +1347,104 @@ const styles = StyleSheet.create({
     gap: 20,
   },
 
-  // Overview Card
-  overviewCard: {
+  // Report Title Card
+  reportTitleCard: {
     padding: 16,
     borderRadius: 14,
-    gap: 12,
-  },
-  statusBadge: {
-    flexDirection: 'row',
     alignItems: 'center',
-    alignSelf: 'flex-start',
-    gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 8,
+    gap: 4,
   },
-  statusText: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  trainingTitle: {
+  reportTitleText: {
     fontSize: 20,
     fontWeight: '700',
     letterSpacing: -0.3,
+    textAlign: 'center',
   },
-  metaRow: {
+  reportTeamText: {
+    fontSize: 14,
+  },
+
+  // Report Card
+  reportCard: {
+    borderRadius: 14,
+    padding: 16,
+  },
+
+  // Report Field
+  reportField: {
+    paddingVertical: 10,
+    gap: 4,
+  },
+  reportFieldLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  reportFieldValue: {
+    fontSize: 15,
+    fontWeight: '500',
+    lineHeight: 22,
+  },
+  reportFieldNoData: {
+    fontStyle: 'italic',
+  },
+
+  // Field Divider
+  fieldDivider: {
+    height: StyleSheet.hairlineWidth,
+  },
+
+  // Drill Flow
+  drillsFlowList: {
+    gap: 8,
+  },
+  drillFlowCard: {
+    borderRadius: 12,
+    padding: 12,
+    gap: 8,
+  },
+  drillFlowHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    flexWrap: 'wrap',
+    gap: 10,
   },
-  metaText: {
+  drillIndex: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  drillIndexText: {
     fontSize: 13,
-  },
-  metaDot: {
-    width: 3,
-    height: 3,
-    borderRadius: 1.5,
-    marginHorizontal: 4,
-  },
-  quickStats: {
-    flexDirection: 'row',
-    paddingTop: 14,
-    marginTop: 4,
-    borderTopWidth: StyleSheet.hairlineWidth,
-  },
-  quickStat: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  quickStatValue: {
-    fontSize: 20,
     fontWeight: '700',
   },
-  quickStatLabel: {
-    fontSize: 11,
-    marginTop: 2,
+  drillFlowInfo: {
+    flex: 1,
+    gap: 2,
   },
-  quickStatDivider: {
-    width: 1,
-    height: 28,
+  drillFlowName: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  drillFlowMeta: {
+    fontSize: 12,
+  },
+  drillFlowStats: {
+    flexDirection: 'row',
+    gap: 12,
+    paddingTop: 8,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  drillFlowStatText: {
+    fontSize: 12,
+  },
+  noDataText: {
+    fontSize: 14,
+    fontStyle: 'italic',
+    textAlign: 'center',
+    paddingVertical: 8,
   },
 
   // Insights Section
@@ -1154,31 +1459,6 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 16,
     fontWeight: '600',
-  },
-
-  // Empty State
-  emptyState: {
-    padding: 32,
-    borderRadius: 14,
-    alignItems: 'center',
-  },
-  emptyIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 16,
-  },
-  emptyTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 6,
-  },
-  emptyDesc: {
-    fontSize: 14,
-    textAlign: 'center',
-    lineHeight: 20,
   },
 
   // Loading

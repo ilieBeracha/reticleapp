@@ -1,8 +1,9 @@
-import type { SessionTargetWithResults } from '@/types/session';
+import type { MissPoint, SessionTargetWithResults } from '@/types/session';
 import { Ionicons } from '@expo/vector-icons';
+import { ChevronDown, ChevronUp } from 'lucide-react-native';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 // ============================================================================
 // TYPES
@@ -11,12 +12,13 @@ interface TargetCardProps {
   target: SessionTargetWithResults;
   index: number;
   onPress: () => void;
+  isExpanded?: boolean;
 }
 
 // ============================================================================
 // COMPONENT
 // ============================================================================
-export const TargetCard = React.memo(function TargetCard({ target, index, onPress }: TargetCardProps) {
+export const TargetCard = React.memo(function TargetCard({ target, index, onPress, isExpanded = false }: TargetCardProps) {
   const { t } = useTranslation();
   const isPaper = target.target_type === 'paper';
 
@@ -33,7 +35,9 @@ export const TargetCard = React.memo(function TargetCard({ target, index, onPres
   let shots = 0;
   let dispersionCm: number | null = null;
   let actualShotsDeclared: number | null = null;
-  const hasImage = isPaper && target.paper_result?.scanned_image_url;
+
+  // Miss points for tactical targets
+  let missPoints: MissPoint[] = [];
 
   if (isPaper && target.paper_result) {
     hits = target.paper_result.hits_total ?? 0;
@@ -43,7 +47,10 @@ export const TargetCard = React.memo(function TargetCard({ target, index, onPres
   } else if (!isPaper && target.tactical_result) {
     hits = target.tactical_result.hits;
     shots = target.tactical_result.bullets_fired;
+    missPoints = target.tactical_result.miss_points ?? [];
   }
+  
+  const hasMissData = missPoints.length > 0;
 
   // For scanned achievement targets, only show accuracy if user declared actual shots
   const canShowAccuracy = !isScanned || actualShotsDeclared != null;
@@ -56,62 +63,62 @@ export const TargetCard = React.memo(function TargetCard({ target, index, onPres
   const laneInfo = target.lane_number ? t('session.lane', { number: target.lane_number }) : null;
   const notesSnippet = target.notes ? target.notes.slice(0, 30) : null;
 
+  function renderTitle() {
+    if (!hasResult) {
+      return <Text style={styles.title}>{t('session.noResult')}</Text>;
+    }
+
+    if (isGroupingTarget) {
+      return (
+        <Text style={styles.title}>
+          {dispersionCm != null ? `${dispersionCm.toFixed(1)}cm` : t('session.shotsCount', { count: shots })}
+          {dispersionCm != null && <Text style={styles.titleMuted}> • {t('session.shotsCount', { count: shots })}</Text>}
+        </Text>
+      );
+    }
+
+    if (isScanned && !actualShotsDeclared) {
+      return <Text style={styles.title}>{t('session.holesCount', { count: hits })}</Text>;
+    }
+
+    if (isScanned && actualShotsDeclared) {
+      return (
+        <Text style={styles.title}>
+          {hits}/{actualShotsDeclared} <Text style={styles.titleAccuracy}>({accuracy}%)</Text>
+        </Text>
+      );
+    }
+
+    return (
+      <Text style={styles.title}>
+        {hits}/{shots} <Text style={styles.titleAccuracy}>({accuracy}%)</Text>
+      </Text>
+    );
+  }
+
   return (
     <TouchableOpacity style={styles.container} onPress={onPress} activeOpacity={0.7}>
-      {/* Thumbnail or Distance Badge */}
-      {hasImage ? (
-        <View style={styles.thumbnailContainer}>
-          <Image
-            source={{ uri: target.paper_result!.scanned_image_url! }}
-            style={styles.thumbnail}
-            resizeMode="cover"
-          />
-          <View style={styles.thumbnailOverlay}>
-            <Text style={styles.thumbnailDistance}>{target.distance_m}m</Text>
-          </View>
-        </View>
-      ) : (
-        <View style={[styles.distanceBadge, isPaper ? styles.distanceBadgePaper : styles.distanceBadgeTactical]}>
-          <Text style={styles.distanceValue}>{target.distance_m || '—'}</Text>
-          <Text style={styles.distanceUnit}>m</Text>
-        </View>
-      )}
+      {/* Distance Badge - always show (click to expand and see image) */}
+      <View style={[styles.distanceBadge, isPaper ? styles.distanceBadgePaper : styles.distanceBadgeTactical]}>
+        <Text style={styles.distanceValue}>{target.distance_m || '—'}</Text>
+        <Text style={styles.distanceUnit}>m</Text>
+      </View>
 
       {/* Content */}
       <View style={styles.content}>
         {/* Main line: different display based on entry method */}
         <View style={styles.header}>
-          {hasResult ? (
-            isGroupingTarget ? (
-              // Grouping: show dispersion (primary) and shot count
-              <Text style={styles.title}>
-                {dispersionCm != null ? `${dispersionCm.toFixed(1)}cm` : t('session.shotsCount', { count: shots })}
-                {dispersionCm != null && <Text style={styles.titleMuted}> • {t('session.shotsCount', { count: shots })}</Text>}
-              </Text>
-            ) : isScanned ? (
-              // SCANNED: Show holes detected (not "hits" - we're counting holes on paper)
-              actualShotsDeclared ? (
-                // User declared shots → can show accuracy
-                <Text style={styles.title}>
-                  {hits}/{actualShotsDeclared} <Text style={styles.titleAccuracy}>({accuracy}%)</Text>
-                </Text>
-              ) : (
-                // No declared shots → just holes detected
-                <Text style={styles.title}>{t('session.holesCount', { count: hits })}</Text>
-              )
-            ) : (
-              // MANUAL: User entered shots + hits → show accuracy
-              <Text style={styles.title}>
-                {hits}/{shots} <Text style={styles.titleAccuracy}>({accuracy}%)</Text>
-              </Text>
-            )
-          ) : (
-            <Text style={styles.title}>{t('session.noResult')}</Text>
-          )}
+          {renderTitle()}
           {/* Entry method indicator */}
           <View style={[styles.entryTag, isScanned ? styles.entryTagScan : styles.entryTagManual]}>
             <Ionicons name={isScanned ? 'scan' : 'create'} size={10} color="#fff" />
           </View>
+          {/* Miss indicator badge */}
+          {hasMissData && (
+            <View style={styles.missBadge}>
+              <Text style={styles.missBadgeText}>{missPoints.length} {t('session.misses', 'misses')}</Text>
+            </View>
+          )}
         </View>
 
         {/* Meta line */}
@@ -155,8 +162,14 @@ export const TargetCard = React.memo(function TargetCard({ target, index, onPres
         </View>
       </View>
 
-      {/* Index */}
-      <Text style={styles.index}>#{index}</Text>
+      {/* Expand/collapse indicator */}
+      <View style={styles.expandIndicator}>
+        {isExpanded ? (
+          <ChevronUp size={20} color="rgba(255,255,255,0.5)" />
+        ) : (
+          <ChevronDown size={20} color="rgba(255,255,255,0.5)" />
+        )}
+      </View>
     </TouchableOpacity>
   );
 });
@@ -174,34 +187,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
 
-  // Thumbnail
-  thumbnailContainer: {
-    width: 56,
-    height: 56,
-    borderRadius: 10,
-    overflow: 'hidden',
-    backgroundColor: '#1a1a1a',
-  },
-  thumbnail: {
-    width: '100%',
-    height: '100%',
-  },
-  thumbnailOverlay: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    paddingVertical: 2,
-    alignItems: 'center',
-  },
-  thumbnailDistance: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#fff',
-  },
-
-  // Distance Badge (when no image)
+  // Distance Badge
   distanceBadge: {
     width: 56,
     height: 56,
@@ -268,6 +254,18 @@ const styles = StyleSheet.create({
   entryTagManual: {
     backgroundColor: 'rgba(59, 130, 246, 0.3)', // Blue for manual
   },
+  missBadge: {
+    backgroundColor: 'rgba(239, 68, 68, 0.2)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    marginLeft: 6,
+  },
+  missBadgeText: {
+    fontSize: 9,
+    fontWeight: '600',
+    color: '#EF4444',
+  },
 
   // Meta
   meta: {
@@ -314,10 +312,8 @@ const styles = StyleSheet.create({
     color: '#60A5FA', // Blue for manual
   },
 
-  // Index
-  index: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: 'rgba(255,255,255,0.3)',
+  // Expand indicator
+  expandIndicator: {
+    padding: 4,
   },
 });

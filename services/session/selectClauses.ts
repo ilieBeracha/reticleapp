@@ -309,6 +309,8 @@ export const TARGET_STATS_SELECT = `
   ),
   tactical_target_results(
     bullets_fired,
-    hits
+    hits,
+    miss_points,
+    first_shot_hit
   )
 `;

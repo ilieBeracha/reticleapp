@@ -1,13 +1,13 @@
 import { supabase } from '@/services/supabase';
 import type {
-    CreatePaperResultParams,
-    CreateTacticalResultParams,
-    CreateTargetParams,
-    MissPoint,
-    PaperTargetResult,
-    SessionTarget,
-    SessionTargetWithResults,
-    TacticalTargetResult,
+  CreatePaperResultParams,
+  CreateTacticalResultParams,
+  CreateTargetParams,
+  MissPoint,
+  PaperTargetResult,
+  SessionTarget,
+  SessionTargetWithResults,
+  TacticalTargetResult,
 } from '@/types/session';
 
 /**
@@ -423,7 +423,9 @@ export async function getTacticalTargetResult(sessionTargetId: string): Promise<
       hits,
       is_stage_cleared,
       time_seconds,
-      notes
+      notes,
+      miss_points,
+      first_shot_hit
     `
     )
     .eq('session_target_id', sessionTargetId)
@@ -450,6 +452,7 @@ export async function getSessionTargetsWithResults(sessionId: string): Promise<S
       `
       id,
       session_id,
+      participant_id,
       target_type,
       distance_m,
       lane_number,
@@ -477,7 +480,9 @@ export async function getSessionTargetsWithResults(sessionId: string): Promise<S
         hits,
         is_stage_cleared,
         time_seconds,
-        notes
+        notes,
+        miss_points,
+        first_shot_hit
       )
     `
     )
@@ -497,6 +502,7 @@ export async function getSessionTargetsWithResults(sessionId: string): Promise<S
     return {
       id: t.id,
       session_id: t.session_id,
+      participant_id: t.participant_id,
       target_type: t.target_type,
       sequence_in_session: t.sequence_in_session,
       distance_m: t.distance_m,
@@ -520,6 +526,7 @@ export async function getTargetWithResults(targetId: string): Promise<SessionTar
       `
       id,
       session_id,
+      participant_id,
       target_type,
       distance_m,
       lane_number,
@@ -547,7 +554,9 @@ export async function getTargetWithResults(targetId: string): Promise<SessionTar
         hits,
         is_stage_cleared,
         time_seconds,
-        notes
+        notes,
+        miss_points,
+        first_shot_hit
       )
     `
     )
@@ -570,6 +579,7 @@ export async function getTargetWithResults(targetId: string): Promise<SessionTar
   return {
     id: target.id,
     session_id: target.session_id,
+    participant_id: target.participant_id,
     target_type: target.target_type,
     sequence_in_session: target.sequence_in_session,
     distance_m: target.distance_m,
@@ -620,6 +630,27 @@ export async function saveMissPoints(
 
   if (error) {
     console.error('[Targets] Error saving miss points:', error);
+    throw error;
+  }
+  return data;
+}
+
+/**
+ * Update miss_points on a tactical target result
+ */
+export async function updateTacticalMissPoints(
+  tacticalResultId: string,
+  missPoints: MissPoint[] | null
+): Promise<TacticalTargetResult> {
+  const { data, error } = await supabase
+    .from('tactical_target_results')
+    .update({ miss_points: missPoints })
+    .eq('id', tacticalResultId)
+    .select()
+    .single();
+
+  if (error) {
+    console.error('[Targets] Error updating tactical miss points:', error);
     throw error;
   }
   return data;

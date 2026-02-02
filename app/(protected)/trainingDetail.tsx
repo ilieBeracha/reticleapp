@@ -312,7 +312,7 @@ function TabBar({
 }) {
   const { t } = useTranslation();
   return (
-    <View style={[styles.tabBar, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+    <View style={[styles.tabBar, {borderBottomColor: colors.border }]}>
       <TouchableOpacity
         style={[styles.tab, activeTab === 'drills' && { borderBottomColor: colors.primary }]}
         onPress={() => onTabChange('drills')}
@@ -1728,16 +1728,16 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   scroll: { flex: 1 },
   scrollContent: { flexGrow: 1 },
-  contentContainer: { paddingHorizontal: 16, gap: 16, marginTop: 16 },
+  contentContainer: { paddingHorizontal: 14, gap: 12, marginTop: 12 },
 
   // Not Invited Banner
   notInvitedBanner: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderRadius: 12,
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 10,
     borderWidth: 1,
   },
   notInvitedInfo: {
@@ -1745,12 +1745,12 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   notInvitedTitle: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
   },
   notInvitedText: {
-    fontSize: 12,
-    lineHeight: 16,
+    fontSize: 11,
+    lineHeight: 15,
   },
 
   // Loading & Error States
@@ -1783,40 +1783,40 @@ const styles = StyleSheet.create({
 
   // Expanded Hero
   heroCard: {
-    paddingHorizontal: 16,
-    paddingBottom: 12,
+    paddingHorizontal: 14,
+    paddingBottom: 10,
   },
-  navRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
+  navRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
   navBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     alignItems: 'center',
     justifyContent: 'center',
   },
   heroContent: {
-    gap: 6,
-    marginBottom: 10,
+    gap: 4,
+    marginBottom: 8,
   },
   statusBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     alignSelf: 'flex-start',
-    gap: 5,
-    paddingHorizontal: 8,
+    gap: 4,
+    paddingHorizontal: 7,
     paddingVertical: 3,
-    borderRadius: 6,
+    borderRadius: 5,
   },
   statusBadgeText: {
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: '800',
-    letterSpacing: 1,
+    letterSpacing: 0.8,
   },
   heroTitle: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: '800',
     letterSpacing: -0.5,
-    lineHeight: 30,
+    lineHeight: 27,
   },
   heroFooter: {
     flexDirection: 'row',
@@ -1825,14 +1825,14 @@ const styles = StyleSheet.create({
   },
   heroStats: {
     flexDirection: 'row',
-    gap: 6,
+    gap: 5,
   },
   statChip: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
     borderRadius: 6,
   },
   statChipText: {
@@ -1842,14 +1842,14 @@ const styles = StyleSheet.create({
   commanderBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
     borderRadius: 8,
   },
   commanderBtnText: {
     color: '#fff',
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '700',
   },
 
@@ -1865,25 +1865,25 @@ const styles = StyleSheet.create({
       ios: {
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.06,
-        shadowRadius: 4,
+        shadowOpacity: 0.05,
+        shadowRadius: 3,
       },
       android: {
-        elevation: 3,
+        elevation: 2,
       },
     }),
   },
   stickyContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    gap: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    gap: 8,
   },
   stickyBackBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1891,10 +1891,10 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
   },
   stickyTitle: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '700',
     letterSpacing: -0.2,
     flexShrink: 1,
@@ -1903,19 +1903,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 3,
-    paddingHorizontal: 6,
+    paddingHorizontal: 5,
     paddingVertical: 2,
     borderRadius: 4,
   },
   stickyBadgeText: {
-    fontSize: 9,
+    fontSize: 8,
     fontWeight: '800',
     letterSpacing: 0.5,
   },
   stickyAction: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1930,38 +1930,38 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 12,
+    gap: 5,
+    paddingVertical: 10,
     borderBottomWidth: 2,
     borderBottomColor: 'transparent',
   },
   tabText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
   },
 
   // Results Tab - Overview Card
-  resultsContainer: { gap: 12 },
+  resultsContainer: { gap: 10 },
   overviewCard: {
-    borderRadius: 16,
+    borderRadius: 12,
     borderWidth: 1,
     overflow: 'hidden',
   },
   overviewTop: {
-    padding: 20,
-    gap: 16,
+    padding: 16,
+    gap: 12,
   },
   overviewMainStat: {
     alignItems: 'center',
-    gap: 2,
+    gap: 1,
   },
   overviewValue: {
-    fontSize: 36,
+    fontSize: 32,
     fontWeight: '800',
     letterSpacing: -1,
   },
   overviewLabel: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '600',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
@@ -1975,71 +1975,71 @@ const styles = StyleSheet.create({
   overviewStat: {
     flex: 1,
     alignItems: 'center',
-    gap: 2,
+    gap: 1,
   },
   overviewStatValue: {
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: '700',
     letterSpacing: -0.3,
   },
   overviewStatLabel: {
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: '600',
     textTransform: 'uppercase',
     letterSpacing: 0.3,
   },
   overviewStatDivider: {
     width: 1,
-    height: 24,
+    height: 20,
     alignSelf: 'center',
   },
 
   // Filter Chips
   filterChipsRow: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 6,
     flexWrap: 'wrap',
   },
   filterChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-    borderRadius: 10,
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 8,
     borderWidth: 1,
   },
   filterChipText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '600',
   },
   filterChipCount: {
-    paddingHorizontal: 5,
+    paddingHorizontal: 4,
     paddingVertical: 1,
-    borderRadius: 6,
-    minWidth: 18,
+    borderRadius: 5,
+    minWidth: 16,
     alignItems: 'center',
   },
   filterChipCountText: {
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: '700',
   },
 
   // Filter Summary Strip
   filterSummary: {
     flexDirection: 'row',
-    borderRadius: 12,
+    borderRadius: 10,
     borderWidth: 1,
-    paddingVertical: 12,
+    paddingVertical: 10,
     paddingHorizontal: 4,
   },
   filterSummaryItem: {
     flex: 1,
     alignItems: 'center',
-    gap: 2,
+    gap: 1,
   },
   filterSummaryValue: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '700',
     letterSpacing: -0.3,
   },
@@ -2052,29 +2052,29 @@ const styles = StyleSheet.create({
 
   // Participant List (expanded squad rows)
   participantList: {
-    marginHorizontal: 14,
-    marginBottom: 10,
-    borderRadius: 10,
+    marginHorizontal: 12,
+    marginBottom: 8,
+    borderRadius: 8,
     overflow: 'hidden',
   },
 
   // Sections
-  section: { gap: 10 },
+  section: { gap: 8 },
   sectionLabel: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '700',
     textTransform: 'uppercase',
     letterSpacing: 0.8,
-    marginBottom: 2,
+    marginBottom: 1,
   },
 
   // Squad participant rows
   squadParticipantRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    gap: 7,
   },
   squadParticipantName: {
     flex: 1,
@@ -2083,7 +2083,7 @@ const styles = StyleSheet.create({
     letterSpacing: -0.2,
   },
   squadParticipantShots: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '500',
   },
 
@@ -2098,98 +2098,98 @@ const styles = StyleSheet.create({
   userAvatarText: { fontSize: 11, fontWeight: '700' },
 
   // Sessions List
-  sessionsList: { borderRadius: 14, borderWidth: 1, overflow: 'hidden' },
-  sessionRow: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 10 },
+  sessionsList: { borderRadius: 12, borderWidth: 1, overflow: 'hidden' },
+  sessionRow: { flexDirection: 'row', alignItems: 'center', padding: 12, gap: 9 },
   sessionIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
+    width: 30,
+    height: 30,
+    borderRadius: 9,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  sessionInfo: { flex: 1, gap: 4 },
-  sessionNameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  sessionName: { fontSize: 15, fontWeight: '600', letterSpacing: -0.2 },
-  sessionMeta: { fontSize: 12 },
-  sessionResult: { fontSize: 14, fontWeight: '700' },
+  sessionInfo: { flex: 1, gap: 3 },
+  sessionNameRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  sessionName: { fontSize: 14, fontWeight: '600', letterSpacing: -0.2 },
+  sessionMeta: { fontSize: 11 },
+  sessionResult: { fontSize: 13, fontWeight: '700' },
 
   // Badges
-  squadBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
-  squadBadgeText: { fontSize: 10, fontWeight: '600' },
-  drillNameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  squadBadge: { paddingHorizontal: 5, paddingVertical: 2, borderRadius: 4 },
+  squadBadgeText: { fontSize: 9, fontWeight: '600' },
+  drillNameRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   policyBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 3,
-    paddingHorizontal: 6,
+    paddingHorizontal: 5,
     paddingVertical: 2,
     borderRadius: 4,
   },
-  policyBadgeText: { fontSize: 9, fontWeight: '600', textTransform: 'uppercase' },
+  policyBadgeText: { fontSize: 8, fontWeight: '700', textTransform: 'uppercase' },
 
   // Start Drill Button
   startDrillBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
     alignItems: 'center',
     justifyContent: 'center',
   },
   completedBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
+    gap: 3,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 10,
   },
   completedBadgeText: {
     color: '#fff',
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '700',
   },
-  drillsHint: { fontSize: 12, textAlign: 'center', marginTop: 8, fontStyle: 'italic' },
+  drillsHint: { fontSize: 11, textAlign: 'center', marginTop: 6, fontStyle: 'italic' },
 
   // Empty States
-  pendingNotice: { padding: 16, borderRadius: 14, borderWidth: 1 },
-  pendingText: { fontSize: 13, textAlign: 'center', lineHeight: 20 },
+  pendingNotice: { padding: 14, borderRadius: 12, borderWidth: 1 },
+  pendingText: { fontSize: 12, textAlign: 'center', lineHeight: 18 },
   emptyState: {
     alignItems: 'center',
-    padding: 32,
-    borderRadius: 14,
+    padding: 24,
+    borderRadius: 12,
     borderWidth: 1,
     borderStyle: 'dashed',
-    gap: 10,
+    gap: 8,
   },
   emptyIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: 16,
+    width: 48,
+    height: 48,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  emptyTitle: { fontSize: 16, fontWeight: '700' },
-  emptySubtitle: { fontSize: 13, textAlign: 'center' },
+  emptyTitle: { fontSize: 15, fontWeight: '700' },
+  emptySubtitle: { fontSize: 12, textAlign: 'center' },
 
   // Empty Results (for Results tab)
   emptyResults: {
-    padding: 24,
-    borderRadius: 14,
+    padding: 20,
+    borderRadius: 12,
     borderWidth: 1,
     borderStyle: 'dashed',
     alignItems: 'center',
   },
   emptyResultsText: {
-    fontSize: 14,
+    fontSize: 13,
   },
 
   // Footer
   footer: {
-    fontSize: 12,
+    fontSize: 11,
     textAlign: 'center',
-    paddingVertical: 24,
-    paddingHorizontal: 16,
-    opacity: 0.5,
+    paddingVertical: 20,
+    paddingHorizontal: 14,
+    opacity: 0.4,
   },
 
   // Miss Analyzer

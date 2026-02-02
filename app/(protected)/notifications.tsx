@@ -53,6 +53,12 @@ export default function NotificationsSheet() {
     try {
       const history = await getNotificationHistory(100);
       setNotifications(history);
+
+      // Mark all as read when viewing (removes badge, keeps notifications)
+      if (history.some((n) => !n.read)) {
+        await markAllNotificationsRead();
+        setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+      }
     } catch (error) {
       console.error('Failed to load notifications:', error);
     } finally {

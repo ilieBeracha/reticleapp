@@ -20,7 +20,6 @@ import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as Haptics from 'expo-haptics';
 import {
-  Calendar,
   ChevronDown,
   ChevronUp,
   Crosshair,
@@ -77,6 +76,47 @@ interface SessionCardProps {
   onRemove: () => void;
   onMove: (direction: 'up' | 'down') => void;
   colors: ReturnType<typeof useColors>;
+}
+
+function getDistanceCategoryLabel(category: string, t: (key: string) => string): string {
+  if (category === 'short') return t('training.shortRange');
+  if (category === 'medium') return t('training.mediumRange');
+  return t('training.longRange');
+}
+
+function buildSessionMetaText(
+  session: TrainingDrillItem,
+  purposeLabel: string,
+  t: (key: string, opts?: Record<string, any>) => string
+): string {
+  const parts: string[] = [purposeLabel];
+  const config = session.config;
+
+  if (config?.distance_category) {
+    parts.push(getDistanceCategoryLabel(config.distance_category, t));
+  } else if (config?.distance_m != null) {
+    parts.push(`${config.distance_m}m`);
+  }
+
+  if (config?.rounds != null) {
+    parts.push(t('training.shotsCount', { count: config.rounds }));
+  }
+
+  if (config?.position) {
+    parts.push(t(`session.positionOptions.${config.position}`));
+  }
+
+  if (config?.distance_m == null && !config?.distance_category && config?.rounds == null) {
+    parts.push(t('training.soldierChooses'));
+  }
+
+  if (config?.available_from && config?.available_until) {
+    parts.push(
+      `${new Date(config.available_from).toLocaleDateString()} → ${new Date(config.available_until).toLocaleDateString()}`
+    );
+  }
+
+  return parts.join(' · ');
 }
 
 function SessionCard({ session, index, total, onRemove, onMove, colors }: SessionCardProps) {
@@ -146,20 +186,7 @@ function SessionCard({ session, index, total, onRemove, onMove, colors }: Sessio
               )}
             </View>
             <Text style={[styles.sessionMeta, { color: colors.textMuted }]}>
-              {purposeLabel}
-              {session.config?.distance_category
-                ? ` · ${session.config.distance_category === 'short' ? t('training.shortRange') : session.config.distance_category === 'medium' ? t('training.mediumRange') : t('training.longRange')}`
-                : session.config?.distance_m != null
-                  ? ` · ${session.config.distance_m}m`
-                  : ''}
-              {session.config?.rounds != null ? ` · ${t('training.shotsCount', { count: session.config.rounds })}` : ''}
-              {session.config?.position && ` · ${t(`session.positionOptions.${session.config.position}`)}`}
-              {session.config?.distance_m == null &&
-                !session.config?.distance_category &&
-                session.config?.rounds == null &&
-                ` · ${t('training.soldierChooses')}`}
-              {session.config?.available_from && session.config?.available_until &&
-                ` · ${new Date(session.config.available_from).toLocaleDateString()} → ${new Date(session.config.available_until).toLocaleDateString()}`}
+              {buildSessionMetaText(session, purposeLabel, t)}
             </Text>
           </View>
           <View style={styles.sessionActions}>
@@ -329,13 +356,7 @@ function AddSessionSheet({ visible, onClose, onAdd }: AddSessionSheetProps) {
     if (!name) {
       const nameParts = [purpose === 'grouping' ? t('session.grouping') : t('session.engagement')];
       if (hasDistanceCategory) {
-        const catLabel =
-          context.distanceCategory === 'short'
-            ? t('training.shortRange')
-            : context.distanceCategory === 'medium'
-              ? t('training.mediumRange')
-              : t('training.longRange');
-        nameParts.push(catLabel);
+        nameParts.push(getDistanceCategoryLabel(context.distanceCategory!, t));
       } else if (hasDistance) {
         nameParts.push(`${context.distance}m`);
       }
@@ -600,38 +621,6 @@ function AddSessionSheet({ visible, onClose, onAdd }: AddSessionSheetProps) {
                     </Text>
                   </View>
                 </View>
-
-                {/* Date Range */}
-                <View style={[styles.formDivider, { backgroundColor: colors.border }]} />
-                <View style={styles.dateRangeSection}>
-                  <View style={styles.dateRangeHeader}>
-                    <Calendar size={14} color={colors.textMuted} />
-                    <Text style={[styles.formRowText, { color: colors.text }]}>{t('training.availabilityPeriod')}</Text>
-                  </View>
-                  <Text style={[styles.dateRangeHint, { color: colors.textMuted }]}>{t('training.availabilityPeriodHint')}</Text>
-                  <View style={styles.dateRow}>
-                    <TouchableOpacity
-                      style={[styles.dateBtn, { backgroundColor: colors.background, borderColor: availableFrom ? colors.primary : colors.border }]}
-                      onPress={() => setShowFromPicker(true)}
-                    >
-                      <Text style={[styles.dateBtnLabel, { color: colors.textMuted }]}>{t('training.from')}</Text>
-                      <Text style={[styles.dateBtnValue, { color: availableFrom ? colors.text : colors.textMuted }]}>
-                        {availableFrom ? availableFrom.toLocaleDateString() : t('training.notSet')}
-                      </Text>
-                    </TouchableOpacity>
-                    <Text style={[styles.dateSeparator, { color: colors.textMuted }]}>→</Text>
-                    <TouchableOpacity
-                      style={[styles.dateBtn, { backgroundColor: colors.background, borderColor: availableUntil ? colors.primary : colors.border }]}
-                      onPress={() => setShowUntilPicker(true)}
-                    >
-                      <Text style={[styles.dateBtnLabel, { color: colors.textMuted }]}>{t('training.until')}</Text>
-                      <Text style={[styles.dateBtnValue, { color: availableUntil ? colors.text : colors.textMuted }]}>
-                        {availableUntil ? availableUntil.toLocaleDateString() : t('training.notSet')}
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-
                 <View style={[styles.formDivider, { backgroundColor: colors.border }]} />
                 <SessionContextStep
                   purpose={purpose}

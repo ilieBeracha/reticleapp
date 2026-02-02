@@ -2,8 +2,8 @@ import { BaseAvatar } from '@/components/shared/Avatar';
 import { useAuth } from '@/contexts/AuthContext';
 import { useColors } from '@/hooks/ui/useColors';
 import { useAppContext } from '@/hooks/useAppContext';
+import { getUnreadCount } from '@/services/notifications';
 import * as Haptics from 'expo-haptics';
-import * as Notifications from 'expo-notifications';
 import { router } from 'expo-router';
 import { Bell } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
@@ -27,12 +27,12 @@ export function Header({ onNotificationPress }: HeaderProps) {
   const { profileAvatarUrl } = useAuth();
   const [notificationCount, setNotificationCount] = useState(0);
 
-  // Fetch pending notification count
+  // Fetch unread notification count from history
   useEffect(() => {
     const fetchCount = async () => {
       try {
-        const pending = await Notifications.getAllScheduledNotificationsAsync();
-        setNotificationCount(pending.length);
+        const count = await getUnreadCount();
+        setNotificationCount(count);
       } catch (error) {
         console.error('Failed to get notification count:', error);
       }
@@ -45,6 +45,7 @@ export function Header({ onNotificationPress }: HeaderProps) {
 
   const handleNotificationPress = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setNotificationCount(0);
     onNotificationPress?.();
   };
 
@@ -73,9 +74,7 @@ export function Header({ onNotificationPress }: HeaderProps) {
         >
           <Bell size={18} color={colors.text} strokeWidth={2} />
           {notificationCount > 0 && (
-            <View style={[styles.badge, { backgroundColor: colors.red, borderColor: colors.background }]}>
-              <Text style={styles.badgeText}>{notificationCount > 9 ? '9+' : notificationCount}</Text>
-            </View>
+            <View style={[styles.badge, { backgroundColor: colors.red, borderColor: colors.background }]} />
           )}
         </TouchableOpacity>
 
@@ -136,19 +135,11 @@ const styles = StyleSheet.create({
   },
   badge: {
     position: 'absolute',
-    top: -4,
-    right: -4,
-    minWidth: 18,
-    height: 18,
-    borderRadius: 9,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 4,
+    top: -2,
+    right: -2,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
     borderWidth: 2,
-  },
-  badgeText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#FFF',
   },
 });

@@ -7,8 +7,8 @@
 
 import { isGroupingPaper, isPaperTarget } from '@/constants/drill';
 import { useColors } from '@/hooks/ui/useColors';
-import { useTranslation } from 'react-i18next';
 import { Target } from 'lucide-react-native';
+import { useTranslation } from 'react-i18next';
 import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 interface HeroTargetProps {
@@ -22,6 +22,7 @@ export function HeroTarget({ target, onPress }: HeroTargetProps) {
 
   const isPaper = isPaperTarget(target.target_type);
   const paperResult = target.paper_result;
+  const tacticalResult = target.tactical_result;
 
   const imageUrl = paperResult?.scanned_image_url;
   const hasImage = !!imageUrl;
@@ -31,14 +32,22 @@ export function HeroTarget({ target, onPress }: HeroTargetProps) {
 
   const distance = target.distance_m;
   const dispersion = paperResult?.dispersion_cm;
-  const hits = paperResult?.hits_total ?? target.tactical_result?.hits ?? 0;
+  const bullets = tacticalResult?.bullets_fired ?? 0;
+  const hits = paperResult?.hits_total ?? tacticalResult?.hits ?? 0;
+  const accuracy = bullets > 0 ? Math.round((hits / bullets) * 100) : 0;
 
   const typeLabel = isGrouping
     ? t('session.grouping')
     : isScanned
       ? t('session.scannedLabel')
       : t('session.manualLabel');
-  const typeColor = isGrouping ? '#22C55E' : isScanned ? '#A78BFA' : '#60A5FA';
+
+  function getTypeColor(): string {
+    if (isGrouping) return '#22C55E';
+    if (isScanned) return '#A78BFA';
+    return '#60A5FA';
+  }
+  const typeColor = getTypeColor();
 
   return (
     <TouchableOpacity
@@ -66,24 +75,39 @@ export function HeroTarget({ target, onPress }: HeroTargetProps) {
         </View>
       </View>
 
-      {/* Bottom: Key metric only */}
+      {/* Bottom: Key metric */}
       <View style={styles.overlay}>
-        <Text style={styles.metricValue}>
-          {isGrouping && dispersion != null ? `${dispersion.toFixed(1)}cm` : `${hits} ${isScanned ? t('session.holes') : t('session.hits')}`}
-        </Text>
+        <View style={styles.hitsRow}>
+          <Text style={styles.metricValue}>
+            {isGrouping && dispersion != null 
+              ? `${dispersion.toFixed(1)}cm` 
+              : bullets > 0 ? `${hits}/${bullets}` : `${hits}`}
+          </Text>
+          {!isGrouping && bullets > 0 && (
+            <View style={[styles.accuracyBadge, getAccuracyStyle(accuracy)]}>
+              <Text style={styles.accuracyText}>{accuracy}%</Text>
+            </View>
+          )}
+        </View>
         <Text style={styles.metricLabel}>
-          {isGrouping ? t('session.groupSize') : isScanned ? t('session.detected') : t('session.recorded')}
+          {isGrouping ? t('session.groupSize') : isScanned ? t('session.detected') : t('session.hits')}
         </Text>
       </View>
     </TouchableOpacity>
   );
 }
 
+function getAccuracyStyle(accuracy: number) {
+  if (accuracy >= 80) return styles.accuracyGood;
+  if (accuracy >= 50) return styles.accuracyOk;
+  return styles.accuracyPoor;
+}
+
 const styles = StyleSheet.create({
   container: {
     borderRadius: 12,
     overflow: 'hidden',
-    height: 160,
+    height: 140,
   },
   image: {
     width: '100%',
@@ -130,15 +154,38 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    padding: 14,
-    backgroundColor: 'rgba(0,0,0,0.65)',
+    padding: 12,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+  },
+  hitsRow: {
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: 8,
   },
   metricValue: {
     fontSize: 22,
     fontWeight: '800',
     color: '#fff',
     letterSpacing: -0.5,
+  },
+  accuracyBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  accuracyGood: {
+    backgroundColor: 'rgba(34, 197, 94, 0.3)',
+  },
+  accuracyOk: {
+    backgroundColor: 'rgba(245, 158, 11, 0.3)',
+  },
+  accuracyPoor: {
+    backgroundColor: 'rgba(239, 68, 68, 0.3)',
+  },
+  accuracyText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#fff',
   },
   metricLabel: {
     fontSize: 11,

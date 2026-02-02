@@ -683,6 +683,7 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    paddingVertical: 12,
   },
   sectionTitle: {
     fontSize: 14,
@@ -703,6 +704,7 @@ const s = StyleSheet.create({
   card: {
     borderRadius: 12,
     borderWidth: 1,
+    padding: 12,
     overflow: 'hidden',
   },
   cardMain: {

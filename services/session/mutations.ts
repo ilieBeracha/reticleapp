@@ -4,22 +4,23 @@ import { buildSessionContext, evaluateAndStoreVerdict } from '@/services/standar
 import { supabase } from '@/services/supabase';
 import { markWeaponUsed } from '@/services/weaponService';
 import type {
-    BaseSessionConfig,
-    CreateSessionParams,
-    PaperType,
-    SessionStats,
-    SessionTargetWithResults,
-    SessionWithDetails,
-    TargetType,
+  BaseSessionConfig,
+  CreateSessionParams,
+  MissPoint,
+  PaperType,
+  SessionStats,
+  SessionTargetWithResults,
+  SessionWithDetails,
+  TargetType,
 } from '@/types/session';
 import type { TransformedWatchData, WatchDetailsPayload } from '@/types/session.watch';
 import { getDrillRequirements } from './drillContract';
 import { mapSession } from './mappers';
 import {
-    getMyActiveSessionForTraining,
-    getMyActiveSessionsAll,
-    getSessionById,
-    shouldAutoCancelSession,
+  getMyActiveSessionForTraining,
+  getMyActiveSessionsAll,
+  getSessionById,
+  shouldAutoCancelSession,
 } from './queries';
 import { SESSION_SELECT_AFTER_CREATE, SESSION_SELECT_AFTER_UPDATE } from './selectClauses';
 import { calculateSessionStats } from './stats';
@@ -427,40 +428,17 @@ export async function updateSession(
     updated_at: new Date().toISOString(),
   };
 
-  if (typeof updates.status !== 'undefined') {
-    updatePayload.status = updates.status;
-  }
+  // Copy only explicitly provided fields to the payload
+  const allowedKeys = [
+    'status', 'ended_at', 'started_at', 'watch_controlled',
+    'custom_drill_config', 'soldier_distance_m', 'soldier_bullets',
+    'soldier_position', 'weapon_id',
+  ] as const;
 
-  if (typeof updates.ended_at !== 'undefined') {
-    updatePayload.ended_at = updates.ended_at;
-  }
-
-  if (typeof updates.started_at !== 'undefined') {
-    updatePayload.started_at = updates.started_at;
-  }
-
-  if (typeof updates.watch_controlled !== 'undefined') {
-    updatePayload.watch_controlled = updates.watch_controlled;
-  }
-
-  if (typeof updates.custom_drill_config !== 'undefined') {
-    updatePayload.custom_drill_config = updates.custom_drill_config;
-  }
-
-  if (typeof updates.soldier_distance_m !== 'undefined') {
-    updatePayload.soldier_distance_m = updates.soldier_distance_m;
-  }
-
-  if (typeof updates.soldier_bullets !== 'undefined') {
-    updatePayload.soldier_bullets = updates.soldier_bullets;
-  }
-
-  if (typeof updates.soldier_position !== 'undefined') {
-    updatePayload.soldier_position = updates.soldier_position;
-  }
-
-  if (typeof updates.weapon_id !== 'undefined') {
-    updatePayload.weapon_id = updates.weapon_id;
+  for (const key of allowedKeys) {
+    if (updates[key] !== undefined) {
+      updatePayload[key] = updates[key];
+    }
   }
 
   // Return a fully-hydrated session payload so callers don't lose drill context after updates.
@@ -660,11 +638,6 @@ async function evaluateSessionStandardsVerdict(session: SessionWithDetails, stat
       console.log('[SessionService] No drill config, skipping standards evaluation');
       return;
     }
-
-    // Calculate duration
-    const endedAt = session.ended_at ? new Date(session.ended_at).getTime() : Date.now();
-    const startedAt = session.started_at ? new Date(session.started_at).getTime() : endedAt;
-    const durationSeconds = Math.max(0, Math.floor((endedAt - startedAt) / 1000));
 
     // Build session context for the Standards Engine
     const context = buildSessionContext({
@@ -873,8 +846,8 @@ export async function addTargetWithTacticalResult(params: {
   is_stage_cleared?: boolean;
   time_seconds?: number | null;
   result_notes?: string | null;
-  /** Miss Analyzer: normalized miss coordinates */
-  miss_points?: Array<{ x: number; y: number; distance: number; angle_deg: number }> | null;
+  /** Miss Analyzer: normalized miss positions (ring + mil) */
+  miss_points?: MissPoint[] | null;
   /** Whether the first shot was a hit */
   first_shot_hit?: boolean | null;
 }): Promise<SessionTargetWithResults> {

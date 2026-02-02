@@ -405,22 +405,19 @@ export interface CreateTargetParams {
  *
  * Coordinate system:
  * - Center of target = (0, 0)
- * - x: -1 (far left) to +1 (far right)
- * - y: -1 (far below center) to +1 (far above center)
- * - distance: 0 (dead center) to 1 (edge of target)
- * - angle_deg: compass bearing, 0 = up (12 o'clock), clockwise
+ * Mil-based (thousandths) encoding for ballistic precision:
+ * - ring: Discrete area bucket (0 = closest to target, higher = further out)
+ * - mil: Angle in thousandths (0 = 12 o'clock, clockwise, 6400 = full circle)
  *
- * Resolution-independent — no pixel values stored.
+ * IMPORTANT: No distance/radius values stored — only discrete ring + angle.
+ * Two taps in the same ring at the same clock direction produce identical MissPoint.
+ * Each ring represents 0.5 mil of ballistic offset.
  */
 export interface MissPoint {
-  /** Horizontal offset from center: -1 (left) to +1 (right) */
-  x: number;
-  /** Vertical offset from center: -1 (below) to +1 (above) */
-  y: number;
-  /** Normalized radial distance from center: 0 to 1 */
-  distance: number;
-  /** Compass bearing in degrees: 0 = up, 90 = right, 180 = down, 270 = left */
-  angle_deg: number;
+  /** Ring index (area bucket): 0 = innermost miss zone, higher = further from target */
+  ring: number;
+  /** Angle in thousandths (mils): 0 = 12 o'clock, clockwise, range 0-6399 */
+  mil: number;
 }
 
 // ============================================================================

@@ -13,18 +13,18 @@ import { COLORS } from '@/constants/activeSession';
 import { PAPER_TYPE, RANGE_CATEGORIES } from '@/constants/drill';
 import { useColors } from '@/hooks/ui/useColors';
 import { addTargetWithPaperResult, addTargetWithTacticalResult } from '@/services/session/mutations';
+import { updateTacticalMissPoints } from '@/services/session/targets';
 import type { DrillProgress, WatchState } from '@/types/activeSession';
 import type { MissPoint, SessionDrillConfig, SessionWithDetails } from '@/types/session';
 import { formatDistanceDisplay, formatTime } from '@/utils/activeSession.helpers';
 import { isGroupingSession } from '@/utils/drillGoal';
 import * as Haptics from 'expo-haptics';
-import { Camera, Check, ChevronDown, Crosshair, Lock, MapPin, Minus, Plus, Ruler, Square, Target, X, Zap } from 'lucide-react-native';
+import { Camera, Check, ChevronDown, Crosshair, Lock, MapPin, Minus, Plus, Square, Target, Zap } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
   Alert,
-  FlatList,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -33,12 +33,13 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  View,
+  View
 } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { EdgeInsets } from 'react-native-safe-area-context';
 import { styles as sharedStyles } from './activeSession.styles';
 import { HeroTarget } from './components/HeroTarget';
+import { MissDataCard } from './components/MissDataCard';
 
 interface TeamTrainingViewProps {
   session: SessionWithDetails;
@@ -125,9 +126,14 @@ export function TeamTrainingView({
   const [saving, setSaving] = useState(false);
   const [firstShotHit, setFirstShotHit] = useState<boolean | null>(null);
 
-  // Miss Marker modal state (pops up after save if there are misses)
+  // Miss Marker modal state
   const [showMissMarker, setShowMissMarker] = useState(false);
   const [pendingMissMarker, setPendingMissMarker] = useState(false);
+  // Store tactical result ID for updating miss_points after MissMarker completes
+  const [pendingTacticalResultId, setPendingTacticalResultId] = useState<string | null>(null);
+  
+  // Expanded target state (for click to expand)
+  const [expandedTargetId, setExpandedTargetId] = useState<string | null>(null);
 
   // Effect: Show MissMarker after sheet closes (can't stack pageSheet modals on iOS)
   useEffect(() => {
@@ -162,12 +168,11 @@ export function TeamTrainingView({
   // Calculate misses for current entry
   const missCount = bullets - hits;
 
-  // Actually save the target (called after miss marking or if no misses)
-  const doSave = useCallback(async (finalMissPoints: MissPoint[]) => {
+  // Save target immediately (without waiting for miss marking)
+  const doSave = useCallback(async () => {
     setSaving(true);
 
     try {
-      // Use selected distance if range available, otherwise use effective distance
       const finalDistance = canSelectDistance ? localDistance : effectiveDistance;
 
       // Set the distance on session if it's the first target
@@ -188,7 +193,8 @@ export function TeamTrainingView({
           result_notes: null,
         });
       } else {
-        await addTargetWithTacticalResult({
+        // Save target without miss_points first
+        const result = await addTargetWithTacticalResult({
           session_id: session.id,
           distance_m: finalDistance,
           lane_number: null,
@@ -199,9 +205,15 @@ export function TeamTrainingView({
           is_stage_cleared: false,
           time_seconds: null,
           result_notes: null,
-          miss_points: finalMissPoints.length > 0 ? finalMissPoints : null,
+          miss_points: null, // Will be updated separately if there are misses
           first_shot_hit: firstShotHit,
         });
+
+        // If there are misses, store the tactical result ID for later update
+        if (missCount > 0 && result.tactical_result?.id) {
+          setPendingTacticalResultId(result.tactical_result.id);
+          setPendingMissMarker(true);
+        }
       }
 
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -225,6 +237,7 @@ export function TeamTrainingView({
     groupSizeCm,
     bullets,
     hits,
+    missCount,
     firstShotHit,
     onDistanceSet,
     onRefresh,
@@ -232,7 +245,23 @@ export function TeamTrainingView({
     t,
   ]);
 
-  // Handle save button press - check for misses first
+  // Update miss_points on already-saved tactical result
+  const saveMissPointsToTarget = useCallback(async (points: MissPoint[]) => {
+    if (!pendingTacticalResultId) return;
+    
+    try {
+      await updateTacticalMissPoints(pendingTacticalResultId, points.length > 0 ? points : null);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      onRefresh();
+    } catch (error: any) {
+      console.error('Failed to save miss points:', error);
+      // Don't show error - the target was already saved, this is optional
+    } finally {
+      setPendingTacticalResultId(null);
+    }
+  }, [pendingTacticalResultId, onRefresh]);
+
+  // Handle save button press
   const handleSave = useCallback(() => {
     // Validation
     if (isGrouping && !groupSizeCm) {
@@ -247,24 +276,21 @@ export function TeamTrainingView({
       return;
     }
 
-    // For engagement with misses, show MissMarker first
-    if (!isGrouping && missCount > 0) {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      // Set pending flag and close sheet - useEffect will show MissMarker when sheet closes
-      setPendingMissMarker(true);
-      setShowSheet(false);
-      return;
-    }
+    // Always save immediately
+    doSave();
+  }, [isGrouping, groupSizeCm, groupingShots, doSave, t]);
 
-    // No misses or grouping mode - save directly
-    doSave([]);
-  }, [isGrouping, groupSizeCm, groupingShots, missCount, doSave, t]);
+  function getEndBtnStyle() {
+    if (drillComplete) return { backgroundColor: '#10B981' };
+    if (targets.length === 0) return { backgroundColor: colors.secondary };
+    return { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border };
+  }
 
   return (
     <View style={[sharedStyles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
       <View style={[sharedStyles.header, { paddingTop: insets.top + 8 }]}>
-        <View style={{ width: 36 }} />
+        <View style={{ width: 34 }} />
         <View style={sharedStyles.headerCenter}>
           <Text style={[sharedStyles.headerTitle, { color: colors.text }]} numberOfLines={1}>
             {session.drill_name || 'Drill'}
@@ -279,140 +305,191 @@ export function TeamTrainingView({
               </Text>
             </View>
           ) : (
-            <View style={{ width: 36 }} />
+            <View style={{ width: 34 }} />
           )}
         </View>
       </View>
 
-      {/* Weather */}
-      {weather && !weatherLoading && (
-        <View style={styles.weatherWrap}>
-          <WeatherStrip weather={weather} />
-        </View>
-      )}
-
-      {/* Drill info card */}
-      <View style={styles.focusCard}>
-        <View style={[styles.focusCardInner, { backgroundColor: colors.card }]}>
-          {/* Status row */}
-          <View style={styles.statusRow}>
-            <View style={[styles.badge, { backgroundColor: `${colors.primary}15` }]}>
-              <Lock size={12} color={colors.primary} />
-              <Text style={[styles.badgeText, { color: colors.primary }]}>{t('session.locked')}</Text>
-            </View>
-            {drillComplete && (
-              <View style={[styles.badge, { backgroundColor: '#10B98120' }]}>
-                <Check size={12} color="#10B981" />
-                <Text style={[styles.badgeText, { color: '#10B981' }]}>{t('session.complete')}</Text>
-              </View>
-            )}
+      <ScrollView 
+        style={styles.scrollView} 
+        contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Weather */}
+        {weather && !weatherLoading && (
+          <View style={styles.weatherWrap}>
+            <WeatherStrip weather={weather} />
           </View>
+        )}
 
-          {/* Params */}
-          <View style={styles.paramsRow}>
-            <View style={styles.param}>
-              <MapPin size={14} color={colors.textMuted} />
-              <Text style={[styles.paramText, { color: colors.text }]}>
-                {session.soldier_distance_m
-                  ? `${session.soldier_distance_m}m`
-                  : formatDistanceDisplay(drill?.distance_m, drill?.distance_category, t)}
+        {/* Drill info card */}
+        <View style={styles.focusCard}>
+          <View style={[styles.focusCardInner, { backgroundColor: colors.card }]}>
+            {/* Status row */}
+            <View style={styles.statusRow}>
+              <View style={[styles.badge, { backgroundColor: `${colors.primary}15` }]}>
+                <Lock size={12} color={colors.primary} />
+                <Text style={[styles.badgeText, { color: colors.primary }]}>{t('session.locked')}</Text>
+              </View>
+              {drillComplete && (
+                <View style={[styles.badge, { backgroundColor: '#10B98120' }]}>
+                  <Check size={12} color="#10B981" />
+                  <Text style={[styles.badgeText, { color: '#10B981' }]}>{t('session.complete')}</Text>
+                </View>
+              )}
+            </View>
+
+            {/* Params */}
+            <View style={styles.paramsRow}>
+              <View style={styles.param}>
+                <MapPin size={14} color={colors.textMuted} />
+                <Text style={[styles.paramText, { color: colors.text }]}>
+                  {session.soldier_distance_m
+                    ? `${session.soldier_distance_m}m`
+                    : formatDistanceDisplay(drill?.distance_m, drill?.distance_category, t)}
+                </Text>
+              </View>
+              <View style={styles.param}>
+                <Zap size={14} color={colors.textMuted} />
+                <Text style={[styles.paramText, { color: colors.text }]}>{bullets} {t('target.shots')}</Text>
+              </View>
+            </View>
+
+            {/* Weapon - locked once targets exist */}
+            <TouchableOpacity
+              style={[
+                styles.weaponRow, 
+                { 
+                  backgroundColor: targets.length > 0 ? colors.secondary : `${colors.primary}08`, 
+                  borderColor: targets.length > 0 ? colors.border : `${colors.primary}30` 
+                }
+              ]}
+              onPress={targets.length === 0 ? onWeaponPress : undefined}
+              disabled={targets.length > 0}
+            >
+              {targets.length > 0 ? (
+                <Lock size={14} color={colors.textMuted} />
+              ) : (
+                <Target size={14} color={colors.primary} />
+              )}
+              <Text 
+                style={[
+                  styles.weaponText, 
+                  { color: targets.length > 0 ? colors.textMuted : (session.weapon_name ? colors.text : colors.primary) }
+                ]} 
+                numberOfLines={1}
+              >
+                {session.weapon_name || t('session.selectWeapon')}
+              </Text>
+              {targets.length === 0 && <ChevronDown size={14} color={colors.primary} />}
+            </TouchableOpacity>
+
+            {/* Progress */}
+            <View style={styles.progressWrap}>
+              <View style={[styles.progressBg, { backgroundColor: colors.secondary }]}>
+                <View
+                  style={[styles.progressFill, { width: `${drillProgress?.targetsProgress || 0}%`, backgroundColor: drillComplete ? '#10B981' : colors.text }]}
+                />
+              </View>
+              <Text style={[styles.progressText, { color: colors.textMuted }]}>
+                {targets.length}/{drillProgress?.requiredTargets ?? 1} targets
               </Text>
             </View>
-            <View style={styles.param}>
-              <Zap size={14} color={colors.textMuted} />
-              <Text style={[styles.paramText, { color: colors.text }]}>{bullets} {t('target.shots')}</Text>
-            </View>
-          </View>
-
-          {/* Weapon */}
-          <TouchableOpacity
-            style={[styles.weaponRow, { backgroundColor: `${colors.primary}08`, borderColor: `${colors.primary}30` }]}
-            onPress={onWeaponPress}
-          >
-            <Target size={14} color={colors.primary} />
-            <Text style={[styles.weaponText, { color: session.weapon_name ? colors.text : colors.primary }]} numberOfLines={1}>
-              {session.weapon_name || t('session.selectWeapon')}
-            </Text>
-            <ChevronDown size={14} color={colors.primary} />
-          </TouchableOpacity>
-
-          {/* Progress */}
-          <View style={styles.progressWrap}>
-            <View style={[styles.progressBg, { backgroundColor: colors.secondary }]}>
-              <View
-                style={[styles.progressFill, { width: `${drillProgress?.targetsProgress || 0}%`, backgroundColor: drillComplete ? '#10B981' : colors.text }]}
-              />
-            </View>
-            <Text style={[styles.progressText, { color: colors.textMuted }]}>
-              {targets.length}/{drillProgress?.requiredTargets ?? 1} targets
-            </Text>
           </View>
         </View>
-      </View>
 
-      {/* Latest target */}
-      {targets.length > 0 && (
-        <Animated.View entering={FadeIn.duration(200)} style={styles.heroWrap}>
-          <HeroTarget target={targets[0]} onPress={() => onTargetPress(targets[0])} />
-        </Animated.View>
-      )}
-
-      {/* Action button */}
-      {canAddTarget && !drillComplete && (
-        <Animated.View entering={FadeInDown.duration(200)} style={styles.actionWrap}>
-          <TouchableOpacity
-            style={[styles.actionBtn, { backgroundColor: colors.text }]}
-            onPress={isGrouping ? onScanRoute : openSheet}
-          >
-            {isGrouping ? (
-              <>
-                <Camera size={20} color={colors.background} />
-                <Text style={[styles.actionText, { color: colors.background }]}>{t('session.scanTarget')}</Text>
-              </>
-            ) : (
-              <>
-                <Crosshair size={20} color={colors.background} />
-                <Text style={[styles.actionText, { color: colors.background }]}>{t('session.logResult')}</Text>
-              </>
+        {/* Single target - show hero view */}
+        {targets.length === 1 && (
+          <>
+            <Animated.View entering={FadeIn.duration(200)} style={styles.heroWrap}>
+              <HeroTarget target={targets[0]} onPress={() => onTargetPress(targets[0])} />
+            </Animated.View>
+            {/* Miss data card - shows below hero when there's miss data */}
+            {targets[0].tactical_result?.miss_points?.length > 0 && (
+              <Animated.View entering={FadeIn.duration(300).delay(100)} style={styles.missDataWrap}>
+                <MissDataCard
+                  missPoints={targets[0].tactical_result.miss_points}
+                  hits={targets[0].tactical_result.hits}
+                  totalShots={targets[0].tactical_result.bullets_fired}
+                />
+              </Animated.View>
             )}
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.altAction} onPress={isGrouping ? openSheet : onScanRoute}>
-            <Text style={[styles.altText, { color: colors.textMuted }]}>
-              {isGrouping ? t('session.orEnterManually') : t('session.orScanPaper')}
-            </Text>
-          </TouchableOpacity>
-        </Animated.View>
-      )}
+          </>
+        )}
 
-      {/* Previous targets */}
-      {targets.length > 1 && (
-        <View style={styles.prevList}>
-          <Text style={[styles.prevLabel, { color: colors.textMuted }]}>
-            {t('session.previous', { count: targets.length - 1 })}
-          </Text>
-          <FlatList
-            data={targets.slice(1)}
-            renderItem={({ item, index }) => (
-              <TargetCard target={item} index={targets.length - 1 - index} onPress={() => onTargetPress(item)} />
-            )}
-            keyExtractor={(item) => item.id}
-            contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}
-            showsVerticalScrollIndicator={false}
-          />
-        </View>
-      )}
+        {/* Multiple targets - show all in same list format with expandable miss data */}
+        {targets.length > 1 && (
+          <View style={styles.targetsList}>
+            {targets.map((item, index) => {
+              const isExpanded = expandedTargetId === item.id;
+              const missPoints = item.tactical_result?.miss_points ?? [];
+              const hasMissData = missPoints.length > 0;
+              
+              return (
+                <View key={item.id}>
+                  <TargetCard 
+                    target={item} 
+                    index={targets.length - index} 
+                    onPress={() => setExpandedTargetId(isExpanded ? null : item.id)}
+                    isExpanded={isExpanded}
+                  />
+                  {/* Expanded miss data section */}
+                  {isExpanded && hasMissData && (
+                    <Animated.View entering={FadeIn.duration(200)} style={styles.expandedMissWrap}>
+                      <MissDataCard
+                        missPoints={missPoints}
+                        hits={item.tactical_result?.hits ?? 0}
+                        totalShots={item.tactical_result?.bullets_fired ?? 0}
+                      />
+                    </Animated.View>
+                  )}
+                  {/* No miss data - just show basic info */}
+                  {isExpanded && !hasMissData && (
+                    <Animated.View entering={FadeIn.duration(200)} style={[styles.expandedMissWrap, styles.expandedNoMiss]}>
+                      <Target size={24} color={colors.textMuted} />
+                      <Text style={[styles.noMissText, { color: colors.textMuted }]}>
+                        {item.tactical_result?.hits ?? 0}/{item.tactical_result?.bullets_fired ?? 0} hits
+                      </Text>
+                    </Animated.View>
+                  )}
+                </View>
+              );
+            })}
+          </View>
+        )}
+
+        {/* Action button */}
+        {canAddTarget && !drillComplete && (
+          <Animated.View entering={FadeInDown.duration(200)} style={styles.actionWrap}>
+            <TouchableOpacity
+              style={[styles.actionBtn, { backgroundColor: colors.text }]}
+              onPress={isGrouping ? onScanRoute : openSheet}
+            >
+              {isGrouping ? (
+                <>
+                  <Camera size={20} color={colors.background} />
+                  <Text style={[styles.actionText, { color: colors.background }]}>{t('session.scanTarget')}</Text>
+                </>
+              ) : (
+                <>
+                  <Crosshair size={20} color={colors.background} />
+                  <Text style={[styles.actionText, { color: colors.background }]}>{t('session.logResult')}</Text>
+                </>
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.altAction} onPress={isGrouping ? openSheet : onScanRoute}>
+              <Text style={[styles.altText, { color: colors.textMuted }]}>
+                {isGrouping ? t('session.orEnterManually') : t('session.orScanPaper')}
+              </Text>
+            </TouchableOpacity>
+          </Animated.View>
+        )}
+      </ScrollView>
 
       {/* Bottom bar */}
-      <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 16, backgroundColor: colors.background }]}>
+      <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 12, backgroundColor: colors.background }]}>
         <TouchableOpacity
-          style={[
-            styles.endBtn,
-            drillComplete
-              ? { backgroundColor: '#10B981' }
-              : targets.length === 0
-                ? { backgroundColor: colors.secondary }
-                : { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border },
-          ]}
+          style={[styles.endBtn, getEndBtnStyle()]}
           onPress={onEndSession}
           disabled={ending}
         >
@@ -440,7 +517,7 @@ export function TeamTrainingView({
           keyboardVerticalOffset={-80}
         >
           <TouchableOpacity style={styles.sheetBackdrop} activeOpacity={1} onPress={closeSheet} />
-          <View style={[styles.sheetContainer, { backgroundColor: colors.background, paddingBottom: insets.bottom + 12 }]}>
+          <View style={[styles.sheetContainer, { backgroundColor: colors.background, paddingBottom: insets.bottom + 10 }]}>
             {/* Handle */}
             <View style={styles.sheetHandle}>
               <View style={[styles.sheetHandleBar, { backgroundColor: colors.border }]} />
@@ -665,7 +742,7 @@ export function TeamTrainingView({
 
             {/* Save button */}
             <TouchableOpacity
-              style={[styles.saveBtn, { backgroundColor: colors.primary, marginHorizontal: 16 }]}
+              style={[styles.saveBtn, { backgroundColor: colors.primary, marginHorizontal: 14 }]}
               onPress={handleSave}
               disabled={saving}
             >
@@ -682,14 +759,14 @@ export function TeamTrainingView({
         </KeyboardAvoidingView>
       </Modal>
 
-      {/* Miss Marker Modal - elegant bottom sheet */}
+      {/* Miss Marker Modal - target already saved, this just updates miss_points */}
       <Modal
         visible={showMissMarker}
         animationType="slide"
         transparent
         onRequestClose={() => {
           setShowMissMarker(false);
-          doSave([]);
+          setPendingTacticalResultId(null);
         }}
       >
         <View style={styles.missMarkerOverlay}>
@@ -698,10 +775,10 @@ export function TeamTrainingView({
             activeOpacity={1} 
             onPress={() => {
               setShowMissMarker(false);
-              doSave([]);
+              setPendingTacticalResultId(null);
             }} 
           />
-          <View style={[styles.missMarkerSheet, { backgroundColor: colors.background, paddingBottom: insets.bottom + 12 }]}>
+          <View style={[styles.missMarkerSheet, { backgroundColor: colors.background, paddingBottom: insets.bottom + 10 }]}>
             {/* Handle bar */}
             <View style={styles.missMarkerHandle}>
               <View style={[styles.missMarkerHandleBar, { backgroundColor: colors.border }]} />
@@ -710,11 +787,11 @@ export function TeamTrainingView({
               initialPoints={[]}
               onSave={(points) => {
                 setShowMissMarker(false);
-                doSave(points);
+                saveMissPointsToTarget(points);
               }}
               onCancel={() => {
                 setShowMissMarker(false);
-                doSave([]);
+                setPendingTacticalResultId(null);
               }}
               maxPoints={missCount}
             />
@@ -726,108 +803,129 @@ export function TeamTrainingView({
 }
 
 const styles = StyleSheet.create({
-  headerRight: { flexDirection: 'row', alignItems: 'center', minWidth: 36 },
-  weatherWrap: { paddingHorizontal: 16, marginBottom: 12 },
+  scrollView: { flex: 1 },
+  headerRight: { flexDirection: 'row', alignItems: 'center', minWidth: 34 },
+  weatherWrap: { paddingHorizontal: 14, marginBottom: 10 },
 
   // Focus card
-  focusCard: { paddingHorizontal: 16, marginBottom: 16 },
-  focusCardInner: { borderRadius: 14, padding: 16, gap: 14 },
-  statusRow: { flexDirection: 'row', gap: 8 },
-  badge: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 },
-  badgeText: { fontSize: 10, fontWeight: '700', letterSpacing: 0.5 },
-  paramsRow: { flexDirection: 'row', gap: 16 },
-  param: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  paramText: { fontSize: 14, fontWeight: '600' },
-  weaponRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, paddingHorizontal: 12, borderRadius: 10, borderWidth: 1 },
-  weaponText: { flex: 1, fontSize: 14, fontWeight: '600' },
-  progressWrap: { gap: 6 },
-  progressBg: { height: 6, borderRadius: 3, overflow: 'hidden' },
-  progressFill: { height: '100%', borderRadius: 3 },
-  progressText: { fontSize: 12, fontWeight: '500' },
+  focusCard: { paddingHorizontal: 14, marginBottom: 12 },
+  focusCardInner: { borderRadius: 12, padding: 14, gap: 10 },
+  statusRow: { flexDirection: 'row', gap: 6 },
+  badge: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
+  badgeText: { fontSize: 9, fontWeight: '700', letterSpacing: 0.5 },
+  paramsRow: { flexDirection: 'row', gap: 12 },
+  param: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  paramText: { fontSize: 13, fontWeight: '600' },
+  weaponRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8, paddingHorizontal: 10, borderRadius: 8, borderWidth: 1 },
+  weaponText: { flex: 1, fontSize: 13, fontWeight: '600' },
+  progressWrap: { gap: 4 },
+  progressBg: { height: 5, borderRadius: 2.5, overflow: 'hidden' },
+  progressFill: { height: '100%', borderRadius: 2.5 },
+  progressText: { fontSize: 11, fontWeight: '500' },
 
   // Hero
-  heroWrap: { paddingHorizontal: 16, marginBottom: 12 },
+  heroWrap: { paddingHorizontal: 14, marginBottom: 10 },
+
+  // Miss data
+  missDataWrap: { paddingHorizontal: 14, marginBottom: 10 },
 
   // Action
-  actionWrap: { paddingHorizontal: 16, marginBottom: 20, alignItems: 'center' },
-  actionBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, width: '100%', height: 54, borderRadius: 14 },
-  actionText: { fontSize: 17, fontWeight: '600' },
-  altAction: { marginTop: 10, paddingVertical: 6 },
-  altText: { fontSize: 13, fontWeight: '500' },
+  actionWrap: { paddingHorizontal: 14, marginBottom: 16, alignItems: 'center' },
+  actionBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%', height: 48, borderRadius: 12 },
+  actionText: { fontSize: 15, fontWeight: '600' },
+  altAction: { marginTop: 8, paddingVertical: 5 },
+  altText: { fontSize: 12, fontWeight: '500' },
 
-  // Previous
-  prevList: { flex: 1, paddingHorizontal: 16 },
-  prevLabel: { fontSize: 11, fontWeight: '600', letterSpacing: 0.5, marginBottom: 10 },
+  // Targets list (for 2+ targets)
+  targetsList: { paddingHorizontal: 14, gap: 6 },
+
+  // Expanded miss data
+  expandedMissWrap: {
+    marginTop: -3,
+    marginBottom: 6,
+  },
+  expandedNoMiss: {
+    padding: 14,
+    borderRadius: 10,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  noMissText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
 
   // Bottom bar
-  bottomBar: { position: 'absolute', bottom: 0, left: 0, right: 0, paddingHorizontal: 16, paddingTop: 12 },
-  endBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, height: 50, borderRadius: 12 },
-  endBtnText: { fontSize: 16, fontWeight: '600' },
+  bottomBar: { position: 'absolute', bottom: 0, left: 0, right: 0, paddingHorizontal: 14, paddingTop: 10 },
+  endBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, height: 46, borderRadius: 11 },
+  endBtnText: { fontSize: 15, fontWeight: '600' },
 
   // ═══════════════════════════════════════════════════════════════════════
   // COMPACT SHEET STYLES
   // ═══════════════════════════════════════════════════════════════════════
   sheetOverlay: { flex: 1, justifyContent: 'flex-end' },
   sheetBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.4)' },
-  sheetContainer: { borderTopLeftRadius: 20, borderTopRightRadius: 20 },
-  sheetHandle: { alignItems: 'center', paddingVertical: 8 },
-  sheetHandleBar: { width: 36, height: 4, borderRadius: 2 },
-  sheetSection: { paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 1, alignItems: 'center' },
-  sheetLabel: { fontSize: 13, fontWeight: '600', textAlign: 'center', marginBottom: 12, opacity: 0.6 },
+  sheetContainer: { borderTopLeftRadius: 18, borderTopRightRadius: 18 },
+  sheetHandle: { alignItems: 'center', paddingVertical: 7 },
+  sheetHandleBar: { width: 32, height: 4, borderRadius: 2 },
+  sheetSection: { paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, alignItems: 'center' },
+  sheetLabel: { fontSize: 12, fontWeight: '600', textAlign: 'center', marginBottom: 10, opacity: 0.6 },
 
   // Stepper (shared)
-  stepper: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 20, marginBottom: 12 },
-  stepBtn: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
-  stepperValue: { fontSize: 32, fontWeight: '700', minWidth: 100, textAlign: 'center', fontVariant: ['tabular-nums'] },
+  stepper: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 16, marginBottom: 10 },
+  stepBtn: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  stepperValue: { fontSize: 28, fontWeight: '700', minWidth: 90, textAlign: 'center', fontVariant: ['tabular-nums'] },
   distanceDisplay: { alignItems: 'center' },
-  distanceInput: { width: 80, height: 48, borderRadius: 12, fontSize: 28, fontWeight: '700', textAlign: 'center', borderWidth: 2 },
-  distanceUnit: { fontSize: 14, fontWeight: '600', marginTop: 2 },
-  stepHint: { fontSize: 11, fontWeight: '600', marginTop: 2 },
-  
+  distanceInput: { width: 76, height: 44, borderRadius: 10, fontSize: 26, fontWeight: '700', textAlign: 'center', borderWidth: 2 },
+  distanceUnit: { fontSize: 13, fontWeight: '600', marginTop: 2 },
+  stepHint: { fontSize: 10, fontWeight: '600', marginTop: 2 },
+
   // Range warning
-  rangeWarning: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, marginTop: 10 },
-  rangeWarningText: { fontSize: 12, fontWeight: '600' },
+  rangeWarning: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 7, marginTop: 8 },
+  rangeWarningText: { fontSize: 11, fontWeight: '600' },
 
   // Hits ring
-  hitsRing: { width: 88, height: 88, borderRadius: 44, borderWidth: 3, borderColor: 'rgba(128,128,128,0.3)', alignItems: 'center', justifyContent: 'center' },
-  hitsValue: { fontSize: 32, fontWeight: '700' },
-  hitsMax: { fontSize: 13 },
-  accuracyText: { fontSize: 14, fontWeight: '600', textAlign: 'center', marginTop: 8, marginBottom: 10, opacity: 0.6 },
+  hitsRing: { width: 80, height: 80, borderRadius: 40, borderWidth: 3, borderColor: 'rgba(128,128,128,0.3)', alignItems: 'center', justifyContent: 'center' },
+  hitsValue: { fontSize: 28, fontWeight: '700' },
+  hitsMax: { fontSize: 12 },
+  accuracyText: { fontSize: 13, fontWeight: '600', textAlign: 'center', marginTop: 6, marginBottom: 8, opacity: 0.6 },
 
   // Input row
-  inputRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 12 },
-  numInput: { width: 100, height: 52, borderRadius: 12, fontSize: 28, fontWeight: '700', textAlign: 'center' },
-  inputUnit: { fontSize: 18, fontWeight: '600' },
+  inputRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 10 },
+  numInput: { width: 90, height: 46, borderRadius: 10, fontSize: 26, fontWeight: '700', textAlign: 'center' },
+  inputUnit: { fontSize: 16, fontWeight: '600' },
 
   // Shots row
-  shotsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12, paddingTop: 14, borderTopWidth: 1, marginTop: 14, width: '100%' },
-  shotsLabel: { fontSize: 14, fontWeight: '600', opacity: 0.6 },
-  miniStepper: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  miniBtn: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
-  miniValue: { fontSize: 18, fontWeight: '700', minWidth: 28, textAlign: 'center' },
+  shotsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingTop: 12, borderTopWidth: 1, marginTop: 12, width: '100%' },
+  shotsLabel: { fontSize: 13, fontWeight: '600', opacity: 0.6 },
+  miniStepper: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  miniBtn: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  miniValue: { fontSize: 16, fontWeight: '700', minWidth: 26, textAlign: 'center' },
 
   // Quick select
-  quickRow: { flexDirection: 'row', justifyContent: 'center', gap: 8 },
-  quickBtn: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 16 },
-  quickText: { fontSize: 14, fontWeight: '600' },
+  quickRow: { flexDirection: 'row', justifyContent: 'center', gap: 6 },
+  quickBtn: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 14 },
+  quickText: { fontSize: 13, fontWeight: '600' },
 
   // First shot hit
-  firstShotRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 14, borderTopWidth: 1, marginTop: 14, width: '100%' },
-  firstShotLabel: { fontSize: 14, fontWeight: '600' },
-  firstShotOptions: { flexDirection: 'row', gap: 8 },
-  firstShotBtn: { paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10 },
-  firstShotBtnText: { fontSize: 14, fontWeight: '600' },
+  firstShotRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 12, borderTopWidth: 1, marginTop: 12, width: '100%' },
+  firstShotLabel: { fontSize: 13, fontWeight: '600' },
+  firstShotOptions: { flexDirection: 'row', gap: 6 },
+  firstShotBtn: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8 },
+  firstShotBtnText: { fontSize: 13, fontWeight: '600' },
 
   // Save button
-  saveBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, height: 50, borderRadius: 12 },
-  saveBtnText: { fontSize: 16, fontWeight: '600', color: '#fff' },
+  saveBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, height: 46, borderRadius: 11 },
+  saveBtnText: { fontSize: 15, fontWeight: '600', color: '#fff' },
 
   // Miss Marker
   missHint: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '500',
     textAlign: 'center',
-    marginTop: 12,
+    marginTop: 10,
     opacity: 0.7,
   },
   missMarkerOverlay: {
@@ -839,16 +937,16 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.5)',
   },
   missMarkerSheet: {
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
   },
   missMarkerHandle: {
     alignItems: 'center',
-    paddingTop: 12,
-    paddingBottom: 4,
+    paddingTop: 10,
+    paddingBottom: 3,
   },
   missMarkerHandleBar: {
-    width: 40,
+    width: 36,
     height: 4,
     borderRadius: 2,
   },
