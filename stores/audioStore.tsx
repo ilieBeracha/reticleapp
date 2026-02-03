@@ -7,6 +7,7 @@ import {
   startShotAudio,
   stopShotAudio,
 } from '@/modules/shot-audio';
+import type { AudioDetection } from '@/types/audio';
 import type { EventSubscription } from 'expo-modules-core';
 import { create } from 'zustand';
 
@@ -21,6 +22,10 @@ interface AudioState {
   // Callback for external handling (e.g., session integration)
   onShotDetectedCallback: ((event: ShotDetectionEvent) => void) | null;
 
+  // Session tracking
+  sessionDetections: AudioDetection[];
+  sessionStartTime: number | null;
+
   // Actions
   start: () => void;
   stop: () => void;
@@ -28,6 +33,11 @@ interface AudioState {
   setShotDetectedCallback: (cb: ((e: ShotDetectionEvent) => void) | null) => void;
   checkAvailability: () => boolean;
   reset: () => void;
+
+  // Session actions
+  startSession: () => void;
+  endSession: () => AudioDetection[];
+  getSessionDetections: () => AudioDetection[];
 }
 
 let subscription: EventSubscription | null = null;
@@ -39,6 +49,8 @@ export const useAudioStore = create<AudioState>((set, get) => ({
   lastDetection: null,
   detectionCount: 0,
   onShotDetectedCallback: null,
+  sessionDetections: [],
+  sessionStartTime: null,
 
   start: () => {
     if (get().isListening) return;
@@ -55,6 +67,17 @@ export const useAudioStore = create<AudioState>((set, get) => ({
       set((state) => ({
         lastDetection: event,
         detectionCount: state.detectionCount + 1,
+      }));
+
+      // Accumulate for session correlation
+      const detection: AudioDetection = {
+        timestamp: event.timestamp,
+        confidence: event.confidence,
+        peakEnergy: event.peakEnergy,
+      };
+
+      set((state) => ({
+        sessionDetections: [...state.sessionDetections, detection],
       }));
 
       // Call registered callback (for session integration)
@@ -101,8 +124,31 @@ export const useAudioStore = create<AudioState>((set, get) => ({
       lastDetection: null,
       detectionCount: 0,
       onShotDetectedCallback: null,
+      sessionDetections: [],
+      sessionStartTime: null,
     });
     console.log('[AudioStore] Reset');
+  },
+
+  startSession: () => {
+    set({
+      sessionDetections: [],
+      sessionStartTime: Date.now(),
+      detectionCount: 0,
+    });
+    get().start();
+    console.log('[AudioStore] Session started');
+  },
+
+  endSession: () => {
+    get().stop();
+    const detections = get().sessionDetections;
+    console.log(`[AudioStore] Session ended with ${detections.length} detections`);
+    return detections;
+  },
+
+  getSessionDetections: () => {
+    return get().sessionDetections;
   },
 }));
 
@@ -111,3 +157,5 @@ export const useIsAudioListening = () => useAudioStore((s) => s.isListening);
 export const useAudioDetectionCount = () => useAudioStore((s) => s.detectionCount);
 export const useLastAudioDetection = () => useAudioStore((s) => s.lastDetection);
 export const useIsAudioModuleLoaded = () => useAudioStore((s) => s.isModuleLoaded);
+export const useSessionDetections = () => useAudioStore((s) => s.sessionDetections);
+export const useSessionStartTime = () => useAudioStore((s) => s.sessionStartTime);
