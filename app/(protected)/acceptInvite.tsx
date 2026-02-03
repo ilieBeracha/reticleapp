@@ -24,8 +24,6 @@ import {
 } from 'react-native';
 
 /**
- * ACCEPT INVITE SHEET - Team Invitations
- *
  * Team-First Architecture: Users join teams directly via invite code.
  */
 export default function AcceptInviteSheet() {

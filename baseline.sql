@@ -983,7 +983,12 @@ CREATE TABLE IF NOT EXISTS "public"."sessions" (
     "watch_controlled" boolean DEFAULT false,
     "weapon_id" "uuid",
     "weather" "jsonb",
+    "soldier_distance_m" integer,
+    "soldier_bullets" integer,
+    "soldier_position" "text",
+    "execution_number" integer DEFAULT 1,
     CONSTRAINT "sessions_session_mode_check" CHECK (("session_mode" = ANY (ARRAY['solo'::"text", 'group'::"text"]))),
+    CONSTRAINT "sessions_soldier_position_check" CHECK ((("soldier_position" IS NULL) OR ("soldier_position" = ANY (ARRAY['standing'::"text", 'kneeling'::"text", 'prone'::"text", 'seated'::"text", 'sitting'::"text", 'barricade'::"text", 'transition'::"text", 'freestyle'::"text"])))),
     CONSTRAINT "sessions_status_check" CHECK (("status" = ANY (ARRAY['pending'::"text", 'active'::"text", 'completed'::"text", 'cancelled'::"text"])))
 );
 
@@ -998,6 +1003,22 @@ COMMENT ON COLUMN "public"."sessions"."drill_template_id" IS 'For quick practice
 
 
 COMMENT ON COLUMN "public"."sessions"."custom_drill_config" IS 'Inline drill configuration for quick practice sessions (no template reference)';
+
+
+
+COMMENT ON COLUMN "public"."sessions"."soldier_distance_m" IS 'Actual distance soldier shot at. Used when commander set distance_category (range constraint) instead of exact distance_m.';
+
+
+
+COMMENT ON COLUMN "public"."sessions"."soldier_bullets" IS 'Actual bullets soldier used. Used when commander left rounds_per_shooter NULL (soldier chooses).';
+
+
+
+COMMENT ON COLUMN "public"."sessions"."soldier_position" IS 'Actual position soldier used. Used when commander left position NULL (soldier chooses).';
+
+
+
+COMMENT ON COLUMN "public"."sessions"."execution_number" IS 'Which execution attempt this is for the drill (1 = first attempt, 2 = second, etc.).';
 
 
 
@@ -1351,7 +1372,7 @@ $$;
 ALTER FUNCTION "public"."get_my_team_ids"() OWNER TO "postgres";
 
 
-CREATE OR REPLACE FUNCTION "public"."get_my_teams"() RETURNS TABLE("id" "uuid", "name" "text", "description" "text", "squads" "text"[], "team_type" "text", "created_by" "uuid", "created_at" timestamp with time zone, "my_role" "text", "member_count" bigint)
+CREATE OR REPLACE FUNCTION "public"."get_my_teams"() RETURNS TABLE("id" "uuid", "name" "text", "description" "text", "squads" "text"[], "team_type" "text", "specialty" "text", "created_by" "uuid", "created_at" timestamp with time zone, "my_role" "text", "member_count" bigint)
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO 'public'
     AS $$
@@ -1363,6 +1384,7 @@ BEGIN
         t.description,
         t.squads,
         t.team_type,
+        t.specialty,  -- Added specialty field
         t.created_by,
         t.created_at,
         tm.role,
@@ -1376,6 +1398,10 @@ $$;
 
 
 ALTER FUNCTION "public"."get_my_teams"() OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."get_my_teams"() IS 'Returns all teams the current user belongs to, including specialty for feature flags';
+
 
 
 CREATE OR REPLACE FUNCTION "public"."get_org_workspace_members"("p_org_workspace_id" "uuid") RETURNS TABLE("id" "uuid", "org_workspace_id" "uuid", "member_id" "uuid", "role" "text", "joined_at" timestamp with time zone, "profile_id" "uuid", "profile_email" "text", "profile_full_name" "text", "profile_avatar_url" "text", "teams" "jsonb")
@@ -2999,6 +3025,7 @@ CREATE TABLE IF NOT EXISTS "public"."engagement_participants" (
     "shots_fired" integer,
     "hits" integer,
     "role" "text" DEFAULT 'shooter'::"text",
+    "target_results" "jsonb",
     CONSTRAINT "engagement_participants_role_check" CHECK (("role" = ANY (ARRAY['shooter'::"text", 'spotter'::"text"]))),
     CONSTRAINT "engagement_participants_state_check" CHECK (("state" = ANY (ARRAY['pending'::"text", 'joined'::"text", 'declined'::"text", 'left'::"text"])))
 );
@@ -3024,6 +3051,10 @@ COMMENT ON COLUMN "public"."engagement_participants"."engagement_id" IS 'Referen
 
 
 COMMENT ON COLUMN "public"."engagement_participants"."role" IS 'Participant role: shooter (fires weapon, records results) or spotter (observer, assists shooter)';
+
+
+
+COMMENT ON COLUMN "public"."engagement_participants"."target_results" IS 'Per-target results as JSONB array: [{"target_number": 1, "shots_fired": N, "hits": N}]. NULL when target_count=1.';
 
 
 
@@ -3087,6 +3118,8 @@ CREATE TABLE IF NOT EXISTS "public"."notification_history" (
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL
 );
 
+ALTER TABLE ONLY "public"."notification_history" REPLICA IDENTITY FULL;
+
 
 ALTER TABLE "public"."notification_history" OWNER TO "postgres";
 
@@ -3119,11 +3152,16 @@ CREATE TABLE IF NOT EXISTS "public"."paper_target_results" (
     "scanned_image_url" "text",
     "notes" "text",
     "actual_shots_declared" integer,
+    "miss_points" "jsonb",
     CONSTRAINT "paper_target_results_paper_type_check" CHECK (("paper_type" = ANY (ARRAY['grouping'::"text", 'engagement'::"text"])))
 );
 
 
 ALTER TABLE "public"."paper_target_results" OWNER TO "postgres";
+
+
+COMMENT ON COLUMN "public"."paper_target_results"."miss_points" IS 'Array of normalized miss point coordinates [{x, y, distance, angle_deg}]. NULL = not analyzed.';
+
 
 
 CREATE TABLE IF NOT EXISTS "public"."profiles" (
@@ -3303,11 +3341,21 @@ CREATE TABLE IF NOT EXISTS "public"."tactical_target_results" (
     "hits" integer NOT NULL,
     "is_stage_cleared" boolean DEFAULT false,
     "time_seconds" numeric,
-    "notes" "text"
+    "notes" "text",
+    "miss_points" "jsonb",
+    "first_shot_hit" boolean
 );
 
 
 ALTER TABLE "public"."tactical_target_results" OWNER TO "postgres";
+
+
+COMMENT ON COLUMN "public"."tactical_target_results"."miss_points" IS 'Array of normalized miss coordinates from MissMarker. Format: [{x, y, distance, angle_deg}, ...]';
+
+
+
+COMMENT ON COLUMN "public"."tactical_target_results"."first_shot_hit" IS 'Whether the first shot was a hit. NULL = not tracked, true = hit, false = miss';
+
 
 
 CREATE TABLE IF NOT EXISTS "public"."team_drill_presets" (
@@ -3511,6 +3559,9 @@ CREATE TABLE IF NOT EXISTS "public"."training_drills" (
     "input_method" "text",
     "execution_policy" "text" DEFAULT 'locked'::"text",
     "engagement_mode" "text" DEFAULT 'solo'::"text",
+    "distance_category" "text",
+    "max_executions" integer,
+    "measurement_scope" "text",
     CONSTRAINT "training_drills_category_check" CHECK ((("category" IS NULL) OR ("category" = ANY (ARRAY['fundamentals'::"text", 'speed'::"text", 'accuracy'::"text", 'stress'::"text", 'tactical'::"text", 'competition'::"text", 'qualification'::"text"])))),
     CONSTRAINT "training_drills_difficulty_check" CHECK ((("difficulty" IS NULL) OR ("difficulty" = ANY (ARRAY['beginner'::"text", 'intermediate'::"text", 'advanced'::"text", 'expert'::"text"])))),
     CONSTRAINT "training_drills_engagement_mode_check" CHECK (("engagement_mode" = ANY (ARRAY['solo'::"text", 'squad'::"text"]))),
@@ -3562,6 +3613,18 @@ COMMENT ON COLUMN "public"."training_drills"."engagement_mode" IS 'How the drill
 
 
 
+COMMENT ON COLUMN "public"."training_drills"."distance_category" IS 'Range category (short/medium/long). If set, soldier picks exact distance within this range at execution time.';
+
+
+
+COMMENT ON COLUMN "public"."training_drills"."max_executions" IS 'Maximum number of times a soldier can execute this drill. NULL = unlimited.';
+
+
+
+COMMENT ON COLUMN "public"."training_drills"."measurement_scope" IS 'Measurement scope: individual (per-person results) or collective (shared squad results). NULL defaults to individual.';
+
+
+
 CREATE TABLE IF NOT EXISTS "public"."trainings" (
     "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
     "team_id" "uuid" NOT NULL,
@@ -3577,6 +3640,8 @@ CREATE TABLE IF NOT EXISTS "public"."trainings" (
     "ended_at" timestamp with time zone,
     "expires_at" timestamp with time zone,
     "auto_close_at" timestamp with time zone,
+    "invite_all" boolean DEFAULT true,
+    "invited_member_ids" "uuid"[],
     CONSTRAINT "trainings_status_check" CHECK (("status" = ANY (ARRAY['planned'::"text", 'ongoing'::"text", 'finished'::"text", 'cancelled'::"text"])))
 );
 
@@ -3597,6 +3662,18 @@ COMMENT ON COLUMN "public"."trainings"."started_at" IS 'When the training was ac
 
 
 COMMENT ON COLUMN "public"."trainings"."ended_at" IS 'When the training was finished';
+
+
+
+COMMENT ON COLUMN "public"."trainings"."invite_all" IS 'true = entire team       
+     is invited (default), false = only invited_member_ids may                  
+     participate';
+
+
+
+COMMENT ON COLUMN "public"."trainings"."invited_member_ids" IS 'Array of         
+     user UUIDs invited when invite_all is false. NULL when invite_all is       
+     true.';
 
 
 
@@ -4192,6 +4269,10 @@ CREATE INDEX "idx_sessions_user" ON "public"."sessions" USING "btree" ("user_id"
 
 
 CREATE INDEX "idx_sessions_weapon_id" ON "public"."sessions" USING "btree" ("weapon_id");
+
+
+
+CREATE INDEX "idx_tactical_target_results_miss_points_not_null" ON "public"."tactical_target_results" USING "btree" ((("miss_points" IS NOT NULL)));
 
 
 
@@ -4914,6 +4995,10 @@ CREATE POLICY "Engagement owner can delete participants" ON "public"."engagement
 
 
 
+CREATE POLICY "Engagement owner can update participants" ON "public"."engagement_participants" FOR UPDATE USING (("public"."get_engagement_session_owner"("engagement_id") = "auth"."uid"())) WITH CHECK (("public"."get_engagement_session_owner"("engagement_id") = "auth"."uid"()));
+
+
+
 CREATE POLICY "Owners and commanders can add members" ON "public"."team_members" FOR INSERT WITH CHECK ("public"."is_team_admin"("team_id"));
 
 
@@ -5194,6 +5279,10 @@ CREATE POLICY "Users can update engagements" ON "public"."engagements" FOR UPDAT
    FROM ("public"."sessions" "s"
      JOIN "public"."team_members" "tm" ON (("tm"."team_id" = "s"."team_id")))
   WHERE (("s"."id" = "engagements"."session_id") AND ("tm"."user_id" = "auth"."uid"()) AND ("tm"."role" = ANY (ARRAY['owner'::"text", 'commander'::"text", 'squad_commander'::"text"])))))));
+
+
+
+CREATE POLICY "Users can update own drill completions" ON "public"."user_drill_completions" FOR UPDATE USING (("user_id" = "auth"."uid"())) WITH CHECK (("user_id" = "auth"."uid"()));
 
 
 
@@ -5550,7 +5639,6 @@ ALTER TABLE "public"."weapon_requests" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."weapons" ENABLE ROW LEVEL SECURITY;
 
 
-REVOKE USAGE ON SCHEMA "public" FROM PUBLIC;
 GRANT USAGE ON SCHEMA "public" TO "postgres";
 GRANT USAGE ON SCHEMA "public" TO "anon";
 GRANT USAGE ON SCHEMA "public" TO "authenticated";
@@ -6129,6 +6217,9 @@ ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON SEQ
 
 
 
+
+
+
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON FUNCTIONS TO "postgres";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON FUNCTIONS TO "anon";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON FUNCTIONS TO "authenticated";
@@ -6136,10 +6227,16 @@ ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON FUN
 
 
 
+
+
+
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TABLES TO "postgres";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TABLES TO "anon";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TABLES TO "authenticated";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TABLES TO "service_role";
+
+
+
 
 
 
