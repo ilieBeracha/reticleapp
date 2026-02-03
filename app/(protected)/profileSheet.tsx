@@ -12,12 +12,13 @@ import { useAppContext } from '@/hooks/useAppContext';
 import { useNotifications } from '@/hooks/useNotifications';
 import { Language } from '@/services/i18n';
 import { sendTestNotification } from '@/services/notifications';
+import { useAudioStore } from '@/stores/audioStore';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Platform, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 
 const delay = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
@@ -42,6 +43,41 @@ export default function ProfileSheet() {
   const { language, setLanguage } = useLanguage();
   const [showThemeOptions, setShowThemeOptions] = useState(false);
   const [showLanguageOptions, setShowLanguageOptions] = useState(false);
+  const [showAudioDemo, setShowAudioDemo] = useState(false);
+
+  // Audio shot detection
+  const {
+    isListening: audioListening,
+    isModuleLoaded: audioModuleLoaded,
+    detectionCount: audioDetectionCount,
+    lastDetection,
+    start: startAudio,
+    stop: stopAudio,
+    reset: resetAudio,
+  } = useAudioStore();
+
+  // Cleanup audio on unmount
+  useEffect(() => {
+    return () => {
+      if (audioListening) {
+        stopAudio();
+      }
+    };
+  }, [audioListening, stopAudio]);
+
+  const handleToggleAudio = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    if (audioListening) {
+      stopAudio();
+    } else {
+      startAudio();
+    }
+  }, [audioListening, startAudio, stopAudio]);
+
+  const handleResetAudio = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    resetAudio();
+  }, [resetAudio]);
 
   const handleTestNotification = useCallback(async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -293,6 +329,103 @@ export default function ProfileSheet() {
             <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
           </TouchableOpacity>
 
+          {/* Audio Shot Detection Demo (iOS only) */}
+          {Platform.OS === 'ios' && (
+            <>
+              <View style={[styles.separator, { backgroundColor: colors.border }]} />
+              <TouchableOpacity
+                style={styles.menuItem}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  setShowAudioDemo(!showAudioDemo);
+                }}
+              >
+                <View style={[styles.iconContainer, { backgroundColor: audioListening ? '#EF4444' : '#EC4899' }]}>
+                  <Ionicons name="mic" size={18} color="#fff" />
+                </View>
+                <View style={styles.menuItemContent}>
+                  <Text style={[styles.menuItemText, { color: colors.text }]}>Audio Shot Detection</Text>
+                  <Text style={[styles.menuItemSubtitle, { color: colors.textMuted }]}>
+                    {audioListening ? `Listening • ${audioDetectionCount} shots` : 'Test microphone detection'}
+                  </Text>
+                </View>
+                <Ionicons name={showAudioDemo ? 'chevron-down' : 'chevron-forward'} size={16} color={colors.textMuted} />
+              </TouchableOpacity>
+
+              {/* Audio Demo Expanded */}
+              {showAudioDemo && (
+                <View style={[styles.audioDemoContainer, { backgroundColor: colors.secondary }]}>
+                  {!audioModuleLoaded ? (
+                    // Module not loaded - show rebuild message
+                    <View style={styles.audioRebuildMessage}>
+                      <Ionicons name="build-outline" size={32} color={colors.textMuted} />
+                      <Text style={[styles.audioRebuildTitle, { color: colors.text }]}>Native Rebuild Required</Text>
+                      <Text style={[styles.audioRebuildText, { color: colors.textMuted }]}>
+                        The audio module requires a native rebuild. Run:
+                      </Text>
+                      <View style={[styles.audioCodeBlock, { backgroundColor: colors.background }]}>
+                        <Text style={[styles.audioCodeText, { color: colors.primary }]}>npx expo run:ios</Text>
+                      </View>
+                    </View>
+                  ) : (
+                    <>
+                      {/* Status indicator */}
+                      <View style={styles.audioDemoStatus}>
+                        <View
+                          style={[
+                            styles.audioStatusDot,
+                            { backgroundColor: audioListening ? '#22C55E' : colors.textMuted },
+                          ]}
+                        />
+                        <Text style={[styles.audioStatusText, { color: colors.text }]}>
+                          {audioListening ? 'Listening for shots...' : 'Not listening'}
+                        </Text>
+                      </View>
+
+                      {/* Shot counter */}
+                      <View style={[styles.audioCounterBox, { backgroundColor: colors.background }]}>
+                        <Text style={[styles.audioCounterNumber, { color: colors.primary }]}>{audioDetectionCount}</Text>
+                        <Text style={[styles.audioCounterLabel, { color: colors.textMuted }]}>Shots Detected</Text>
+                        {lastDetection && (
+                          <Text style={[styles.audioLastDetection, { color: colors.textMuted }]}>
+                            Last: {Math.round(lastDetection.confidence * 100)}% confidence
+                          </Text>
+                        )}
+                      </View>
+
+                      {/* Controls */}
+                      <View style={styles.audioDemoControls}>
+                        <TouchableOpacity
+                          style={[
+                            styles.audioDemoButton,
+                            { backgroundColor: audioListening ? '#EF4444' : colors.primary },
+                          ]}
+                          onPress={handleToggleAudio}
+                        >
+                          <Ionicons name={audioListening ? 'stop' : 'play'} size={18} color="#fff" />
+                          <Text style={styles.audioDemoButtonText}>{audioListening ? 'Stop' : 'Start'}</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          style={[styles.audioDemoButton, { backgroundColor: colors.textMuted }]}
+                          onPress={handleResetAudio}
+                        >
+                          <Ionicons name="refresh" size={18} color="#fff" />
+                          <Text style={styles.audioDemoButtonText}>Reset</Text>
+                        </TouchableOpacity>
+                      </View>
+
+                      {/* Instructions */}
+                      <Text style={[styles.audioDemoHint, { color: colors.textMuted }]}>
+                        Clap or snap to test detection. Adjusts automatically for gunshots during sessions.
+                      </Text>
+                    </>
+                  )}
+                </View>
+              )}
+            </>
+          )}
+
           {/* Help & Support */}
           <View style={[styles.separator, { backgroundColor: colors.border }]} />
           <TouchableOpacity style={styles.menuItem}>
@@ -448,6 +581,94 @@ const styles = StyleSheet.create({
   themeOptionText: {
     flex: 1,
     fontSize: 15,
+    fontWeight: '500',
+  },
+
+  // Audio Demo
+  audioDemoContainer: {
+    marginHorizontal: 12,
+    marginBottom: 8,
+    borderRadius: 8,
+    padding: 16,
+    gap: 16,
+  },
+  audioDemoStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  audioStatusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  audioStatusText: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  audioCounterBox: {
+    borderRadius: 12,
+    padding: 20,
+    alignItems: 'center',
+  },
+  audioCounterNumber: {
+    fontSize: 48,
+    fontWeight: '700',
+    lineHeight: 56,
+  },
+  audioCounterLabel: {
+    fontSize: 14,
+    marginTop: 4,
+  },
+  audioLastDetection: {
+    fontSize: 12,
+    marginTop: 8,
+  },
+  audioDemoControls: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  audioDemoButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    borderRadius: 8,
+    gap: 8,
+  },
+  audioDemoButtonText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  audioDemoHint: {
+    fontSize: 12,
+    textAlign: 'center',
+    lineHeight: 18,
+  },
+  audioRebuildMessage: {
+    alignItems: 'center',
+    paddingVertical: 16,
+    gap: 12,
+  },
+  audioRebuildTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  audioRebuildText: {
+    fontSize: 14,
+    textAlign: 'center',
+  },
+  audioCodeBlock: {
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    marginTop: 4,
+  },
+  audioCodeText: {
+    fontSize: 14,
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
     fontWeight: '500',
   },
 });
