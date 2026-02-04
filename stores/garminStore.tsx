@@ -45,6 +45,14 @@ import {
   mergeCompactWatchDetails,
   mergeWatchSessionDetails,
 } from '@/services/session/mutations';
+
+import { useAudioStore } from '@/stores/audioStore';
+import {
+  correlateShots,
+  splitTimesToTimestamps,
+  toRelativeTimestamps,
+} from '@/services/session/shotCorrelation';
+import type { CorrelationResult } from '@/types/audio';
 import type { WatchDetailsPayload } from '@/types/session.watch';
 
 // Re-export types for convenience
@@ -86,6 +94,9 @@ interface GarminState {
   lastTimelineData: GarminTimelineData | null;
   timelineProgress: { chunk: number; total: number } | null;
 
+  // Audio correlation result
+  lastCorrelationResult: CorrelationResult | null;
+
   // Watch heartbeat state (from HEARTBEAT_ACK)
   watchState: {
     state: 'idle' | 'preview' | 'active' | 'syncing' | 'unknown';
@@ -100,6 +111,8 @@ interface GarminState {
   onTimelineComplete: ((data: GarminTimelineData) => void) | null;
   /** Called when watch session completes (state goes from active to idle) */
   onWatchSessionComplete: ((sessionId: string, shotCount: number) => void) | null;
+  /** Called when shot correlation completes */
+  onCorrelationComplete: ((result: CorrelationResult) => void) | null;
 
   // ---------------------------------------------------------------------------
   // Session Start Retry State
@@ -142,6 +155,7 @@ interface GarminState {
   setSessionDataCallback: (callback: ((data: GarminSessionData) => void) | null) => void;
   setTimelineCompleteCallback: (callback: ((data: GarminTimelineData) => void) | null) => void;
   setWatchSessionCompleteCallback: (callback: ((sessionId: string, shotCount: number) => void) | null) => void;
+  setCorrelationCompleteCallback: (callback: ((result: CorrelationResult) => void) | null) => void;
   clearTimelineData: () => void;
 
   // Internal: called by initialization hook
@@ -166,6 +180,7 @@ export const useGarminStore = create<GarminState>((set, get) => ({
   lastSessionData: null,
   lastTimelineData: null,
   timelineProgress: null,
+  lastCorrelationResult: null,
   watchState: {
     state: 'unknown',
     sessionId: null,
@@ -176,6 +191,7 @@ export const useGarminStore = create<GarminState>((set, get) => ({
   onSessionData: null,
   onTimelineComplete: null,
   onWatchSessionComplete: null,
+  onCorrelationComplete: null,
   sessionStartStatus: 'idle',
   sessionStartAttempts: 0,
 
@@ -290,6 +306,10 @@ export const useGarminStore = create<GarminState>((set, get) => ({
     set({ onWatchSessionComplete: callback });
   },
 
+  setCorrelationCompleteCallback: (callback) => {
+    set({ onCorrelationComplete: callback });
+  },
+
   clearTimelineData: () => {
     set({ lastTimelineData: null, timelineProgress: null });
   },
@@ -398,7 +418,50 @@ export function useGarminInitialize() {
             if (store.onSessionData) {
               store.onSessionData(event.data);
             }
-            
+
+            // =========================================================================
+            // AUDIO-WATCH CORRELATION
+            // =========================================================================
+            // Correlate audio detections with watch shot data
+            {
+              const audioStore = useAudioStore.getState();
+              const sessionStartTime = audioStore.sessionStartTime;
+              const audioDetections = audioStore.getSessionDetections();
+
+              if (sessionStartTime && audioDetections.length > 0) {
+                // Convert watch splitTimes to cumulative timestamps
+                const watchTimestamps = splitTimesToTimestamps(
+                  event.data.splitTimes || [],
+                  event.data.shotsRecorded
+                );
+
+                // Convert audio detections to relative timestamps
+                const relativeAudioDetections = toRelativeTimestamps(
+                  audioDetections,
+                  sessionStartTime
+                );
+
+                // Correlate
+                const correlationResult = correlateShots(watchTimestamps, relativeAudioDetections);
+
+                console.log('[GarminStore] 🎯 Shot correlation complete:', {
+                  userShots: correlationResult.summary.totalUserShots,
+                  distantShots: correlationResult.summary.totalDistantShots,
+                  correlationRate: `${(correlationResult.summary.correlationRate * 100).toFixed(0)}%`,
+                });
+
+                // Update state
+                useGarminStore.setState({ lastCorrelationResult: correlationResult });
+
+                // Call registered callback
+                if (store.onCorrelationComplete) {
+                  store.onCorrelationComplete(correlationResult);
+                }
+              } else {
+                console.log('[GarminStore] ⚠️ Skipping correlation - no audio session data');
+              }
+            }
+
             // SESSION_SUMMARY = session is DONE! (Timeline syncs in background)
             // This is Phase 1 - instant, user shouldn't wait for timeline
             if (event.data?.completed && event.data?.sessionId) {
@@ -610,3 +673,6 @@ export const useGarminTimelineData = () => useGarminStore((s) => s.lastTimelineD
 
 /** Returns timeline sync progress (chunk/total) */
 export const useTimelineProgress = () => useGarminStore((s) => s.timelineProgress);
+
+/** Returns the last correlation result */
+export const useCorrelationResult = () => useGarminStore((s) => s.lastCorrelationResult);

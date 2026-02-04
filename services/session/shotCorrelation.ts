@@ -25,6 +25,50 @@ const DEFAULT_CONFIG: CorrelationConfig = {
 };
 
 /**
+ * Convert split times (intervals) to cumulative shot timestamps.
+ *
+ * @param splitTimes - Array of intervals between shots [ms between shot 1-2, ms between shot 2-3, ...]
+ * @param shotCount - Total number of shots (splitTimes.length + 1, or use directly)
+ * @returns Array of cumulative timestamps starting at 0
+ *
+ * @example
+ * splitTimesToTimestamps([500, 600, 400]) => [0, 500, 1100, 1500]
+ */
+export function splitTimesToTimestamps(splitTimes: number[], shotCount?: number): number[] {
+  // If no splits, return single shot at 0 or empty
+  if (!splitTimes || splitTimes.length === 0) {
+    return shotCount && shotCount > 0 ? [0] : [];
+  }
+
+  const timestamps: number[] = [0]; // First shot at t=0
+  let cumulative = 0;
+
+  for (const split of splitTimes) {
+    cumulative += split;
+    timestamps.push(cumulative);
+  }
+
+  return timestamps;
+}
+
+/**
+ * Convert absolute audio timestamps to relative (ms since session start).
+ *
+ * @param detections - Audio detections with absolute timestamps
+ * @param sessionStartTime - Session start timestamp (Date.now() when session started)
+ * @returns Audio detections with relative timestamps
+ */
+export function toRelativeTimestamps(
+  detections: AudioDetection[],
+  sessionStartTime: number
+): AudioDetection[] {
+  return detections.map((d) => ({
+    ...d,
+    timestamp: d.timestamp - sessionStartTime,
+  }));
+}
+
+/**
  * Correlate watch timestamps with audio detections to classify shots.
  *
  * @param watchTimestamps - Timestamps from Garmin watch (ms since session start or absolute)

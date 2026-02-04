@@ -4,4 +4,4 @@
  * Re-exports for session-related services.
  */
 
-export { correlateShots } from './shotCorrelation';
+export { correlateShots, splitTimesToTimestamps, toRelativeTimestamps } from './shotCorrelation';
