@@ -6,6 +6,9 @@
  */
 
 import { DirectionalChevron } from '@/components/shared/DirectionalChevron';
+import { STREAK_DISPLAY_THRESHOLD } from '@/constants/unifiedHomePage';
+import type { WeeklyStatsCardProps } from '@/types/home';
+import { formatDuration } from '@/utils/unifiedHomePage.helpers';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { Clock, Crosshair, Flame, Target, TrendingUp } from 'lucide-react-native';
@@ -13,9 +16,6 @@ import React, { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeInDown, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
-import { STREAK_DISPLAY_THRESHOLD } from '@/constants/unifiedHomePage';
-import { formatDuration } from '@/utils/unifiedHomePage.helpers';
-import type { WeeklyStatsCardProps } from '@/types/home';
 
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
@@ -69,48 +69,12 @@ export function WeeklyStatsCard({ stats, streak, colors, sessionsData }: WeeklyS
     router.push('/sessionHistory');
   };
 
-  // Empty state - no sessions this week
+  // Compute completed sessions
   const completedSessions = useMemo(() => {
     return sessionsData.filter((s) => s.status === 'completed');
   }, [sessionsData]);
 
-  const hasAnySessionsThisWeek = stats.sessions > 0;
-
-  if (!hasAnySessionsThisWeek) {
-    return (
-      <AnimatedTouchable
-        entering={FadeInDown.duration(350).delay(150)}
-        style={[s.card, { backgroundColor: colors.card, borderColor: colors.border }, animStyle]}
-        onPress={handlePress}
-        activeOpacity={0.9}
-      >
-        <View style={s.emptyHeader}>
-          <View style={s.headerRow}>
-            <Text style={[s.title, { color: colors.text }]}>{t('home.thisWeek')}</Text>
-            <DirectionalChevron size={16} color={colors.textMuted} style={{ opacity: 0.5 }} />
-          </View>
-        </View>
-        <View style={s.emptyContent}>
-          <View style={s.emptyStatsRow}>
-            <View style={[s.emptyStat, { backgroundColor: colors.secondary }]}>
-              <Target size={14} color={colors.textMuted} />
-              <Text style={[s.emptyStatText, { color: colors.textMuted }]}>--</Text>
-            </View>
-            <View style={[s.emptyStat, { backgroundColor: colors.secondary }]}>
-              <TrendingUp size={14} color={colors.textMuted} />
-              <Text style={[s.emptyStatText, { color: colors.textMuted }]}>--</Text>
-            </View>
-            <View style={[s.emptyStat, { backgroundColor: colors.secondary }]}>
-              <Clock size={14} color={colors.textMuted} />
-              <Text style={[s.emptyStatText, { color: colors.textMuted }]}>--</Text>
-            </View>
-          </View>
-          <Text style={[s.emptyMessage, { color: colors.textMuted }]}>{t('home.noSessionsThisWeek')}</Text>
-        </View>
-      </AnimatedTouchable>
-    );
-  }
-
+  // Compute view stats (must be called unconditionally - React hooks rule)
   const viewStats = useMemo(() => {
     let shots = 0;
     let hits = 0;
@@ -156,6 +120,44 @@ export function WeeklyStatsCard({ stats, streak, colors, sessionsData }: WeeklyS
       medianGroupAt100m,
     };
   }, [completedSessions]);
+
+  // Empty state - no sessions this week (early return AFTER all hooks)
+  const hasAnySessionsThisWeek = stats.sessions > 0;
+
+  if (!hasAnySessionsThisWeek) {
+    return (
+      <AnimatedTouchable
+        entering={FadeInDown.duration(350).delay(150)}
+        style={[s.card, { backgroundColor: colors.card, borderColor: colors.border }, animStyle]}
+        onPress={handlePress}
+        activeOpacity={0.9}
+      >
+        <View style={s.emptyHeader}>
+          <View style={s.headerRow}>
+            <Text style={[s.title, { color: colors.text }]}>{t('home.thisWeek')}</Text>
+            <DirectionalChevron size={16} color={colors.textMuted} style={{ opacity: 0.5 }} />
+          </View>
+        </View>
+        <View style={s.emptyContent}>
+          <View style={s.emptyStatsRow}>
+            <View style={[s.emptyStat, { backgroundColor: colors.secondary }]}>
+              <Target size={14} color={colors.textMuted} />
+              <Text style={[s.emptyStatText, { color: colors.textMuted }]}>--</Text>
+            </View>
+            <View style={[s.emptyStat, { backgroundColor: colors.secondary }]}>
+              <TrendingUp size={14} color={colors.textMuted} />
+              <Text style={[s.emptyStatText, { color: colors.textMuted }]}>--</Text>
+            </View>
+            <View style={[s.emptyStat, { backgroundColor: colors.secondary }]}>
+              <Clock size={14} color={colors.textMuted} />
+              <Text style={[s.emptyStatText, { color: colors.textMuted }]}>--</Text>
+            </View>
+          </View>
+          <Text style={[s.emptyMessage, { color: colors.textMuted }]}>{t('home.noSessionsThisWeek')}</Text>
+        </View>
+      </AnimatedTouchable>
+    );
+  }
 
   const displayShots = viewStats.sessions > 0 ? viewStats.shots.toLocaleString() : '—';
   const displayAccuracy = viewStats.sessions > 0 && viewStats.accuracy != null ? `${viewStats.accuracy}%` : '—';

@@ -1,0 +1,367 @@
+/**
+ * useTeamHomePage Hook
+ *
+ * Team-specific home page data and handlers.
+ * Focused on team context: trainings, members, team activity.
+ */
+
+import { useFocusEffect } from '@react-navigation/native';
+import * as Haptics from 'expo-haptics';
+import { router } from 'expo-router';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+
+import { CONTEXT_SWITCH_LOADING_DELAY_MS, getFetchConfig } from '@/constants/unifiedHomePage';
+import { useAuth } from '@/contexts/AuthContext';
+import { getRecentSessionsWithStats } from '@/services/session/queries';
+import { useGarminStore } from '@/stores/garminStore';
+import { useTeamStore } from '@/stores/teamStore';
+import { useTrainingStore } from '@/stores/trainingStore';
+import type { WeeklyStats } from '@/types/home';
+import type { SessionWithDetails } from '@/types/session';
+import type { TeamMemberWithProfile, TrainingWithDetails } from '@/types/workspace';
+import { calculateStreak, calculateWeeklyStats, getGreeting } from '@/utils/unifiedHomePage.helpers';
+
+export function useTeamHomePage() {
+  const { t } = useTranslation();
+  const { profileFullName, profileAvatarUrl, user } = useAuth();
+  const garminStatus = useGarminStore((s) => s.status);
+  const isGarminConnected = garminStatus === 'CONNECTED';
+
+  // User info
+  const greeting = getGreeting(t);
+  const firstName = profileFullName?.split(' ')[0] || t('home.defaultFirstName');
+  const avatarUrl = profileAvatarUrl ?? user?.user_metadata?.avatar_url ?? null;
+  const fallbackInitial =
+    profileFullName?.charAt(0)?.toUpperCase() ?? user?.email?.charAt(0)?.toUpperCase() ?? '?';
+
+  // Stores
+  const { activeTeam, activeTeamId, loadActiveTeam, members } = useTeamStore();
+  const { myUpcomingTrainings, loadMyUpcomingTrainings, loadMyStats } = useTrainingStore();
+
+  // Get user's role in this team
+  const myRole = useTeamStore((state) => {
+    const team = state.teams.find((t) => t.id === state.activeTeamId);
+    return team?.my_role || null;
+  });
+  const isCommander = myRole === 'owner' || myRole === 'commander';
+
+  // Local state
+  const [refreshing, setRefreshing] = useState(false);
+  const [teamSessions, setTeamSessions] = useState<SessionWithDetails[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [isContextSwitching, setIsContextSwitching] = useState(false);
+  const prevTeamIdRef = useRef<string | null | undefined>(undefined);
+  const contextSwitchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Load team sessions
+  const loadTeamSessions = useCallback(async () => {
+    if (!activeTeamId) return;
+    try {
+      const config = getFetchConfig(true);
+      const sessions = await getRecentSessionsWithStats({
+        days: config.days,
+        limit: config.limit,
+        teamId: activeTeamId,
+      });
+      setTeamSessions(sessions);
+    } catch (error) {
+      console.error('Failed to load team sessions:', error);
+    } finally {
+      setLoading(false);
+      setIsContextSwitching(false);
+    }
+  }, [activeTeamId]);
+
+  // Initial load
+  useFocusEffect(
+    useCallback(() => {
+      loadTeamSessions();
+      loadMyUpcomingTrainings();
+      loadMyStats();
+      if (activeTeamId) loadActiveTeam(activeTeamId);
+    }, [loadTeamSessions, loadMyUpcomingTrainings, loadMyStats, activeTeamId, loadActiveTeam])
+  );
+
+  // Context switch handling
+  useEffect(() => {
+    if (prevTeamIdRef.current === undefined) {
+      prevTeamIdRef.current = activeTeamId;
+      return;
+    }
+    if (prevTeamIdRef.current === activeTeamId) return;
+
+    prevTeamIdRef.current = activeTeamId;
+
+    if (contextSwitchTimeoutRef.current) {
+      clearTimeout(contextSwitchTimeoutRef.current);
+    }
+
+    contextSwitchTimeoutRef.current = setTimeout(() => {
+      setIsContextSwitching(true);
+      setLoading(true);
+      setTeamSessions([]);
+
+      Promise.all([loadTeamSessions(), loadMyUpcomingTrainings(), loadMyStats()]).finally(() => {
+        setIsContextSwitching(false);
+      });
+    }, CONTEXT_SWITCH_LOADING_DELAY_MS);
+
+    return () => {
+      if (contextSwitchTimeoutRef.current) {
+        clearTimeout(contextSwitchTimeoutRef.current);
+      }
+    };
+  }, [activeTeamId, loadTeamSessions, loadMyUpcomingTrainings, loadMyStats]);
+
+  // Filter trainings for active team
+  const teamTrainings = useMemo(() => {
+    if (!activeTeamId) return [];
+    return myUpcomingTrainings
+      .filter((t) => t.team_id === activeTeamId)
+      .filter((t) => t.status === 'planned' || t.status === 'ongoing');
+  }, [myUpcomingTrainings, activeTeamId]);
+
+  // Active (live) training
+  const liveTraining = useMemo(() => {
+    return teamTrainings.find((t) => t.status === 'ongoing') ?? null;
+  }, [teamTrainings]);
+
+  // Upcoming trainings (planned)
+  const upcomingTrainings = useMemo(() => {
+    return teamTrainings.filter((t) => t.status === 'planned').slice(0, 5);
+  }, [teamTrainings]);
+
+  // Team stats
+  const completedSessions = useMemo(() => {
+    return teamSessions.filter((s) => s.status === 'completed');
+  }, [teamSessions]);
+
+  const weeklyStats: WeeklyStats = useMemo(() => {
+    return calculateWeeklyStats(completedSessions);
+  }, [completedSessions]);
+
+  const streak = useMemo(() => {
+    return calculateStreak(completedSessions);
+  }, [completedSessions]);
+
+  // Team member count
+  const memberCount = activeTeam?.member_count ?? 0;
+
+  // Recent activity (sessions from team members)
+  const recentActivity = useMemo(() => {
+    return teamSessions
+      .filter((s) => s.status === 'completed')
+      .slice(0, 5)
+      .map((s) => ({
+        id: s.id,
+        userName: s.user_full_name || 'Unknown',
+        action: 'completed session',
+        timeAgo: getTimeAgo(new Date(s.ended_at || s.created_at)),
+        shotCount: s.stats?.shots_fired || 0,
+        accuracy: s.stats?.accuracy_pct,
+      }));
+  }, [teamSessions]);
+
+  // Weekly goal (default to 10 sessions)
+  const weeklyGoal = 10;
+
+  // Leaderboard data - aggregate stats per user
+  const leaderboard = useMemo(() => {
+    const userStats = new Map<
+      string,
+      { userName: string; sessions: number; shots: number; hits: number }
+    >();
+
+    completedSessions.forEach((s) => {
+      const userId = s.user_id;
+      const userName = s.user_full_name || 'Unknown';
+      const existing = userStats.get(userId) || { userName, sessions: 0, shots: 0, hits: 0 };
+
+      userStats.set(userId, {
+        userName,
+        sessions: existing.sessions + 1,
+        shots: existing.shots + (s.stats?.shots_fired || 0),
+        hits: existing.hits + (s.stats?.hits_total || 0),
+      });
+    });
+
+    // Convert to array and sort by sessions (primary) and accuracy (secondary)
+    return Array.from(userStats.entries())
+      .map(([userId, data]) => ({
+        userId,
+        userName: data.userName,
+        sessions: data.sessions,
+        shots: data.shots,
+        accuracy: data.shots > 0 ? (data.hits / data.shots) * 100 : 0,
+        rank: 0,
+      }))
+      .sort((a, b) => {
+        if (b.sessions !== a.sessions) return b.sessions - a.sessions;
+        return b.accuracy - a.accuracy;
+      })
+      .map((entry, index) => ({ ...entry, rank: index + 1 }));
+  }, [completedSessions]);
+
+  // Active members - mock data based on team members
+  // In a real app, this would come from presence/status service
+  const activeMembers = useMemo(() => {
+    if (!members || members.length === 0) return [];
+
+    return members.slice(0, 6).map((m: TeamMemberWithProfile, index: number) => ({
+      userId: m.user_id,
+      userName: m.profile?.full_name || 'Unknown',
+      avatarUrl: m.profile?.avatar_url || null,
+      // Mock status - first 2 are "active"
+      status: index < 2 ? ('online' as const) : ('recent' as const),
+      lastActivity: index >= 2 ? getTimeAgo(new Date(Date.now() - (index * 30 + 10) * 60000)) : undefined,
+    }));
+  }, [members]);
+
+  // Total shots this week
+  const totalShotsThisWeek = useMemo(() => {
+    return completedSessions.reduce((sum, s) => sum + (s.stats?.shots_fired || 0), 0);
+  }, [completedSessions]);
+
+  // Loading state
+  const shouldShowLoading = isContextSwitching || (loading && teamSessions.length === 0);
+
+  // Handlers
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    await Promise.all([loadTeamSessions(), loadMyUpcomingTrainings(), loadMyStats()]);
+    setRefreshing(false);
+  }, [loadTeamSessions, loadMyUpcomingTrainings, loadMyStats]);
+
+  const handleTrainingPress = useCallback((training: TrainingWithDetails) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    router.push(`/(protected)/trainingDetail?id=${training.id}`);
+  }, []);
+
+  const handleJoinTraining = useCallback((training: TrainingWithDetails) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    router.push(`/(protected)/trainingDetail?id=${training.id}`);
+  }, []);
+
+  const handleTeamSettings = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    router.push('/(protected)/(tabs)/team');
+  }, []);
+
+  const handleViewTeamInsights = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    router.push('/(protected)/(tabs)/insights');
+  }, []);
+
+  const handleStartTraining = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    if (liveTraining) {
+      router.push(`/(protected)/trainingDetail?id=${liveTraining.id}`);
+    } else {
+      // Start a new session
+      router.push('/(protected)/sessionNew');
+    }
+  }, [liveTraining]);
+
+  const handleViewSchedule = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    router.push('/(protected)/(tabs)/team');
+  }, []);
+
+  const handleViewLeaderboard = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    router.push('/(protected)/(tabs)/insights');
+  }, []);
+
+  const handleViewAllMembers = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    router.push('/(protected)/(tabs)/team');
+  }, []);
+
+  // My personal stats (for member view)
+  const myStats = useMemo(() => {
+    const mySessions = completedSessions.filter((s) => s.user_id === user?.id);
+    const totalShots = mySessions.reduce((sum, s) => sum + (s.stats?.shots_fired || 0), 0);
+    const totalHits = mySessions.reduce((sum, s) => sum + (s.stats?.hits_total || 0), 0);
+    return {
+      sessions: mySessions.length,
+      shots: totalShots,
+      accuracy: totalShots > 0 ? (totalHits / totalShots) * 100 : 0,
+    };
+  }, [completedSessions, user?.id]);
+
+  // Team totals (for member view - collaborative stats)
+  const teamTotals = useMemo(() => {
+    const totalSessions = completedSessions.length;
+    const totalShots = completedSessions.reduce((sum, s) => sum + (s.stats?.shots_fired || 0), 0);
+    const uniqueMembers = new Set(completedSessions.map((s) => s.user_id)).size;
+    return {
+      sessions: totalSessions,
+      shots: totalShots,
+      activeMembers: uniqueMembers,
+    };
+  }, [completedSessions]);
+
+  return {
+    // User info
+    greeting,
+    firstName,
+    avatarUrl,
+    fallbackInitial,
+    isGarminConnected,
+    userId: user?.id || '',
+
+    // Role
+    myRole,
+    isCommander,
+
+    // Team info
+    activeTeam,
+    memberCount,
+    members: activeMembers,
+
+    // State
+    refreshing,
+    shouldShowLoading,
+
+    // Data
+    liveTraining,
+    upcomingTrainings,
+    weeklyStats,
+    streak,
+    recentActivity,
+    sessionsThisWeek: weeklyStats.sessions,
+    weeklyGoal,
+    leaderboard,
+    totalShotsThisWeek,
+    myStats,
+    teamTotals,
+
+    // Handlers
+    onRefresh,
+    handleTrainingPress,
+    handleJoinTraining,
+    handleTeamSettings,
+    handleViewTeamInsights,
+    handleStartTraining,
+    handleViewSchedule,
+    handleViewLeaderboard,
+    handleViewAllMembers,
+  };
+}
+
+// Helper function
+function getTimeAgo(date: Date): string {
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMins / 60);
+  const diffDays = Math.floor(diffHours / 24);
+
+  if (diffMins < 1) return 'just now';
+  if (diffMins < 60) return `${diffMins}m ago`;
+  if (diffHours < 24) return `${diffHours}h ago`;
+  if (diffDays < 7) return `${diffDays}d ago`;
+  return date.toLocaleDateString();
+}

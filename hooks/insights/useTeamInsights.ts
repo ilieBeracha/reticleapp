@@ -1,0 +1,603 @@
+/**
+ * useTeamInsights Hook
+ *
+ * Provides all data and handlers for team insights view.
+ * Includes commander-specific analytics and member-specific collaborative view.
+ */
+
+import { DEFAULT_FILTERS } from '@/constants/insights';
+import { useAuth } from '@/contexts/AuthContext';
+import { applyFilters, computeContextProfiles, computeInsights, computeOverviewStatus } from '@/services/insights/dashboardEngine';
+import { featuresToSessions } from '@/services/insights/insightsAdapter';
+import { getDashboardFeatures } from '@/services/session/queries';
+import { useTeamStore } from '@/stores/teamStore';
+import type { ComputedInsights, EvidenceContext, InsightsFilters, OverviewStatus } from '@/types/insights';
+import type { SessionWithDetails } from '@/types/session';
+import * as Haptics from 'expo-haptics';
+import { useRouter } from 'expo-router';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+
+// ============================================================================
+// TYPES
+// ============================================================================
+
+export interface TeamMemberStat {
+  userId: string;
+  userName: string;
+  sessions: number;
+  shots: number;
+  hits: number;
+  accuracy: number | null;
+  bestDispersion: number | null;
+  lastActive: string | null;
+}
+
+export interface PositionBreakdown {
+  position: string;
+  sessions: number;
+  avgAccuracy: number | null;
+  memberCount: number;
+}
+
+export interface DistanceBreakdown {
+  range: string;
+  label: string;
+  sessions: number;
+  avgAccuracy: number | null;
+}
+
+export interface TeamWeakArea {
+  type: 'position' | 'distance';
+  label: string;
+  detail: string;
+  affectedMembers: number;
+  avgAccuracy: number;
+}
+
+export type ComparisonLevel = 'above' | 'below' | 'average';
+
+export interface MyComparison {
+  accuracy: ComparisonLevel | null;
+  activity: ComparisonLevel;
+  volume: ComparisonLevel;
+}
+
+// ============================================================================
+// HOOK
+// ============================================================================
+
+export function useTeamInsights() {
+  const { t } = useTranslation();
+  const router = useRouter();
+  const { user } = useAuth();
+
+  // Team state
+  const activeTeamId = useTeamStore((s) => s.activeTeamId);
+  const activeTeam = useTeamStore((s) => s.activeTeam);
+  const members = useTeamStore((s) => s.members);
+
+  // Get user's role
+  const myRole = useTeamStore((state) => {
+    const team = state.teams.find((t) => t.id === state.activeTeamId);
+    return team?.my_role || null;
+  });
+  const isCommander = myRole === 'owner' || myRole === 'commander';
+
+  // Data state
+  const [sessions, setSessions] = useState<SessionWithDetails[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  // Filter state
+  const [filters, setFilters] = useState<InsightsFilters>(DEFAULT_FILTERS);
+
+  // Evidence sheet state
+  const [evidenceContext, setEvidenceContext] = useState<EvidenceContext | null>(null);
+  const [showEvidence, setShowEvidence] = useState(false);
+
+  // Track initial load
+  const initialLoadDone = useRef(false);
+
+  // Load team sessions
+  const loadSessions = useCallback(async () => {
+    if (!user?.id || !activeTeamId) {
+      setLoading(false);
+      return;
+    }
+    try {
+      const features = await getDashboardFeatures({
+        userId: user.id,
+        days: 365,
+        limit: 500,
+        teamId: activeTeamId,
+      });
+      setSessions(featuresToSessions(features));
+    } catch (e) {
+      console.error('Failed to load team sessions:', e);
+    } finally {
+      setLoading(false);
+    }
+  }, [user?.id, activeTeamId]);
+
+  useEffect(() => {
+    loadSessions();
+    initialLoadDone.current = true;
+  }, [loadSessions]);
+
+  // Reload when team changes
+  useEffect(() => {
+    if (initialLoadDone.current) {
+      setLoading(true);
+      loadSessions();
+    }
+  }, [activeTeamId, loadSessions]);
+
+  // Refresh handler
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await loadSessions();
+    setRefreshing(false);
+  }, [loadSessions]);
+
+  // Apply filters
+  const filteredSessions = useMemo(() => {
+    return applyFilters(sessions, filters);
+  }, [sessions, filters]);
+
+  const completedSessions = useMemo(() => {
+    return filteredSessions.filter((s) => s.status === 'completed');
+  }, [filteredSessions]);
+
+  // ============================================================================
+  // TEAM-WIDE STATS
+  // ============================================================================
+
+  const teamTotals = useMemo(() => {
+    const totalSessions = completedSessions.length;
+    const totalShots = completedSessions.reduce((sum, s) => sum + (s.stats?.shots_fired || 0), 0);
+    const totalHits = completedSessions.reduce((sum, s) => sum + (s.stats?.hits_total || 0), 0);
+    const avgAccuracy = totalShots > 0 ? (totalHits / totalShots) * 100 : null;
+    const uniqueMembers = new Set(completedSessions.map((s) => s.user_id)).size;
+
+    return {
+      sessions: totalSessions,
+      shots: totalShots,
+      hits: totalHits,
+      avgAccuracy,
+      activeMembers: uniqueMembers,
+      totalMembers: members?.length || 0,
+    };
+  }, [completedSessions, members]);
+
+  // Participation rate
+  const participationRate = useMemo(() => {
+    if (!teamTotals.totalMembers) return 0;
+    return Math.round((teamTotals.activeMembers / teamTotals.totalMembers) * 100);
+  }, [teamTotals]);
+
+  // ============================================================================
+  // MY STATS (within team context) + COMPARISON METRICS
+  // ============================================================================
+
+  const myStats = useMemo(() => {
+    const mySessions = completedSessions.filter((s) => s.user_id === user?.id);
+    const myShots = mySessions.reduce((sum, s) => sum + (s.stats?.shots_fired || 0), 0);
+    const myHits = mySessions.reduce((sum, s) => sum + (s.stats?.hits_total || 0), 0);
+    const myAccuracy = myShots > 0 ? (myHits / myShots) * 100 : null;
+
+    // Best dispersion
+    const dispersions = mySessions
+      .map((s) => s.stats?.best_dispersion_cm)
+      .filter((d): d is number => d !== null && d !== undefined);
+    const myBestGrouping = dispersions.length > 0 ? Math.min(...dispersions) : null;
+
+    const contribution = teamTotals.sessions > 0
+      ? Math.round((mySessions.length / teamTotals.sessions) * 100)
+      : 0;
+
+    const vsTeamAvg = myAccuracy !== null && teamTotals.avgAccuracy !== null
+      ? myAccuracy - teamTotals.avgAccuracy
+      : null;
+
+    // Last session date
+    const lastSession = mySessions.length > 0
+      ? mySessions.sort((a, b) => new Date(b.started_at).getTime() - new Date(a.started_at).getTime())[0].started_at
+      : null;
+
+    return {
+      sessions: mySessions.length,
+      shots: myShots,
+      hits: myHits,
+      accuracy: myAccuracy,
+      bestGrouping: myBestGrouping,
+      contribution,
+      vsTeamAvg,
+      lastSession,
+    };
+  }, [completedSessions, user?.id, teamTotals]);
+
+  // Comparison indicators (above/below/at team average for different metrics)
+  const myComparison = useMemo((): MyComparison => {
+    const avgShotsPerMember = teamTotals.activeMembers > 0
+      ? teamTotals.shots / teamTotals.activeMembers
+      : 0;
+    const avgSessionsPerMember = teamTotals.activeMembers > 0
+      ? teamTotals.sessions / teamTotals.activeMembers
+      : 0;
+
+    const accuracyComparison: ComparisonLevel | null = myStats.vsTeamAvg !== null
+      ? myStats.vsTeamAvg > 2 ? 'above' : myStats.vsTeamAvg < -2 ? 'below' : 'average'
+      : null;
+
+    const activityComparison: ComparisonLevel = myStats.sessions > avgSessionsPerMember * 1.1
+      ? 'above'
+      : myStats.sessions < avgSessionsPerMember * 0.9
+        ? 'below'
+        : 'average';
+
+    const volumeComparison: ComparisonLevel = myStats.shots > avgShotsPerMember * 1.1
+      ? 'above'
+      : myStats.shots < avgShotsPerMember * 0.9
+        ? 'below'
+        : 'average';
+
+    return {
+      accuracy: accuracyComparison,
+      activity: activityComparison,
+      volume: volumeComparison,
+    };
+  }, [myStats, teamTotals]);
+
+  // ============================================================================
+  // TEAM AVERAGES (for comparison display)
+  // ============================================================================
+
+  const teamAverages = useMemo(() => {
+    const avgSessionsPerMember = teamTotals.activeMembers > 0
+      ? teamTotals.sessions / teamTotals.activeMembers
+      : 0;
+    const avgShotsPerMember = teamTotals.activeMembers > 0
+      ? teamTotals.shots / teamTotals.activeMembers
+      : 0;
+
+    // Calculate average best grouping across team
+    const allDispersions = completedSessions
+      .map((s) => s.stats?.best_dispersion_cm)
+      .filter((d): d is number => d !== null && d !== undefined);
+    const avgGrouping = allDispersions.length > 0
+      ? allDispersions.reduce((a, b) => a + b, 0) / allDispersions.length
+      : null;
+
+    return {
+      sessionsPerMember: avgSessionsPerMember,
+      shotsPerMember: avgShotsPerMember,
+      accuracy: teamTotals.avgAccuracy,
+      grouping: avgGrouping,
+    };
+  }, [teamTotals, completedSessions]);
+
+  // ============================================================================
+  // MEMBER RANKINGS (commander only)
+  // ============================================================================
+
+  const memberStats = useMemo((): TeamMemberStat[] => {
+    const statsMap = new Map<string, TeamMemberStat>();
+
+    completedSessions.forEach((s) => {
+      const existing = statsMap.get(s.user_id);
+      if (existing) {
+        existing.sessions += 1;
+        existing.shots += s.stats?.shots_fired || 0;
+        existing.hits += s.stats?.hits_total || 0;
+        if (s.stats?.best_dispersion_cm && (!existing.bestDispersion || s.stats.best_dispersion_cm < existing.bestDispersion)) {
+          existing.bestDispersion = s.stats.best_dispersion_cm;
+        }
+        if (!existing.lastActive || new Date(s.started_at) > new Date(existing.lastActive)) {
+          existing.lastActive = s.started_at;
+        }
+      } else {
+        statsMap.set(s.user_id, {
+          userId: s.user_id,
+          userName: s.user_full_name || 'Unknown',
+          sessions: 1,
+          shots: s.stats?.shots_fired || 0,
+          hits: s.stats?.hits_total || 0,
+          accuracy: null,
+          bestDispersion: s.stats?.best_dispersion_cm || null,
+          lastActive: s.started_at,
+        });
+      }
+    });
+
+    // Calculate accuracy
+    return Array.from(statsMap.values()).map((m) => ({
+      ...m,
+      accuracy: m.shots > 0 ? (m.hits / m.shots) * 100 : null,
+    }));
+  }, [completedSessions]);
+
+  // Member's percentile ranking (where they stand vs team - without showing explicit rank)
+  const myPercentile = useMemo(() => {
+    if (!user?.id || !memberStats || memberStats.length <= 1) return null;
+
+    const myMemberStat = memberStats.find((m) => m.userId === user.id);
+    if (!myMemberStat || myMemberStat.accuracy === null) return null;
+
+    // Count how many members have lower accuracy
+    const membersBelow = memberStats.filter(
+      (m) => m.accuracy !== null && m.accuracy < (myMemberStat.accuracy ?? 0)
+    ).length;
+
+    // Percentile = (members below / total members) * 100
+    return Math.round((membersBelow / memberStats.length) * 100);
+  }, [memberStats, user?.id]);
+
+  // Sorted rankings
+  const memberRankings = useMemo(() => {
+    return [...memberStats].sort((a, b) => {
+      // Sort by sessions first, then accuracy
+      if (b.sessions !== a.sessions) return b.sessions - a.sessions;
+      return (b.accuracy ?? 0) - (a.accuracy ?? 0);
+    });
+  }, [memberStats]);
+
+  // Top performers (top 3 by accuracy with min 3 sessions)
+  const topPerformers = useMemo(() => {
+    return memberStats
+      .filter((m) => m.sessions >= 3 && m.accuracy !== null)
+      .sort((a, b) => (b.accuracy ?? 0) - (a.accuracy ?? 0))
+      .slice(0, 3);
+  }, [memberStats]);
+
+  // Members needing attention (low activity or low accuracy)
+  const needsAttention = useMemo(() => {
+    const avgSessionsPerMember = teamTotals.sessions / Math.max(teamTotals.activeMembers, 1);
+    return memberStats.filter((m) => {
+      const lowActivity = m.sessions < avgSessionsPerMember * 0.5;
+      const lowAccuracy = m.accuracy !== null && m.accuracy < 50;
+      return lowActivity || lowAccuracy;
+    });
+  }, [memberStats, teamTotals]);
+
+  // Inactive members (in team but no sessions)
+  const inactiveMembers = useMemo(() => {
+    if (!members) return [];
+    const activeUserIds = new Set(memberStats.map((m) => m.userId));
+    return members.filter((m) => !activeUserIds.has(m.user_id));
+  }, [members, memberStats]);
+
+  // ============================================================================
+  // POSITION & DISTANCE BREAKDOWN (commander analytics)
+  // ============================================================================
+
+  const positionBreakdown = useMemo((): PositionBreakdown[] => {
+    const positions = ['standing', 'kneeling', 'prone', 'sitting'];
+    return positions.map((pos) => {
+      const posSessions = completedSessions.filter(
+        (s) => s.drill_config?.position === pos
+      );
+      const totalShots = posSessions.reduce((sum, s) => sum + (s.stats?.shots_fired || 0), 0);
+      const totalHits = posSessions.reduce((sum, s) => sum + (s.stats?.hits_total || 0), 0);
+      const uniqueMembers = new Set(posSessions.map((s) => s.user_id)).size;
+
+      return {
+        position: pos,
+        sessions: posSessions.length,
+        avgAccuracy: totalShots > 0 ? (totalHits / totalShots) * 100 : null,
+        memberCount: uniqueMembers,
+      };
+    }).filter((p) => p.sessions > 0);
+  }, [completedSessions]);
+
+  const distanceBreakdown = useMemo((): DistanceBreakdown[] => {
+    const ranges = [
+      { range: 'close', label: '0-25m', min: 0, max: 25 },
+      { range: 'medium', label: '25-100m', min: 25, max: 100 },
+      { range: 'long', label: '100-300m', min: 100, max: 300 },
+      { range: 'precision', label: '300m+', min: 300, max: Infinity },
+    ];
+
+    return ranges.map(({ range, label, min, max }) => {
+      const rangeSessions = completedSessions.filter((s) => {
+        const dist = s.drill_config?.distance_m ?? s.stats?.avg_distance_m;
+        return dist !== undefined && dist >= min && dist < max;
+      });
+      const totalShots = rangeSessions.reduce((sum, s) => sum + (s.stats?.shots_fired || 0), 0);
+      const totalHits = rangeSessions.reduce((sum, s) => sum + (s.stats?.hits_total || 0), 0);
+
+      return {
+        range,
+        label,
+        sessions: rangeSessions.length,
+        avgAccuracy: totalShots > 0 ? (totalHits / totalShots) * 100 : null,
+      };
+    }).filter((d) => d.sessions > 0);
+  }, [completedSessions]);
+
+  // Team weak areas
+  const teamWeakAreas = useMemo((): TeamWeakArea[] => {
+    const weakAreas: TeamWeakArea[] = [];
+
+    // Check positions with low accuracy
+    positionBreakdown.forEach((p) => {
+      if (p.avgAccuracy !== null && p.avgAccuracy < 60 && p.memberCount >= 2) {
+        weakAreas.push({
+          type: 'position',
+          label: p.position.charAt(0).toUpperCase() + p.position.slice(1),
+          detail: `${p.memberCount} members avg ${p.avgAccuracy.toFixed(0)}%`,
+          affectedMembers: p.memberCount,
+          avgAccuracy: p.avgAccuracy,
+        });
+      }
+    });
+
+    // Check distances with low accuracy
+    distanceBreakdown.forEach((d) => {
+      if (d.avgAccuracy !== null && d.avgAccuracy < 60 && d.sessions >= 5) {
+        weakAreas.push({
+          type: 'distance',
+          label: d.label,
+          detail: `${d.sessions} sessions avg ${d.avgAccuracy.toFixed(0)}%`,
+          affectedMembers: 0,
+          avgAccuracy: d.avgAccuracy,
+        });
+      }
+    });
+
+    return weakAreas.sort((a, b) => a.avgAccuracy - b.avgAccuracy);
+  }, [positionBreakdown, distanceBreakdown]);
+
+  // ============================================================================
+  // CHART DATA
+  // ============================================================================
+
+  // Weekly activity data for bar chart
+  const weeklyActivityData = useMemo(() => {
+    const now = new Date();
+    const days = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+    const result: { label: string; sessions: number; rounds: number }[] = [];
+
+    for (let i = 6; i >= 0; i--) {
+      const date = new Date(now);
+      date.setDate(date.getDate() - i);
+      const dayStart = new Date(date.setHours(0, 0, 0, 0));
+      const dayEnd = new Date(date.setHours(23, 59, 59, 999));
+
+      const daySessions = completedSessions.filter((s) => {
+        const sessionDate = new Date(s.started_at);
+        return sessionDate >= dayStart && sessionDate <= dayEnd;
+      });
+
+      result.push({
+        label: days[dayStart.getDay()],
+        sessions: daySessions.length,
+        rounds: daySessions.reduce((sum, s) => sum + (s.stats?.shots_fired || 0), 0),
+      });
+    }
+
+    return result;
+  }, [completedSessions]);
+
+  // Performance chart data (team accuracy over time)
+  const performanceChartData = useMemo(() => {
+    // Group sessions by date and calculate daily team accuracy
+    const dailyMap = new Map<string, { shots: number; hits: number; dispersion: number[] }>();
+
+    completedSessions
+      .sort((a, b) => new Date(a.started_at).getTime() - new Date(b.started_at).getTime())
+      .forEach((s) => {
+        const dateKey = new Date(s.started_at).toISOString().split('T')[0];
+        const existing = dailyMap.get(dateKey) || { shots: 0, hits: 0, dispersion: [] };
+        existing.shots += s.stats?.shots_fired || 0;
+        existing.hits += s.stats?.hits_total || 0;
+        if (s.stats?.best_dispersion_cm) {
+          existing.dispersion.push(s.stats.best_dispersion_cm);
+        }
+        dailyMap.set(dateKey, existing);
+      });
+
+    // Convert to chart data points (last 15 days with data)
+    return Array.from(dailyMap.entries())
+      .map(([date, data]) => ({
+        date,
+        accuracy: data.shots > 0 ? (data.hits / data.shots) * 100 : undefined,
+        grouping: data.dispersion.length > 0
+          ? data.dispersion.reduce((a, b) => a + b, 0) / data.dispersion.length
+          : undefined,
+      }))
+      .slice(-15);
+  }, [completedSessions]);
+
+  // ============================================================================
+  // COMPUTED INSIGHTS (reusing existing engine)
+  // ============================================================================
+
+  const insights: ComputedInsights = useMemo(() => {
+    return computeInsights(sessions, filters, undefined, t);
+  }, [sessions, filters, t]);
+
+  const contextProfiles = useMemo(() => {
+    return computeContextProfiles(completedSessions, undefined, t);
+  }, [completedSessions, t]);
+
+  const overviewStatus: OverviewStatus = useMemo(() => {
+    return computeOverviewStatus(insights, contextProfiles);
+  }, [insights, contextProfiles]);
+
+  // ============================================================================
+  // NAVIGATION
+  // ============================================================================
+
+  const goToSessionHistory = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    router.push('/sessionHistory');
+  }, [router]);
+
+  const goToStartSession = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    router.push('/(protected)/(tabs)');
+  }, [router]);
+
+  const closeEvidence = useCallback(() => {
+    setShowEvidence(false);
+  }, []);
+
+  return {
+    // State
+    loading,
+    refreshing,
+    sessions,
+    filters,
+    setFilters,
+    hasData: sessions.length > 0,
+    userId: user?.id ?? '',
+
+    // Team info
+    activeTeam,
+    members,
+    myRole,
+    isCommander,
+
+    // Team totals & averages
+    teamTotals,
+    teamAverages,
+    participationRate,
+
+    // My stats (member view)
+    myStats,
+    myPercentile,
+    myComparison,
+
+    // Member rankings (commander view)
+    memberStats,
+    memberRankings,
+    topPerformers,
+    needsAttention,
+    inactiveMembers,
+
+    // Breakdown analytics (commander view)
+    positionBreakdown,
+    distanceBreakdown,
+    teamWeakAreas,
+
+    // Chart data
+    weeklyActivityData,
+    performanceChartData,
+
+    // Computed insights
+    insights,
+    contextProfiles,
+    overviewStatus,
+
+    // Evidence
+    evidenceContext,
+    showEvidence,
+    closeEvidence,
+
+    // Handlers
+    handleRefresh,
+    goToSessionHistory,
+    goToStartSession,
+  };
+}

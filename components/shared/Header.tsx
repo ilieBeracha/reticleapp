@@ -1,7 +1,8 @@
+import { AccountSwitcherPill, AccountSwitcherSheet } from '@/components/account';
 import { BaseAvatar } from '@/components/shared/Avatar';
 import { useAuth } from '@/contexts/AuthContext';
-import { useColors } from '@/hooks/ui/useColors';
 import { useNotificationRealtime } from '@/hooks/realtime/notification/useNotificationRealtime';
+import { useColors } from '@/hooks/ui/useColors';
 import { useAppContext } from '@/hooks/useAppContext';
 import { getUnreadCount } from '@/services/notifications';
 import * as Haptics from 'expo-haptics';
@@ -27,6 +28,7 @@ export function Header({ onNotificationPress }: HeaderProps) {
   const { fullName, avatarUrl } = useAppContext();
   const { user, profileAvatarUrl } = useAuth();
   const [notificationCount, setNotificationCount] = useState(0);
+  const [accountSwitcherVisible, setAccountSwitcherVisible] = useState(false);
 
   // Fetch initial unread count on mount
   useEffect(() => {
@@ -61,37 +63,45 @@ export function Header({ onNotificationPress }: HeaderProps) {
   const avatarSource = avatarUrl || profileAvatarUrl;
 
   return (
-    <View style={styles.container}>
-      {/* Left - Brand */}
-      <View style={styles.left}>
-        <Image source={require('@/assets/images/icon.jpg')} style={styles.appIcon} />
-        <Text style={[styles.brandName, { color: colors.text }]}>Reticle</Text>
+    <>
+      <View style={styles.container}>
+        {/* Left - Brand */}
+        <View style={styles.left}>
+          <Image source={require('@/assets/images/icon.jpg')} style={styles.appIcon} />
+          <Text style={[styles.brandName, { color: colors.text }]}>Reticle</Text>
+        </View>
+
+        {/* Center - Account Switcher */}
+        <AccountSwitcherPill onPress={() => setAccountSwitcherVisible(true)} />
+
+        {/* Right - Action Buttons */}
+        <View style={styles.actions}>
+          <TouchableOpacity
+            style={[styles.iconBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
+            onPress={handleNotificationPress}
+            activeOpacity={0.7}
+          >
+            <Bell size={18} color={colors.text} strokeWidth={2} />
+            {notificationCount > 0 && (
+              <View style={[styles.badge, { backgroundColor: colors.red, borderColor: colors.background }]} />
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity onPress={handleProfilePress} activeOpacity={0.7}>
+            <BaseAvatar
+              source={avatarSource ? { uri: avatarSource } : undefined}
+              fallbackText={fullName?.charAt(0) || 'U'}
+              size="sm"
+              borderWidth={1}
+              borderColor={colors.border}
+            />
+          </TouchableOpacity>
+        </View>
       </View>
 
-      {/* Right - Action Buttons */}
-      <View style={styles.actions}>
-        <TouchableOpacity
-          style={[styles.iconBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
-          onPress={handleNotificationPress}
-          activeOpacity={0.7}
-        >
-          <Bell size={18} color={colors.text} strokeWidth={2} />
-          {notificationCount > 0 && (
-            <View style={[styles.badge, { backgroundColor: colors.red, borderColor: colors.background }]} />
-          )}
-        </TouchableOpacity>
-
-        <TouchableOpacity onPress={handleProfilePress} activeOpacity={0.7}>
-          <BaseAvatar
-            source={avatarSource ? { uri: avatarSource } : undefined}
-            fallbackText={fullName?.charAt(0) || 'U'}
-            size="sm"
-            borderWidth={1}
-            borderColor={colors.border}
-          />
-        </TouchableOpacity>
-      </View>
-    </View>
+      {/* Account Switcher Modal */}
+      <AccountSwitcherSheet visible={accountSwitcherVisible} onClose={() => setAccountSwitcherVisible(false)} />
+    </>
   );
 }
 
@@ -109,7 +119,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    flex: 1,
   },
   appIcon: {
     width: 32,

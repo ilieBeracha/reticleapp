@@ -1,7 +1,9 @@
+import { TeamHomePage } from '@/components/home/TeamHomePage/TeamHomePage';
 import { UnifiedHomePage } from '@/components/home/UnifiedHomePage/UnifiedHomePage';
 import { ThemedText } from '@/components/shared/ThemedText';
 import { ThemedView } from '@/components/shared/ThemedView';
 import { useColors } from '@/hooks/ui/useColors';
+import { useIsTeamMode } from '@/stores/teamStore';
 import * as Sentry from '@sentry/react-native';
 import { Stack } from 'expo-router';
 import { Component, memo, type ErrorInfo, type ReactNode } from 'react';
@@ -31,16 +33,24 @@ function ErrorFallback({ error, onReset }: { error: Error | null; onReset: () =>
 }
 
 /**
- * Unified Home Screen
+ * Home Screen
  *
  * Route: /(protected)/(tabs)/
  *
- * Single dashboard showing:
- * - Active session (if any)
- * - Live trainings from any team
- * - Upcoming trainings across all teams
- * - Quick actions
- * - Team overview
+ * Mode-aware dashboard that shows different layouts:
+ *
+ * TEAM MODE (TeamHomePage):
+ * - Team header with name and settings
+ * - Live training banner (if active)
+ * - Team quick stats (members, sessions, upcoming)
+ * - Upcoming trainings list
+ * - Team member activity feed
+ *
+ * PERSONAL MODE (UnifiedHomePage):
+ * - Personal greeting and streak
+ * - Quick actions (start session)
+ * - Weekly stats and progress
+ * - Recent sessions list
  *
  * Features:
  * - Error boundary for graceful error handling
@@ -109,10 +119,14 @@ class HomeErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState
 
 /**
  * Home Screen Component
- * Main entry point for the unified dashboard
+ * Renders TeamHomePage when in team mode, UnifiedHomePage (personal) otherwise.
  */
 function HomeScreenContent() {
-  return <UnifiedHomePage />;
+  const isTeamMode = useIsTeamMode();
+
+  // Team mode: Show team-focused dashboard
+  // Personal mode: Show personal training dashboard
+  return isTeamMode ? <TeamHomePage /> : <UnifiedHomePage />;
 }
 
 // Memoize the component to prevent unnecessary re-renders

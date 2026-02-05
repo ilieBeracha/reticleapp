@@ -6,6 +6,7 @@
  */
 
 import type { Device } from 'react-native-garmin-connect';
+import type { CorrelationResult } from './audio';
 
 // ============================================================================
 // DEVICE & CONNECTION TYPES
@@ -215,6 +216,8 @@ export interface GarminSessionData {
   };
   /** True if this is summary-only data (details coming in Phase 2) */
   isSummaryOnly?: boolean;
+  /** Audio-watch correlation result (phone detected vs watch detected shots) */
+  correlation?: CorrelationResult | null;
 }
 
 /** Watch error payload - sent when watch encounters communication errors */
@@ -280,6 +283,7 @@ export type GarminServiceEvent =
   | { event: 'session_details'; data: Partial<GarminSessionData> & { sessionId: string } }  // Phase 2: Full data to merge
   | { event: 'timeline_chunk'; sessionId: string; chunk: number; total: number }  // Phase 3: Progress update
   | { event: 'timeline_complete'; data: GarminTimelineData }  // Phase 3: All chunks received
+  | { event: 'shot_recorded'; sessionId?: string; timestamp: number; shotNumber: number }  // Real-time shot detection from watch
   | { event: 'error'; error: Error };
 
 export type GarminServiceListener = (event: GarminServiceEvent) => void;

@@ -12,21 +12,22 @@
 import type { UserWeapon, WeaponStats } from '@/services/weaponService';
 import type { Colors, HeroMode } from '@/types/home';
 import type { HomeSession } from '@/types/home.viewmodel';
-import type { TrainingWithDetails } from '@/types/workspace';
+import type { TeamWithMembers, TrainingWithDetails } from '@/types/workspace';
+import { getTeamColor } from '@/utils/teamColors';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { ChevronRight, Play, Radio, Target } from 'lucide-react-native';
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, {
-  Easing,
-  FadeInDown,
-  useAnimatedStyle,
-  useSharedValue,
-  withRepeat,
-  withSequence,
-  withSpring,
-  withTiming,
+    Easing,
+    FadeInDown,
+    useAnimatedStyle,
+    useSharedValue,
+    withRepeat,
+    withSequence,
+    withSpring,
+    withTiming,
 } from 'react-native-reanimated';
 import { TimelineStrip } from './TimelineStrip';
 
@@ -39,7 +40,8 @@ interface HeroActionsProps {
   starting: boolean;
   onStartSession: () => void;
   onActiveSessionPress: () => void;
-  // Team training
+  // Team context
+  activeTeam: TeamWithMembers | null;
   activeTeamTraining: TrainingWithDetails | null;
   isTrainingCommander: boolean;
   hasTeams: boolean;
@@ -70,6 +72,7 @@ export function HeroActions({
   starting,
   onStartSession,
   onActiveSessionPress,
+  activeTeam,
   activeTeamTraining,
   isTrainingCommander,
   onTrainingPress,
@@ -81,6 +84,14 @@ export function HeroActions({
   const weaponScale = useSharedValue(1);
   const statsScale = useSharedValue(1);
   const pulseOpacity = useSharedValue(1);
+
+  // Get team-specific accent color
+  const teamColor = useMemo(() => {
+    if (activeTeam?.id) {
+      return getTeamColor(activeTeam.id);
+    }
+    return colors.primary; // Fallback to primary color
+  }, [activeTeam?.id, colors.primary]);
 
   useEffect(() => {
     if (heroMode === 'team-live' || heroMode === 'solo-active') {
@@ -124,7 +135,12 @@ export function HeroActions({
     } else if (heroMode === 'solo-active') {
       onActiveSessionPress();
     } else {
-      onStartSession();
+      // Idle: main area shows weapon, tapping navigates to weapon/loadout
+      if (defaultWeapon) {
+        router.push(`/(protected)/weaponDetail?weaponId=${defaultWeapon.id}` as any);
+      } else {
+        router.push('/(protected)/(tabs)/loadout' as any);
+      }
     }
   };
 
@@ -159,9 +175,10 @@ export function HeroActions({
       <Animated.View
         style={[
           s.splitContainer,
-          heroMode === 'team-live' && { backgroundColor: `${colors.primary}15`, borderColor: `${colors.primary}30` },
+          heroMode === 'team-live' && { backgroundColor: `${teamColor}15`, borderColor: `${teamColor}30` },
           heroMode === 'solo-active' && { backgroundColor: `${colors.green}15`, borderColor: `${colors.green}30` },
-          heroMode === 'idle' && { backgroundColor: colors.card, borderColor: colors.border },
+          heroMode === 'idle' && activeTeam && { backgroundColor: `${teamColor}08`, borderColor: `${teamColor}20` },
+          heroMode === 'idle' && !activeTeam && { backgroundColor: colors.card, borderColor: colors.border },
           mainAnimStyle,
         ]}
       >
@@ -181,9 +198,9 @@ export function HeroActions({
           {heroMode === 'team-live' && activeTeamTraining && (
             <>
               <View style={s.liveIconContainer}>
-                <Animated.View style={[s.livePulse, { backgroundColor: `${colors.primary}40` }, pulseStyle]} />
-                <View style={[s.liveIconBadge, { backgroundColor: `${colors.primary}40` }]}>
-                  <Radio size={11} color={colors.primary} />
+                <Animated.View style={[s.livePulse, { backgroundColor: `${teamColor}40` }, pulseStyle]} />
+                <View style={[s.liveIconBadge, { backgroundColor: `${teamColor}40` }]}>
+                  <Radio size={11} color={teamColor} />
                 </View>
               </View>
               <View style={s.mainTextContainer}>
@@ -194,7 +211,7 @@ export function HeroActions({
                   {activeTeamTraining.title || 'Live Training'}
                 </Text>
               </View>
-              <View style={[s.badge, { backgroundColor: colors.primary }]}>
+              <View style={[s.badge, { backgroundColor: teamColor }]}>
                 <Text style={[s.badgeText, { color: '#fff' }]}>{isTrainingCommander ? 'MANAGE' : 'JOIN'}</Text>
               </View>
               <ChevronRight size={14} color={colors.textMuted} />
@@ -222,10 +239,18 @@ export function HeroActions({
 
           {heroMode === 'idle' && (
             <>
-              <View style={[s.soloIconDefault, { backgroundColor: `${colors.textMuted}20` }]}>
-                <Target size={13} color={colors.text} strokeWidth={2} />
+              <View style={[s.soloIconDefault, { backgroundColor: activeTeam ? `${teamColor}15` : `${colors.textMuted}15` }]}>
+                <Target size={13} color={activeTeam ? teamColor : colors.textMuted} strokeWidth={2} />
               </View>
-              <Text style={[s.idleText, { color: colors.text }]}>Start Session</Text>
+              <View style={s.mainTextContainer}>
+                <Text style={[s.mainLabel, { color: colors.textMuted }]} numberOfLines={1}>
+                  {activeTeam ? activeTeam.name : (defaultWeapon ? 'Default Weapon' : 'Ready to Train')}
+                </Text>
+                <Text style={[s.mainTitle, { color: colors.text }]} numberOfLines={1}>
+                  {defaultWeapon?.name || 'No weapon selected'}
+                </Text>
+              </View>
+              <ChevronRight size={14} color={activeTeam ? teamColor : colors.textMuted} />
             </>
           )}
         </TouchableOpacity>
@@ -233,7 +258,7 @@ export function HeroActions({
         {/* Solo side — attached, separated by divider (only when team-live) */}
         {heroMode === 'team-live' && (
           <>
-            <View style={[s.divider, { backgroundColor: `${colors.primary}25` }]} />
+            <View style={[s.divider, { backgroundColor: `${teamColor}25` }]} />
             <TouchableOpacity style={s.sideArea} onPress={handleSoloSidePress} activeOpacity={0.7}>
               <View style={[s.sideIcon, { backgroundColor: `${colors.textMuted}10` }]}>
                 <Target size={14} color={colors.textMuted} strokeWidth={2} />

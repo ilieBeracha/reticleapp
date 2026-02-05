@@ -1,13 +1,15 @@
 /**
  * UnifiedHomePage
  *
- * Elegant, flowing layout with personal overview first,
- * team content below, and coach-like guidance throughout.
+ * Mode-aware home page that adapts to team vs personal context.
+ * When in team mode: Shows team branding, team stats, and team-focused content.
+ * When in personal mode: Shows solo training focus, personal stats, and individual goals.
  *
  * This component is the main orchestrator - it uses the hook for state
  * and delegates rendering to sub-components.
  */
 
+import { useUnifiedHomePage } from '@/hooks/home/useUnifiedHomePage';
 import { useColors } from '@/hooks/ui/useColors';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
@@ -16,26 +18,29 @@ import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, {
-    FadeIn,
-    FadeInDown,
-    FadeOut,
-    useAnimatedStyle,
-    useSharedValue,
-    withSpring,
+  FadeIn,
+  FadeInDown,
+  FadeOut,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
 } from 'react-native-reanimated';
 import { styles } from './UnifiedHomePage.styles';
 import { CoachMessage } from './components/CoachMessage';
 import { DailyTip } from './components/DailyTip';
 import { HeroActions } from './components/HeroActions';
 import { HomeHeader } from './components/HomeHeader';
+import { PersonalModeBanner } from './components/PersonalModeBanner';
 import { RecentActivitySection } from './components/RecentActivitySection';
+import { TeamContextBanner } from './components/TeamContextBanner';
+import { TeamSection } from './components/TeamSection';
+import { TeamStatsCard } from './components/TeamStatsCard';
 import { WeeklyStatsCard } from './components/WeeklyStatsCard';
-import { useUnifiedHomePage } from '@/hooks/home/useUnifiedHomePage';
 
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
 // ════════════════════════════════════════════════════════════════════════════
-// SECTION HEADER WITH TOOLTIP
+// SECTION HEADER - Clean and minimal
 // ════════════════════════════════════════════════════════════════════════════
 
 interface SectionHeaderProps {
@@ -54,7 +59,6 @@ function SectionHeader({ title, tooltip, colors }: SectionHeaderProps) {
 
   return (
     <View style={localStyles.sectionBlock}>
-      <View style={[localStyles.sectionDivider, { backgroundColor: colors.border }]} />
       <View style={localStyles.sectionHeader}>
         <Text style={[localStyles.sectionTitle, { color: colors.textMuted }]}>{title}</Text>
         <TouchableOpacity
@@ -125,6 +129,7 @@ export function UnifiedHomePage() {
     hasActiveSession,
     hasTeams,
     heroMode,
+    activeTeam,
     activeTeamTraining,
     isTrainingCommander,
     nextUpcomingTraining,
@@ -139,6 +144,11 @@ export function UnifiedHomePage() {
     handleSessionPress,
     handleTrainingPress,
   } = useUnifiedHomePage();
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // MODE DETECTION
+  // ═══════════════════════════════════════════════════════════════════════════
+  const isTeamMode = !!activeTeam;
 
   // ═══════════════════════════════════════════════════════════════════════════
   // LOADING STATE
@@ -183,6 +193,20 @@ export function UnifiedHomePage() {
         />
 
         {/* ─────────────────────────────────────────────────────────────────── */}
+        {/* MODE CONTEXT BANNER */}
+        {/* ─────────────────────────────────────────────────────────────────── */}
+        {isTeamMode && activeTeam ? (
+          <TeamContextBanner team={activeTeam} colors={colors} />
+        ) : (
+          <PersonalModeBanner
+            streak={streak}
+            weeklyProgress={weeklyStats.sessions}
+            weeklyGoal={3}
+            colors={colors}
+          />
+        )}
+
+        {/* ─────────────────────────────────────────────────────────────────── */}
         {/* COACH MESSAGE */}
         {/* ─────────────────────────────────────────────────────────────────── */}
         <CoachMessage message={coachMessage} colors={colors} />
@@ -190,7 +214,11 @@ export function UnifiedHomePage() {
         {/* ─────────────────────────────────────────────────────────────────── */}
         {/* SECTION: QUICK ACTIONS */}
         {/* ─────────────────────────────────────────────────────────────────── */}
-        <SectionHeader title={t('home.quickActions')} tooltip={t('home.quickActionsTooltip')} colors={colors} />
+        <SectionHeader
+          title={t('home.quickActions')}
+          tooltip={t('home.quickActionsTooltip')}
+          colors={colors}
+        />
         <HeroActions
           colors={colors}
           heroMode={heroMode}
@@ -199,6 +227,7 @@ export function UnifiedHomePage() {
           starting={starting}
           onStartSession={handleStartSession}
           onActiveSessionPress={handleActiveSessionPress}
+          activeTeam={activeTeam}
           activeTeamTraining={activeTeamTraining}
           isTrainingCommander={isTrainingCommander}
           hasTeams={hasTeams}
@@ -210,9 +239,35 @@ export function UnifiedHomePage() {
         />
 
         {/* ─────────────────────────────────────────────────────────────────── */}
+        {/* TEAM MODE: TEAM STATS & TRAININGS */}
+        {/* ─────────────────────────────────────────────────────────────────── */}
+        {isTeamMode && activeTeam && (
+          <>
+            <TeamStatsCard
+              team={activeTeam}
+              upcomingTrainingsCount={myUpcomingTrainings.length}
+              weeklyTeamSessions={weeklyStats.sessions}
+              colors={colors}
+            />
+            {myUpcomingTrainings.length > 0 && (
+              <TeamSection
+                trainings={myUpcomingTrainings}
+                hasTeams={hasTeams}
+                colors={colors}
+                onTrainingPress={handleTrainingPress}
+              />
+            )}
+          </>
+        )}
+
+        {/* ─────────────────────────────────────────────────────────────────── */}
         {/* SECTION: THIS WEEK */}
         {/* ─────────────────────────────────────────────────────────────────── */}
-        <SectionHeader title={t('home.thisWeek')} tooltip={t('home.thisWeekTooltip')} colors={colors} />
+        <SectionHeader
+          title={t('home.thisWeek')}
+          tooltip={t('home.thisWeekTooltip')}
+          colors={colors}
+        />
         <DailyTip
           colors={colors}
           streak={streak}
@@ -225,7 +280,11 @@ export function UnifiedHomePage() {
         {/* ─────────────────────────────────────────────────────────────────── */}
         {/* SECTION: RECENT ACTIVITY */}
         {/* ─────────────────────────────────────────────────────────────────── */}
-        <SectionHeader title={t('home.recentActivity')} tooltip={t('home.recentActivityTooltip')} colors={colors} />
+        <SectionHeader
+          title={t('home.recentActivity')}
+          tooltip={t('home.recentActivityTooltip')}
+          colors={colors}
+        />
         <RecentActivitySection sessions={recentSessions} colors={colors} onSessionPress={handleSessionPress} />
 
         {/* ─────────────────────────────────────────────────────────────────── */}
@@ -271,13 +330,8 @@ export function UnifiedHomePage() {
 
 const localStyles = StyleSheet.create({
   sectionBlock: {
-    marginTop: 16,
-    marginBottom: 8,
-    gap: 8,
-  },
-  sectionDivider: {
-    height: StyleSheet.hairlineWidth,
-    opacity: 0.4,
+    marginTop: 14,
+    marginBottom: 6,
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -286,44 +340,45 @@ const localStyles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 0.8,
+    fontWeight: '600',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
   },
   helpButton: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
   },
   tooltipBubble: {
-    marginTop: 10,
-    padding: 12,
-    borderRadius: 10,
+    marginTop: 8,
+    padding: 10,
+    borderRadius: 8,
   },
   tooltipText: {
-    fontSize: 13,
-    lineHeight: 18,
+    fontSize: 12,
+    lineHeight: 16,
     fontWeight: '500',
   },
   viewAllLink: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 12,
-    borderRadius: 12,
+    padding: 10,
+    borderRadius: 10,
     borderWidth: 1,
-    marginTop: 16,
+    marginTop: 12,
   },
   viewAllContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 8,
   },
   viewAllIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
+    width: 32,
+    height: 32,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -333,13 +388,13 @@ const localStyles = StyleSheet.create({
     letterSpacing: -0.2,
   },
   viewAllSubtitle: {
-    fontSize: 11,
+    fontSize: 10,
     marginTop: 1,
   },
   viewAllArrow: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
     alignItems: 'center',
     justifyContent: 'center',
   },

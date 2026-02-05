@@ -14,6 +14,7 @@ import type {
   TargetType,
 } from '@/types/session';
 import type { TransformedWatchData, WatchDetailsPayload } from '@/types/session.watch';
+import type { CorrelationResult } from '@/types/audio';
 import { getDrillRequirements } from './drillContract';
 import { mapSession } from './mappers';
 import {
@@ -988,6 +989,8 @@ export interface WatchSessionData {
     shotScores?: number[];
     timeline?: [number, number, number][];
   };
+  // Audio-watch correlation result
+  correlation?: CorrelationResult | null;
 }
 
 /**
@@ -1118,6 +1121,20 @@ export async function saveWatchSessionData(
       shot_scores: data.steadiness.shotScores,
       timeline: data.steadiness.timeline,
     };
+  }
+
+  // Add audio-watch correlation data if available
+  if (data.correlation) {
+    targetData.correlation = {
+      user_shots: data.correlation.summary.totalUserShots,
+      distant_shots: data.correlation.summary.totalDistantShots,
+      correlation_rate: data.correlation.summary.correlationRate,
+      // Detailed breakdown
+      matched_shots: data.correlation.userShots.length,
+      watch_only_shots: data.correlation.watchOnlyShots.length,
+      audio_only_shots: data.correlation.distantShots.length,
+    };
+    console.log('[SessionService] 🎯 Correlation data saved:', targetData.correlation);
   }
 
   console.log('[SessionService] Target data keys:', Object.keys(targetData));

@@ -46,12 +46,12 @@ import {
   mergeWatchSessionDetails,
 } from '@/services/session/mutations';
 
-import { useAudioStore } from '@/stores/audioStore';
 import {
   correlateShots,
   splitTimesToTimestamps,
   toRelativeTimestamps,
 } from '@/services/session/shotCorrelation';
+import { useAudioStore } from '@/stores/audioStore';
 import type { CorrelationResult } from '@/types/audio';
 import type { WatchDetailsPayload } from '@/types/session.watch';
 
@@ -96,6 +96,10 @@ interface GarminState {
 
   // Audio correlation result
   lastCorrelationResult: CorrelationResult | null;
+
+  // Real-time shot timestamps from SHOT_RECORDED messages (phone clock)
+  // These are the actual timestamps when the phone received shot notifications
+  shotRecordedTimestamps: number[];
 
   // Watch heartbeat state (from HEARTBEAT_ACK)
   watchState: {
@@ -181,6 +185,7 @@ export const useGarminStore = create<GarminState>((set, get) => ({
   lastTimelineData: null,
   timelineProgress: null,
   lastCorrelationResult: null,
+  shotRecordedTimestamps: [],
   watchState: {
     state: 'unknown',
     sessionId: null,
@@ -258,8 +263,9 @@ export const useGarminStore = create<GarminState>((set, get) => ({
   },
 
   startSessionWithRetry: async (payload) => {
-    set({ sessionStartStatus: 'sending', sessionStartAttempts: 0 });
-    
+    // Clear previous shot timestamps for fresh correlation
+    set({ sessionStartStatus: 'sending', sessionStartAttempts: 0, shotRecordedTimestamps: [] });
+
     const success = await serviceSendMessageWithRetry('SESSION_START', payload, {
       maxRetries: 3,
       timeoutMs: 3000,
@@ -412,43 +418,86 @@ export function useGarminInitialize() {
           // =========================================================================
           case 'session_summary':
             console.log('[GarminStore] 📩 SESSION_SUMMARY received (Phase 1)');
-            useGarminStore.setState({ lastSessionData: event.data });
-
-            // Call registered callback if any
-            if (store.onSessionData) {
-              store.onSessionData(event.data);
-            }
 
             // =========================================================================
-            // AUDIO-WATCH CORRELATION
+            // AUDIO-WATCH CORRELATION (must happen BEFORE callback so it's included)
             // =========================================================================
-            // Correlate audio detections with watch shot data
             {
               const audioStore = useAudioStore.getState();
               const sessionStartTime = audioStore.sessionStartTime;
               const audioDetections = audioStore.getSessionDetections();
+              const { shotRecordedTimestamps } = useGarminStore.getState();
+              let correlationResult: CorrelationResult | null = null;
 
-              if (sessionStartTime && audioDetections.length > 0) {
-                // Convert watch splitTimes to cumulative timestamps
-                const watchTimestamps = splitTimesToTimestamps(
-                  event.data.splitTimes || [],
-                  event.data.shotsRecorded
-                );
+              console.log('[GarminStore] 🎤 Audio session state at summary:', {
+                sessionStartTime,
+                audioDetectionsCount: audioDetections.length,
+                isListening: audioStore.isListening,
+                isModuleLoaded: audioStore.isModuleLoaded,
+                shotRecordedTimestampsCount: shotRecordedTimestamps.length,
+              });
 
-                // Convert audio detections to relative timestamps
-                const relativeAudioDetections = toRelativeTimestamps(
-                  audioDetections,
-                  sessionStartTime
-                );
+              if (audioDetections.length > 0 && shotRecordedTimestamps.length > 0) {
+                // =========================================================================
+                // Use real SHOT_RECORDED timestamps from watch
+                // Both use Date.now() but SHOT_RECORDED has Bluetooth delay (~100-500ms)
+                // We align by assuming first audio detection = first watch detection = same shot
+                // =========================================================================
+                console.log('[GarminStore] 🎯 Using SHOT_RECORDED timestamps with first-shot alignment');
 
-                // Correlate
-                const correlationResult = correlateShots(watchTimestamps, relativeAudioDetections);
+                // Both are absolute timestamps (Date.now())
+                // SHOT_RECORDED arrives later due to Bluetooth transmission delay
+                // Audio detects sound nearly instantly
+
+                // Find first timestamps - these should be the same physical shot
+                const firstAudioTs = Math.min(...audioDetections.map(d => d.timestamp));
+                const firstWatchTs = shotRecordedTimestamps[0];
+
+                // Convert audio to relative timestamps (relative to first audio detection)
+                // First audio timestamp becomes 0
+                const relativeAudioDetections = audioDetections.map(d => ({
+                  ...d,
+                  timestamp: d.timestamp - firstAudioTs,
+                }));
+
+                // Convert watch to relative timestamps (relative to first SHOT_RECORDED)
+                // First watch timestamp becomes 0
+                // Now both timelines start at 0 (the first shot)
+                const watchTimestamps = shotRecordedTimestamps.map(t => t - firstWatchTs);
+
+                console.log('[GarminStore] 🔧 Aligned timestamps (both start at 0):', {
+                  firstAudioTs,
+                  firstWatchTs,
+                  bluetoothDelay: Math.round(firstWatchTs - firstAudioTs),
+                  watchTimestamps: watchTimestamps.map(t => Math.round(t)),
+                  audioTimestamps: relativeAudioDetections.map(d => Math.round(d.timestamp)),
+                  shotRecordedCount: shotRecordedTimestamps.length,
+                  audioCount: audioDetections.length,
+                });
+
+                // Correlate using aligned timestamps
+                correlationResult = correlateShots(watchTimestamps, relativeAudioDetections);
 
                 console.log('[GarminStore] 🎯 Shot correlation complete:', {
                   userShots: correlationResult.summary.totalUserShots,
                   distantShots: correlationResult.summary.totalDistantShots,
                   correlationRate: `${(correlationResult.summary.correlationRate * 100).toFixed(0)}%`,
+                  audioDetections: audioDetections.length,
+                  matchedShots: correlationResult.userShots.length,
+                  watchOnlyShots: correlationResult.watchOnlyShots.length,
                 });
+
+                // Debug: show the actual deltas for matched and unmatched shots
+                if (correlationResult.userShots.length > 0) {
+                  console.log('[GarminStore] 🎯 Matched shot deltas:',
+                    correlationResult.userShots.map(s => `${s.correlationDeltaMs}ms`).join(', ')
+                  );
+                }
+                if (correlationResult.watchOnlyShots.length > 0) {
+                  console.log('[GarminStore] ⚠️ Watch-only shots (no audio match):',
+                    correlationResult.watchOnlyShots.map(s => `@${s.watchTimestamp}ms`).join(', ')
+                  );
+                }
 
                 // Update state
                 useGarminStore.setState({ lastCorrelationResult: correlationResult });
@@ -457,8 +506,75 @@ export function useGarminInitialize() {
                 if (store.onCorrelationComplete) {
                   store.onCorrelationComplete(correlationResult);
                 }
+
+                // End audio session (stops listening)
+                audioStore.endSession();
+                console.log('[GarminStore] 🔇 Audio session ended');
+              } else if (sessionStartTime && audioDetections.length > 0) {
+                // =========================================================================
+                // FALLBACK: Use splitTimes reconstruction when SHOT_RECORDED not available
+                // (e.g., older watch firmware or Bluetooth issues)
+                // =========================================================================
+                console.log('[GarminStore] ⚠️ No SHOT_RECORDED timestamps, falling back to splitTimes');
+
+                // Convert watch splitTimes to cumulative timestamps (relative to first shot at t=0)
+                const rawWatchTimestamps = splitTimesToTimestamps(
+                  event.data.splitTimes || [],
+                  event.data.shotsRecorded
+                );
+
+                // Convert audio detections to relative timestamps (relative to audio session start)
+                const relativeAudioDetections = toRelativeTimestamps(
+                  audioDetections,
+                  sessionStartTime
+                );
+
+                // Auto-calculate alignment offset
+                const firstAudioTs = relativeAudioDetections.length > 0
+                  ? Math.min(...relativeAudioDetections.map(d => d.timestamp))
+                  : 0;
+                const firstWatchTs = rawWatchTimestamps.length > 0 ? rawWatchTimestamps[0] : 0;
+                const alignmentOffset = firstAudioTs - firstWatchTs;
+                const watchTimestamps = rawWatchTimestamps.map(t => t + alignmentOffset);
+
+                console.log('[GarminStore] 🔧 Fallback timestamp alignment:', {
+                  firstAudioTs: Math.round(firstAudioTs),
+                  firstWatchTs,
+                  alignmentOffset: Math.round(alignmentOffset),
+                  watchTimestamps: watchTimestamps.map(t => Math.round(t)),
+                  audioTimestamps: relativeAudioDetections.map(d => Math.round(d.timestamp)),
+                });
+
+                correlationResult = correlateShots(watchTimestamps, relativeAudioDetections);
+
+                console.log('[GarminStore] 🎯 Fallback correlation complete:', {
+                  correlationRate: `${(correlationResult.summary.correlationRate * 100).toFixed(0)}%`,
+                });
+
+                useGarminStore.setState({ lastCorrelationResult: correlationResult });
+
+                if (store.onCorrelationComplete) {
+                  store.onCorrelationComplete(correlationResult);
+                }
+
+                audioStore.endSession();
+                console.log('[GarminStore] 🔇 Audio session ended');
               } else {
                 console.log('[GarminStore] ⚠️ Skipping correlation - no audio session data');
+              }
+
+              // Enhance event data with correlation result for downstream consumers
+              const enhancedData = {
+                ...event.data,
+                correlation: correlationResult,
+              };
+
+              // Update state with enhanced data
+              useGarminStore.setState({ lastSessionData: enhancedData });
+
+              // Call registered callback with correlation data included
+              if (store.onSessionData) {
+                store.onSessionData(enhancedData);
               }
             }
 
@@ -582,6 +698,16 @@ export function useGarminInitialize() {
                   console.error('[GarminStore] ❌ Error saving timeline to DB:', err);
                 });
             }
+            break;
+
+          // =========================================================================
+          // SHOT_RECORDED: Real-time shot detection from watch
+          // =========================================================================
+          case 'shot_recorded':
+            console.log(`[GarminStore] 🎯 SHOT_RECORDED #${event.shotNumber} for ${event.sessionId?.slice(0, 8)}... at ${event.timestamp}`);
+            useGarminStore.setState((state) => ({
+              shotRecordedTimestamps: [...state.shotRecordedTimestamps, event.timestamp],
+            }));
             break;
 
           case 'error':

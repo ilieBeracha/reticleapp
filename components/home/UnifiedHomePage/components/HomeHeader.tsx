@@ -7,12 +7,12 @@
  */
 
 import { BaseAvatar } from '@/components/shared/Avatar';
+import type { HomeHeaderProps } from '@/types/home';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeIn, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
-import type { HomeHeaderProps } from '@/types/home';
 
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
@@ -88,7 +88,7 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 14,
+    marginBottom: 10,
     paddingTop: 4,
   },
   left: {
@@ -99,18 +99,18 @@ const s = StyleSheet.create({
   rightActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 8,
   },
   avatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
   },
   avatarText: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '700',
   },
   greeting: {
@@ -120,7 +120,7 @@ const s = StyleSheet.create({
     opacity: 0.7,
   },
   name: {
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: '700',
     letterSpacing: -0.3,
   },
@@ -128,21 +128,14 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 20,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 16,
   },
   watchDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
     backgroundColor: '#10B981',
-  },
-  iconButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
 });

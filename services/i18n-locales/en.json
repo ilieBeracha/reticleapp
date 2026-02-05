@@ -1061,6 +1061,12 @@
     "removeFromSquadTitle": "Remove from Squad",
     "removeFromSquadConfirm": "Remove this soldier from the squad?"
   },
+  "account": {
+    "personal": "Personal",
+    "switchAccount": "Switch Account",
+    "mySessions": "My Sessions",
+    "teams": "Teams"
+  },
   "weapons": {
     "title": "Weapons",
     "weapon": "Weapon",
