@@ -37,7 +37,7 @@ Sentry.init({
 
   // Enable Logs
   enableLogs: true,
-
+  
   // Configure Session Replay
   replaysSessionSampleRate: 0.1,
   replaysOnErrorSampleRate: 1,

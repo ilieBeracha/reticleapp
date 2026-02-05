@@ -4,32 +4,35 @@
  * Full-screen weapon management with role-based views:
  * - Commander: Full management (assignments, pool, requests, contributions)
  * - Soldier: View assignment, pool weapons, request weapon
+ *
+ * Design language: matches UnifiedHomePage / TeamHomePage
+ * Compact, professional, utility-focused.
  */
 
 import { ApproveRequestModal } from '@/components/weapons/ApproveRequestModal';
 import { RequestWeaponModal } from '@/components/weapons/RequestWeaponModal';
-import { useWeaponRealtime } from '@/hooks/realtime/weapon/useWeaponRealtime';
 import type { WeaponRequestRecord } from '@/hooks/realtime/records/weapon';
+import { useWeaponRealtime } from '@/hooks/realtime/weapon/useWeaponRealtime';
 import { useColors } from '@/hooks/ui/useColors';
 import { notifyWeaponRequested } from '@/services/notifications';
 import { getTeamMembers } from '@/services/teamService';
 import {
-  approveSharedWeapon,
-  assignTeamWeapon,
-  cancelWeaponRequest,
-  createTeamWeapon,
-  getArmoryOverview,
-  getCategoryLabel,
-  getGlobalWeapons,
-  rejectSharedWeapon,
-  setWeaponPoolAvailable,
-  unassignTeamWeapon,
-  WEAPON_CATEGORIES,
-  type ArmoryOverviewData,
-  type GlobalWeapon,
-  type TeamWeapon,
-  type UserWeapon,
-  type WeaponRequest,
+    approveSharedWeapon,
+    assignTeamWeapon,
+    cancelWeaponRequest,
+    createTeamWeapon,
+    getArmoryOverview,
+    getCategoryLabel,
+    getGlobalWeapons,
+    rejectSharedWeapon,
+    setWeaponPoolAvailable,
+    unassignTeamWeapon,
+    WEAPON_CATEGORIES,
+    type ArmoryOverviewData,
+    type GlobalWeapon,
+    type TeamWeapon,
+    type UserWeapon,
+    type WeaponRequest,
 } from '@/services/weaponService';
 import { useTeamStore } from '@/stores/teamStore';
 import type { WeaponCategory } from '@/types/workspace';
@@ -37,38 +40,38 @@ import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from 'expo-router';
 import { t } from 'i18next';
 import {
-  AlertTriangle,
-  Check,
-  ChevronLeft,
-  ChevronRight,
-  Clock,
-  Gift,
-  Plus,
-  RefreshCw,
-  Search,
-  Shield,
-  ShieldCheck,
-  User,
-  UserMinus,
-  UserPlus,
-  Users,
-  X,
+    AlertTriangle,
+    Check,
+    ChevronLeft,
+    ChevronRight,
+    Clock,
+    Gift,
+    Plus,
+    Search,
+    Shield,
+    ShieldCheck,
+    User,
+    UserMinus,
+    UserPlus,
+    Users,
+    X,
 } from 'lucide-react-native';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  ActivityIndicator,
-  Alert,
-  FlatList,
-  Modal,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Alert,
+    FlatList,
+    Modal,
+    RefreshControl,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from 'react-native';
+import Animated, { FadeIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // ============================================================================
@@ -108,22 +111,23 @@ function TabBar({
   ];
 
   return (
-    <View style={[styles.tabBar, { backgroundColor: colors.card, borderColor: colors.border }]}>
+    <View style={[s.tabBar, { backgroundColor: colors.card, borderColor: colors.border }]}>
       {tabs.map((tab) => {
         const isActive = activeTab === tab.id;
         return (
           <TouchableOpacity
             key={tab.id}
-            style={[styles.tab, isActive && { backgroundColor: colors.primary + '15' }]}
+            style={[s.tab, isActive && { backgroundColor: colors.primary + '12' }]}
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
               onTabChange(tab.id);
             }}
+            activeOpacity={0.7}
           >
-            <Text style={[styles.tabLabel, { color: isActive ? colors.primary : colors.textMuted }]}>{tab.label}</Text>
+            <Text style={[s.tabLabel, { color: isActive ? colors.primary : colors.textMuted }]}>{tab.label}</Text>
             {tab.badge !== undefined && (
-              <View style={[styles.tabBadge, { backgroundColor: colors.destructive }]}>
-                <Text style={styles.tabBadgeText}>{tab.badge}</Text>
+              <View style={[s.tabBadge, { backgroundColor: colors.destructive }]}>
+                <Text style={s.tabBadgeText}>{tab.badge}</Text>
               </View>
             )}
           </TouchableOpacity>
@@ -134,71 +138,10 @@ function TabBar({
 }
 
 // ============================================================================
-// STAT CARD COMPONENT
+// WEAPON ROW COMPONENT (renders inside grouped card)
 // ============================================================================
 
-function StatCard({
-  label,
-  value,
-  icon,
-  colors,
-}: {
-  label: string;
-  value: number;
-  icon: React.ReactNode;
-  colors: ReturnType<typeof useColors>;
-}) {
-  return (
-    <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-      <View style={[styles.statIcon, { backgroundColor: colors.secondary }]}>{icon}</View>
-      <Text style={[styles.statValue, { color: colors.text }]}>{value}</Text>
-      <Text style={[styles.statLabel, { color: colors.textMuted }]}>{label}</Text>
-    </View>
-  );
-}
-
-// ============================================================================
-// SECTION HEADER COMPONENT
-// ============================================================================
-
-function SectionHeader({
-  title,
-  icon,
-  count,
-  colors,
-  action,
-}: {
-  title: string;
-  icon: React.ReactNode;
-  count?: number;
-  colors: ReturnType<typeof useColors>;
-  action?: { label: string; onPress: () => void };
-}) {
-  return (
-    <View style={styles.sectionHeader}>
-      <View style={styles.sectionHeaderLeft}>
-        {icon}
-        <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>{title}</Text>
-        {count !== undefined && count > 0 && (
-          <View style={[styles.countBadge, { backgroundColor: colors.primary }]}>
-            <Text style={styles.countText}>{count}</Text>
-          </View>
-        )}
-      </View>
-      {action && (
-        <TouchableOpacity onPress={action.onPress}>
-          <Text style={[styles.sectionAction, { color: colors.primary }]}>{action.label}</Text>
-        </TouchableOpacity>
-      )}
-    </View>
-  );
-}
-
-// ============================================================================
-// WEAPON CARD COMPONENT
-// ============================================================================
-
-function WeaponCard({
+function WeaponRow({
   weapon,
   colors,
   isAssigned,
@@ -222,48 +165,60 @@ function WeaponCard({
   actionLoading?: boolean;
 }) {
   return (
-    <View style={[styles.weaponCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-      <View style={styles.weaponInfo}>
-        <Text style={[styles.weaponName, { color: colors.text }]}>{weapon.name}</Text>
-        <Text style={[styles.weaponMeta, { color: colors.textMuted }]}>
+    <View style={s.weaponRow}>
+      <View style={[s.weaponIcon, { backgroundColor: isPool ? colors.yellow + '12' : colors.primary + '12' }]}>
+        <Shield size={15} color={isPool ? colors.yellow : colors.primary} />
+      </View>
+      <View style={s.weaponInfo}>
+        <Text style={[s.weaponName, { color: colors.text }]}>{weapon.name}</Text>
+        <Text style={[s.weaponMeta, { color: colors.textMuted }]}>
           {getCategoryLabel(weapon.category)}
           {weapon.caliber && ` \u2022 ${weapon.caliber}`}
         </Text>
         {showAssignedUser && weapon.assigned_user && (
-          <View style={styles.assignedUserRow}>
-            <User size={12} color={colors.textMuted} />
-            <Text style={[styles.assignedUserName, { color: colors.textMuted }]}>{weapon.assigned_user.full_name}</Text>
+          <View style={s.assignedUserRow}>
+            <User size={10} color={colors.textMuted} />
+            <Text style={[s.assignedUserName, { color: colors.textMuted }]}>{weapon.assigned_user.full_name}</Text>
           </View>
         )}
       </View>
 
-      <View style={styles.weaponActions}>
+      <View style={s.weaponActions}>
         {actionLoading ? (
           <ActivityIndicator size="small" color={colors.primary} />
         ) : (
           <>
             {isAssigned && onUnassign && (
-              <TouchableOpacity style={[styles.actionBtn, { backgroundColor: colors.muted }]} onPress={onUnassign}>
-                <UserMinus size={16} color={colors.destructive} />
+              <TouchableOpacity
+                style={[s.actionBtn, { backgroundColor: colors.destructive + '12' }]}
+                onPress={onUnassign}
+                hitSlop={4}
+              >
+                <UserMinus size={14} color={colors.destructive} />
               </TouchableOpacity>
             )}
             {!isAssigned && onAssign && (
-              <TouchableOpacity style={[styles.assignBtn, { backgroundColor: colors.primary }]} onPress={onAssign}>
-                <UserPlus size={14} color="#fff" />
-                <Text style={styles.assignBtnText}>{t('weapons.assign')}</Text>
+              <TouchableOpacity style={[s.assignBtn, { backgroundColor: colors.primary }]} onPress={onAssign}>
+                <UserPlus size={12} color="#fff" />
+                <Text style={s.assignBtnText}>{t('weapons.assign')}</Text>
               </TouchableOpacity>
             )}
             {isPool && onRemoveFromPool && (
-              <TouchableOpacity style={[styles.poolBtn, { backgroundColor: colors.muted }]} onPress={onRemoveFromPool}>
-                <X size={14} color={colors.textMuted} />
+              <TouchableOpacity
+                style={[s.actionBtn, { backgroundColor: colors.muted }]}
+                onPress={onRemoveFromPool}
+                hitSlop={4}
+              >
+                <X size={12} color={colors.textMuted} />
               </TouchableOpacity>
             )}
             {!isPool && !isAssigned && onAddToPool && (
               <TouchableOpacity
-                style={[styles.poolBtn, { backgroundColor: colors.green + '20' }]}
+                style={[s.actionBtn, { backgroundColor: colors.green + '12' }]}
                 onPress={onAddToPool}
+                hitSlop={4}
               >
-                <Gift size={14} color={colors.green} />
+                <Gift size={12} color={colors.green} />
               </TouchableOpacity>
             )}
           </>
@@ -288,28 +243,21 @@ function PendingRequestCard({
 }) {
   const { t } = useTranslation();
   return (
-    <TouchableOpacity
-      style={[styles.requestCard, { backgroundColor: colors.yellow + '10', borderColor: colors.yellow }]}
-      onPress={onReview}
-      activeOpacity={0.7}
-    >
-      <View style={styles.requestHeader}>
+    <TouchableOpacity style={s.requestRow} onPress={onReview} activeOpacity={0.7}>
+      <View style={[s.requestIcon, { backgroundColor: colors.yellow + '15' }]}>
         <AlertTriangle size={14} color={colors.yellow} />
-        <Text style={[styles.requestLabel, { color: colors.yellow }]}>{t('weapons.weaponRequest')}</Text>
       </View>
-      <View style={styles.requestInfo}>
-        <Text style={[styles.requestUser, { color: colors.text }]}>
+      <View style={s.requestInfo}>
+        <Text style={[s.requestUser, { color: colors.text }]}>
           {request.user?.full_name || t('common.unknown')}
         </Text>
         {request.weapon_category && (
-          <View style={[styles.categoryTag, { backgroundColor: colors.primary + '15' }]}>
-            <Text style={[styles.categoryTagText, { color: colors.primary }]}>
-              {getCategoryLabel(request.weapon_category)}
-            </Text>
-          </View>
+          <Text style={[s.requestCat, { color: colors.textMuted }]}>
+            {getCategoryLabel(request.weapon_category)}
+          </Text>
         )}
       </View>
-      <ChevronRight size={18} color={colors.textMuted} style={styles.requestChevron} />
+      <ChevronRight size={14} color={colors.textMuted} />
     </TouchableOpacity>
   );
 }
@@ -333,34 +281,32 @@ function PendingContributionCard({
 }) {
   const { t } = useTranslation();
   return (
-    <View style={[styles.contributionCard, { backgroundColor: colors.card, borderColor: colors.yellow }]}>
-      <View style={styles.contributionHeader}>
+    <View style={s.contributionRow}>
+      <View style={[s.contributionIcon, { backgroundColor: colors.yellow + '12' }]}>
         <Gift size={14} color={colors.yellow} />
-        <Text style={[styles.contributionLabel, { color: colors.yellow }]}>{t('weapons.pendingContributions')}</Text>
       </View>
-      <View style={styles.weaponInfo}>
-        <Text style={[styles.weaponName, { color: colors.text }]}>{weapon.name}</Text>
-        <Text style={[styles.weaponMeta, { color: colors.textMuted }]}>
+      <View style={s.contributionInfo}>
+        <Text style={[s.weaponName, { color: colors.text }]}>{weapon.name}</Text>
+        <Text style={[s.weaponMeta, { color: colors.textMuted }]}>
           {getCategoryLabel(weapon.category)}
           {weapon.caliber && ` \u2022 ${weapon.caliber}`}
+          {weapon.user && ` \u2022 ${weapon.user.full_name}`}
         </Text>
-        {weapon.user && (
-          <Text style={[styles.contributorName, { color: colors.textMuted }]}>
-            {t('common.from')}: {weapon.user.full_name}
-          </Text>
-        )}
       </View>
-      <View style={styles.contributionActions}>
+      <View style={s.contributionActions}>
         {actionLoading ? (
           <ActivityIndicator size="small" color={colors.primary} />
         ) : (
           <>
-            <TouchableOpacity style={[styles.rejectSmallBtn, { backgroundColor: colors.muted }]} onPress={onReject}>
-              <X size={16} color={colors.destructive} />
+            <TouchableOpacity
+              style={[s.actionBtn, { backgroundColor: colors.destructive + '12' }]}
+              onPress={onReject}
+              hitSlop={4}
+            >
+              <X size={13} color={colors.destructive} />
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.approveSmallBtn, { backgroundColor: colors.green }]} onPress={onApprove}>
-              <Check size={16} color="#fff" />
-              <Text style={styles.approveSmallText}>{t('common.approve')}</Text>
+            <TouchableOpacity style={[s.approveBtn, { backgroundColor: colors.green }]} onPress={onApprove}>
+              <Check size={13} color="#fff" />
             </TouchableOpacity>
           </>
         )}
@@ -387,20 +333,20 @@ function MyAssignmentCard({
   const { t } = useTranslation();
   if (!weapon) {
     return (
-      <View style={[styles.noAssignmentCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        <View style={[styles.noAssignmentIcon, { backgroundColor: colors.primary + '15' }]}>
-          <Shield size={32} color={colors.primary} />
+      <View style={[s.noAssignmentCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <View style={[s.noAssignmentIcon, { backgroundColor: colors.primary + '12' }]}>
+          <Shield size={24} color={colors.primary} />
         </View>
-        <Text style={[styles.noAssignmentTitle, { color: colors.text }]}>{t('weapons.getReadyForTraining')}</Text>
-        <Text style={[styles.noAssignmentHint, { color: colors.textMuted }]}>{t('weapons.requestMessage')}</Text>
+        <Text style={[s.noAssignmentTitle, { color: colors.text }]}>{t('weapons.getReadyForTraining')}</Text>
+        <Text style={[s.noAssignmentHint, { color: colors.textMuted }]}>{t('weapons.requestMessage')}</Text>
         {!hasPendingRequest && onRequestWeapon && (
           <TouchableOpacity
-            style={[styles.noAssignmentCta, { backgroundColor: colors.primary }]}
+            style={[s.noAssignmentCta, { backgroundColor: colors.primary }]}
             onPress={onRequestWeapon}
             activeOpacity={0.8}
           >
-            <Text style={styles.noAssignmentCtaText}>{t('weapons.requestAction')}</Text>
-            <ChevronRight size={16} color="#fff" />
+            <Text style={s.noAssignmentCtaText}>{t('weapons.requestAction')}</Text>
+            <ChevronRight size={14} color="#fff" />
           </TouchableOpacity>
         )}
       </View>
@@ -408,16 +354,20 @@ function MyAssignmentCard({
   }
 
   return (
-    <View style={[styles.myAssignmentCard, { backgroundColor: colors.card, borderColor: colors.primary }]}>
-      <View style={[styles.myAssignmentBadge, { backgroundColor: colors.primary }]}>
-        <ShieldCheck size={16} color="#fff" />
-        <Text style={styles.myAssignmentBadgeText}>{t('weapons.yourAssignedWeapon')}</Text>
+    <View style={[s.myAssignmentCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+      <View style={s.myAssignmentTop}>
+        <View style={[s.myAssignmentBadge, { backgroundColor: colors.primary }]}>
+          <ShieldCheck size={12} color="#fff" />
+          <Text style={s.myAssignmentBadgeText}>{t('weapons.yourAssignedWeapon')}</Text>
+        </View>
       </View>
-      <Text style={[styles.myAssignmentName, { color: colors.text }]}>{weapon.name}</Text>
-      <Text style={[styles.myAssignmentMeta, { color: colors.textMuted }]}>
-        {getCategoryLabel(weapon.category)}
-        {weapon.caliber && ` \u2022 ${weapon.caliber}`}
-      </Text>
+      <View style={[s.myAssignmentBody, { borderTopColor: colors.border }]}>
+        <Text style={[s.myAssignmentName, { color: colors.text }]}>{weapon.name}</Text>
+        <Text style={[s.myAssignmentMeta, { color: colors.textMuted }]}>
+          {getCategoryLabel(weapon.category)}
+          {weapon.caliber && ` \u2022 ${weapon.caliber}`}
+        </Text>
+      </View>
     </View>
   );
 }
@@ -439,26 +389,31 @@ function MyPendingRequestCard({
 }) {
   const { t } = useTranslation();
   return (
-    <View style={[styles.myRequestCard, { backgroundColor: colors.yellow + '10', borderColor: colors.yellow }]}>
-      <View style={styles.myRequestHeader}>
-        <Clock size={16} color={colors.yellow} />
-        <Text style={[styles.myRequestTitle, { color: colors.yellow }]}>{t('weapons.requestPending')}</Text>
+    <View style={[s.myRequestCard, { backgroundColor: colors.yellow + '08', borderColor: colors.yellow + '40' }]}>
+      <View style={s.myRequestHeader}>
+        <View style={[s.myRequestIconBg, { backgroundColor: colors.yellow + '15' }]}>
+          <Clock size={13} color={colors.yellow} />
+        </View>
+        <View style={s.myRequestHeaderInfo}>
+          <Text style={[s.myRequestTitle, { color: colors.text }]}>{t('weapons.requestPending')}</Text>
+          {request.weapon_category && (
+            <Text style={[s.myRequestPreference, { color: colors.textMuted }]}>
+              {t('weapons.preferred')} {getCategoryLabel(request.weapon_category)}
+            </Text>
+          )}
+        </View>
       </View>
-      <Text style={[styles.myRequestText, { color: colors.text }]}>{t('weapons.pendingMessage')}</Text>
-      {request.weapon_category && (
-        <Text style={[styles.myRequestPreference, { color: colors.textMuted }]}>
-          {t('weapons.preferred')} {getCategoryLabel(request.weapon_category)}
-        </Text>
-      )}
+      <Text style={[s.myRequestText, { color: colors.textMuted }]}>{t('weapons.pendingMessage')}</Text>
       <TouchableOpacity
-        style={[styles.cancelRequestBtn, { borderColor: colors.destructive }]}
+        style={[s.cancelRequestBtn, { borderColor: colors.destructive + '40' }]}
         onPress={onCancel}
         disabled={cancelling}
+        activeOpacity={0.7}
       >
         {cancelling ? (
           <ActivityIndicator size="small" color={colors.destructive} />
         ) : (
-          <Text style={[styles.cancelRequestText, { color: colors.destructive }]}>{t('weapons.cancelRequest')}</Text>
+          <Text style={[s.cancelRequestText, { color: colors.destructive }]}>{t('weapons.cancelRequest')}</Text>
         )}
       </TouchableOpacity>
     </View>
@@ -522,9 +477,7 @@ function AddWeaponModal({
   }, [allCatalogWeapons.length]);
 
   const filteredCatalog = allCatalogWeapons.filter((w) => {
-    // Category filter
     if (catalogCategory && w.category !== catalogCategory) return false;
-    // Search filter
     if (!catalogSearch.trim()) return true;
     const q = catalogSearch.toLowerCase();
     return (
@@ -534,7 +487,6 @@ function AddWeaponModal({
     );
   });
 
-  // Group weapons by manufacturer for better organization
   const groupedByManufacturer = filteredCatalog.reduce(
     (acc, weapon) => {
       const key = weapon.manufacturer || 'Other';
@@ -545,7 +497,6 @@ function AddWeaponModal({
     {} as Record<string, GlobalWeapon[]>
   );
 
-  // Sort manufacturers alphabetically, with 'Other' at the end
   const sortedManufacturers = Object.keys(groupedByManufacturer).sort((a, b) => {
     if (a === 'Other') return 1;
     if (b === 'Other') return -1;
@@ -588,12 +539,13 @@ function AddWeaponModal({
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={resetModal}>
-      <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
-        <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
-          <TouchableOpacity onPress={resetModal}>
-            <Text style={[styles.modalCancel, { color: colors.primary }]}>{t('common.cancel')}</Text>
+      <View style={[s.modalContainer, { backgroundColor: colors.background }]}>
+        {/* Modal Header */}
+        <View style={[s.modalHeader, { borderBottomColor: colors.border }]}>
+          <TouchableOpacity onPress={resetModal} hitSlop={8}>
+            <Text style={[s.modalCancel, { color: colors.primary }]}>{t('common.cancel')}</Text>
           </TouchableOpacity>
-          <Text style={[styles.modalTitle, { color: colors.text }]}>
+          <Text style={[s.modalTitle, { color: colors.text }]}>
             {step === 'choose'
               ? t('weapons.addWeapon')
               : step === 'catalog'
@@ -601,11 +553,11 @@ function AddWeaponModal({
                 : t('weapons.weaponDetails')}
           </Text>
           {step === 'custom' ? (
-            <TouchableOpacity onPress={handleCreate} disabled={creating || !newWeaponName.trim()}>
+            <TouchableOpacity onPress={handleCreate} disabled={creating || !newWeaponName.trim()} hitSlop={8}>
               {creating ? (
                 <ActivityIndicator size="small" color={colors.primary} />
               ) : (
-                <Text style={[styles.modalSave, { color: newWeaponName.trim() ? colors.primary : colors.textMuted }]}>
+                <Text style={[s.modalSave, { color: newWeaponName.trim() ? colors.primary : colors.textMuted }]}>
                   {t('common.add')}
                 </Text>
               )}
@@ -615,48 +567,52 @@ function AddWeaponModal({
           )}
         </View>
 
+        {/* Step: Choose */}
         {step === 'choose' && (
-          <View style={styles.chooseContainer}>
-            <TouchableOpacity
-              style={[styles.chooseOption, { backgroundColor: colors.card, borderColor: colors.border }]}
-              onPress={() => {
-                setStep('catalog');
-                loadCatalog();
-              }}
-            >
-              <View style={[styles.chooseIcon, { backgroundColor: colors.primary + '15' }]}>
-                <Search size={22} color={colors.primary} />
-              </View>
-              <View style={styles.chooseContent}>
-                <Text style={[styles.chooseTitle, { color: colors.text }]}>{t('weapons.fromCatalog')}</Text>
-                <Text style={[styles.chooseDesc, { color: colors.textMuted }]}>{t('weapons.browseCatalog')}</Text>
-              </View>
-              <ChevronRight size={20} color={colors.textMuted} />
-            </TouchableOpacity>
+          <View style={s.chooseContainer}>
+            <View style={[s.chooseCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <TouchableOpacity
+                style={s.chooseOption}
+                onPress={() => {
+                  setStep('catalog');
+                  loadCatalog();
+                }}
+                activeOpacity={0.7}
+              >
+                <View style={[s.chooseIcon, { backgroundColor: colors.primary + '12' }]}>
+                  <Search size={16} color={colors.primary} />
+                </View>
+                <View style={s.chooseContent}>
+                  <Text style={[s.chooseTitle, { color: colors.text }]}>{t('weapons.fromCatalog')}</Text>
+                  <Text style={[s.chooseDesc, { color: colors.textMuted }]}>{t('weapons.browseCatalog')}</Text>
+                </View>
+                <ChevronRight size={14} color={colors.textMuted} />
+              </TouchableOpacity>
 
-            <TouchableOpacity
-              style={[styles.chooseOption, { backgroundColor: colors.card, borderColor: colors.border }]}
-              onPress={() => setStep('custom')}
-            >
-              <View style={[styles.chooseIcon, { backgroundColor: colors.green + '15' }]}>
-                <Plus size={22} color={colors.green} />
-              </View>
-              <View style={styles.chooseContent}>
-                <Text style={[styles.chooseTitle, { color: colors.text }]}>{t('weapons.customWeapon')}</Text>
-                <Text style={[styles.chooseDesc, { color: colors.textMuted }]}>{t('weapons.createScratch')}</Text>
-              </View>
-              <ChevronRight size={20} color={colors.textMuted} />
-            </TouchableOpacity>
+              <View style={[s.hairline, { backgroundColor: colors.border }]} />
+
+              <TouchableOpacity style={s.chooseOption} onPress={() => setStep('custom')} activeOpacity={0.7}>
+                <View style={[s.chooseIcon, { backgroundColor: colors.green + '12' }]}>
+                  <Plus size={16} color={colors.green} />
+                </View>
+                <View style={s.chooseContent}>
+                  <Text style={[s.chooseTitle, { color: colors.text }]}>{t('weapons.customWeapon')}</Text>
+                  <Text style={[s.chooseDesc, { color: colors.textMuted }]}>{t('weapons.createScratch')}</Text>
+                </View>
+                <ChevronRight size={14} color={colors.textMuted} />
+              </TouchableOpacity>
+            </View>
           </View>
         )}
 
+        {/* Step: Catalog */}
         {step === 'catalog' && (
-          <View style={styles.catalogContainer}>
+          <View style={s.catalogContainer}>
             {/* Search Bar */}
-            <View style={[styles.searchBar, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <Search size={18} color={colors.textMuted} />
+            <View style={[s.searchBar, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <Search size={16} color={colors.textMuted} />
               <TextInput
-                style={[styles.searchInput, { color: colors.text }]}
+                style={[s.searchInput, { color: colors.text }]}
                 placeholder={t('weapons.searchPlaceholder')}
                 placeholderTextColor={colors.textMuted}
                 value={catalogSearch}
@@ -664,8 +620,8 @@ function AddWeaponModal({
                 autoFocus
               />
               {catalogSearch.length > 0 && (
-                <TouchableOpacity onPress={() => setCatalogSearch('')}>
-                  <X size={16} color={colors.textMuted} />
+                <TouchableOpacity onPress={() => setCatalogSearch('')} hitSlop={8}>
+                  <X size={14} color={colors.textMuted} />
                 </TouchableOpacity>
               )}
             </View>
@@ -674,12 +630,12 @@ function AddWeaponModal({
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
-              style={styles.catalogFilterScroll}
-              contentContainerStyle={styles.catalogFilterContent}
+              style={s.catalogFilterScroll}
+              contentContainerStyle={s.catalogFilterContent}
             >
               <TouchableOpacity
                 style={[
-                  styles.catalogFilterChip,
+                  s.catalogFilterChip,
                   {
                     backgroundColor: !catalogCategory ? colors.text : colors.card,
                     borderColor: !catalogCategory ? colors.text : colors.border,
@@ -687,7 +643,7 @@ function AddWeaponModal({
                 ]}
                 onPress={() => setCatalogCategory(null)}
               >
-                <Text style={[styles.catalogFilterText, { color: !catalogCategory ? colors.background : colors.text }]}>
+                <Text style={[s.catalogFilterText, { color: !catalogCategory ? colors.background : colors.text }]}>
                   {t('weapons.all')}
                 </Text>
               </TouchableOpacity>
@@ -695,7 +651,7 @@ function AddWeaponModal({
                 <TouchableOpacity
                   key={cat.value}
                   style={[
-                    styles.catalogFilterChip,
+                    s.catalogFilterChip,
                     {
                       backgroundColor: catalogCategory === cat.value ? colors.text : colors.card,
                       borderColor: catalogCategory === cat.value ? colors.text : colors.border,
@@ -705,7 +661,7 @@ function AddWeaponModal({
                 >
                   <Text
                     style={[
-                      styles.catalogFilterText,
+                      s.catalogFilterText,
                       { color: catalogCategory === cat.value ? colors.background : colors.text },
                     ]}
                   >
@@ -717,74 +673,70 @@ function AddWeaponModal({
 
             {/* Results count */}
             {!catalogLoading && (
-              <View style={styles.catalogResultsHeader}>
-                <Text style={[styles.catalogResultsCount, { color: colors.textMuted }]}>
-                  {filteredCatalog.length} weapon{filteredCatalog.length !== 1 ? 's' : ''} found
-                </Text>
-              </View>
+              <Text style={[s.catalogResultsCount, { color: colors.textMuted }]}>
+                {filteredCatalog.length} weapon{filteredCatalog.length !== 1 ? 's' : ''} found
+              </Text>
             )}
 
             {catalogLoading ? (
-              <View style={styles.catalogLoadingContainer}>
+              <View style={s.catalogLoadingContainer}>
                 <ActivityIndicator size="large" color={colors.primary} />
-                <Text style={[styles.catalogLoadingText, { color: colors.textMuted }]}>Loading catalog...</Text>
+                <Text style={[s.catalogLoadingText, { color: colors.textMuted }]}>Loading catalog...</Text>
               </View>
             ) : filteredCatalog.length === 0 ? (
-              <View style={styles.catalogEmptyContainer}>
-                <View style={[styles.catalogEmptyIcon, { backgroundColor: colors.card }]}>
-                  <Search size={32} color={colors.textMuted} />
+              <View style={s.catalogEmptyContainer}>
+                <View style={[s.catalogEmptyIcon, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                  <Search size={24} color={colors.textMuted} />
                 </View>
-                <Text style={[styles.catalogEmptyTitle, { color: colors.text }]}>
+                <Text style={[s.catalogEmptyTitle, { color: colors.text }]}>
                   {catalogSearch || catalogCategory ? 'No matches found' : 'No weapons in catalog'}
                 </Text>
-                <Text style={[styles.catalogEmptyDesc, { color: colors.textMuted }]}>
+                <Text style={[s.catalogEmptyDesc, { color: colors.textMuted }]}>
                   {catalogSearch || catalogCategory
                     ? 'Try adjusting your search or filters'
                     : 'The weapon catalog is empty'}
                 </Text>
                 <TouchableOpacity
-                  style={[styles.catalogEmptyBtn, { backgroundColor: colors.primary }]}
+                  style={[s.catalogEmptyBtn, { backgroundColor: colors.primary }]}
                   onPress={() => setStep('custom')}
                 >
-                  <Plus size={16} color="#fff" />
-                  <Text style={styles.catalogEmptyBtnText}>Create Custom Weapon</Text>
+                  <Plus size={14} color="#fff" />
+                  <Text style={s.catalogEmptyBtnText}>Create Custom Weapon</Text>
                 </TouchableOpacity>
               </View>
             ) : (
-              <ScrollView style={styles.catalogScrollView} contentContainerStyle={styles.catalogList}>
+              <ScrollView style={s.catalogScrollView} contentContainerStyle={s.catalogList}>
                 {sortedManufacturers.map((manufacturer) => (
-                  <View key={manufacturer} style={styles.catalogManufacturerGroup}>
-                    <Text style={[styles.catalogManufacturerTitle, { color: colors.textMuted }]}>
+                  <View key={manufacturer} style={s.catalogManufacturerGroup}>
+                    <Text style={[s.catalogManufacturerTitle, { color: colors.textMuted }]}>
                       {manufacturer.toUpperCase()}
                     </Text>
-                    {groupedByManufacturer[manufacturer].map((item) => (
-                      <TouchableOpacity
-                        key={item.id}
-                        style={[styles.catalogItem, { backgroundColor: colors.card, borderColor: colors.border }]}
-                        onPress={() => handleSelectCatalog(item)}
-                        activeOpacity={0.7}
-                      >
-                        <View style={[styles.catalogItemIcon, { backgroundColor: colors.primary + '15' }]}>
-                          <Shield size={18} color={colors.primary} />
-                        </View>
-                        <View style={styles.catalogInfo}>
-                          <Text style={[styles.catalogName, { color: colors.text }]}>{item.name}</Text>
-                          <View style={styles.catalogMetaRow}>
-                            <View style={[styles.catalogCategoryBadge, { backgroundColor: colors.secondary }]}>
-                              <Text style={[styles.catalogCategoryText, { color: colors.textMuted }]}>
+                    <View style={[s.groupCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                      {groupedByManufacturer[manufacturer].map((item, idx) => (
+                        <View key={item.id}>
+                          <TouchableOpacity
+                            style={s.catalogItem}
+                            onPress={() => handleSelectCatalog(item)}
+                            activeOpacity={0.7}
+                          >
+                            <View style={[s.catalogItemIcon, { backgroundColor: colors.primary + '12' }]}>
+                              <Shield size={14} color={colors.primary} />
+                            </View>
+                            <View style={s.catalogInfo}>
+                              <Text style={[s.catalogName, { color: colors.text }]}>{item.name}</Text>
+                              <Text style={[s.catalogMeta, { color: colors.textMuted }]}>
                                 {getCategoryLabel(item.category)}
+                                {item.caliber && ` \u2022 ${item.caliber}`}
                               </Text>
                             </View>
-                            {item.caliber && (
-                              <Text style={[styles.catalogCaliberText, { color: colors.textMuted }]}>
-                                {item.caliber}
-                              </Text>
-                            )}
-                          </View>
+                            <ChevronRight size={14} color={colors.textMuted} />
+                          </TouchableOpacity>
+                          {idx < groupedByManufacturer[manufacturer].length - 1 && (
+                            <View style={[s.hairline, { backgroundColor: colors.border }]} />
+                          )}
                         </View>
-                        <ChevronRight size={18} color={colors.textMuted} />
-                      </TouchableOpacity>
-                    ))}
+                      ))}
+                    </View>
                   </View>
                 ))}
               </ScrollView>
@@ -793,97 +745,97 @@ function AddWeaponModal({
             {/* Skip to custom */}
             {filteredCatalog.length > 0 && (
               <TouchableOpacity
-                style={[styles.skipCatalog, { backgroundColor: colors.card, borderColor: colors.border }]}
+                style={[s.skipCatalog, { backgroundColor: colors.card, borderColor: colors.border }]}
                 onPress={() => setStep('custom')}
               >
-                <Plus size={16} color={colors.textMuted} />
-                <Text style={[styles.skipCatalogText, { color: colors.text }]}>{t('weapons.createCustomInstead')}</Text>
+                <Plus size={14} color={colors.textMuted} />
+                <Text style={[s.skipCatalogText, { color: colors.text }]}>{t('weapons.createCustomInstead')}</Text>
               </TouchableOpacity>
             )}
           </View>
         )}
 
+        {/* Step: Custom Form */}
         {step === 'custom' && (
-          <ScrollView style={styles.formContainer} contentContainerStyle={styles.formContent}>
+          <ScrollView style={s.formContainer} contentContainerStyle={s.formContent}>
             {selectedCatalogWeapon && (
-              <View style={[styles.basedOnBadge, { backgroundColor: colors.primary + '15' }]}>
-                <Text style={[styles.basedOnText, { color: colors.primary }]}>
+              <View style={[s.basedOnBadge, { backgroundColor: colors.primary + '12' }]}>
+                <Text style={[s.basedOnText, { color: colors.primary }]}>
                   {t('weapons.basedOn')} {selectedCatalogWeapon.name}
                 </Text>
               </View>
             )}
 
-            <View style={styles.formGroup}>
-              <Text style={[styles.formLabel, { color: colors.textMuted }]}>{t('weapons.nameLabel')}</Text>
-              <TextInput
-                style={[
-                  styles.formInput,
-                  { backgroundColor: colors.card, borderColor: colors.border, color: colors.text },
-                ]}
-                value={newWeaponName}
-                onChangeText={setNewWeaponName}
-                placeholder={t('weapons.namePlaceholder')}
-                placeholderTextColor={colors.textMuted}
-                autoFocus={!selectedCatalogWeapon}
-              />
-            </View>
+            <View style={[s.formCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <View style={s.formGroup}>
+                <Text style={[s.formLabel, { color: colors.textMuted }]}>{t('weapons.nameLabel')}</Text>
+                <TextInput
+                  style={[s.formInput, { backgroundColor: colors.background, borderColor: colors.border, color: colors.text }]}
+                  value={newWeaponName}
+                  onChangeText={setNewWeaponName}
+                  placeholder={t('weapons.namePlaceholder')}
+                  placeholderTextColor={colors.textMuted}
+                  autoFocus={!selectedCatalogWeapon}
+                />
+              </View>
 
-            <View style={styles.formGroup}>
-              <Text style={[styles.formLabel, { color: colors.textMuted }]}>{t('weapons.categoryLabel')}</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryScroll}>
-                <View style={styles.categoryRow}>
-                  {WEAPON_CATEGORIES.map((cat) => (
-                    <TouchableOpacity
-                      key={cat.value}
-                      style={[
-                        styles.categoryChip,
-                        {
-                          backgroundColor: newWeaponCategory === cat.value ? colors.primary : colors.card,
-                          borderColor: newWeaponCategory === cat.value ? colors.primary : colors.border,
-                        },
-                      ]}
-                      onPress={() => setNewWeaponCategory(cat.value)}
-                    >
-                      <Text
+              <View style={[s.formDivider, { backgroundColor: colors.border }]} />
+
+              <View style={s.formGroup}>
+                <Text style={[s.formLabel, { color: colors.textMuted }]}>{t('weapons.categoryLabel')}</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                  <View style={s.categoryRow}>
+                    {WEAPON_CATEGORIES.map((cat) => (
+                      <TouchableOpacity
+                        key={cat.value}
                         style={[
-                          styles.categoryChipText,
-                          { color: newWeaponCategory === cat.value ? '#fff' : colors.text },
+                          s.categoryChip,
+                          {
+                            backgroundColor: newWeaponCategory === cat.value ? colors.primary : colors.background,
+                            borderColor: newWeaponCategory === cat.value ? colors.primary : colors.border,
+                          },
                         ]}
+                        onPress={() => setNewWeaponCategory(cat.value)}
                       >
-                        {cat.label}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </ScrollView>
-            </View>
+                        <Text
+                          style={[
+                            s.categoryChipText,
+                            { color: newWeaponCategory === cat.value ? '#fff' : colors.text },
+                          ]}
+                        >
+                          {cat.label}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </ScrollView>
+              </View>
 
-            <View style={styles.formGroup}>
-              <Text style={[styles.formLabel, { color: colors.textMuted }]}>{t('weapons.caliberLabel')}</Text>
-              <TextInput
-                style={[
-                  styles.formInput,
-                  { backgroundColor: colors.card, borderColor: colors.border, color: colors.text },
-                ]}
-                value={newWeaponCaliber}
-                onChangeText={setNewWeaponCaliber}
-                placeholder={t('weapons.caliberPlaceholder')}
-                placeholderTextColor={colors.textMuted}
-              />
-            </View>
+              <View style={[s.formDivider, { backgroundColor: colors.border }]} />
 
-            <View style={styles.formGroup}>
-              <Text style={[styles.formLabel, { color: colors.textMuted }]}>{t('weapons.serialLabel')}</Text>
-              <TextInput
-                style={[
-                  styles.formInput,
-                  { backgroundColor: colors.card, borderColor: colors.border, color: colors.text },
-                ]}
-                value={newWeaponSerial}
-                onChangeText={setNewWeaponSerial}
-                placeholder={t('common.optional')}
-                placeholderTextColor={colors.textMuted}
-              />
+              <View style={s.formGroup}>
+                <Text style={[s.formLabel, { color: colors.textMuted }]}>{t('weapons.caliberLabel')}</Text>
+                <TextInput
+                  style={[s.formInput, { backgroundColor: colors.background, borderColor: colors.border, color: colors.text }]}
+                  value={newWeaponCaliber}
+                  onChangeText={setNewWeaponCaliber}
+                  placeholder={t('weapons.caliberPlaceholder')}
+                  placeholderTextColor={colors.textMuted}
+                />
+              </View>
+
+              <View style={[s.formDivider, { backgroundColor: colors.border }]} />
+
+              <View style={s.formGroup}>
+                <Text style={[s.formLabel, { color: colors.textMuted }]}>{t('weapons.serialLabel')}</Text>
+                <TextInput
+                  style={[s.formInput, { backgroundColor: colors.background, borderColor: colors.border, color: colors.text }]}
+                  value={newWeaponSerial}
+                  onChangeText={setNewWeaponSerial}
+                  placeholder={t('common.optional')}
+                  placeholderTextColor={colors.textMuted}
+                />
+              </View>
             </View>
           </ScrollView>
         )}
@@ -918,64 +870,66 @@ function MemberPickerModal({
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
-        <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
-          <TouchableOpacity onPress={onClose}>
-            <X size={20} color={colors.textMuted} />
+      <View style={[s.modalContainer, { backgroundColor: colors.background }]}>
+        <View style={[s.modalHeader, { borderBottomColor: colors.border }]}>
+          <TouchableOpacity onPress={onClose} hitSlop={8}>
+            <X size={18} color={colors.textMuted} />
           </TouchableOpacity>
-          <Text style={[styles.modalTitle, { color: colors.text }]}>
+          <Text style={[s.modalTitle, { color: colors.text }]}>
             {t('weapons.assignTo', { name: weapon.name })}
           </Text>
-          <View style={{ width: 20 }} />
+          <View style={{ width: 18 }} />
         </View>
 
-        <Text style={[styles.memberPickerHint, { color: colors.textMuted }]}>{t('weapons.selectMember')}</Text>
+        <Text style={[s.pickerHint, { color: colors.textMuted }]}>{t('weapons.selectMember')}</Text>
 
         <FlatList
           data={members}
           keyExtractor={(item) => item.id}
-          renderItem={({ item }) => {
+          renderItem={({ item, index }) => {
             const existingWeapon = existingAssignments.get(item.id);
             const hasWeapon = !!existingWeapon;
 
             return (
-              <TouchableOpacity
-                style={[
-                  styles.memberItem,
-                  {
-                    backgroundColor: colors.card,
-                    borderColor: colors.border,
-                    opacity: hasWeapon ? 0.5 : 1,
-                  },
-                ]}
-                onPress={() => {
-                  if (hasWeapon) {
-                    Alert.alert(
-                      t('weapons.alreadyAssignedTitle'),
-                      t('weapons.alreadyAssignedMessage', { member: item.full_name, weapon: existingWeapon }),
-                      [{ text: t('common.ok') }]
-                    );
-                  } else {
-                    onSelect(item.id);
-                  }
-                }}
-              >
-                <User size={18} color={hasWeapon ? colors.textMuted : colors.text} />
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.memberName, { color: hasWeapon ? colors.textMuted : colors.text }]}>
-                    {item.full_name}
-                  </Text>
-                  {hasWeapon && (
-                    <Text style={[styles.memberWeapon, { color: colors.textMuted }]}>
-                      {t('weapons.has')} {existingWeapon}
+              <View>
+                <TouchableOpacity
+                  style={[s.pickerRow, { opacity: hasWeapon ? 0.5 : 1 }]}
+                  onPress={() => {
+                    if (hasWeapon) {
+                      Alert.alert(
+                        t('weapons.alreadyAssignedTitle'),
+                        t('weapons.alreadyAssignedMessage', { member: item.full_name, weapon: existingWeapon }),
+                        [{ text: t('common.ok') }]
+                      );
+                    } else {
+                      onSelect(item.id);
+                    }
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <View style={[s.pickerAvatar, { backgroundColor: hasWeapon ? colors.muted : colors.primary + '12' }]}>
+                    <User size={14} color={hasWeapon ? colors.textMuted : colors.primary} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[s.pickerName, { color: hasWeapon ? colors.textMuted : colors.text }]}>
+                      {item.full_name}
                     </Text>
-                  )}
-                </View>
-                {!hasWeapon && <ChevronRight size={18} color={colors.textMuted} />}
-              </TouchableOpacity>
+                    {hasWeapon && (
+                      <Text style={[s.pickerSub, { color: colors.textMuted }]}>
+                        {t('weapons.has')} {existingWeapon}
+                      </Text>
+                    )}
+                  </View>
+                  {!hasWeapon && <ChevronRight size={14} color={colors.textMuted} />}
+                </TouchableOpacity>
+                {index < members.length - 1 && (
+                  <View style={[s.pickerDivider, { backgroundColor: colors.border }]} />
+                )}
+              </View>
             );
           }}
-          contentContainerStyle={styles.memberList}
+          contentContainerStyle={s.pickerList}
+          style={[s.pickerListCard, { backgroundColor: colors.card, borderColor: colors.border }]}
         />
       </View>
     </Modal>
@@ -1008,48 +962,56 @@ function WeaponPickerForMemberModal({
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
-        <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
-          <TouchableOpacity onPress={onClose}>
-            <X size={20} color={colors.textMuted} />
+      <View style={[s.modalContainer, { backgroundColor: colors.background }]}>
+        <View style={[s.modalHeader, { borderBottomColor: colors.border }]}>
+          <TouchableOpacity onPress={onClose} hitSlop={8}>
+            <X size={18} color={colors.textMuted} />
           </TouchableOpacity>
-          <Text style={[styles.modalTitle, { color: colors.text }]}>
+          <Text style={[s.modalTitle, { color: colors.text }]}>
             {t('weapons.assignToMember', { name: member.full_name })}
           </Text>
-          <View style={{ width: 20 }} />
+          <View style={{ width: 18 }} />
         </View>
 
-        <Text style={[styles.memberPickerHint, { color: colors.textMuted }]}>{t('weapons.selectWeaponForMember')}</Text>
+        <Text style={[s.pickerHint, { color: colors.textMuted }]}>{t('weapons.selectWeaponForMember')}</Text>
 
         <FlatList
           data={availableWeapons}
           keyExtractor={(item) => item.id}
-          renderItem={({ item }) => {
+          renderItem={({ item, index }) => {
             const isLoading = actionLoading === item.id;
             return (
-              <TouchableOpacity
-                style={[styles.memberItem, { backgroundColor: colors.card, borderColor: colors.border }]}
-                onPress={() => onSelect(item.id)}
-                disabled={isLoading}
-                activeOpacity={0.7}
-              >
-                <Shield size={18} color={colors.primary} />
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.memberName, { color: colors.text }]}>{item.name}</Text>
-                  <Text style={[styles.memberWeapon, { color: colors.textMuted }]}>
-                    {getCategoryLabel(item.category)}
-                    {item.caliber && ` \u2022 ${item.caliber}`}
-                  </Text>
-                </View>
-                {isLoading ? (
-                  <ActivityIndicator size="small" color={colors.primary} />
-                ) : (
-                  <ChevronRight size={18} color={colors.textMuted} />
+              <View>
+                <TouchableOpacity
+                  style={s.pickerRow}
+                  onPress={() => onSelect(item.id)}
+                  disabled={isLoading}
+                  activeOpacity={0.7}
+                >
+                  <View style={[s.pickerAvatar, { backgroundColor: colors.primary + '12' }]}>
+                    <Shield size={14} color={colors.primary} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[s.pickerName, { color: colors.text }]}>{item.name}</Text>
+                    <Text style={[s.pickerSub, { color: colors.textMuted }]}>
+                      {getCategoryLabel(item.category)}
+                      {item.caliber && ` \u2022 ${item.caliber}`}
+                    </Text>
+                  </View>
+                  {isLoading ? (
+                    <ActivityIndicator size="small" color={colors.primary} />
+                  ) : (
+                    <ChevronRight size={14} color={colors.textMuted} />
+                  )}
+                </TouchableOpacity>
+                {index < availableWeapons.length - 1 && (
+                  <View style={[s.pickerDivider, { backgroundColor: colors.border }]} />
                 )}
-              </TouchableOpacity>
+              </View>
             );
           }}
-          contentContainerStyle={styles.memberList}
+          contentContainerStyle={s.pickerList}
+          style={[s.pickerListCard, { backgroundColor: colors.card, borderColor: colors.border }]}
         />
       </View>
     </Modal>
@@ -1060,11 +1022,19 @@ function WeaponPickerForMemberModal({
 // MAIN COMPONENT
 // ============================================================================
 
-export default function TeamArmoryScreen() {
+interface TeamArmoryProps {
+  /** When provided, use this teamId instead of search params */
+  teamIdProp?: string;
+  /** When true, skip the standalone header (for tab embedding) */
+  embedded?: boolean;
+}
+
+export function TeamArmoryContent({ teamIdProp, embedded }: TeamArmoryProps) {
   const { t } = useTranslation();
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { teamId } = useLocalSearchParams<{ teamId: string }>();
+  const { teamId: paramTeamId } = useLocalSearchParams<{ teamId: string }>();
+  const teamId = teamIdProp || paramTeamId;
   const { teams } = useTeamStore();
 
   const team = teams.find((t) => t.id === teamId);
@@ -1116,7 +1086,6 @@ export default function TeamArmoryScreen() {
   }, [teamId, isCommander]);
 
   useEffect(() => {
-    // Reset data when teamId changes to prevent showing stale data
     setData(null);
     setTeamMembers([]);
     setLoading(true);
@@ -1126,16 +1095,13 @@ export default function TeamArmoryScreen() {
   // Real-time updates for weapon requests and assignments
   useWeaponRealtime({
     teamId,
-    enabled: isCommander, // Only commanders need real-time request notifications
+    enabled: isCommander,
     onNewRequest: useCallback(
       async (request: WeaponRequestRecord) => {
         console.log('[TeamArmory] Realtime: New weapon request!');
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-        // Refresh data first to get full request details including user name
         await loadData();
-        // Send notification to commander
         if (teamId && team?.name) {
-          // Find the requester's name from the refreshed data
           const requestData = data?.pendingRequests?.find((r) => r.id === request.id);
           const requesterName = (requestData as any)?.user?.full_name || t('teams.teamMember');
           notifyWeaponRequested(teamId, team.name, requesterName);
@@ -1144,11 +1110,9 @@ export default function TeamArmoryScreen() {
       [loadData, teamId, team?.name, data?.pendingRequests]
     ),
     onRequestChange: useCallback(() => {
-      // Any request change - refresh silently
       loadData();
     }, [loadData]),
     onWeaponChange: useCallback(() => {
-      // Any weapon change (assignment, pool status) - refresh
       loadData();
     }, [loadData]),
   });
@@ -1272,7 +1236,6 @@ export default function TeamArmoryScreen() {
     data?.assignedWeapons.filter((w) => w.assigned_to).map((w) => w.assigned_to!) || []
   );
 
-  // Calculate unassigned members (members without a weapon)
   const unassignedMembers = teamMembers.filter((m) => !membersWithWeapons.has(m.id));
   const assignedMembers = teamMembers.filter((m) => membersWithWeapons.has(m.id));
 
@@ -1281,64 +1244,64 @@ export default function TeamArmoryScreen() {
 
   if (loading) {
     return (
-      <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
-        <ActivityIndicator size="large" color={colors.primary} />
+      <View style={[s.loadingContainer, { backgroundColor: colors.background }]}>
+        <ActivityIndicator size="small" color={colors.textMuted} />
       </View>
     );
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Header */}
-      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-          <ChevronLeft size={24} color={colors.text} />
-        </TouchableOpacity>
-        <View style={styles.headerCenter}>
-          <Text style={[styles.headerTitle, { color: colors.text }]}>{t('weapons.teamArmory')}</Text>
-          <Text style={[styles.headerSubtitle, { color: colors.textMuted }]}>{team?.name}</Text>
-        </View>
-        <TouchableOpacity style={styles.refreshBtn} onPress={handleRefresh}>
-          <RefreshCw size={20} color={colors.textMuted} />
-        </TouchableOpacity>
-      </View>
+    <View style={[s.container, { backgroundColor: colors.background }]}>
+      {/* Header - only in standalone mode */}
+      {!embedded && (
+        <Animated.View entering={FadeIn.duration(200)} style={[s.header, { paddingTop: insets.top + 4 }]}>
+          <TouchableOpacity style={s.backBtn} onPress={() => router.back()} hitSlop={8}>
+            <ChevronLeft size={22} color={colors.text} />
+          </TouchableOpacity>
+          <View style={s.headerInfo}>
+            <Text style={[s.headerTitle, { color: colors.text }]}>{t('weapons.teamArmory')}</Text>
+            <Text style={[s.headerSubtitle, { color: colors.textMuted }]}>{team?.name}</Text>
+          </View>
+        </Animated.View>
+      )}
 
       <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 100 }]}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.primary} />}
+        style={s.scrollView}
+        contentContainerStyle={[s.scrollContent, { paddingBottom: insets.bottom + 100 }]}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.textMuted} />}
         showsVerticalScrollIndicator={false}
       >
         {isCommander ? (
           // ============ COMMANDER VIEW ============
           <>
-            {/* Stats */}
-            <View style={styles.statsRow}>
-              <StatCard
-                label={t('weapons.total')}
-                value={totalWeapons}
-                icon={<Shield size={18} color={colors.primary} />}
-                colors={colors}
-              />
-              <StatCard
-                label={t('weapons.assigned')}
-                value={assignedCount}
-                icon={<Users size={18} color={colors.green} />}
-                colors={colors}
-              />
-              <StatCard
-                label={t('weapons.pool')}
-                value={poolCount}
-                icon={<Gift size={18} color={colors.yellow} />}
-                colors={colors}
-              />
-              <StatCard
-                label={t('weapons.pending')}
-                value={pendingCount}
-                icon={<Clock size={18} color={colors.destructive} />}
-                colors={colors}
-              />
-            </View>
+            {/* Stats Strip */}
+            <Animated.View entering={FadeIn.duration(300)}>
+              <View style={[s.statsCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <View style={s.statsStrip}>
+                  <View style={s.stat}>
+                    <Text style={[s.statValue, { color: colors.text }]}>{totalWeapons}</Text>
+                    <Text style={[s.statLabel, { color: colors.textMuted }]}>{t('weapons.total')}</Text>
+                  </View>
+                  <View style={[s.statDivider, { backgroundColor: colors.border }]} />
+                  <View style={s.stat}>
+                    <Text style={[s.statValue, { color: colors.text }]}>{assignedCount}</Text>
+                    <Text style={[s.statLabel, { color: colors.textMuted }]}>{t('weapons.assigned')}</Text>
+                  </View>
+                  <View style={[s.statDivider, { backgroundColor: colors.border }]} />
+                  <View style={s.stat}>
+                    <Text style={[s.statValue, { color: colors.text }]}>{poolCount}</Text>
+                    <Text style={[s.statLabel, { color: colors.textMuted }]}>{t('weapons.pool')}</Text>
+                  </View>
+                  <View style={[s.statDivider, { backgroundColor: colors.border }]} />
+                  <View style={s.stat}>
+                    <Text style={[s.statValue, { color: pendingCount > 0 ? colors.yellow : colors.text }]}>
+                      {pendingCount}
+                    </Text>
+                    <Text style={[s.statLabel, { color: colors.textMuted }]}>{t('weapons.pending')}</Text>
+                  </View>
+                </View>
+              </View>
+            </Animated.View>
 
             {/* Tab Bar */}
             <TabBar
@@ -1351,255 +1314,305 @@ export default function TeamArmoryScreen() {
 
             {/* ========== WEAPONS TAB ========== */}
             {activeTab === 'weapons' && (
-              <>
+              <Animated.View entering={FadeIn.duration(250)} style={s.tabContent}>
                 {/* Add Weapon Button */}
                 <TouchableOpacity
-                  style={[styles.addWeaponBtn, { backgroundColor: colors.primary }]}
+                  style={[s.addWeaponBtn, { backgroundColor: colors.primary }]}
                   onPress={() => setShowAddWeapon(true)}
+                  activeOpacity={0.8}
                 >
-                  <Plus size={18} color="#fff" />
-                  <Text style={styles.addWeaponText}>{t('weapons.addTeamWeapon')}</Text>
+                  <Plus size={15} color="#fff" />
+                  <Text style={s.addWeaponText}>{t('weapons.addTeamWeapon')}</Text>
                 </TouchableOpacity>
 
                 {/* Pending Contributions */}
                 {data && data.pendingContributions.length > 0 && (
-                  <View style={styles.section}>
-                    <SectionHeader
-                      title={t('weapons.pendingContributions')}
-                      icon={<Gift size={14} color={colors.yellow} />}
-                      count={data.pendingContributions.length}
-                      colors={colors}
-                    />
-                    {data.pendingContributions.map((w) => (
-                      <PendingContributionCard
-                        key={w.id}
-                        weapon={w as any}
-                        colors={colors}
-                        onApprove={() => handleApproveContribution(w.id)}
-                        onReject={() => handleRejectContribution(w.id)}
-                        actionLoading={actionLoading === w.id}
-                      />
-                    ))}
+                  <View style={s.section}>
+                    <View style={s.sectionLabelRow}>
+                      <Text style={[s.sectionLabel, { color: colors.textMuted }]}>
+                        {t('weapons.pendingContributions').toUpperCase()}
+                      </Text>
+                      <View style={[s.sectionBadge, { backgroundColor: colors.yellow }]}>
+                        <Text style={s.sectionBadgeText}>{data.pendingContributions.length}</Text>
+                      </View>
+                    </View>
+                    <View style={[s.groupCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                      {data.pendingContributions.map((w, idx) => (
+                        <View key={w.id}>
+                          <PendingContributionCard
+                            weapon={w as any}
+                            colors={colors}
+                            onApprove={() => handleApproveContribution(w.id)}
+                            onReject={() => handleRejectContribution(w.id)}
+                            actionLoading={actionLoading === w.id}
+                          />
+                          {idx < data.pendingContributions.length - 1 && (
+                            <View style={[s.hairline, { backgroundColor: colors.border }]} />
+                          )}
+                        </View>
+                      ))}
+                    </View>
                   </View>
                 )}
 
                 {/* Assigned Weapons */}
                 {data && data.assignedWeapons.length > 0 && (
-                  <View style={styles.section}>
-                    <SectionHeader
-                      title={t('weapons.assignedWeapons')}
-                      icon={<Users size={14} color={colors.green} />}
-                      count={data.assignedWeapons.length}
-                      colors={colors}
-                    />
-                    {data.assignedWeapons.map((w) => (
-                      <WeaponCard
-                        key={w.id}
-                        weapon={w}
-                        colors={colors}
-                        isAssigned
-                        showAssignedUser
-                        onUnassign={() => handleUnassign(w.id)}
-                        actionLoading={actionLoading === w.id}
-                      />
-                    ))}
+                  <View style={s.section}>
+                    <View style={s.sectionLabelRow}>
+                      <Text style={[s.sectionLabel, { color: colors.textMuted }]}>
+                        {t('weapons.assignedWeapons').toUpperCase()}
+                      </Text>
+                      <View style={[s.sectionBadge, { backgroundColor: colors.green }]}>
+                        <Text style={s.sectionBadgeText}>{data.assignedWeapons.length}</Text>
+                      </View>
+                    </View>
+                    <View style={[s.groupCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                      {data.assignedWeapons.map((w, idx) => (
+                        <View key={w.id}>
+                          <WeaponRow
+                            weapon={w}
+                            colors={colors}
+                            isAssigned
+                            showAssignedUser
+                            onUnassign={() => handleUnassign(w.id)}
+                            actionLoading={actionLoading === w.id}
+                          />
+                          {idx < data.assignedWeapons.length - 1 && (
+                            <View style={[s.hairline, { backgroundColor: colors.border }]} />
+                          )}
+                        </View>
+                      ))}
+                    </View>
                   </View>
                 )}
 
                 {/* Pool Weapons */}
                 {data && data.poolWeapons.length > 0 && (
-                  <View style={styles.section}>
-                    <SectionHeader
-                      title="Pool Weapons"
-                      icon={<Gift size={14} color={colors.yellow} />}
-                      count={data.poolWeapons.length}
-                      colors={colors}
-                    />
-                    <Text style={[styles.poolHint, { color: colors.textMuted }]}>
-                      Available for all team members to use
-                    </Text>
-                    {data.poolWeapons.map((w) => (
-                      <WeaponCard
-                        key={w.id}
-                        weapon={w}
-                        colors={colors}
-                        isPool
-                        onRemoveFromPool={() => handleRemoveFromPool(w.id)}
-                        onAssign={() => setSelectedWeaponForAssign(w)}
-                        actionLoading={actionLoading === w.id}
-                      />
-                    ))}
+                  <View style={s.section}>
+                    <View style={s.sectionLabelRow}>
+                      <Text style={[s.sectionLabel, { color: colors.textMuted }]}>
+                        POOL WEAPONS
+                      </Text>
+                      <View style={[s.sectionBadge, { backgroundColor: colors.yellow }]}>
+                        <Text style={s.sectionBadgeText}>{data.poolWeapons.length}</Text>
+                      </View>
+                    </View>
+                    <View style={[s.groupCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                      {data.poolWeapons.map((w, idx) => (
+                        <View key={w.id}>
+                          <WeaponRow
+                            weapon={w}
+                            colors={colors}
+                            isPool
+                            onRemoveFromPool={() => handleRemoveFromPool(w.id)}
+                            onAssign={() => setSelectedWeaponForAssign(w)}
+                            actionLoading={actionLoading === w.id}
+                          />
+                          {idx < data.poolWeapons.length - 1 && (
+                            <View style={[s.hairline, { backgroundColor: colors.border }]} />
+                          )}
+                        </View>
+                      ))}
+                    </View>
                   </View>
                 )}
 
                 {/* Unassigned Weapons */}
                 {data && data.unassignedWeapons.length > 0 && (
-                  <View style={styles.section}>
-                    <SectionHeader
-                      title={t('weapons.unassigned')}
-                      icon={<Shield size={14} color={colors.textMuted} />}
-                      count={data.unassignedWeapons.length}
-                      colors={colors}
-                    />
-                    {data.unassignedWeapons.map((w) => (
-                      <WeaponCard
-                        key={w.id}
-                        weapon={w}
-                        colors={colors}
-                        onAssign={() => setSelectedWeaponForAssign(w)}
-                        onAddToPool={() => handleAddToPool(w.id)}
-                        actionLoading={actionLoading === w.id}
-                      />
-                    ))}
+                  <View style={s.section}>
+                    <View style={s.sectionLabelRow}>
+                      <Text style={[s.sectionLabel, { color: colors.textMuted }]}>
+                        {t('weapons.unassigned').toUpperCase()}
+                      </Text>
+                      <View style={[s.sectionBadge, { backgroundColor: colors.border }]}>
+                        <Text style={[s.sectionBadgeText, { color: colors.textMuted }]}>
+                          {data.unassignedWeapons.length}
+                        </Text>
+                      </View>
+                    </View>
+                    <View style={[s.groupCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                      {data.unassignedWeapons.map((w, idx) => (
+                        <View key={w.id}>
+                          <WeaponRow
+                            weapon={w}
+                            colors={colors}
+                            onAssign={() => setSelectedWeaponForAssign(w)}
+                            onAddToPool={() => handleAddToPool(w.id)}
+                            actionLoading={actionLoading === w.id}
+                          />
+                          {idx < data.unassignedWeapons.length - 1 && (
+                            <View style={[s.hairline, { backgroundColor: colors.border }]} />
+                          )}
+                        </View>
+                      ))}
+                    </View>
                   </View>
                 )}
 
                 {/* Empty State */}
                 {totalWeapons === 0 && (
-                  <View style={styles.emptyState}>
-                    <View style={[styles.emptyIcon, { backgroundColor: colors.secondary }]}>
-                      <Shield size={32} color={colors.textMuted} />
+                  <View style={[s.emptyState, { borderColor: colors.border }]}>
+                    <View style={[s.emptyIcon, { backgroundColor: colors.card }]}>
+                      <Shield size={22} color={colors.textMuted} />
                     </View>
-                    <Text style={[styles.emptyTitle, { color: colors.text }]}>{t('weapons.noTeamWeapons')}</Text>
-                    <Text style={[styles.emptyHint, { color: colors.textMuted }]}>{t('weapons.addWeaponsOnce')}</Text>
+                    <View style={s.emptyContent}>
+                      <Text style={[s.emptyTitle, { color: colors.text }]}>{t('weapons.noTeamWeapons')}</Text>
+                      <Text style={[s.emptyHint, { color: colors.textMuted }]}>{t('weapons.addWeaponsOnce')}</Text>
+                    </View>
                   </View>
                 )}
-              </>
+              </Animated.View>
             )}
 
             {/* ========== MEMBERS TAB ========== */}
             {activeTab === 'members' && (
-              <>
+              <Animated.View entering={FadeIn.duration(250)} style={s.tabContent}>
                 {/* Unassigned Members */}
                 {unassignedMembers.length > 0 && (
-                  <View style={styles.section}>
-                    <SectionHeader
-                      title={t('weapons.needWeapons')}
-                      icon={<UserMinus size={14} color={colors.destructive} />}
-                      count={unassignedMembers.length}
-                      colors={colors}
-                    />
-                    {unassignedMembers.map((member) => (
-                      <View
-                        key={member.id}
-                        style={[
-                          styles.memberCard,
-                          { backgroundColor: colors.card, borderColor: colors.destructive + '40' },
-                        ]}
-                      >
-                        <View style={[styles.memberCardAvatar, { backgroundColor: colors.destructive + '20' }]}>
-                          <User size={20} color={colors.destructive} />
-                        </View>
-                        <View style={styles.memberCardInfo}>
-                          <Text style={[styles.memberCardName, { color: colors.text }]}>{member.full_name}</Text>
-                          <Text style={[styles.memberCardStatus, { color: colors.destructive }]}>
-                            {t('weapons.noWeaponAssigned')}
-                          </Text>
-                        </View>
-                        {(data?.unassignedWeapons.length || 0) + (data?.poolWeapons.length || 0) > 0 && (
-                          <TouchableOpacity
-                            style={[styles.memberCardAction, { backgroundColor: colors.primary }]}
-                            onPress={() => setTargetMemberForAssign(member)}
-                          >
-                            <Text style={[styles.memberCardActionText, { color: '#fff' }]}>{t('weapons.assign')}</Text>
-                          </TouchableOpacity>
-                        )}
+                  <View style={s.section}>
+                    <View style={s.sectionLabelRow}>
+                      <Text style={[s.sectionLabel, { color: colors.textMuted }]}>
+                        {t('weapons.needWeapons').toUpperCase()}
+                      </Text>
+                      <View style={[s.sectionBadge, { backgroundColor: colors.destructive }]}>
+                        <Text style={s.sectionBadgeText}>{unassignedMembers.length}</Text>
                       </View>
-                    ))}
+                    </View>
+                    <View style={[s.groupCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                      {unassignedMembers.map((member, idx) => (
+                        <View key={member.id}>
+                          <View style={s.memberRow}>
+                            <View style={[s.memberAvatar, { backgroundColor: colors.destructive + '15' }]}>
+                              <User size={14} color={colors.destructive} />
+                            </View>
+                            <View style={s.memberInfo}>
+                              <Text style={[s.memberName, { color: colors.text }]}>{member.full_name}</Text>
+                              <Text style={[s.memberStatus, { color: colors.destructive }]}>
+                                {t('weapons.noWeaponAssigned')}
+                              </Text>
+                            </View>
+                            {(data?.unassignedWeapons.length || 0) + (data?.poolWeapons.length || 0) > 0 && (
+                              <TouchableOpacity
+                                style={[s.assignBtn, { backgroundColor: colors.primary }]}
+                                onPress={() => setTargetMemberForAssign(member)}
+                              >
+                                <Text style={s.assignBtnText}>{t('weapons.assign')}</Text>
+                              </TouchableOpacity>
+                            )}
+                          </View>
+                          {idx < unassignedMembers.length - 1 && (
+                            <View style={[s.hairline, { backgroundColor: colors.border }]} />
+                          )}
+                        </View>
+                      ))}
+                    </View>
                   </View>
                 )}
 
                 {/* Assigned Members */}
                 {assignedMembers.length > 0 && (
-                  <View style={styles.section}>
-                    <SectionHeader
-                      title="Armed"
-                      icon={<ShieldCheck size={14} color={colors.green} />}
-                      count={assignedMembers.length}
-                      colors={colors}
-                    />
-                    {assignedMembers.map((member) => {
-                      const weapon = data?.assignedWeapons.find((w) => w.assigned_to === member.id);
-                      return (
-                        <View
-                          key={member.id}
-                          style={[styles.memberCard, { backgroundColor: colors.card, borderColor: colors.border }]}
-                        >
-                          <View style={[styles.memberCardAvatar, { backgroundColor: colors.green + '20' }]}>
-                            <User size={20} color={colors.green} />
+                  <View style={s.section}>
+                    <View style={s.sectionLabelRow}>
+                      <Text style={[s.sectionLabel, { color: colors.textMuted }]}>ARMED</Text>
+                      <View style={[s.sectionBadge, { backgroundColor: colors.green }]}>
+                        <Text style={s.sectionBadgeText}>{assignedMembers.length}</Text>
+                      </View>
+                    </View>
+                    <View style={[s.groupCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                      {assignedMembers.map((member, idx) => {
+                        const weapon = data?.assignedWeapons.find((w) => w.assigned_to === member.id);
+                        return (
+                          <View key={member.id}>
+                            <View style={s.memberRow}>
+                              <View style={[s.memberAvatar, { backgroundColor: colors.green + '15' }]}>
+                                <User size={14} color={colors.green} />
+                              </View>
+                              <View style={s.memberInfo}>
+                                <Text style={[s.memberName, { color: colors.text }]}>{member.full_name}</Text>
+                                <Text style={[s.memberStatus, { color: colors.textMuted }]}>
+                                  {weapon?.name || 'Unknown weapon'}
+                                </Text>
+                              </View>
+                            </View>
+                            {idx < assignedMembers.length - 1 && (
+                              <View style={[s.hairline, { backgroundColor: colors.border }]} />
+                            )}
                           </View>
-                          <View style={styles.memberCardInfo}>
-                            <Text style={[styles.memberCardName, { color: colors.text }]}>{member.full_name}</Text>
-                            <Text style={[styles.memberCardStatus, { color: colors.textMuted }]}>
-                              {weapon?.name || 'Unknown weapon'}
-                            </Text>
-                          </View>
-                        </View>
-                      );
-                    })}
+                        );
+                      })}
+                    </View>
                   </View>
                 )}
 
                 {/* Empty State */}
                 {teamMembers.length === 0 && (
-                  <View style={styles.emptyState}>
-                    <View style={[styles.emptyIcon, { backgroundColor: colors.secondary }]}>
-                      <Users size={32} color={colors.textMuted} />
+                  <View style={[s.emptyState, { borderColor: colors.border }]}>
+                    <View style={[s.emptyIcon, { backgroundColor: colors.card }]}>
+                      <Users size={22} color={colors.textMuted} />
                     </View>
-                    <Text style={[styles.emptyTitle, { color: colors.text }]}>No Team Members</Text>
-                    <Text style={[styles.emptyHint, { color: colors.textMuted }]}>
-                      Invite members to your team first
-                    </Text>
+                    <View style={s.emptyContent}>
+                      <Text style={[s.emptyTitle, { color: colors.text }]}>No Team Members</Text>
+                      <Text style={[s.emptyHint, { color: colors.textMuted }]}>
+                        Invite members to your team first
+                      </Text>
+                    </View>
                   </View>
                 )}
-              </>
+              </Animated.View>
             )}
 
             {/* ========== REQUESTS TAB ========== */}
             {activeTab === 'requests' && (
-              <>
-                {/* Pending Requests */}
+              <Animated.View entering={FadeIn.duration(250)} style={s.tabContent}>
                 {data && data.pendingRequests.length > 0 ? (
-                  <View style={styles.section}>
-                    <SectionHeader
-                      title={t('weapons.pendingRequests')}
-                      icon={<AlertTriangle size={14} color={colors.yellow} />}
-                      count={data.pendingRequests.length}
-                      colors={colors}
-                    />
-                    {data.pendingRequests.map((req) => (
-                      <PendingRequestCard
-                        key={req.id}
-                        request={req}
-                        colors={colors}
-                        onReview={() => setSelectedRequestForReview(req)}
-                      />
-                    ))}
+                  <View style={s.section}>
+                    <View style={s.sectionLabelRow}>
+                      <Text style={[s.sectionLabel, { color: colors.textMuted }]}>
+                        {t('weapons.pendingRequests').toUpperCase()}
+                      </Text>
+                      <View style={[s.sectionBadge, { backgroundColor: colors.yellow }]}>
+                        <Text style={s.sectionBadgeText}>{data.pendingRequests.length}</Text>
+                      </View>
+                    </View>
+                    <View style={[s.groupCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                      {data.pendingRequests.map((req, idx) => (
+                        <View key={req.id}>
+                          <PendingRequestCard
+                            request={req}
+                            colors={colors}
+                            onReview={() => setSelectedRequestForReview(req)}
+                          />
+                          {idx < data.pendingRequests.length - 1 && (
+                            <View style={[s.hairline, { backgroundColor: colors.border }]} />
+                          )}
+                        </View>
+                      ))}
+                    </View>
                   </View>
                 ) : (
-                  <View style={styles.emptyState}>
-                    <View style={[styles.emptyIcon, { backgroundColor: colors.secondary }]}>
-                      <Check size={32} color={colors.green} />
+                  <View style={[s.emptyState, { borderColor: colors.border }]}>
+                    <View style={[s.emptyIcon, { backgroundColor: colors.green + '12' }]}>
+                      <Check size={22} color={colors.green} />
                     </View>
-                    <Text style={[styles.emptyTitle, { color: colors.text }]}>{t('weapons.allCaughtUp')}</Text>
-                    <Text style={[styles.emptyHint, { color: colors.textMuted }]}>
-                      {t('weapons.noPendingRequests')}
-                    </Text>
+                    <View style={s.emptyContent}>
+                      <Text style={[s.emptyTitle, { color: colors.text }]}>{t('weapons.allCaughtUp')}</Text>
+                      <Text style={[s.emptyHint, { color: colors.textMuted }]}>
+                        {t('weapons.noPendingRequests')}
+                      </Text>
+                    </View>
                   </View>
                 )}
-              </>
+              </Animated.View>
             )}
           </>
         ) : (
           // ============ SOLDIER VIEW ============
-          <>
+          <Animated.View entering={FadeIn.duration(300)} style={s.tabContent}>
             {/* My Assignment */}
-            <View style={styles.section}>
-              <SectionHeader
-                title={t('weapons.myAssignment')}
-                icon={<ShieldCheck size={14} color={colors.primary} />}
-                colors={colors}
-              />
+            <View style={s.section}>
+              <Text style={[s.sectionLabel, { color: colors.textMuted }]}>
+                {t('weapons.myAssignment').toUpperCase()}
+              </Text>
               <MyAssignmentCard
                 weapon={data?.myAssignment || null}
                 colors={colors}
@@ -1610,7 +1623,7 @@ export default function TeamArmoryScreen() {
 
             {/* My Pending Request */}
             {data?.myPendingRequest && (
-              <View style={styles.section}>
+              <View style={s.section}>
                 <MyPendingRequestCard
                   request={data.myPendingRequest}
                   colors={colors}
@@ -1622,22 +1635,28 @@ export default function TeamArmoryScreen() {
 
             {/* Team Pool */}
             {data && data.poolWeapons.length > 0 && (
-              <View style={styles.section}>
-                <SectionHeader
-                  title={t('weapons.teamPool')}
-                  icon={<Gift size={14} color={colors.yellow} />}
-                  count={data.poolWeapons.length}
-                  colors={colors}
-                />
-                <Text style={[styles.poolHint, { color: colors.textMuted }]}>
-                  {t('weapons.availableForAllMembers')}
-                </Text>
-                {data.poolWeapons.map((w) => (
-                  <WeaponCard key={w.id} weapon={w} colors={colors} isPool />
-                ))}
+              <View style={s.section}>
+                <View style={s.sectionLabelRow}>
+                  <Text style={[s.sectionLabel, { color: colors.textMuted }]}>
+                    {t('weapons.teamPool').toUpperCase()}
+                  </Text>
+                  <View style={[s.sectionBadge, { backgroundColor: colors.yellow }]}>
+                    <Text style={s.sectionBadgeText}>{data.poolWeapons.length}</Text>
+                  </View>
+                </View>
+                <View style={[s.groupCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                  {data.poolWeapons.map((w, idx) => (
+                    <View key={w.id}>
+                      <WeaponRow weapon={w} colors={colors} isPool />
+                      {idx < data.poolWeapons.length - 1 && (
+                        <View style={[s.hairline, { backgroundColor: colors.border }]} />
+                      )}
+                    </View>
+                  ))}
+                </View>
               </View>
             )}
-          </>
+          </Animated.View>
         )}
       </ScrollView>
 
@@ -1693,11 +1712,20 @@ export default function TeamArmoryScreen() {
   );
 }
 
+/**
+ * Default export for route — standalone page with header & back button.
+ * TeamArmoryContent is also exported for embedding in loadout tab.
+ */
+export default function TeamArmoryScreen() {
+  return <TeamArmoryContent />;
+}
+
 // ============================================================================
 // STYLES
 // ============================================================================
 
-const styles = StyleSheet.create({
+const s = StyleSheet.create({
+  // Layout
   container: {
     flex: 1,
   },
@@ -1706,163 +1734,197 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingBottom: 12,
-  },
-  backBtn: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerCenter: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 17,
-    fontWeight: '600',
-  },
-  headerSubtitle: {
-    fontSize: 12,
-    marginTop: 2,
-  },
-  refreshBtn: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
     paddingHorizontal: 16,
-    gap: 20,
+  },
+  tabContent: {
+    gap: 16,
   },
 
-  // Stats
-  statsRow: {
+  // Header
+  header: {
     flexDirection: 'row',
-    gap: 8,
-  },
-  statCard: {
-    flex: 1,
     alignItems: 'center',
-    padding: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    gap: 6,
+    paddingHorizontal: 12,
+    paddingBottom: 8,
+    gap: 4,
   },
-  statIcon: {
+  backBtn: {
     width: 36,
     height: 36,
-    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  headerInfo: {
+    flex: 1,
+  },
+  headerTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    letterSpacing: -0.3,
+  },
+  headerSubtitle: {
+    fontSize: 11,
+    fontWeight: '500',
+    marginTop: 1,
+  },
+
+  // Stats Card
+  statsCard: {
+    borderRadius: 10,
+    borderWidth: 1,
+    overflow: 'hidden',
+    marginBottom: 12,
+  },
+  statsStrip: {
+    flexDirection: 'row',
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+  },
+  stat: {
+    flex: 1,
+    alignItems: 'center',
   },
   statValue: {
     fontSize: 18,
     fontWeight: '700',
+    letterSpacing: -0.5,
   },
   statLabel: {
-    fontSize: 11,
-    fontWeight: '500',
+    fontSize: 10,
+    fontWeight: '600',
+    marginTop: 2,
+    letterSpacing: 0.3,
+  },
+  statDivider: {
+    width: 1,
+    alignSelf: 'stretch',
+    marginVertical: 2,
   },
 
-  // Add Weapon Button
-  addWeaponBtn: {
+  // Tab Bar
+  tabBar: {
+    flexDirection: 'row',
+    borderRadius: 10,
+    borderWidth: 1,
+    padding: 3,
+    marginBottom: 14,
+  },
+  tab: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 14,
-    borderRadius: 12,
+    paddingVertical: 8,
+    borderRadius: 7,
+    gap: 5,
   },
-  addWeaponText: {
-    fontSize: 15,
+  tabLabel: {
+    fontSize: 13,
     fontWeight: '600',
+  },
+  tabBadge: {
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  tabBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
     color: '#fff',
   },
 
   // Section
   section: {
-    gap: 10,
+    gap: 6,
   },
-  sectionHeader: {
+  sectionLabelRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: 6,
   },
-  sectionHeaderLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  sectionTitle: {
-    fontSize: 13,
+  sectionLabel: {
+    fontSize: 10,
     fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: 0.8,
   },
-  countBadge: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 8,
-    minWidth: 20,
+  sectionBadge: {
+    minWidth: 16,
+    height: 16,
+    borderRadius: 4,
     alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
   },
-  countText: {
-    fontSize: 11,
+  sectionBadgeText: {
+    fontSize: 9,
     fontWeight: '700',
     color: '#fff',
   },
-  sectionAction: {
-    fontSize: 13,
-    fontWeight: '600',
+
+  // Group Card
+  groupCard: {
+    borderRadius: 10,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  hairline: {
+    height: StyleSheet.hairlineWidth,
+    marginLeft: 48,
   },
 
-  // Weapon Card
-  weaponCard: {
+  // Weapon Row (inside group card)
+  weaponRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 14,
-    borderRadius: 12,
-    borderWidth: 1,
+    padding: 10,
+    gap: 10,
+  },
+  weaponIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   weaponInfo: {
     flex: 1,
-    gap: 2,
+    gap: 1,
   },
   weaponName: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '600',
+    letterSpacing: -0.2,
   },
   weaponMeta: {
-    fontSize: 13,
+    fontSize: 11,
+    fontWeight: '500',
   },
   assignedUserRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    marginTop: 4,
+    gap: 3,
+    marginTop: 2,
   },
   assignedUserName: {
-    fontSize: 12,
+    fontSize: 10,
+    fontWeight: '500',
   },
   weaponActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    marginLeft: 12,
+    gap: 6,
   },
   actionBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
+    width: 28,
+    height: 28,
+    borderRadius: 7,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1871,256 +1933,268 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 4,
     paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
+    paddingVertical: 5,
+    borderRadius: 6,
   },
   assignBtnText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '600',
     color: '#fff',
   },
-  poolBtn: {
+  approveBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 7,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // Add Weapon Button
+  addWeaponBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  addWeaponText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#fff',
+  },
+
+  // Request Row (inside group card)
+  requestRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 10,
+    gap: 10,
+  },
+  requestIcon: {
     width: 32,
     height: 32,
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  poolHint: {
-    fontSize: 12,
-    marginLeft: 4,
-    marginTop: -4,
-  },
-
-  // Request Card
-  requestCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 14,
-    borderRadius: 12,
-    borderWidth: 1,
-  },
-  requestHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    position: 'absolute',
-    top: 10,
-    left: 14,
-  },
-  requestLabel: {
-    fontSize: 10,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-  },
   requestInfo: {
     flex: 1,
-    paddingTop: 18,
-    gap: 6,
+    gap: 1,
   },
   requestUser: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '600',
+    letterSpacing: -0.2,
   },
-  categoryTag: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-    alignSelf: 'flex-start',
-  },
-  categoryTagText: {
+  requestCat: {
     fontSize: 11,
-    fontWeight: '600',
-  },
-  requestChevron: {
-    marginLeft: 8,
+    fontWeight: '500',
   },
 
-  // Contribution Card
-  contributionCard: {
-    padding: 14,
-    borderRadius: 12,
-    borderWidth: 1,
-    gap: 10,
-  },
-  contributionHeader: {
+  // Contribution Row (inside group card)
+  contributionRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    padding: 10,
+    gap: 10,
   },
-  contributionLabel: {
-    fontSize: 10,
-    fontWeight: '600',
-    textTransform: 'uppercase',
+  contributionIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  contributorName: {
-    fontSize: 12,
-    marginTop: 2,
+  contributionInfo: {
+    flex: 1,
+    gap: 1,
   },
   contributionActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'flex-end',
-    gap: 8,
-  },
-  rejectSmallBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  approveSmallBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
     gap: 6,
-    paddingHorizontal: 14,
-    height: 36,
-    borderRadius: 10,
-  },
-  approveSmallText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#fff',
   },
 
-  // My Assignment Card
-  noAssignmentCard: {
+  // Member Row (inside group card)
+  memberRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    padding: 24,
-    borderRadius: 12,
-    borderWidth: 1,
-    gap: 8,
+    padding: 10,
+    gap: 10,
   },
-  noAssignmentIcon: {
-    width: 56,
-    height: 56,
+  memberAvatar: {
+    width: 32,
+    height: 32,
     borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
   },
+  memberInfo: {
+    flex: 1,
+    gap: 1,
+  },
+  memberName: {
+    fontSize: 14,
+    fontWeight: '600',
+    letterSpacing: -0.2,
+  },
+  memberStatus: {
+    fontSize: 11,
+    fontWeight: '500',
+  },
+
+  // My Assignment Card (Soldier)
+  noAssignmentCard: {
+    alignItems: 'center',
+    padding: 20,
+    borderRadius: 10,
+    borderWidth: 1,
+    gap: 6,
+  },
+  noAssignmentIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
+  },
   noAssignmentTitle: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
   },
   noAssignmentHint: {
-    fontSize: 14,
+    fontSize: 12,
     textAlign: 'center',
-    lineHeight: 20,
+    lineHeight: 18,
     paddingHorizontal: 16,
   },
   noAssignmentCta: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 10,
-    marginTop: 8,
+    gap: 5,
+    paddingVertical: 9,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    marginTop: 6,
   },
   noAssignmentCtaText: {
-    fontSize: 15,
+    fontSize: 13,
     fontWeight: '600',
     color: '#fff',
   },
   myAssignmentCard: {
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    gap: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  myAssignmentTop: {
+    padding: 10,
   },
   myAssignmentBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
+    gap: 5,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
     alignSelf: 'flex-start',
   },
   myAssignmentBadgeText: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '600',
     color: '#fff',
   },
+  myAssignmentBody: {
+    borderTopWidth: 1,
+    padding: 12,
+    gap: 2,
+  },
   myAssignmentName: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '700',
-    marginTop: 4,
+    letterSpacing: -0.3,
   },
   myAssignmentMeta: {
-    fontSize: 14,
+    fontSize: 12,
+    fontWeight: '500',
   },
 
-  // My Pending Request
+  // My Pending Request (Soldier)
   myRequestCard: {
-    padding: 16,
-    borderRadius: 12,
+    borderRadius: 10,
     borderWidth: 1,
-    gap: 10,
+    padding: 12,
+    gap: 8,
   },
   myRequestHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
   },
+  myRequestIconBg: {
+    width: 28,
+    height: 28,
+    borderRadius: 7,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  myRequestHeaderInfo: {
+    flex: 1,
+    gap: 1,
+  },
   myRequestTitle: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
   },
-  myRequestText: {
-    fontSize: 14,
-  },
   myRequestPreference: {
+    fontSize: 11,
+    fontWeight: '500',
+  },
+  myRequestText: {
     fontSize: 12,
+    lineHeight: 17,
   },
   cancelRequestBtn: {
     alignItems: 'center',
-    paddingVertical: 10,
-    borderRadius: 8,
+    paddingVertical: 8,
+    borderRadius: 7,
     borderWidth: 1,
-    marginTop: 4,
   },
   cancelRequestText: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '600',
-  },
-
-  // Request Button
-  requestBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 14,
-    borderRadius: 12,
-  },
-  requestBtnText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#fff',
   },
 
   // Empty State
   emptyState: {
+    flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 48,
-    gap: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    padding: 14,
+    gap: 10,
   },
   emptyIcon: {
-    width: 72,
-    height: 72,
-    borderRadius: 20,
+    width: 36,
+    height: 36,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
   },
+  emptyContent: {
+    flex: 1,
+    gap: 2,
+  },
   emptyTitle: {
-    fontSize: 17,
+    fontSize: 13,
     fontWeight: '600',
   },
   emptyHint: {
-    fontSize: 14,
+    fontSize: 11,
   },
 
   // Modal Shared
@@ -2134,51 +2208,59 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 16,
     paddingBottom: 12,
-    borderBottomWidth: 1,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
   modalCancel: {
-    fontSize: 16,
+    fontSize: 15,
+    fontWeight: '500',
   },
   modalTitle: {
-    fontSize: 17,
+    fontSize: 15,
     fontWeight: '600',
+    letterSpacing: -0.2,
   },
   modalSave: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
   },
 
-  // Add Weapon Modal
+  // Add Weapon Modal - Choose Step
   chooseContainer: {
-    padding: 20,
-    gap: 12,
+    padding: 16,
+  },
+  chooseCard: {
+    borderRadius: 10,
+    borderWidth: 1,
+    overflow: 'hidden',
   },
   chooseOption: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    gap: 14,
+    padding: 12,
+    gap: 10,
   },
   chooseIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
+    width: 36,
+    height: 36,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
   chooseContent: {
     flex: 1,
-    gap: 2,
+    gap: 1,
   },
   chooseTitle: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
+    letterSpacing: -0.2,
   },
   chooseDesc: {
-    fontSize: 13,
+    fontSize: 11,
+    fontWeight: '500',
   },
+
+  // Add Weapon Modal - Catalog Step
   catalogContainer: {
     flex: 1,
   },
@@ -2186,321 +2268,248 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     margin: 16,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 10,
-    borderWidth: 1,
-    gap: 10,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 16,
-  },
-  catalogList: {
-    padding: 16,
-    paddingTop: 0,
-    gap: 8,
-  },
-  catalogFilterScroll: {
-    maxHeight: 44,
-  },
-  catalogFilterContent: {
-    paddingHorizontal: 16,
-    gap: 8,
-  },
-  catalogFilterChip: {
-    paddingHorizontal: 14,
+    marginBottom: 10,
+    paddingHorizontal: 10,
     paddingVertical: 8,
     borderRadius: 8,
     borderWidth: 1,
+    gap: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 14,
+  },
+  catalogFilterScroll: {
+    maxHeight: 36,
+  },
+  catalogFilterContent: {
+    paddingHorizontal: 16,
+    gap: 6,
+  },
+  catalogFilterChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 6,
+    borderWidth: 1,
   },
   catalogFilterText: {
-    fontSize: 13,
-    fontWeight: '500',
-  },
-  catalogResultsHeader: {
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 8,
-  },
-  catalogResultsCount: {
     fontSize: 12,
     fontWeight: '500',
+  },
+  catalogResultsCount: {
+    fontSize: 10,
+    fontWeight: '500',
+    letterSpacing: 0.5,
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    paddingBottom: 6,
   },
   catalogLoadingContainer: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 12,
-    paddingTop: 60,
+    gap: 10,
+    paddingTop: 48,
   },
   catalogLoadingText: {
-    fontSize: 14,
+    fontSize: 12,
   },
   catalogEmptyContainer: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 32,
-    paddingTop: 40,
-    gap: 12,
+    paddingTop: 32,
+    gap: 8,
   },
   catalogEmptyIcon: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
+    width: 56,
+    height: 56,
+    borderRadius: 14,
+    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 8,
+    marginBottom: 4,
   },
   catalogEmptyTitle: {
-    fontSize: 17,
+    fontSize: 15,
     fontWeight: '600',
     textAlign: 'center',
   },
   catalogEmptyDesc: {
-    fontSize: 14,
+    fontSize: 12,
     textAlign: 'center',
-    lineHeight: 20,
+    lineHeight: 18,
   },
   catalogEmptyBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 10,
-    marginTop: 8,
+    gap: 6,
+    paddingVertical: 9,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+    marginTop: 4,
   },
   catalogEmptyBtnText: {
-    fontSize: 15,
+    fontSize: 13,
     fontWeight: '600',
     color: '#fff',
   },
   catalogScrollView: {
     flex: 1,
   },
+  catalogList: {
+    padding: 16,
+    paddingTop: 0,
+    gap: 12,
+  },
   catalogManufacturerGroup: {
-    gap: 8,
-    marginBottom: 16,
+    gap: 6,
   },
   catalogManufacturerTitle: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '700',
-    letterSpacing: 0.5,
+    letterSpacing: 0.8,
     marginLeft: 4,
-    marginBottom: 4,
   },
   catalogItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 14,
-    borderRadius: 12,
-    borderWidth: 1,
-    gap: 12,
+    padding: 10,
+    gap: 10,
   },
   catalogItemIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
+    width: 32,
+    height: 32,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
   catalogInfo: {
     flex: 1,
-    gap: 4,
+    gap: 1,
   },
   catalogName: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '600',
-  },
-  catalogMetaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  catalogCategoryBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 5,
-  },
-  catalogCategoryText: {
-    fontSize: 11,
-    fontWeight: '500',
-  },
-  catalogCaliberText: {
-    fontSize: 12,
+    letterSpacing: -0.2,
   },
   catalogMeta: {
-    fontSize: 13,
-  },
-  noResults: {
-    textAlign: 'center',
-    paddingVertical: 32,
-    fontSize: 14,
+    fontSize: 11,
+    fontWeight: '500',
   },
   skipCatalog: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    gap: 6,
     margin: 16,
-    padding: 14,
-    borderRadius: 10,
+    padding: 10,
+    borderRadius: 8,
     borderWidth: 1,
   },
   skipCatalogText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '500',
   },
+
+  // Add Weapon Modal - Custom Form Step
   formContainer: {
     flex: 1,
   },
   formContent: {
-    padding: 20,
-    gap: 20,
+    padding: 16,
+    gap: 14,
   },
   basedOnBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 7,
     alignSelf: 'flex-start',
   },
   basedOnText: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '500',
   },
-  formGroup: {
-    gap: 8,
-  },
-  formLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    letterSpacing: 0.5,
-    marginLeft: 4,
-  },
-  formInput: {
-    padding: 14,
+  formCard: {
     borderRadius: 10,
     borderWidth: 1,
-    fontSize: 16,
+    overflow: 'hidden',
   },
-  categoryScroll: {
-    marginHorizontal: -4,
+  formGroup: {
+    padding: 12,
+    gap: 6,
+  },
+  formDivider: {
+    height: StyleSheet.hairlineWidth,
+  },
+  formLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    letterSpacing: 0.5,
+  },
+  formInput: {
+    padding: 10,
+    borderRadius: 7,
+    borderWidth: 1,
+    fontSize: 14,
   },
   categoryRow: {
     flexDirection: 'row',
-    gap: 8,
-    paddingHorizontal: 4,
+    gap: 6,
   },
   categoryChip: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
     borderWidth: 1,
   },
   categoryChipText: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '500',
   },
 
-  // Member Picker Modal
-  memberPickerHint: {
-    fontSize: 14,
+  // Picker Modal Shared (Member & Weapon Pickers)
+  pickerHint: {
+    fontSize: 12,
+    fontWeight: '500',
     paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 8,
+    paddingTop: 12,
+    paddingBottom: 6,
   },
-  memberList: {
-    padding: 16,
-    gap: 8,
+  pickerListCard: {
+    marginHorizontal: 16,
+    marginTop: 6,
+    borderRadius: 10,
+    borderWidth: 1,
+    overflow: 'hidden',
   },
-  memberItem: {
+  pickerList: {},
+  pickerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    padding: 14,
-    borderRadius: 12,
-    borderWidth: 1,
+    gap: 10,
+    padding: 10,
   },
-  memberName: {
-    fontSize: 15,
-    fontWeight: '500',
-  },
-  memberWeapon: {
-    fontSize: 12,
-    marginTop: 2,
-  },
-
-  // Tab Bar
-  tabBar: {
-    flexDirection: 'row',
-    borderRadius: 12,
-    borderWidth: 1,
-    padding: 4,
-    marginBottom: 16,
-  },
-  tab: {
-    flex: 1,
-    flexDirection: 'row',
+  pickerAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 10,
-    borderRadius: 8,
-    gap: 6,
   },
-  tabLabel: {
+  pickerName: {
     fontSize: 14,
     fontWeight: '600',
+    letterSpacing: -0.2,
   },
-  tabBadge: {
-    minWidth: 18,
-    height: 18,
-    borderRadius: 9,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 5,
-  },
-  tabBadgeText: {
+  pickerSub: {
     fontSize: 11,
-    fontWeight: '700',
-    color: '#fff',
+    fontWeight: '500',
+    marginTop: 1,
   },
-
-  // Member Card (for Members tab)
-  memberCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 14,
-    borderRadius: 12,
-    borderWidth: 1,
-    gap: 12,
-  },
-  memberCardAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  memberCardInfo: {
-    flex: 1,
-    gap: 2,
-  },
-  memberCardName: {
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  memberCardStatus: {
-    fontSize: 12,
-  },
-  memberCardAction: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-  },
-  memberCardActionText: {
-    fontSize: 12,
-    fontWeight: '600',
+  pickerDivider: {
+    height: StyleSheet.hairlineWidth,
+    marginLeft: 48,
   },
 });

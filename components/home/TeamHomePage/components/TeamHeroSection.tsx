@@ -1,22 +1,36 @@
 /**
  * TeamHeroSection Component
  *
- * Compact command-style team header with inline stats.
- * Refined, professional aesthetic - minimal color usage.
+ * Merged team summary card:
+ * - Team identity (name, members, streak)
+ * - Stats strip (sessions, accuracy, participation, goal)
+ * - Commander: actionable insights (top performer, needs attention, inactive)
+ * - Progress bar
  */
 
-import { ChevronRight, Users } from 'lucide-react-native';
+import { AlertTriangle, ChevronRight, TrendingDown, TrendingUp, Users } from 'lucide-react-native';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
+
+interface LeaderboardEntry {
+  userId: string;
+  userName: string;
+  rank: number;
+  sessions: number;
+  accuracy: number;
+  shots: number;
+}
 
 interface TeamHeroSectionProps {
   teamName: string;
   teamColor: string;
   memberCount: number;
-  weeklyGoal: number;
   weeklyProgress: number;
   weeklyAccuracy: number;
   streak: number;
+  isCommander: boolean;
+  leaderboard: LeaderboardEntry[];
+  totalShots: number;
   onViewDetails: () => void;
   colors: {
     text: string;
@@ -24,25 +38,38 @@ interface TeamHeroSectionProps {
     card: string;
     border: string;
     background: string;
+    green: string;
   };
+}
+
+function formatShots(n: number): string {
+  if (n >= 10000) return `${(n / 1000).toFixed(0)}k`;
+  if (n >= 1000) return `${(n / 1000).toFixed(1)}k`;
+  return n.toString();
 }
 
 export function TeamHeroSection({
   teamName,
   teamColor,
   memberCount,
-  weeklyGoal,
   weeklyProgress,
   weeklyAccuracy,
   streak,
+  isCommander,
+  leaderboard,
+  totalShots,
   onViewDetails,
   colors,
 }: TeamHeroSectionProps) {
-  const progressPercent = weeklyGoal > 0 ? Math.min((weeklyProgress / weeklyGoal) * 100, 100) : 0;
+  const activeMembers = leaderboard.length;
+  const participationRate = memberCount > 0 ? Math.round((activeMembers / memberCount) * 100) : 0;
+
+  // Commander insights
+  const topPerformer = leaderboard[0];
+  const needsAttention = leaderboard.filter((e) => e.accuracy < 50 || e.sessions < 2);
 
   return (
     <Animated.View entering={FadeIn.duration(300)} style={s.container}>
-      {/* Main Card */}
       <View style={[s.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
         {/* Team Identity Row */}
         <View style={s.identityRow}>
@@ -58,6 +85,14 @@ export function TeamHeroSection({
                 <>
                   <View style={[s.metaDivider, { backgroundColor: colors.border }]} />
                   <Text style={[s.metaText, { color: colors.textMuted }]}>{streak}d streak</Text>
+                </>
+              )}
+              {totalShots > 0 && (
+                <>
+                  <View style={[s.metaDivider, { backgroundColor: colors.border }]} />
+                  <Text style={[s.metaText, { color: colors.textMuted }]}>
+                    {totalShots.toLocaleString()} shots
+                  </Text>
                 </>
               )}
             </View>
@@ -76,20 +111,56 @@ export function TeamHeroSection({
           </View>
           <View style={[s.statDivider, { backgroundColor: colors.border }]} />
           <View style={s.stat}>
-            <Text style={[s.statValue, { color: colors.text }]}>{Math.round(weeklyAccuracy)}%</Text>
+            <Text style={[s.statValue, { color: colors.text }]}>
+              {weeklyAccuracy > 0 ? `${Math.round(weeklyAccuracy)}%` : '—'}
+            </Text>
             <Text style={[s.statLabel, { color: colors.textMuted }]}>accuracy</Text>
           </View>
           <View style={[s.statDivider, { backgroundColor: colors.border }]} />
           <View style={s.stat}>
-            <Text style={[s.statValue, { color: colors.text }]}>{Math.round(progressPercent)}%</Text>
-            <Text style={[s.statLabel, { color: colors.textMuted }]}>of goal</Text>
+            <Text style={[s.statValue, { color: colors.text }]}>
+              {totalShots > 0 ? formatShots(totalShots) : '—'}
+            </Text>
+            <Text style={[s.statLabel, { color: colors.textMuted }]}>shots</Text>
+          </View>
+          <View style={[s.statDivider, { backgroundColor: colors.border }]} />
+          <View style={s.stat}>
+            <Text style={[s.statValue, { color: colors.text }]}>{participationRate}%</Text>
+            <Text style={[s.statLabel, { color: colors.textMuted }]}>active</Text>
           </View>
         </View>
 
-        {/* Minimal Progress Bar */}
-        <View style={[s.progressContainer, { backgroundColor: colors.border }]}>
-          <View style={[s.progressFill, { width: `${progressPercent}%`, backgroundColor: colors.textMuted }]} />
-        </View>
+        {/* Commander Insights */}
+        {isCommander && (topPerformer || needsAttention.length > 0 || (participationRate < 50 && memberCount > 2)) && (
+          <View style={[s.insightsSection, { borderTopColor: colors.border }]}>
+            {topPerformer && (
+              <View style={s.insightRow}>
+                <TrendingUp size={11} color={colors.green} />
+                <Text style={[s.insightText, { color: colors.textMuted }]}>
+                  <Text style={{ color: colors.text, fontWeight: '600' }}>{topPerformer.userName}</Text>
+                  {' '}leads — {topPerformer.sessions} sessions, {Math.round(topPerformer.accuracy)}%
+                </Text>
+              </View>
+            )}
+            {needsAttention.length > 0 && needsAttention.length < leaderboard.length && (
+              <View style={s.insightRow}>
+                <AlertTriangle size={11} color={colors.textMuted} />
+                <Text style={[s.insightText, { color: colors.textMuted }]}>
+                  {needsAttention.length} member{needsAttention.length !== 1 ? 's' : ''} may need support
+                </Text>
+              </View>
+            )}
+            {participationRate < 50 && memberCount > 2 && (
+              <View style={s.insightRow}>
+                <TrendingDown size={11} color={colors.textMuted} />
+                <Text style={[s.insightText, { color: colors.textMuted }]}>
+                  {memberCount - activeMembers} inactive this week
+                </Text>
+              </View>
+            )}
+          </View>
+        )}
+
       </View>
     </Animated.View>
   );
@@ -178,10 +249,21 @@ const s = StyleSheet.create({
     alignSelf: 'stretch',
     marginVertical: 2,
   },
-  progressContainer: {
-    height: 2,
+  insightsSection: {
+    borderTopWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    gap: 6,
   },
-  progressFill: {
-    height: '100%',
+  insightRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 6,
+  },
+  insightText: {
+    flex: 1,
+    fontSize: 11,
+    fontWeight: '400',
+    lineHeight: 15,
   },
 });

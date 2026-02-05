@@ -99,6 +99,16 @@ export function useTeamInsights() {
   // Track initial load
   const initialLoadDone = useRef(false);
 
+  // Build a map of user IDs to display names from team members
+  const memberNameMap = useMemo(() => {
+    const map = new Map<string, string>();
+    members?.forEach((m) => {
+      const name = m.profile?.full_name || m.profile?.email || null;
+      if (name) map.set(m.user_id, name);
+    });
+    return map;
+  }, [members]);
+
   // Load team sessions
   const loadSessions = useCallback(async () => {
     if (!user?.id || !activeTeamId) {
@@ -112,13 +122,22 @@ export function useTeamInsights() {
         limit: 500,
         teamId: activeTeamId,
       });
-      setSessions(featuresToSessions(features));
+      const converted = featuresToSessions(features);
+
+      // Enrich with member names from team store
+      converted.forEach((s) => {
+        if (!s.user_full_name) {
+          s.user_full_name = memberNameMap.get(s.user_id) || null;
+        }
+      });
+
+      setSessions(converted);
     } catch (e) {
       console.error('Failed to load team sessions:', e);
     } finally {
       setLoading(false);
     }
-  }, [user?.id, activeTeamId]);
+  }, [user?.id, activeTeamId, memberNameMap]);
 
   useEffect(() => {
     loadSessions();
@@ -401,7 +420,7 @@ export function useTeamInsights() {
     return ranges.map(({ range, label, min, max }) => {
       const rangeSessions = completedSessions.filter((s) => {
         const dist = s.drill_config?.distance_m ?? s.stats?.avg_distance_m;
-        return dist !== undefined && dist >= min && dist < max;
+        return dist !== undefined && dist !== null && dist !== undefined && dist >= min && dist < max;
       });
       const totalShots = rangeSessions.reduce((sum, s) => sum + (s.stats?.shots_fired || 0), 0);
       const totalHits = rangeSessions.reduce((sum, s) => sum + (s.stats?.hits_total || 0), 0);

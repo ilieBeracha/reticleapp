@@ -243,7 +243,7 @@ function StatItem({ icon, value, label, colors }: StatItemProps) {
 
 const s = StyleSheet.create({
   card: {
-    borderRadius: 12,
+    borderRadius: 10,
     borderWidth: 1,
     marginBottom: 14,
     padding: 12,

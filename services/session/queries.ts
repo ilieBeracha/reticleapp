@@ -756,20 +756,23 @@ export async function getDashboardFeatures(options: {
         has_weather,
         weather_wind_speed_mps`
       )
-      .eq('user_id', userId)
       .gte('created_at', dateThresholdISO)
       .order('created_at', { ascending: false })
       .limit(limit);
 
-    // Filter by team if provided (account context scoping)
+    // Filter by team/user context
     if (teamId !== undefined) {
       if (teamId === null) {
-        // Personal mode: only solo sessions
-        query = query.is('team_id', null);
+        // Personal mode: only this user's solo sessions
+        query = query.eq('user_id', userId).is('team_id', null);
       } else {
-        // Team mode: only that team's sessions
+        // Team mode: ALL team members' sessions (no user_id filter)
+        // RLS policy handles access control via team membership
         query = query.eq('team_id', teamId);
       }
+    } else {
+      // No context specified: default to user's own sessions
+      query = query.eq('user_id', userId);
     }
 
     const { data, error } = await query;

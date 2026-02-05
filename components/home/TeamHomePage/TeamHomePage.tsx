@@ -4,14 +4,14 @@
  * Role-based team dashboard:
  *
  * COMMANDER VIEW (owner/commander):
- * - Team insights with comparisons
- * - Leaderboard with rankings
- * - Performance analytics
+ * - Merged hero card (team info + stats + commander insights)
+ * - Quick actions with content tabs (schedule/insights/activity)
+ * - Members, Leaderboard, Recent activity
  *
  * MEMBER VIEW (squad_commander/soldier):
- * - Personal progress
- * - Team activity (collaborative, no rankings)
- * - What teammates accomplished
+ * - Merged hero card (team info + stats, no commander insights)
+ * - Upcoming trainings (no tabs, just the list)
+ * - My Progress + Teammate feed
  *
  * Design: Professional, compact, minimal color.
  */
@@ -19,19 +19,20 @@
 import { useTeamHomePage } from '@/hooks/home/useTeamHomePage';
 import { useColors } from '@/hooks/ui/useColors';
 import { getTeamColor } from '@/utils/teamColors';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { ActiveMembers } from './components/ActiveMembers';
 import { ActiveTrainingBanner } from './components/ActiveTrainingBanner';
-import { CommanderInsights } from './components/CommanderInsights';
 import { MyProgressCard } from './components/MyProgressCard';
+import { TeamActivityCard } from './components/TeamActivityCard';
 import { TeamDashboardHeader } from './components/TeamDashboardHeader';
 import { TeamHeroSection } from './components/TeamHeroSection';
 import { TeamLeaderboard } from './components/TeamLeaderboard';
 import { TeammateFeed } from './components/TeammateFeed';
 import { TeamMemberActivity } from './components/TeamMemberActivity';
-import { TeamQuickActions } from './components/TeamQuickActions';
+import { TeamQuickActions, type ContentTab } from './components/TeamQuickActions';
+import { TeamWeeklyInsightsCard } from './components/TeamWeeklyInsightsCard';
 import { UpcomingTrainingsCard } from './components/UpcomingTrainingsCard';
 
 export function TeamHomePage() {
@@ -85,6 +86,21 @@ export function TeamHomePage() {
     return activeTeam?.id ? getTeamColor(activeTeam.id) : colors.primary;
   }, [activeTeam?.id, colors.primary]);
 
+  // Content tab state (commander only)
+  const [contentTab, setContentTab] = useState<ContentTab>('schedule');
+
+  // Map recentActivity for TeamActivityCard
+  const activityItems = useMemo(() => {
+    return recentActivity.map((a: any) => ({
+      id: a.id || `${a.userName}-${a.timeAgo}`,
+      userName: a.userName || 'Unknown',
+      type: 'session' as const,
+      detail: a.action || `${a.shotCount || 0} shots`,
+      timestamp: a.timeAgo || '',
+      accuracy: a.accuracy,
+    }));
+  }, [recentActivity]);
+
   if (shouldShowLoading) {
     return (
       <View style={[s.loadingContainer, { backgroundColor: colors.background }]}>
@@ -111,7 +127,7 @@ export function TeamHomePage() {
           />
         }
       >
-        {/* Header - Same for all */}
+        {/* Header */}
         <TeamDashboardHeader
           greeting={greeting}
           firstName={firstName}
@@ -124,7 +140,7 @@ export function TeamHomePage() {
           colors={colors}
         />
 
-        {/* Live Training - Same for all */}
+        {/* Live Training Banner */}
         {liveTraining && (
           <ActiveTrainingBanner
             training={liveTraining}
@@ -134,52 +150,72 @@ export function TeamHomePage() {
           />
         )}
 
-        {/* Team Summary - Same for all */}
+        {/* Merged Hero Card - team info + stats + commander insights */}
         <TeamHeroSection
           teamName={activeTeam?.name || 'Team'}
           teamColor={teamColor}
           memberCount={memberCount}
-          weeklyGoal={weeklyGoal}
           weeklyProgress={sessionsThisWeek}
           weeklyAccuracy={weeklyStats.accuracy}
           streak={streak}
+          isCommander={isCommander}
+          leaderboard={leaderboard}
+          totalShots={teamTotals.shots}
           onViewDetails={handleViewTeamInsights}
           colors={colors}
         />
 
-        {/* Actions - Leaderboard hidden for members */}
-        <TeamQuickActions
-          onStartTraining={handleStartTraining}
-          onViewSchedule={handleViewSchedule}
-          onViewLeaderboard={handleViewLeaderboard}
-          onTeamSettings={handleTeamSettings}
-          hasLiveTraining={!!liveTraining}
-          upcomingCount={upcomingTrainings.length}
-          showLeaderboard={isCommander}
-          teamColor={teamColor}
-          colors={colors}
-        />
-
-        {/* ═══════════════════════════════════════════════════════════ */}
-        {/* ROLE-SPECIFIC CONTENT BELOW */}
         {/* ═══════════════════════════════════════════════════════════ */}
 
         {isCommander ? (
-          /* ─────────────────────────────────────────────────────────── */
-          /* COMMANDER VIEW */
-          /* ─────────────────────────────────────────────────────────── */
+          /* ─── COMMANDER: tabs + role content ─── */
           <>
-            {/* Commander Insights */}
-            <CommanderInsights
-              leaderboard={leaderboard}
-              avgAccuracy={weeklyStats.accuracy}
-              totalSessions={sessionsThisWeek}
-              totalShots={teamTotals.shots}
-              memberCount={memberCount}
-              weeklyGoal={weeklyGoal}
-              onViewDetails={handleViewTeamInsights}
+            {/* Quick Actions with Content Tabs */}
+            <TeamQuickActions
+              onStartTraining={handleStartTraining}
+              activeTab={contentTab}
+              onTabChange={setContentTab}
+              hasLiveTraining={!!liveTraining}
+              upcomingCount={upcomingTrainings.length}
+              teamColor={teamColor}
               colors={colors}
             />
+
+            {/* Tab Content */}
+            {contentTab === 'schedule' && (
+              upcomingTrainings.length > 0 ? (
+                <UpcomingTrainingsCard
+                  trainings={upcomingTrainings}
+                  teamColor={teamColor}
+                  onTrainingPress={handleTrainingPress}
+                  colors={colors}
+                />
+              ) : (
+                <Animated.View entering={FadeIn} style={[s.emptyTabCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                  <Text style={[s.emptyTabTitle, { color: colors.text }]}>No upcoming trainings</Text>
+                  <Text style={[s.emptyTabText, { color: colors.textMuted }]}>
+                    Scheduled trainings will appear here
+                  </Text>
+                </Animated.View>
+              )
+            )}
+
+            {contentTab === 'insights' && (
+              <TeamWeeklyInsightsCard
+                sessions={sessionsThisWeek}
+                shots={teamTotals.shots}
+                accuracy={weeklyStats.accuracy}
+                activeMembers={teamTotals.activeMembers}
+                totalMembers={memberCount}
+                weeklyGoal={weeklyGoal}
+                onViewDetails={handleViewTeamInsights}
+                colors={colors}
+              />
+            )}
+
+            {contentTab === 'activity' && (
+              <TeamActivityCard activities={activityItems} colors={colors} />
+            )}
 
             {/* Members */}
             {members.length > 0 && (
@@ -192,7 +228,7 @@ export function TeamHomePage() {
               />
             )}
 
-            {/* Leaderboard - Commanders see rankings */}
+            {/* Leaderboard */}
             {leaderboard.length > 0 && (
               <TeamLeaderboard
                 entries={leaderboard}
@@ -203,16 +239,24 @@ export function TeamHomePage() {
               />
             )}
 
-            {/* Recent Activity - with accuracy details for commanders */}
+            {/* Recent Activity */}
             {recentActivity.length > 0 && (
               <TeamMemberActivity activities={recentActivity} teamColor={teamColor} colors={colors} />
             )}
           </>
         ) : (
-          /* ─────────────────────────────────────────────────────────── */
-          /* MEMBER VIEW */
-          /* ─────────────────────────────────────────────────────────── */
+          /* ─── MEMBER: upcoming trainings + progress ─── */
           <>
+            {/* Upcoming Trainings - shown directly, no tabs */}
+            {upcomingTrainings.length > 0 && (
+              <UpcomingTrainingsCard
+                trainings={upcomingTrainings}
+                teamColor={teamColor}
+                onTrainingPress={handleTrainingPress}
+                colors={colors}
+              />
+            )}
+
             {/* My Progress */}
             <MyProgressCard
               sessions={myStats.sessions}
@@ -222,7 +266,7 @@ export function TeamHomePage() {
               colors={colors}
             />
 
-            {/* Teammate Activity - No rankings, just what they did */}
+            {/* Teammate Activity */}
             <TeammateFeed
               activities={recentActivity}
               teamTotalSessions={teamTotals.sessions}
@@ -231,16 +275,6 @@ export function TeamHomePage() {
               colors={colors}
             />
           </>
-        )}
-
-        {/* Schedule - Same for all */}
-        {upcomingTrainings.length > 0 && (
-          <UpcomingTrainingsCard
-            trainings={upcomingTrainings}
-            teamColor={teamColor}
-            onTrainingPress={handleTrainingPress}
-            colors={colors}
-          />
         )}
 
         {/* Empty State */}
@@ -287,6 +321,23 @@ const s = StyleSheet.create({
   },
   emptyText: {
     fontSize: 12,
+    textAlign: 'center',
+  },
+  emptyTabCard: {
+    borderRadius: 10,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    padding: 20,
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  emptyTabTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  emptyTabText: {
+    fontSize: 11,
     textAlign: 'center',
   },
 });

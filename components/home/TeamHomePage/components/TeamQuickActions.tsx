@@ -1,22 +1,23 @@
 /**
  * TeamQuickActions Component
  *
- * Compact toolbar-style actions. Professional, utility-focused.
+ * Primary "Train" button + content tab selector.
+ * Secondary icons act as tabs that change the content card below.
  */
 
 import * as Haptics from 'expo-haptics';
-import { Calendar, Crosshair, Settings, Trophy } from 'lucide-react-native';
+import { Activity, BarChart3, Calendar, Crosshair } from 'lucide-react-native';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 
+export type ContentTab = 'schedule' | 'insights' | 'activity';
+
 interface TeamQuickActionsProps {
   onStartTraining: () => void;
-  onViewSchedule: () => void;
-  onViewLeaderboard: () => void;
-  onTeamSettings: () => void;
+  activeTab: ContentTab;
+  onTabChange: (tab: ContentTab) => void;
   hasLiveTraining?: boolean;
   upcomingCount?: number;
-  showLeaderboard?: boolean; // Commanders only
   teamColor: string;
   colors: {
     text: string;
@@ -29,12 +30,10 @@ interface TeamQuickActionsProps {
 
 export function TeamQuickActions({
   onStartTraining,
-  onViewSchedule,
-  onViewLeaderboard,
-  onTeamSettings,
+  activeTab,
+  onTabChange,
   hasLiveTraining = false,
   upcomingCount = 0,
-  showLeaderboard = true,
   teamColor,
   colors,
 }: TeamQuickActionsProps) {
@@ -43,9 +42,15 @@ export function TeamQuickActions({
     action();
   };
 
+  const tabs: { id: ContentTab; icon: typeof Calendar; label: string; badge?: number }[] = [
+    { id: 'schedule', icon: Calendar, label: 'Schedule', badge: upcomingCount > 0 ? upcomingCount : undefined },
+    { id: 'insights', icon: BarChart3, label: 'Insights' },
+    { id: 'activity', icon: Activity, label: 'Activity' },
+  ];
+
   return (
     <Animated.View entering={FadeIn.delay(50)} style={[s.container, { backgroundColor: colors.card, borderColor: colors.border }]}>
-      {/* Primary Action */}
+      {/* Primary Action - always navigates */}
       <TouchableOpacity
         style={[s.primaryAction, { backgroundColor: hasLiveTraining ? colors.text : colors.border }]}
         onPress={() => handlePress(onStartTraining)}
@@ -61,27 +66,32 @@ export function TeamQuickActions({
       {/* Divider */}
       <View style={[s.divider, { backgroundColor: colors.border }]} />
 
-      {/* Secondary Actions */}
-      <View style={s.secondaryActions}>
-        <TouchableOpacity style={s.action} onPress={() => handlePress(onViewSchedule)}>
-          <Calendar size={14} color={colors.textMuted} />
-          {upcomingCount > 0 && (
-            <View style={[s.badge, { backgroundColor: colors.border }]}>
-              <Text style={[s.badgeText, { color: colors.text }]}>{upcomingCount}</Text>
-            </View>
-          )}
-        </TouchableOpacity>
-
-        {/* Leaderboard - commanders only */}
-        {showLeaderboard && (
-          <TouchableOpacity style={s.action} onPress={() => handlePress(onViewLeaderboard)}>
-            <Trophy size={14} color={colors.textMuted} />
-          </TouchableOpacity>
-        )}
-
-        <TouchableOpacity style={s.action} onPress={() => handlePress(onTeamSettings)}>
-          <Settings size={14} color={colors.textMuted} />
-        </TouchableOpacity>
+      {/* Content Tabs */}
+      <View style={s.tabsRow}>
+        {tabs.map((tab) => {
+          const isActive = activeTab === tab.id;
+          const Icon = tab.icon;
+          return (
+            <TouchableOpacity
+              key={tab.id}
+              style={[s.tab, isActive && { backgroundColor: colors.border }]}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                onTabChange(tab.id);
+              }}
+              activeOpacity={0.6}
+            >
+              <Icon size={13} color={isActive ? colors.text : colors.textMuted} />
+              {tab.badge !== undefined && (
+                <View style={[s.badge, { backgroundColor: isActive ? colors.text : colors.border }]}>
+                  <Text style={[s.badgeText, { color: isActive ? colors.background : colors.text }]}>
+                    {tab.badge}
+                  </Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          );
+        })}
       </View>
     </Animated.View>
   );
@@ -119,20 +129,21 @@ const s = StyleSheet.create({
     width: 1,
     height: 20,
   },
-  secondaryActions: {
+  tabsRow: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-around',
   },
-  action: {
+  tab: {
     padding: 8,
+    borderRadius: 6,
     position: 'relative',
   },
   badge: {
     position: 'absolute',
     top: 2,
-    right: 2,
+    right: 0,
     minWidth: 14,
     height: 14,
     borderRadius: 7,

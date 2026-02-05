@@ -1,28 +1,34 @@
 /**
  * TeamLoadout Component
  *
- * Shows team weapons for team mode:
- * - Team assigned weapons
- * - Team pool weapons
+ * Shows ALL team weapons for team mode (visible to all members):
+ * - My Weapon (soldier only)
+ * - Assigned weapons (with member name visible to everyone)
+ * - Pool weapons (available to all)
+ * - Unassigned weapons (commander only)
  */
 
 import { CreateWeaponFlow } from '@/components/weapons/CreateWeaponFlow';
+import { RequestWeaponModal } from '@/components/weapons/RequestWeaponModal';
 import { getCategoryConfig } from '@/constants/weaponCategories';
+import { useWeaponRealtime } from '@/hooks/realtime/weapon/useWeaponRealtime';
 import { useColors } from '@/hooks/ui/useColors';
+import { getCurrentUserId } from '@/services/authService';
 import {
-    getAllAccessibleWeapons,
-    getWeaponStats,
-    type AccessibleWeapon,
-    type WeaponSource,
-    type WeaponStats,
+    cancelWeaponRequest,
+    getArmoryOverview,
+    getCategoryLabel,
+    type ArmoryOverviewData,
+    type TeamWeapon,
+    type WeaponRequest,
 } from '@/services/weaponService';
 import { useTeamStore } from '@/stores/teamStore';
 import type { WeaponCategory } from '@/types/workspace';
 import { useFocusEffect } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
-import { ChevronRight, Crosshair, Plus, Shield, Star, Target, Users, Zap } from 'lucide-react-native';
-import { useCallback, useMemo, useState } from 'react';
+import { ChevronRight, Clock, Crosshair, Plus, Shield, ShieldCheck, Star, Target, User, Users, X, Zap } from 'lucide-react-native';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
     ActivityIndicator,
@@ -41,6 +47,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 // ============================================================================
 
 type TeamSourceFilter = 'all' | 'team_assigned' | 'team_pool';
+type CardSource = 'team_assigned' | 'team_pool' | 'unassigned';
 
 // ============================================================================
 // HELPERS
@@ -59,26 +66,36 @@ function getCategoryIcon(category: WeaponCategory | null, color: string) {
   }
 }
 
-function getSourceIcon(source: WeaponSource, color: string, size = 10) {
+function getSourceIcon(source: CardSource, color: string, size = 10) {
   switch (source) {
     case 'team_assigned':
       return <Star size={size} color={color} />;
     case 'team_pool':
       return <Users size={size} color={color} />;
+    case 'unassigned':
+      return <Shield size={size} color={color} />;
     default:
       return null;
   }
 }
 
-function getSourceConfig(source: WeaponSource, t: (key: string) => string, colors: ReturnType<typeof useColors>) {
+function getSourceConfig(source: CardSource, t: (key: string) => string, colors: ReturnType<typeof useColors>) {
   switch (source) {
     case 'team_assigned':
       return { label: t('loadout.filters.assigned'), color: colors.primary, bg: `${colors.primary}12` };
     case 'team_pool':
       return { label: t('loadout.filters.pool'), color: colors.textMuted, bg: `${colors.textMuted}10` };
+    case 'unassigned':
+      return { label: 'Unassigned', color: colors.textMuted, bg: `${colors.textMuted}08` };
     default:
       return { label: '', color: colors.textMuted, bg: `${colors.textMuted}10` };
   }
+}
+
+function getNavigationSource(weapon: TeamWeapon): string {
+  if (weapon.assigned_to) return 'team_assigned';
+  if (weapon.pool_available) return 'team_pool';
+  return 'team_assigned';
 }
 
 function formatNumber(num: number): string {
@@ -149,29 +166,29 @@ function SourceFilterPills({ selected, onChange, counts, colors }: SourceFilterP
 // ============================================================================
 
 interface StatsOverviewProps {
-  weaponCount: number;
-  totalSessions: number;
-  totalRounds: number;
+  totalWeapons: number;
+  assignedCount: number;
+  poolCount: number;
   colors: ReturnType<typeof useColors>;
 }
 
-function StatsOverview({ weaponCount, totalSessions, totalRounds, colors }: StatsOverviewProps) {
+function StatsOverview({ totalWeapons, assignedCount, poolCount, colors }: StatsOverviewProps) {
   const { t } = useTranslation();
   return (
     <View style={[s.statsRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
       <View style={s.statItem}>
-        <Text style={[s.statValue, { color: colors.text }]}>{weaponCount}</Text>
+        <Text style={[s.statValue, { color: colors.text }]}>{totalWeapons}</Text>
         <Text style={[s.statLabel, { color: colors.textMuted }]}>{t('weapons.weapons')}</Text>
       </View>
       <View style={[s.statDivider, { backgroundColor: colors.border }]} />
       <View style={s.statItem}>
-        <Text style={[s.statValue, { color: colors.text }]}>{totalSessions}</Text>
-        <Text style={[s.statLabel, { color: colors.textMuted }]}>{t('session.sessions')}</Text>
+        <Text style={[s.statValue, { color: colors.text }]}>{assignedCount}</Text>
+        <Text style={[s.statLabel, { color: colors.textMuted }]}>{t('loadout.filters.assigned')}</Text>
       </View>
       <View style={[s.statDivider, { backgroundColor: colors.border }]} />
       <View style={s.statItem}>
-        <Text style={[s.statValue, { color: colors.text }]}>{formatNumber(totalRounds)}</Text>
-        <Text style={[s.statLabel, { color: colors.textMuted }]}>{t('weapons.rounds')}</Text>
+        <Text style={[s.statValue, { color: colors.text }]}>{poolCount}</Text>
+        <Text style={[s.statLabel, { color: colors.textMuted }]}>{t('loadout.filters.pool')}</Text>
       </View>
     </View>
   );
@@ -182,18 +199,16 @@ function StatsOverview({ weaponCount, totalSessions, totalRounds, colors }: Stat
 // ============================================================================
 
 interface WeaponCardProps {
-  weapon: AccessibleWeapon;
-  stats: WeaponStats | undefined;
+  weapon: TeamWeapon;
+  source: CardSource;
   onPress: () => void;
   colors: ReturnType<typeof useColors>;
 }
 
-function WeaponCard({ weapon, stats, onPress, colors }: WeaponCardProps) {
+function WeaponCard({ weapon, source, onPress, colors }: WeaponCardProps) {
   const { t } = useTranslation();
   const categoryConfig = weapon.category ? getCategoryConfig(weapon.category) : null;
-  const sourceConfig = getSourceConfig(weapon.source, t, colors);
-
-  const statsText = `${stats?.total_sessions ?? 0} ${t('loadout.sess')} · ${formatNumber(stats?.total_rounds_fired ?? 0)} ${t('loadout.rds')}`;
+  const sourceConfig = getSourceConfig(source, t, colors);
 
   return (
     <TouchableOpacity
@@ -214,7 +229,7 @@ function WeaponCard({ weapon, stats, onPress, colors }: WeaponCardProps) {
           </Text>
           <View style={s.cardMetaRow}>
             <View style={[s.sourceBadge, { backgroundColor: sourceConfig.bg }]}>
-              {getSourceIcon(weapon.source, sourceConfig.color)}
+              {getSourceIcon(source, sourceConfig.color)}
               <Text style={[s.sourceBadgeText, { color: sourceConfig.color }]}>{sourceConfig.label}</Text>
             </View>
             <Text style={[s.cardMeta, { color: colors.textMuted }]} numberOfLines={1}>
@@ -222,9 +237,15 @@ function WeaponCard({ weapon, stats, onPress, colors }: WeaponCardProps) {
               {weapon.caliber ? ` · ${weapon.caliber}` : ''}
             </Text>
           </View>
-          <Text style={[s.cardDetail, { color: colors.textMuted }]} numberOfLines={1}>
-            {statsText}
-          </Text>
+          {/* Show assigned user for assigned weapons */}
+          {weapon.assigned_user && (
+            <View style={s.assignedUserRow}>
+              <User size={10} color={colors.primary} />
+              <Text style={[s.assignedUserText, { color: colors.primary }]} numberOfLines={1}>
+                {weapon.assigned_user.full_name}
+              </Text>
+            </View>
+          )}
         </View>
 
         {/* Team indicator */}
@@ -292,24 +313,28 @@ export function TeamLoadout() {
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [weapons, setWeapons] = useState<AccessibleWeapon[]>([]);
-  const [weaponStats, setWeaponStats] = useState<Map<string, WeaponStats>>(new Map());
+  const [armoryData, setArmoryData] = useState<ArmoryOverviewData | null>(null);
   const [showAddWeapon, setShowAddWeapon] = useState(false);
   const [sourceFilter, setSourceFilter] = useState<TeamSourceFilter>('all');
+  const [cancelling, setCancelling] = useState(false);
+  const [showRequestModal, setShowRequestModal] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
+  // Get current user ID for realtime filtering
+  useEffect(() => {
+    getCurrentUserId().then(setCurrentUserId);
+  }, []);
+
+  // Load team armory data
   const loadData = useCallback(async () => {
+    if (!activeTeamId) {
+      setLoading(false);
+      setRefreshing(false);
+      return;
+    }
     try {
-      const [weaponsData, statsData] = await Promise.all([
-        getAllAccessibleWeapons(),
-        getWeaponStats(),
-      ]);
-
-      // Filter to team weapons only (for the active team)
-      const teamWeapons = weaponsData.filter(
-        (w) => (w.source === 'team_assigned' || w.source === 'team_pool') && w.teamId === activeTeamId
-      );
-      setWeapons(teamWeapons);
-      setWeaponStats(statsData);
+      const data = await getArmoryOverview(activeTeamId);
+      setArmoryData(data);
     } catch (error) {
       console.error('[TeamLoadout] Failed to load data:', error);
     } finally {
@@ -317,6 +342,53 @@ export function TeamLoadout() {
       setRefreshing(false);
     }
   }, [activeTeamId]);
+
+  // Derived data from armory overview
+  const myWeapon = armoryData?.myAssignment ?? null;
+  const myPendingRequest = armoryData?.myPendingRequest ?? null;
+  const assignedWeapons = armoryData?.assignedWeapons ?? [];
+  const poolWeapons = armoryData?.poolWeapons ?? [];
+  const unassignedWeapons = armoryData?.unassignedWeapons ?? [];
+
+  // Realtime updates — all handlers refresh the full armory view
+  useWeaponRealtime({
+    teamId: activeTeamId || undefined,
+    userId: currentUserId,
+    enabled: !!activeTeamId,
+    onRequestApproved: useCallback(() => {
+      loadData();
+    }, [loadData]),
+    onRequestRejected: useCallback(() => {
+      loadData();
+    }, [loadData]),
+    onWeaponAssigned: useCallback(() => {
+      loadData();
+    }, [loadData]),
+    onWeaponUnassigned: useCallback(() => {
+      loadData();
+    }, [loadData]),
+  });
+
+  // Handle cancel weapon request
+  const handleCancelRequest = async () => {
+    if (!myPendingRequest) return;
+    try {
+      setCancelling(true);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      await cancelWeaponRequest(myPendingRequest.id);
+      await loadData();
+    } catch (err: any) {
+      console.error('Failed to cancel request:', err);
+    } finally {
+      setCancelling(false);
+    }
+  };
+
+  // Handle weapon request success
+  const handleRequestSuccess = async () => {
+    setShowRequestModal(false);
+    await loadData();
+  };
 
   useFocusEffect(
     useCallback(() => {
@@ -332,42 +404,21 @@ export function TeamLoadout() {
   // Filter counts
   const filterCounts = useMemo(() => {
     const counts: Record<TeamSourceFilter, number> = {
-      all: weapons.length,
-      team_assigned: 0,
-      team_pool: 0,
+      all: assignedWeapons.length + poolWeapons.length,
+      team_assigned: assignedWeapons.length,
+      team_pool: poolWeapons.length,
     };
-    weapons.forEach((w) => {
-      if (w.source === 'team_assigned') counts.team_assigned++;
-      else if (w.source === 'team_pool') counts.team_pool++;
-    });
     return counts;
-  }, [weapons]);
+  }, [assignedWeapons, poolWeapons]);
 
-  // Filtered weapons
-  const filteredWeapons = useMemo(() => {
-    if (sourceFilter === 'all') return weapons;
-    return weapons.filter((w) => w.source === sourceFilter);
-  }, [weapons, sourceFilter]);
+  // Total weapon count (including unassigned for commanders)
+  const totalWeapons = assignedWeapons.length + poolWeapons.length + unassignedWeapons.length;
 
-  // Aggregate stats
-  const totalStats = useMemo(() => {
-    let sessions = 0;
-    let rounds = 0;
-    filteredWeapons.forEach((w) => {
-      const stats = weaponStats.get(w.id);
-      if (stats) {
-        sessions += stats.total_sessions;
-        rounds += stats.total_rounds_fired;
-      }
-    });
-    return { sessions, rounds };
-  }, [filteredWeapons, weaponStats]);
-
-  const handleWeaponPress = useCallback((weapon: AccessibleWeapon) => {
+  const handleWeaponPress = useCallback((weapon: TeamWeapon) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     router.push({
       pathname: '/(protected)/weaponDetail',
-      params: { weaponId: weapon.id, source: weapon.source },
+      params: { weaponId: weapon.id, source: getNavigationSource(weapon) },
     } as any);
   }, []);
 
@@ -380,6 +431,11 @@ export function TeamLoadout() {
     setShowAddWeapon(false);
     await loadData();
   }, [loadData]);
+
+  // Determine which sections to show based on filter
+  const showAssigned = sourceFilter === 'all' || sourceFilter === 'team_assigned';
+  const showPool = sourceFilter === 'all' || sourceFilter === 'team_pool';
+  const hasAnyWeapons = totalWeapons > 0;
 
   if (loading) {
     return (
@@ -421,40 +477,163 @@ export function TeamLoadout() {
           colors={colors}
         />
 
+        {/* Soldier Weapon Section - only for non-commanders */}
+        {!isCommander && (
+          <View style={sw.section}>
+            <View style={sw.sectionHeader}>
+              <ShieldCheck size={14} color={colors.primary} />
+              <Text style={[sw.sectionTitle, { color: colors.textMuted }]}>{t('teams.myWeapon')}</Text>
+            </View>
+
+            {myWeapon ? (
+              <View style={[sw.weaponCard, { backgroundColor: colors.card, borderColor: colors.primary }]}>
+                <View style={[sw.weaponBadge, { backgroundColor: colors.primary }]}>
+                  <ShieldCheck size={14} color="#fff" />
+                  <Text style={sw.weaponBadgeText}>{t('loadout.filters.assigned')}</Text>
+                </View>
+                <Text style={[sw.weaponName, { color: colors.text }]}>{myWeapon.name}</Text>
+                <Text style={[sw.weaponMeta, { color: colors.textMuted }]}>
+                  {getCategoryLabel(myWeapon.category)}
+                  {myWeapon.caliber && ` • ${myWeapon.caliber}`}
+                </Text>
+              </View>
+            ) : (
+              <View style={[sw.noWeaponCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <View style={[sw.noWeaponIcon, { backgroundColor: colors.secondary }]}>
+                  <Shield size={24} color={colors.textMuted} />
+                </View>
+                <Text style={[sw.noWeaponTitle, { color: colors.text }]}>{t('teams.weaponRequired')}</Text>
+                <Text style={[sw.noWeaponHint, { color: colors.textMuted }]}>
+                  {t('teams.requestWeaponToStart')}
+                </Text>
+              </View>
+            )}
+
+            {/* Pending Request or Request Button */}
+            {myPendingRequest ? (
+              <View style={[sw.pendingCard, { backgroundColor: colors.blue + '10', borderColor: colors.blue }]}>
+                <View style={sw.pendingHeader}>
+                  <Clock size={14} color={colors.blue} />
+                  <Text style={[sw.pendingTitle, { color: colors.blue }]}>{t('teams.requestPending')}</Text>
+                </View>
+                <Text style={[sw.pendingText, { color: colors.text }]}>
+                  {t('teams.awaitingCommanderReview')}
+                </Text>
+                {myPendingRequest.weapon_category && (
+                  <Text style={[sw.pendingPreference, { color: colors.textMuted }]}>
+                    {t('teams.preferred')}: {getCategoryLabel(myPendingRequest.weapon_category)}
+                  </Text>
+                )}
+                <TouchableOpacity
+                  style={[sw.cancelBtn, { borderColor: colors.destructive }]}
+                  onPress={handleCancelRequest}
+                  disabled={cancelling}
+                >
+                  {cancelling ? (
+                    <ActivityIndicator size="small" color={colors.destructive} />
+                  ) : (
+                    <>
+                      <X size={14} color={colors.destructive} />
+                      <Text style={[sw.cancelBtnText, { color: colors.destructive }]}>
+                        {t('teams.cancelRequest')}
+                      </Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              </View>
+            ) : !myWeapon ? (
+              <TouchableOpacity
+                style={[sw.requestBtn, { backgroundColor: colors.primary }]}
+                onPress={() => setShowRequestModal(true)}
+              >
+                <Plus size={18} color="#fff" />
+                <Text style={sw.requestBtnText}>{t('teams.requestWeapon')}</Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
+        )}
+
         {/* Stats Overview */}
         <StatsOverview
-          weaponCount={filteredWeapons.length}
-          totalSessions={totalStats.sessions}
-          totalRounds={totalStats.rounds}
+          totalWeapons={totalWeapons}
+          assignedCount={assignedWeapons.length}
+          poolCount={poolWeapons.length}
           colors={colors}
         />
 
         {/* Source Filter Pills */}
         <SourceFilterPills selected={sourceFilter} onChange={setSourceFilter} counts={filterCounts} colors={colors} />
 
-        {/* Section Header */}
-        <View style={s.sectionHeader}>
-          <Text style={[s.sectionTitle, { color: colors.text }]}>
-            {sourceFilter === 'all' ? 'TEAM WEAPONS' : sourceFilter === 'team_assigned' ? 'ASSIGNED' : 'POOL'}
-          </Text>
-          {filteredWeapons.length > 0 && (
-            <Text style={[s.sectionCount, { color: colors.textMuted }]}>{filteredWeapons.length}</Text>
-          )}
-        </View>
+        {/* Weapons Sections */}
+        {hasAnyWeapons ? (
+          <>
+            {/* Assigned Weapons Section */}
+            {showAssigned && assignedWeapons.length > 0 && (
+              <>
+                <View style={s.sectionHeader}>
+                  <Text style={[s.sectionTitle, { color: colors.text }]}>
+                    {t('loadout.filters.assigned').toUpperCase()}
+                  </Text>
+                  <Text style={[s.sectionCount, { color: colors.textMuted }]}>{assignedWeapons.length}</Text>
+                </View>
+                <View style={s.cardList}>
+                  {assignedWeapons.map((weapon) => (
+                    <WeaponCard
+                      key={weapon.id}
+                      weapon={weapon}
+                      source="team_assigned"
+                      onPress={() => handleWeaponPress(weapon)}
+                      colors={colors}
+                    />
+                  ))}
+                </View>
+              </>
+            )}
 
-        {/* Weapons List */}
-        {filteredWeapons.length > 0 ? (
-          <View style={s.cardList}>
-            {filteredWeapons.map((weapon) => (
-              <WeaponCard
-                key={`${weapon.source}-${weapon.id}`}
-                weapon={weapon}
-                stats={weaponStats.get(weapon.id)}
-                onPress={() => handleWeaponPress(weapon)}
-                colors={colors}
-              />
-            ))}
-          </View>
+            {/* Pool Weapons Section */}
+            {showPool && poolWeapons.length > 0 && (
+              <>
+                <View style={[s.sectionHeader, showAssigned && assignedWeapons.length > 0 ? s.sectionSpacing : undefined]}>
+                  <Text style={[s.sectionTitle, { color: colors.text }]}>
+                    {t('loadout.filters.pool').toUpperCase()}
+                  </Text>
+                  <Text style={[s.sectionCount, { color: colors.textMuted }]}>{poolWeapons.length}</Text>
+                </View>
+                <View style={s.cardList}>
+                  {poolWeapons.map((weapon) => (
+                    <WeaponCard
+                      key={weapon.id}
+                      weapon={weapon}
+                      source="team_pool"
+                      onPress={() => handleWeaponPress(weapon)}
+                      colors={colors}
+                    />
+                  ))}
+                </View>
+              </>
+            )}
+
+            {/* Unassigned Weapons Section - commander only */}
+            {isCommander && unassignedWeapons.length > 0 && (
+              <>
+                <View style={[s.sectionHeader, s.sectionSpacing]}>
+                  <Text style={[s.sectionTitle, { color: colors.text }]}>UNASSIGNED</Text>
+                  <Text style={[s.sectionCount, { color: colors.textMuted }]}>{unassignedWeapons.length}</Text>
+                </View>
+                <View style={s.cardList}>
+                  {unassignedWeapons.map((weapon) => (
+                    <WeaponCard
+                      key={weapon.id}
+                      weapon={weapon}
+                      source="unassigned"
+                      onPress={() => handleWeaponPress(weapon)}
+                      colors={colors}
+                    />
+                  ))}
+                </View>
+              </>
+            )}
+          </>
         ) : (
           <View style={[s.emptyState, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <View style={[s.emptyIcon, { backgroundColor: colors.secondary }]}>
@@ -488,6 +667,16 @@ export function TeamLoadout() {
         >
           <CreateWeaponFlow onComplete={handleWeaponCreated} onCancel={() => setShowAddWeapon(false)} />
         </Modal>
+      )}
+
+      {/* Request Weapon Modal (soldier only) */}
+      {!isCommander && (
+        <RequestWeaponModal
+          visible={showRequestModal}
+          teamId={activeTeamId || ''}
+          onClose={() => setShowRequestModal(false)}
+          onSuccess={handleRequestSuccess}
+        />
       )}
     </View>
   );
@@ -535,6 +724,7 @@ const s = StyleSheet.create({
   sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
   sectionTitle: { fontSize: 11, fontWeight: '700', letterSpacing: 0.8 },
   sectionCount: { fontSize: 12, fontWeight: '500' },
+  sectionSpacing: { marginTop: 20 },
 
   // Card List
   cardList: { gap: 8 },
@@ -549,7 +739,8 @@ const s = StyleSheet.create({
   sourceBadge: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 5, paddingVertical: 2, borderRadius: 4 },
   sourceBadgeText: { fontSize: 9, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.2 },
   cardMeta: { fontSize: 11, fontWeight: '400', flexShrink: 1 },
-  cardDetail: { fontSize: 10, fontWeight: '500' },
+  assignedUserRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  assignedUserText: { fontSize: 11, fontWeight: '500' },
   teamIndicator: { width: 26, height: 26, borderRadius: 7, alignItems: 'center', justifyContent: 'center' },
 
   // Empty State
@@ -559,6 +750,31 @@ const s = StyleSheet.create({
   emptySubtitle: { fontSize: 13, textAlign: 'center', marginBottom: 20, lineHeight: 18 },
   emptyButton: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 18, paddingVertical: 10, borderRadius: 10 },
   emptyButtonText: { fontSize: 14, fontWeight: '600', color: '#fff' },
+});
+
+// Soldier weapon styles
+const sw = StyleSheet.create({
+  section: { gap: 10, marginBottom: 16 },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  sectionTitle: { fontSize: 11, fontWeight: '600', letterSpacing: 0.4 },
+  weaponCard: { padding: 16, borderRadius: 12, borderWidth: 1.5, gap: 8 },
+  weaponBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, alignSelf: 'flex-start' },
+  weaponBadgeText: { fontSize: 11, fontWeight: '600', color: '#fff' },
+  weaponName: { fontSize: 18, fontWeight: '700', marginTop: 4 },
+  weaponMeta: { fontSize: 14 },
+  noWeaponCard: { alignItems: 'center', padding: 24, borderRadius: 12, borderWidth: 1, gap: 8 },
+  noWeaponIcon: { width: 56, height: 56, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  noWeaponTitle: { fontSize: 16, fontWeight: '600' },
+  noWeaponHint: { fontSize: 13, textAlign: 'center' },
+  pendingCard: { padding: 16, borderRadius: 12, borderWidth: 1, gap: 10 },
+  pendingHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  pendingTitle: { fontSize: 14, fontWeight: '600' },
+  pendingText: { fontSize: 14 },
+  pendingPreference: { fontSize: 12 },
+  cancelBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: 8, borderWidth: 1, marginTop: 4 },
+  cancelBtnText: { fontSize: 14, fontWeight: '600' },
+  requestBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14, borderRadius: 12 },
+  requestBtnText: { fontSize: 15, fontWeight: '600', color: '#fff' },
 });
 
 export default TeamLoadout;

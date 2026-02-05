@@ -10,31 +10,31 @@ import { useTeamInsights, type MyComparison, type TeamMemberStat, type TeamWeakA
 import { useColors } from '@/hooks/ui/useColors';
 import { Ionicons } from '@expo/vector-icons';
 import {
-  AlertTriangle,
-  BarChart3,
-  ChevronDown,
-  ChevronRight,
-  ChevronUp,
-  Clock,
-  Minus,
-  Shield,
-  Target,
-  TrendingDown,
-  TrendingUp,
-  Users,
-  Zap,
+    AlertTriangle,
+    BarChart3,
+    ChevronDown,
+    ChevronRight,
+    ChevronUp,
+    Clock,
+    Minus,
+    Shield,
+    Target,
+    TrendingDown,
+    TrendingUp,
+    Users,
+    Zap,
 } from 'lucide-react-native';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  ActivityIndicator,
-  Platform,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Platform,
+    RefreshControl,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 
@@ -617,6 +617,7 @@ export function TeamInsights() {
           /* COMMANDER VIEW */
           /* ═══════════════════════════════════════════════════════════ */
           <>
+            {/* 1. Overview Stats - most important at a glance */}
             <CommanderOverview
               sessions={teamTotals.sessions}
               shots={teamTotals.shots}
@@ -627,24 +628,8 @@ export function TeamInsights() {
               colors={colors}
             />
 
-            {/* Activity */}
-            {weeklyActivityData.some((d) => d.sessions > 0) && (
-              <Animated.View entering={FadeIn.delay(80)} style={styles.section}>
-                <SectionHeader title="ACTIVITY" icon={<BarChart3 size={12} color={colors.textMuted} />} colors={colors} />
-                <ActivityChart data={weeklyActivityData} title="" height={90} />
-              </Animated.View>
-            )}
-
-            {/* Trends */}
-            {performanceChartData.length >= 2 && (
-              <Animated.View entering={FadeIn.delay(120)} style={styles.section}>
-                <SectionHeader title="TRENDS" icon={<TrendingUp size={12} color={colors.textMuted} />} colors={colors} />
-                <PerformanceChart data={performanceChartData} height={130} />
-              </Animated.View>
-            )}
-
-            {/* Quick Insights */}
-            <Animated.View entering={FadeIn.delay(160)} style={styles.section}>
+            {/* 2. Quick Insights - actionable alerts (top/attention) */}
+            <Animated.View entering={FadeIn.delay(60)} style={styles.section}>
               <QuickInsights
                 topPerformers={topPerformers}
                 needsAttention={needsAttention}
@@ -653,31 +638,47 @@ export function TeamInsights() {
               />
             </Animated.View>
 
-            {/* Rankings */}
+            {/* 3. Rankings - who's performing */}
             {memberRankings.length > 0 && (
-              <Animated.View entering={FadeIn.delay(200)} style={styles.section}>
+              <Animated.View entering={FadeIn.delay(100)} style={styles.section}>
                 <SectionHeader title="RANKINGS" icon={<Users size={12} color={colors.textMuted} />} colors={colors} />
                 <MemberRankings members={memberRankings} currentUserId={userId} colors={colors} />
               </Animated.View>
             )}
 
-            {/* Training Focus */}
+            {/* 4. Training Focus - areas needing work */}
             {teamWeakAreas.length > 0 && (
-              <Animated.View entering={FadeIn.delay(240)} style={styles.section}>
+              <Animated.View entering={FadeIn.delay(140)} style={styles.section}>
                 <SectionHeader title="TRAINING FOCUS" icon={<Target size={12} color={colors.textMuted} />} colors={colors} />
                 <TrainingFocus weakAreas={teamWeakAreas} colors={colors} />
               </Animated.View>
             )}
 
-            {/* Breakdown */}
+            {/* 5. Activity chart - weekly overview */}
+            {weeklyActivityData.some((d) => d.sessions > 0) && (
+              <Animated.View entering={FadeIn.delay(180)} style={styles.section}>
+                <SectionHeader title="ACTIVITY" icon={<BarChart3 size={12} color={colors.textMuted} />} colors={colors} />
+                <ActivityChart data={weeklyActivityData} title="" height={90} />
+              </Animated.View>
+            )}
+
+            {/* 6. Trends - accuracy over time */}
+            {performanceChartData.length >= 2 && (
+              <Animated.View entering={FadeIn.delay(220)} style={styles.section}>
+                <SectionHeader title="TRENDS" icon={<TrendingUp size={12} color={colors.textMuted} />} colors={colors} />
+                <PerformanceChart data={performanceChartData} height={130} />
+              </Animated.View>
+            )}
+
+            {/* 7. Breakdown by category - deep drill-down */}
             {(positionData.length > 0 || distanceData.length > 0) && (
-              <Animated.View entering={FadeIn.delay(280)} style={styles.section}>
+              <Animated.View entering={FadeIn.delay(260)} style={styles.section}>
                 <SectionHeader title="BY CATEGORY" colors={colors} />
                 <BreakdownGrid positionData={positionData} distanceData={distanceData} colors={colors} />
               </Animated.View>
             )}
 
-            {/* History */}
+            {/* History link */}
             <TouchableOpacity
               style={[styles.linkCard, { backgroundColor: colors.card, borderColor: colors.border }]}
               onPress={goToSessionHistory}
@@ -693,7 +694,7 @@ export function TeamInsights() {
           /* MEMBER VIEW */
           /* ═══════════════════════════════════════════════════════════ */
           <>
-            {/* Comparison Card */}
+            {/* 1. Your Performance vs Team */}
             <MemberComparisonCard
               myStats={myStats}
               teamAverages={teamAverages}
@@ -702,24 +703,8 @@ export function TeamInsights() {
               colors={colors}
             />
 
-            {/* Activity */}
-            {weeklyActivityData.some((d) => d.sessions > 0) && (
-              <Animated.View entering={FadeIn.delay(80)} style={styles.section}>
-                <SectionHeader title="YOUR ACTIVITY" icon={<BarChart3 size={12} color={colors.textMuted} />} colors={colors} />
-                <ActivityChart data={weeklyActivityData} title="" height={90} />
-              </Animated.View>
-            )}
-
-            {/* Trends */}
-            {performanceChartData.length >= 2 && (
-              <Animated.View entering={FadeIn.delay(120)} style={styles.section}>
-                <SectionHeader title="YOUR TRENDS" icon={<TrendingUp size={12} color={colors.textMuted} />} colors={colors} />
-                <PerformanceChart data={performanceChartData} height={130} />
-              </Animated.View>
-            )}
-
-            {/* Team Context */}
-            <Animated.View entering={FadeIn.delay(160)} style={styles.section}>
+            {/* 2. Team Context - where you stand */}
+            <Animated.View entering={FadeIn.delay(60)} style={styles.section}>
               <SectionHeader title="TEAM TOTALS" icon={<Users size={12} color={colors.textMuted} />} colors={colors} />
               <TeamContextCard
                 totalSessions={teamTotals.sessions}
@@ -731,7 +716,23 @@ export function TeamInsights() {
               />
             </Animated.View>
 
-            {/* History */}
+            {/* 3. Your Activity */}
+            {weeklyActivityData.some((d) => d.sessions > 0) && (
+              <Animated.View entering={FadeIn.delay(100)} style={styles.section}>
+                <SectionHeader title="YOUR ACTIVITY" icon={<BarChart3 size={12} color={colors.textMuted} />} colors={colors} />
+                <ActivityChart data={weeklyActivityData} title="" height={90} />
+              </Animated.View>
+            )}
+
+            {/* 4. Your Trends */}
+            {performanceChartData.length >= 2 && (
+              <Animated.View entering={FadeIn.delay(140)} style={styles.section}>
+                <SectionHeader title="YOUR TRENDS" icon={<TrendingUp size={12} color={colors.textMuted} />} colors={colors} />
+                <PerformanceChart data={performanceChartData} height={130} />
+              </Animated.View>
+            )}
+
+            {/* History link */}
             <TouchableOpacity
               style={[styles.linkCard, { backgroundColor: colors.card, borderColor: colors.border }]}
               onPress={goToSessionHistory}

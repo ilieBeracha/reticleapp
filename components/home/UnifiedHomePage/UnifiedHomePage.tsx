@@ -1,109 +1,39 @@
 /**
  * UnifiedHomePage
  *
- * Mode-aware home page that adapts to team vs personal context.
- * When in team mode: Shows team branding, team stats, and team-focused content.
- * When in personal mode: Shows solo training focus, personal stats, and individual goals.
+ * Personal mode home page. Clean, professional, compact.
+ * Mirrors TeamHomePage design language.
  *
- * This component is the main orchestrator - it uses the hook for state
- * and delegates rendering to sub-components.
+ * Layout:
+ * - Header (compact)
+ * - Active Session Banner (if active)
+ * - Personal Hero Section (stats summary)
+ * - Quick Actions toolbar
+ * - Weekly Stats card
+ * - Recent Activity list
+ * - View All Sessions link
  */
 
 import { useUnifiedHomePage } from '@/hooks/home/useUnifiedHomePage';
 import { useColors } from '@/hooks/ui/useColors';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
-import { Clock, HelpCircle, History } from 'lucide-react-native';
-import { useCallback, useState } from 'react';
+import { History } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import Animated, {
-  FadeIn,
-  FadeInDown,
-  FadeOut,
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
-} from 'react-native-reanimated';
-import { styles } from './UnifiedHomePage.styles';
-import { CoachMessage } from './components/CoachMessage';
-import { DailyTip } from './components/DailyTip';
-import { HeroActions } from './components/HeroActions';
+import Animated, { FadeIn } from 'react-native-reanimated';
+import { ActiveSessionBanner } from './components/ActiveSessionBanner';
+import { AllTeamsUpcomingCard } from './components/AllTeamsUpcomingCard';
 import { HomeHeader } from './components/HomeHeader';
-import { PersonalModeBanner } from './components/PersonalModeBanner';
+import { PersonalHeroSection } from './components/PersonalHeroSection';
+import { PersonalQuickActions } from './components/PersonalQuickActions';
 import { RecentActivitySection } from './components/RecentActivitySection';
-import { TeamContextBanner } from './components/TeamContextBanner';
-import { TeamSection } from './components/TeamSection';
-import { TeamStatsCard } from './components/TeamStatsCard';
 import { WeeklyStatsCard } from './components/WeeklyStatsCard';
-
-const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
-
-// ════════════════════════════════════════════════════════════════════════════
-// SECTION HEADER - Clean and minimal
-// ════════════════════════════════════════════════════════════════════════════
-
-interface SectionHeaderProps {
-  title: string;
-  tooltip: string;
-  colors: ReturnType<typeof useColors>;
-}
-
-function SectionHeader({ title, tooltip, colors }: SectionHeaderProps) {
-  const [showTooltip, setShowTooltip] = useState(false);
-
-  const handlePress = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setShowTooltip(!showTooltip);
-  }, [showTooltip]);
-
-  return (
-    <View style={localStyles.sectionBlock}>
-      <View style={localStyles.sectionHeader}>
-        <Text style={[localStyles.sectionTitle, { color: colors.textMuted }]}>{title}</Text>
-        <TouchableOpacity
-          onPress={handlePress}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          style={[localStyles.helpButton, { backgroundColor: showTooltip ? `${colors.primary}15` : colors.secondary }]}
-        >
-          <HelpCircle size={12} color={showTooltip ? colors.primary : colors.textMuted} />
-        </TouchableOpacity>
-      </View>
-      {showTooltip && (
-        <Animated.View
-          entering={FadeInDown.duration(200)}
-          exiting={FadeOut.duration(150)}
-          style={[localStyles.tooltipBubble, { backgroundColor: colors.text, borderColor: colors.text }]}
-        >
-          <Text style={[localStyles.tooltipText, { color: colors.background }]}>{tooltip}</Text>
-        </Animated.View>
-      )}
-    </View>
-  );
-}
 
 export function UnifiedHomePage() {
   const colors = useColors();
   const router = useRouter();
   const { t } = useTranslation();
-  const viewAllScale = useSharedValue(1);
-
-  const viewAllAnimStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: viewAllScale.value }],
-  }));
-
-  const handleViewAllPressIn = () => {
-    viewAllScale.value = withSpring(0.98);
-  };
-
-  const handleViewAllPressOut = () => {
-    viewAllScale.value = withSpring(1);
-  };
-
-  const handleViewAllPress = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    router.push('/sessionHistory');
-  };
 
   const {
     // User info
@@ -122,20 +52,13 @@ export function UnifiedHomePage() {
     homeState,
     weeklyStats,
     streak,
-    lastSessionDaysAgo,
-    coachMessage,
     recentSessions,
-    myUpcomingTrainings,
     hasActiveSession,
-    hasTeams,
-    heroMode,
-    activeTeam,
-    activeTeamTraining,
-    isTrainingCommander,
-    nextUpcomingTraining,
     allSessions,
-    defaultWeapon,
-    defaultWeaponStats,
+
+    // All-teams upcoming (personal mode)
+    allTeamsUpcoming,
+    teamNameMap,
 
     // Handlers
     onRefresh,
@@ -145,44 +68,42 @@ export function UnifiedHomePage() {
     handleTrainingPress,
   } = useUnifiedHomePage();
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // MODE DETECTION
-  // ═══════════════════════════════════════════════════════════════════════════
-  const isTeamMode = !!activeTeam;
+  const handleViewHistory = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    router.push('/sessionHistory');
+  };
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // LOADING STATE
-  // ═══════════════════════════════════════════════════════════════════════════
+  const handleViewInsights = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    router.push('/(protected)/(tabs)/insights');
+  };
+
+  // Loading state - matches TeamHomePage
   if (shouldShowLoading) {
     return (
-      <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
-        <ActivityIndicator size="large" color={colors.primary} />
+      <View style={[s.loadingContainer, { backgroundColor: colors.background }]}>
+        <ActivityIndicator size="small" color={colors.textMuted} />
       </View>
     );
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // MAIN RENDER
-  // ═══════════════════════════════════════════════════════════════════════════
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={[s.container, { backgroundColor: colors.background }]}>
       <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
+        style={s.scrollView}
+        contentContainerStyle={s.scrollContent}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor={colors.text}
-            colors={[colors.primary]}
+            tintColor={colors.textMuted}
+            colors={[colors.textMuted]}
             progressBackgroundColor={colors.card}
           />
         }
       >
-        {/* ─────────────────────────────────────────────────────────────────── */}
-        {/* HEADER */}
-        {/* ─────────────────────────────────────────────────────────────────── */}
+        {/* Header */}
         <HomeHeader
           greeting={greeting}
           firstName={firstName}
@@ -192,181 +113,119 @@ export function UnifiedHomePage() {
           colors={colors}
         />
 
-        {/* ─────────────────────────────────────────────────────────────────── */}
-        {/* MODE CONTEXT BANNER */}
-        {/* ─────────────────────────────────────────────────────────────────── */}
-        {isTeamMode && activeTeam ? (
-          <TeamContextBanner team={activeTeam} colors={colors} />
-        ) : (
-          <PersonalModeBanner
-            streak={streak}
-            weeklyProgress={weeklyStats.sessions}
-            weeklyGoal={3}
+        {/* Active Session Banner */}
+        {hasActiveSession && homeState.activeSession && (
+          <ActiveSessionBanner
+            session={homeState.activeSession}
+            onPress={handleActiveSessionPress}
             colors={colors}
           />
         )}
 
-        {/* ─────────────────────────────────────────────────────────────────── */}
-        {/* COACH MESSAGE */}
-        {/* ─────────────────────────────────────────────────────────────────── */}
-        <CoachMessage message={coachMessage} colors={colors} />
-
-        {/* ─────────────────────────────────────────────────────────────────── */}
-        {/* SECTION: QUICK ACTIONS */}
-        {/* ─────────────────────────────────────────────────────────────────── */}
-        <SectionHeader
-          title={t('home.quickActions')}
-          tooltip={t('home.quickActionsTooltip')}
+        {/* Personal Stats Summary */}
+        <PersonalHeroSection
+          sessions={weeklyStats.sessions}
+          accuracy={weeklyStats.accuracy}
+          streak={streak}
+          totalShots={weeklyStats.shots}
+          onViewInsights={handleViewInsights}
           colors={colors}
         />
-        <HeroActions
-          colors={colors}
-          heroMode={heroMode}
-          activeSession={homeState.activeSession}
-          hasActiveSession={!!hasActiveSession}
-          starting={starting}
+
+        {/* Quick Actions */}
+        <PersonalQuickActions
           onStartSession={handleStartSession}
-          onActiveSessionPress={handleActiveSessionPress}
-          activeTeam={activeTeam}
-          activeTeamTraining={activeTeamTraining}
-          isTrainingCommander={isTrainingCommander}
-          hasTeams={hasTeams}
-          onTrainingPress={handleTrainingPress}
-          nextUpcomingTraining={nextUpcomingTraining}
-          defaultWeapon={defaultWeapon}
-          defaultWeaponStats={defaultWeaponStats}
-          upcomingTrainings={myUpcomingTrainings}
+          onViewHistory={handleViewHistory}
+          onViewInsights={handleViewInsights}
+          hasActiveSession={hasActiveSession}
+          starting={starting}
+          colors={colors}
         />
 
-        {/* ─────────────────────────────────────────────────────────────────── */}
-        {/* TEAM MODE: TEAM STATS & TRAININGS */}
-        {/* ─────────────────────────────────────────────────────────────────── */}
-        {isTeamMode && activeTeam && (
-          <>
-            <TeamStatsCard
-              team={activeTeam}
-              upcomingTrainingsCount={myUpcomingTrainings.length}
-              weeklyTeamSessions={weeklyStats.sessions}
-              colors={colors}
-            />
-            {myUpcomingTrainings.length > 0 && (
-              <TeamSection
-                trainings={myUpcomingTrainings}
-                hasTeams={hasTeams}
-                colors={colors}
-                onTrainingPress={handleTrainingPress}
-              />
-            )}
-          </>
+        {/* Upcoming Trainings from all teams */}
+        {allTeamsUpcoming.length > 0 && (
+          <AllTeamsUpcomingCard
+            trainings={allTeamsUpcoming}
+            teamNameMap={teamNameMap}
+            onTrainingPress={handleTrainingPress}
+            colors={colors}
+          />
         )}
 
-        {/* ─────────────────────────────────────────────────────────────────── */}
-        {/* SECTION: THIS WEEK */}
-        {/* ─────────────────────────────────────────────────────────────────── */}
-        <SectionHeader
-          title={t('home.thisWeek')}
-          tooltip={t('home.thisWeekTooltip')}
-          colors={colors}
-        />
-        <DailyTip
-          colors={colors}
-          streak={streak}
-          accuracy={weeklyStats.accuracy}
-          sessionsThisWeek={weeklyStats.sessions}
-          totalSessions={allSessions.length}
-        />
+        {/* Section: This Week */}
+        <Text style={[s.sectionLabel, { color: colors.textMuted }]}>
+          {t('home.thisWeek').toUpperCase()}
+        </Text>
         <WeeklyStatsCard stats={weeklyStats} streak={streak} colors={colors} sessionsData={allSessions} />
 
-        {/* ─────────────────────────────────────────────────────────────────── */}
-        {/* SECTION: RECENT ACTIVITY */}
-        {/* ─────────────────────────────────────────────────────────────────── */}
-        <SectionHeader
-          title={t('home.recentActivity')}
-          tooltip={t('home.recentActivityTooltip')}
-          colors={colors}
-        />
+        {/* Section: Recent Activity */}
+        <Text style={[s.sectionLabel, { color: colors.textMuted }]}>
+          {t('home.recentActivity').toUpperCase()}
+        </Text>
         <RecentActivitySection sessions={recentSessions} colors={colors} onSessionPress={handleSessionPress} />
 
-        {/* ─────────────────────────────────────────────────────────────────── */}
-        {/* VIEW ALL SESSIONS LINK */}
-        {/* ─────────────────────────────────────────────────────────────────── */}
-        <Animated.View entering={FadeIn.delay(200)}>
-          <AnimatedTouchable
-            style={[
-              localStyles.viewAllLink,
-              { backgroundColor: colors.card, borderColor: colors.border },
-              viewAllAnimStyle,
-            ]}
-            onPress={handleViewAllPress}
-            onPressIn={handleViewAllPressIn}
-            onPressOut={handleViewAllPressOut}
-            activeOpacity={1}
+        {/* View All Sessions */}
+        <Animated.View entering={FadeIn.delay(100)}>
+          <TouchableOpacity
+            style={[s.viewAllLink, { backgroundColor: colors.card, borderColor: colors.border }]}
+            onPress={handleViewHistory}
+            activeOpacity={0.7}
           >
-            <View style={localStyles.viewAllContent}>
-              <View style={[localStyles.viewAllIcon, { backgroundColor: `${colors.primary}12` }]}>
-                <History size={16} color={colors.primary} />
+            <View style={s.viewAllContent}>
+              <View style={[s.viewAllIcon, { backgroundColor: colors.border }]}>
+                <History size={14} color={colors.textMuted} />
               </View>
-              <View>
-                <Text style={[localStyles.viewAllTitle, { color: colors.text }]}>
-                  {recentSessions.length > 0 ? t('home.viewAllSessions') : t('home.sessionHistory')}
-                </Text>
-                <Text style={[localStyles.viewAllSubtitle, { color: colors.textMuted }]}>
-                  {recentSessions.length > 0 ? t('home.browseFullHistory') : t('home.yourTrainingLog')}
-                </Text>
-              </View>
+              <Text style={[s.viewAllText, { color: colors.text }]}>
+                {recentSessions.length > 0 ? t('home.viewAllSessions') : t('home.sessionHistory')}
+              </Text>
             </View>
-            <View style={[localStyles.viewAllArrow, { backgroundColor: colors.secondary }]}>
-              <Clock size={13} color={colors.textMuted} />
-            </View>
-          </AnimatedTouchable>
+          </TouchableOpacity>
         </Animated.View>
 
-        {/* Bottom spacing */}
+        {/* Empty State */}
+        {allSessions.length === 0 && !shouldShowLoading && (
+          <Animated.View entering={FadeIn} style={[s.emptyState, { borderColor: colors.border }]}>
+            <Text style={[s.emptyTitle, { color: colors.text }]}>Ready to train</Text>
+            <Text style={[s.emptyText, { color: colors.textMuted }]}>
+              Complete a session to track your progress.
+            </Text>
+          </Animated.View>
+        )}
+
         <View style={{ height: 100 }} />
       </ScrollView>
     </View>
   );
 }
 
-const localStyles = StyleSheet.create({
-  sectionBlock: {
-    marginTop: 14,
-    marginBottom: 6,
+const s = StyleSheet.create({
+  container: {
+    flex: 1,
   },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+  scrollView: {
+    flex: 1,
   },
-  sectionTitle: {
-    fontSize: 11,
-    fontWeight: '600',
-    letterSpacing: 0.5,
-    textTransform: 'uppercase',
+  scrollContent: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
   },
-  helpButton: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    alignItems: 'center',
+  loadingContainer: {
+    flex: 1,
     justifyContent: 'center',
+    alignItems: 'center',
   },
-  tooltipBubble: {
-    marginTop: 8,
-    padding: 10,
-    borderRadius: 8,
-  },
-  tooltipText: {
-    fontSize: 12,
-    lineHeight: 16,
-    fontWeight: '500',
+  sectionLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    letterSpacing: 0.8,
+    marginBottom: 6,
+    marginTop: 4,
   },
   viewAllLink: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     padding: 10,
-    borderRadius: 10,
+    borderRadius: 8,
     borderWidth: 1,
     marginTop: 12,
   },
@@ -376,27 +235,32 @@ const localStyles = StyleSheet.create({
     gap: 8,
   },
   viewAllIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
+    width: 28,
+    height: 28,
+    borderRadius: 7,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  viewAllTitle: {
+  viewAllText: {
     fontSize: 13,
-    fontWeight: '600',
-    letterSpacing: -0.2,
+    fontWeight: '500',
   },
-  viewAllSubtitle: {
-    fontSize: 10,
-    marginTop: 1,
-  },
-  viewAllArrow: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
+  emptyState: {
+    borderRadius: 8,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    padding: 20,
     alignItems: 'center',
-    justifyContent: 'center',
+    marginTop: 12,
+  },
+  emptyTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  emptyText: {
+    fontSize: 12,
+    textAlign: 'center',
   },
 });
 

@@ -245,9 +245,10 @@ export function useTeamHomePage() {
   }, []);
 
   const handleTeamSettings = useCallback(() => {
+    if (!activeTeamId) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    router.push('/(protected)/(tabs)/team');
-  }, []);
+    router.push(`/(protected)/teamSettings?teamId=${activeTeamId}` as any);
+  }, [activeTeamId]);
 
   const handleViewTeamInsights = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -258,16 +259,20 @@ export function useTeamHomePage() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     if (liveTraining) {
       router.push(`/(protected)/trainingDetail?id=${liveTraining.id}`);
+    } else if (isCommander && activeTeamId) {
+      // Commander: create a team training
+      router.push(`/(protected)/createTraining?teamId=${activeTeamId}` as any);
     } else {
-      // Start a new session
+      // Member: start a solo session
       router.push('/(protected)/sessionNew');
     }
-  }, [liveTraining]);
+  }, [liveTraining, isCommander, activeTeamId]);
 
   const handleViewSchedule = useCallback(() => {
+    if (!activeTeamId) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    router.push('/(protected)/(tabs)/team');
-  }, []);
+    router.push(`/(protected)/createTraining?teamId=${activeTeamId}` as any);
+  }, [activeTeamId]);
 
   const handleViewLeaderboard = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -275,9 +280,10 @@ export function useTeamHomePage() {
   }, []);
 
   const handleViewAllMembers = useCallback(() => {
+    if (!activeTeamId) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    router.push('/(protected)/(tabs)/team');
-  }, []);
+    router.push(`/(protected)/teamMembers?teamId=${activeTeamId}` as any);
+  }, [activeTeamId]);
 
   // My personal stats (for member view)
   const myStats = useMemo(() => {

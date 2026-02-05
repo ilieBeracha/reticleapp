@@ -13,8 +13,8 @@ import { useTranslation } from 'react-i18next';
 import { Alert } from 'react-native';
 
 import {
-  CONTEXT_SWITCH_LOADING_DELAY_MS,
-  getFetchConfig,
+    CONTEXT_SWITCH_LOADING_DELAY_MS,
+    getFetchConfig,
 } from '@/constants/unifiedHomePage';
 import { useAuth } from '@/contexts/AuthContext';
 import { useModals } from '@/contexts/ModalContext';
@@ -206,6 +206,22 @@ export function useUnifiedHomePage() {
       .filter((t) => !allSessions.some((s) => s.training_id === t.id && s.status === 'active'))
       .slice(0, 3);
   }, [myUpcomingTrainings, allSessions, activeTeamId]);
+
+  // All upcoming trainings from ALL teams — for personal mode home page
+  // Sorted by closest date, includes team name for display
+  const allTeamsUpcoming = useMemo(() => {
+    return myUpcomingTrainings
+      .filter((t) => t.status === 'planned' || t.status === 'ongoing')
+      .filter((t) => t.scheduled_at) // Must have a date
+      .sort((a, b) => new Date(a.scheduled_at!).getTime() - new Date(b.scheduled_at!).getTime());
+  }, [myUpcomingTrainings]);
+
+  // Map of team IDs to team names for display
+  const teamNameMap = useMemo(() => {
+    const map = new Map<string, string>();
+    teams.forEach((t) => map.set(t.id, t.name));
+    return map;
+  }, [teams]);
 
   const homeState = useHomeState({
     sessions: allSessions,
@@ -408,6 +424,8 @@ export function useUnifiedHomePage() {
     isTrainingCommander,
     nextUpcomingTraining,
     allSessions, // Raw session data for charts
+    allTeamsUpcoming, // All upcoming trainings from all teams (for personal mode)
+    teamNameMap, // Map of team IDs to names
     defaultWeapon, // Default weapon info
     defaultWeaponStats, // Stats for default weapon
 
