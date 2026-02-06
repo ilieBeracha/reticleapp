@@ -1,7 +1,8 @@
 /**
  * ActiveMembers Component
  *
- * Compact horizontal row of member avatars with status.
+ * Compact row showing team members with avatars.
+ * Tappable to navigate to full members list.
  */
 
 import { BaseAvatar } from '@/components/shared/Avatar';
@@ -9,16 +10,14 @@ import { ChevronRight } from 'lucide-react-native';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 
-interface ActiveMember {
+interface TeamMemberDisplay {
   userId: string;
   userName: string;
   avatarUrl?: string | null;
-  status: 'online' | 'training' | 'recent';
-  lastActivity?: string;
 }
 
 interface ActiveMembersProps {
-  members: ActiveMember[];
+  members: TeamMemberDisplay[];
   totalMembers: number;
   teamColor: string;
   onViewAll: () => void;
@@ -32,20 +31,10 @@ interface ActiveMembersProps {
 }
 
 export function ActiveMembers({ members, totalMembers, teamColor, onViewAll, colors }: ActiveMembersProps) {
-  const onlineCount = members.filter((m) => m.status === 'online' || m.status === 'training').length;
-
   return (
     <Animated.View entering={FadeIn.delay(150)} style={s.container}>
       {/* Header */}
-      <View style={s.header}>
-        <Text style={[s.headerText, { color: colors.textMuted }]}>MEMBERS</Text>
-        {onlineCount > 0 && (
-          <View style={s.onlineIndicator}>
-            <View style={[s.onlineDot, { backgroundColor: colors.green }]} />
-            <Text style={[s.onlineText, { color: colors.textMuted }]}>{onlineCount} active</Text>
-          </View>
-        )}
-      </View>
+      <Text style={[s.headerText, { color: colors.textMuted }]}>MEMBERS</Text>
 
       {/* Members Row */}
       <TouchableOpacity
@@ -60,6 +49,13 @@ export function ActiveMembers({ members, totalMembers, teamColor, onViewAll, col
               <MemberAvatar member={member} colors={colors} size={28} />
             </View>
           ))}
+          {totalMembers > 4 && (
+            <View style={[s.avatarWrapper, { marginLeft: -8, zIndex: 0 }]}>
+              <View style={[s.moreAvatar, { backgroundColor: colors.border, width: 28, height: 28, borderColor: colors.card }]}>
+                <Text style={[s.moreText, { color: colors.textMuted }]}>+{totalMembers - 4}</Text>
+              </View>
+            </View>
+          )}
         </View>
 
         {/* Member Count */}
@@ -74,21 +70,8 @@ export function ActiveMembers({ members, totalMembers, teamColor, onViewAll, col
   );
 }
 
-interface MemberAvatarProps {
-  member: ActiveMember;
-  colors: {
-    text: string;
-    textMuted: string;
-    card: string;
-    border: string;
-    green: string;
-  };
-  size: number;
-}
-
-function MemberAvatar({ member, colors, size }: MemberAvatarProps) {
+function MemberAvatar({ member, colors, size }: { member: TeamMemberDisplay; colors: { text: string; card: string; border: string }; size: number }) {
   const initial = member.userName.charAt(0).toUpperCase();
-  const isActive = member.status === 'online' || member.status === 'training';
 
   return (
     <View style={[s.avatar, { width: size, height: size, borderRadius: size / 2, borderColor: colors.card }]}>
@@ -99,7 +82,6 @@ function MemberAvatar({ member, colors, size }: MemberAvatarProps) {
           <Text style={[s.fallbackText, { color: colors.text, fontSize: size * 0.4 }]}>{initial}</Text>
         </View>
       )}
-      {isActive && <View style={[s.statusDot, { backgroundColor: colors.green, borderColor: colors.card }]} />}
     </View>
   );
 }
@@ -108,30 +90,11 @@ const s = StyleSheet.create({
   container: {
     marginBottom: 12,
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 6,
-  },
   headerText: {
     fontSize: 10,
     fontWeight: '600',
     letterSpacing: 0.8,
-  },
-  onlineIndicator: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  onlineDot: {
-    width: 5,
-    height: 5,
-    borderRadius: 2.5,
-  },
-  onlineText: {
-    fontSize: 10,
-    fontWeight: '500',
+    marginBottom: 6,
   },
   membersRow: {
     flexDirection: 'row',
@@ -152,7 +115,6 @@ const s = StyleSheet.create({
     borderWidth: 2,
     alignItems: 'center',
     justifyContent: 'center',
-    position: 'relative',
   },
   fallbackAvatar: {
     borderRadius: 12,
@@ -162,14 +124,15 @@ const s = StyleSheet.create({
   fallbackText: {
     fontWeight: '600',
   },
-  statusDot: {
-    position: 'absolute',
-    bottom: -1,
-    right: -1,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    borderWidth: 1.5,
+  moreAvatar: {
+    borderRadius: 14,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  moreText: {
+    fontSize: 9,
+    fontWeight: '700',
   },
   countSection: {
     flex: 1,

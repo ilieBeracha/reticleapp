@@ -11,9 +11,10 @@ import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { CONTEXT_SWITCH_LOADING_DELAY_MS, getFetchConfig } from '@/constants/unifiedHomePage';
+import { CONTEXT_SWITCH_LOADING_DELAY_MS } from '@/constants/unifiedHomePage';
 import { useAuth } from '@/contexts/AuthContext';
-import { getRecentSessionsWithStats } from '@/services/session/queries';
+import { featuresToSessions } from '@/services/insights/insightsAdapter';
+import { getDashboardFeatures } from '@/services/session/queries';
 import { useGarminStore } from '@/stores/garminStore';
 import { useTeamStore } from '@/stores/teamStore';
 import { useTrainingStore } from '@/stores/trainingStore';
@@ -48,30 +49,45 @@ export function useTeamHomePage() {
 
   // Local state
   const [refreshing, setRefreshing] = useState(false);
-  const [teamSessions, setTeamSessions] = useState<SessionWithDetails[]>([]);
   const [loading, setLoading] = useState(true);
   const [isContextSwitching, setIsContextSwitching] = useState(false);
   const prevTeamIdRef = useRef<string | null | undefined>(undefined);
   const contextSwitchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Load team sessions
+  // Raw sessions from API (not enriched yet)
+  const [rawTeamSessions, setRawTeamSessions] = useState<SessionWithDetails[]>([]);
+
+  // Load team sessions — same source as useTeamInsights for consistency
   const loadTeamSessions = useCallback(async () => {
-    if (!activeTeamId) return;
+    if (!activeTeamId || !user?.id) return;
     try {
-      const config = getFetchConfig(true);
-      const sessions = await getRecentSessionsWithStats({
-        days: config.days,
-        limit: config.limit,
+      const features = await getDashboardFeatures({
+        userId: user.id,
+        days: 365,
+        limit: 500,
         teamId: activeTeamId,
       });
-      setTeamSessions(sessions);
+      setRawTeamSessions(featuresToSessions(features));
     } catch (error) {
       console.error('Failed to load team sessions:', error);
     } finally {
       setLoading(false);
       setIsContextSwitching(false);
     }
-  }, [activeTeamId]);
+  }, [activeTeamId, user?.id]);
+
+  // Enrich with member names reactively (no refetch when members change)
+  const teamSessions = useMemo(() => {
+    if (rawTeamSessions.length === 0) return rawTeamSessions;
+    return rawTeamSessions.map((s) => {
+      if (s.user_full_name) return s;
+      const name = members?.find((m) => m.user_id === s.user_id);
+      if (name) {
+        return { ...s, user_full_name: name.profile?.full_name || name.profile?.email || null };
+      }
+      return s;
+    });
+  }, [rawTeamSessions, members]);
 
   // Initial load
   useFocusEffect(
@@ -100,7 +116,7 @@ export function useTeamHomePage() {
     contextSwitchTimeoutRef.current = setTimeout(() => {
       setIsContextSwitching(true);
       setLoading(true);
-      setTeamSessions([]);
+      setRawTeamSessions([]);
 
       Promise.all([loadTeamSessions(), loadMyUpcomingTrainings(), loadMyStats()]).finally(() => {
         setIsContextSwitching(false);
@@ -122,9 +138,9 @@ export function useTeamHomePage() {
       .filter((t) => t.status === 'planned' || t.status === 'ongoing');
   }, [myUpcomingTrainings, activeTeamId]);
 
-  // Active (live) training
-  const liveTraining = useMemo(() => {
-    return teamTrainings.find((t) => t.status === 'ongoing') ?? null;
+  // Active (live) trainings - there can be multiple
+  const liveTrainings = useMemo(() => {
+    return teamTrainings.filter((t) => t.status === 'ongoing');
   }, [teamTrainings]);
 
   // Upcoming trainings (planned)
@@ -203,18 +219,14 @@ export function useTeamHomePage() {
       .map((entry, index) => ({ ...entry, rank: index + 1 }));
   }, [completedSessions]);
 
-  // Active members - mock data based on team members
-  // In a real app, this would come from presence/status service
-  const activeMembers = useMemo(() => {
+  // Team members mapped for display
+  const teamMembersDisplay = useMemo(() => {
     if (!members || members.length === 0) return [];
 
-    return members.slice(0, 6).map((m: TeamMemberWithProfile, index: number) => ({
+    return members.slice(0, 6).map((m: TeamMemberWithProfile) => ({
       userId: m.user_id,
-      userName: m.profile?.full_name || 'Unknown',
+      userName: m.profile?.full_name || m.profile?.email || 'Unknown',
       avatarUrl: m.profile?.avatar_url || null,
-      // Mock status - first 2 are "active"
-      status: index < 2 ? ('online' as const) : ('recent' as const),
-      lastActivity: index >= 2 ? getTimeAgo(new Date(Date.now() - (index * 30 + 10) * 60000)) : undefined,
     }));
   }, [members]);
 
@@ -257,8 +269,12 @@ export function useTeamHomePage() {
 
   const handleStartTraining = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    if (liveTraining) {
-      router.push(`/(protected)/trainingDetail?id=${liveTraining.id}`);
+    if (liveTrainings.length === 1) {
+      // Exactly one live training - go directly to it
+      router.push(`/(protected)/trainingDetail?id=${liveTrainings[0].id}`);
+    } else if (liveTrainings.length > 1) {
+      // Multiple live trainings - go to the first one (banners show all)
+      router.push(`/(protected)/trainingDetail?id=${liveTrainings[0].id}`);
     } else if (isCommander && activeTeamId) {
       // Commander: create a team training
       router.push(`/(protected)/createTraining?teamId=${activeTeamId}` as any);
@@ -266,7 +282,7 @@ export function useTeamHomePage() {
       // Member: start a solo session
       router.push('/(protected)/sessionNew');
     }
-  }, [liveTraining, isCommander, activeTeamId]);
+  }, [liveTrainings, isCommander, activeTeamId]);
 
   const handleViewSchedule = useCallback(() => {
     if (!activeTeamId) return;
@@ -325,14 +341,14 @@ export function useTeamHomePage() {
     // Team info
     activeTeam,
     memberCount,
-    members: activeMembers,
+    members: teamMembersDisplay,
 
     // State
     refreshing,
     shouldShowLoading,
 
     // Data
-    liveTraining,
+    liveTrainings,
     upcomingTrainings,
     weeklyStats,
     streak,

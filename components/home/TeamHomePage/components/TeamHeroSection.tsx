@@ -8,7 +8,7 @@
  * - Progress bar
  */
 
-import { AlertTriangle, ChevronRight, TrendingDown, TrendingUp, Users } from 'lucide-react-native';
+import { AlertTriangle, ChevronRight, TrendingUp, Users } from 'lucide-react-native';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 
@@ -61,8 +61,6 @@ export function TeamHeroSection({
   onViewDetails,
   colors,
 }: TeamHeroSectionProps) {
-  const activeMembers = leaderboard.length;
-  const participationRate = memberCount > 0 ? Math.round((activeMembers / memberCount) * 100) : 0;
 
   // Commander insights
   const topPerformer = leaderboard[0];
@@ -123,15 +121,10 @@ export function TeamHeroSection({
             </Text>
             <Text style={[s.statLabel, { color: colors.textMuted }]}>shots</Text>
           </View>
-          <View style={[s.statDivider, { backgroundColor: colors.border }]} />
-          <View style={s.stat}>
-            <Text style={[s.statValue, { color: colors.text }]}>{participationRate}%</Text>
-            <Text style={[s.statLabel, { color: colors.textMuted }]}>active</Text>
-          </View>
         </View>
 
         {/* Commander Insights */}
-        {isCommander && (topPerformer || needsAttention.length > 0 || (participationRate < 50 && memberCount > 2)) && (
+        {isCommander && (topPerformer || needsAttention.length > 0) && (
           <View style={[s.insightsSection, { borderTopColor: colors.border }]}>
             {topPerformer && (
               <View style={s.insightRow}>
@@ -147,14 +140,6 @@ export function TeamHeroSection({
                 <AlertTriangle size={11} color={colors.textMuted} />
                 <Text style={[s.insightText, { color: colors.textMuted }]}>
                   {needsAttention.length} member{needsAttention.length !== 1 ? 's' : ''} may need support
-                </Text>
-              </View>
-            )}
-            {participationRate < 50 && memberCount > 2 && (
-              <View style={s.insightRow}>
-                <TrendingDown size={11} color={colors.textMuted} />
-                <Text style={[s.insightText, { color: colors.textMuted }]}>
-                  {memberCount - activeMembers} inactive this week
                 </Text>
               </View>
             )}

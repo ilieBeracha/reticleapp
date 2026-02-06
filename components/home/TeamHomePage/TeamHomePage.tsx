@@ -19,10 +19,12 @@
 import { useTeamHomePage } from '@/hooks/home/useTeamHomePage';
 import { useColors } from '@/hooks/ui/useColors';
 import { getTeamColor } from '@/utils/teamColors';
+import * as Haptics from 'expo-haptics';
+import { useRouter } from 'expo-router';
+import { History } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
-import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
-import { ActiveMembers } from './components/ActiveMembers';
 import { ActiveTrainingBanner } from './components/ActiveTrainingBanner';
 import { MyProgressCard } from './components/MyProgressCard';
 import { TeamActivityCard } from './components/TeamActivityCard';
@@ -30,9 +32,7 @@ import { TeamDashboardHeader } from './components/TeamDashboardHeader';
 import { TeamHeroSection } from './components/TeamHeroSection';
 import { TeamLeaderboard } from './components/TeamLeaderboard';
 import { TeammateFeed } from './components/TeammateFeed';
-import { TeamMemberActivity } from './components/TeamMemberActivity';
 import { TeamQuickActions, type ContentTab } from './components/TeamQuickActions';
-import { TeamWeeklyInsightsCard } from './components/TeamWeeklyInsightsCard';
 import { UpcomingTrainingsCard } from './components/UpcomingTrainingsCard';
 
 export function TeamHomePage() {
@@ -59,13 +59,12 @@ export function TeamHomePage() {
     shouldShowLoading,
 
     // Data
-    liveTraining,
+    liveTrainings,
     upcomingTrainings,
     weeklyStats,
     streak,
     recentActivity,
     sessionsThisWeek,
-    weeklyGoal,
     leaderboard,
     myStats,
     teamTotals,
@@ -100,6 +99,13 @@ export function TeamHomePage() {
       accuracy: a.accuracy,
     }));
   }, [recentActivity]);
+
+  const router = useRouter();
+
+  const handleViewHistory = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    router.push('/sessionHistory');
+  };
 
   if (shouldShowLoading) {
     return (
@@ -140,15 +146,42 @@ export function TeamHomePage() {
           colors={colors}
         />
 
-        {/* Live Training Banner */}
-        {liveTraining && (
+        {/* Live Training Banner(s) */}
+        {liveTrainings.length === 1 ? (
           <ActiveTrainingBanner
-            training={liveTraining}
+            training={liveTrainings[0]}
             teamColor={teamColor}
-            onJoin={() => handleJoinTraining(liveTraining)}
+            onJoin={() => handleJoinTraining(liveTrainings[0])}
             colors={colors}
           />
-        )}
+        ) : liveTrainings.length > 1 ? (
+          <View style={[s.multiLiveCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={s.multiLiveHeader}>
+              <View style={[s.multiLiveDot, { backgroundColor: '#10B981' }]} />
+              <Text style={[s.multiLiveTitle, { color: colors.text }]}>
+                {liveTrainings.length} LIVE TRAININGS
+              </Text>
+            </View>
+            {liveTrainings.map((training, i) => (
+              <TouchableOpacity
+                key={training.id}
+                style={[
+                  s.multiLiveRow,
+                  i < liveTrainings.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+                ]}
+                onPress={() => handleJoinTraining(training)}
+                activeOpacity={0.6}
+              >
+                <Text style={[s.multiLiveRowTitle, { color: colors.text }]} numberOfLines={1}>
+                  {training.title}
+                </Text>
+                <View style={[s.multiLiveJoinBtn, { backgroundColor: colors.text }]}>
+                  <Text style={[s.multiLiveJoinText, { color: colors.background }]}>Join</Text>
+                </View>
+              </TouchableOpacity>
+            ))}
+          </View>
+        ) : null}
 
         {/* Merged Hero Card - team info + stats + commander insights */}
         <TeamHeroSection
@@ -175,7 +208,7 @@ export function TeamHomePage() {
               onStartTraining={handleStartTraining}
               activeTab={contentTab}
               onTabChange={setContentTab}
-              hasLiveTraining={!!liveTraining}
+              hasLiveTraining={liveTrainings.length > 0}
               upcomingCount={upcomingTrainings.length}
               teamColor={teamColor}
               colors={colors}
@@ -201,47 +234,26 @@ export function TeamHomePage() {
             )}
 
             {contentTab === 'insights' && (
-              <TeamWeeklyInsightsCard
-                sessions={sessionsThisWeek}
-                shots={teamTotals.shots}
-                accuracy={weeklyStats.accuracy}
-                activeMembers={teamTotals.activeMembers}
-                totalMembers={memberCount}
-                weeklyGoal={weeklyGoal}
-                onViewDetails={handleViewTeamInsights}
-                colors={colors}
-              />
+              leaderboard.length > 0 ? (
+                <TeamLeaderboard
+                  entries={leaderboard}
+                  currentUserId={userId}
+                  teamColor={teamColor}
+                  onViewAll={handleViewLeaderboard}
+                  colors={colors}
+                />
+              ) : (
+                <Animated.View entering={FadeIn} style={[s.emptyTabCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                  <Text style={[s.emptyTabTitle, { color: colors.text }]}>No rankings yet</Text>
+                  <Text style={[s.emptyTabText, { color: colors.textMuted }]}>
+                    Complete sessions to see team rankings
+                  </Text>
+                </Animated.View>
+              )
             )}
 
             {contentTab === 'activity' && (
               <TeamActivityCard activities={activityItems} colors={colors} />
-            )}
-
-            {/* Members */}
-            {members.length > 0 && (
-              <ActiveMembers
-                members={members}
-                totalMembers={memberCount}
-                teamColor={teamColor}
-                onViewAll={handleViewAllMembers}
-                colors={colors}
-              />
-            )}
-
-            {/* Leaderboard */}
-            {leaderboard.length > 0 && (
-              <TeamLeaderboard
-                entries={leaderboard}
-                currentUserId={userId}
-                teamColor={teamColor}
-                onViewAll={handleViewLeaderboard}
-                colors={colors}
-              />
-            )}
-
-            {/* Recent Activity */}
-            {recentActivity.length > 0 && (
-              <TeamMemberActivity activities={recentActivity} teamColor={teamColor} colors={colors} />
             )}
           </>
         ) : (
@@ -276,6 +288,18 @@ export function TeamHomePage() {
             />
           </>
         )}
+
+        {/* Session History Link */}
+        <TouchableOpacity
+          style={[s.historyLink, { backgroundColor: colors.card, borderColor: colors.border }]}
+          onPress={handleViewHistory}
+          activeOpacity={0.7}
+        >
+          <View style={[s.historyIcon, { backgroundColor: colors.border }]}>
+            <History size={14} color={colors.textMuted} />
+          </View>
+          <Text style={[s.historyText, { color: colors.text }]}>Session History</Text>
+        </TouchableOpacity>
 
         {/* Empty State */}
         {!hasActivity && !isCommander && (
@@ -330,6 +354,71 @@ const s = StyleSheet.create({
     padding: 20,
     alignItems: 'center',
     marginBottom: 12,
+  },
+  historyLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    marginTop: 12,
+    gap: 8,
+  },
+  historyIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 7,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  historyText: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  multiLiveCard: {
+    borderRadius: 8,
+    borderWidth: 1,
+    marginBottom: 12,
+    overflow: 'hidden',
+  },
+  multiLiveHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  multiLiveDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  multiLiveTitle: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  multiLiveRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  multiLiveRowTitle: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '500',
+    marginRight: 10,
+  },
+  multiLiveJoinBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 6,
+  },
+  multiLiveJoinText: {
+    fontSize: 12,
+    fontWeight: '600',
   },
   emptyTabTitle: {
     fontSize: 13,

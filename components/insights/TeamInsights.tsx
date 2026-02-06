@@ -2,25 +2,38 @@
  * TeamInsights Component
  *
  * Team insights with role-based views:
- * - Commander: Detailed team analytics, rankings, drill-down to specifics
+ * - Commander: Comprehensive team analytics with readiness, rankings, breakdowns, accuracy bars
  * - Member: Personal stats + team context with comparison indicators
  */
 
-import { useTeamInsights, type MyComparison, type TeamMemberStat, type TeamWeakArea } from '@/hooks/insights/useTeamInsights';
+import {
+  useTeamInsights,
+  type MyComparison,
+  type TeamMemberStat,
+  type TeamWeakArea,
+  type TeamReadiness,
+  type WeaponCategoryBreakdown,
+  type InactiveMemberInfo,
+  type PositionBreakdown,
+  type DistanceBreakdown,
+} from '@/hooks/insights/useTeamInsights';
 import { useColors } from '@/hooks/ui/useColors';
 import { Ionicons } from '@expo/vector-icons';
 import {
     AlertTriangle,
     BarChart3,
+    Calendar,
     ChevronDown,
     ChevronRight,
     ChevronUp,
     Clock,
+    Crosshair,
     Minus,
     Shield,
     Target,
     TrendingDown,
     TrendingUp,
+    UserX,
     Users,
     Zap,
 } from 'lucide-react-native';
@@ -40,6 +53,43 @@ import Animated, { FadeIn } from 'react-native-reanimated';
 
 import { ActivityChart } from './components/ActivityChart';
 import { PerformanceChart } from './components/PerformanceChart';
+
+// ============================================================================
+// HELPERS
+// ============================================================================
+
+function formatShots(n: number): string {
+  if (n >= 10000) return `${(n / 1000).toFixed(1)}k`;
+  if (n >= 1000) return `${(n / 1000).toFixed(1)}k`;
+  return n.toLocaleString();
+}
+
+function formatRelativeTime(dateStr: string | null): string {
+  if (!dateStr) return '—';
+  const now = Date.now();
+  const then = new Date(dateStr).getTime();
+  const diffMs = now - then;
+  const diffMins = Math.floor(diffMs / 60000);
+  if (diffMins < 60) return `${diffMins}m`;
+  const diffHours = Math.floor(diffMins / 60);
+  if (diffHours < 24) return `${diffHours}h`;
+  const diffDays = Math.floor(diffHours / 24);
+  if (diffDays < 7) return `${diffDays}d`;
+  const diffWeeks = Math.floor(diffDays / 7);
+  if (diffWeeks < 5) return `${diffWeeks}w`;
+  const diffMonths = Math.floor(diffDays / 30);
+  return `${diffMonths}mo`;
+}
+
+function getInitials(name: string): string {
+  return name
+    .split(' ')
+    .filter(Boolean)
+    .map((n) => n[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2);
+}
 
 // ============================================================================
 // SHARED COMPONENTS
@@ -293,120 +343,62 @@ function TeamContextCard({ totalSessions, totalShots, avgAccuracy, activeMembers
 }
 
 // ============================================================================
-// COMMANDER VIEW: TEAM OVERVIEW CARD
+// COMMANDER VIEW: TEAM READINESS SUMMARY (2x2 grid)
 // ============================================================================
 
-interface CommanderOverviewProps {
-  sessions: number;
-  shots: number;
-  avgAccuracy: number | null;
-  activeMembers: number;
-  totalMembers: number;
-  participationRate: number;
+function TeamReadinessSummary({
+  readiness,
+  colors,
+}: {
+  readiness: TeamReadiness;
   colors: ReturnType<typeof useColors>;
-}
-
-function CommanderOverview({ sessions, shots, avgAccuracy, activeMembers, totalMembers, participationRate, colors }: CommanderOverviewProps) {
-  return (
-    <Animated.View entering={FadeIn.delay(50)} style={[styles.cmdOverview, { backgroundColor: colors.card, borderColor: colors.border }]}>
-      {/* Main stats row */}
-      <View style={styles.cmdOverviewRow}>
-        <View style={styles.cmdOverviewStat}>
-          <Text style={[styles.cmdOverviewValue, { color: colors.text }]}>{sessions}</Text>
-          <Text style={[styles.cmdOverviewLabel, { color: colors.textMuted }]}>Sessions</Text>
-        </View>
-        <View style={[styles.cmdOverviewDivider, { backgroundColor: colors.border }]} />
-        <View style={styles.cmdOverviewStat}>
-          <Text style={[styles.cmdOverviewValue, { color: colors.text }]}>
-            {avgAccuracy !== null ? `${avgAccuracy.toFixed(0)}%` : '—'}
-          </Text>
-          <Text style={[styles.cmdOverviewLabel, { color: colors.textMuted }]}>Accuracy</Text>
-        </View>
-        <View style={[styles.cmdOverviewDivider, { backgroundColor: colors.border }]} />
-        <View style={styles.cmdOverviewStat}>
-          <Text style={[styles.cmdOverviewValue, { color: colors.text }]}>{participationRate}%</Text>
-          <Text style={[styles.cmdOverviewLabel, { color: colors.textMuted }]}>Participation</Text>
-        </View>
-      </View>
-      {/* Secondary info */}
-      <View style={[styles.cmdOverviewSecondary, { borderTopColor: colors.border }]}>
-        <View style={styles.cmdOverviewSecondaryItem}>
-          <Zap size={12} color={colors.textMuted} />
-          <Text style={[styles.cmdOverviewSecondaryText, { color: colors.textMuted }]}>
-            {shots.toLocaleString()} shots
-          </Text>
-        </View>
-        <View style={styles.cmdOverviewSecondaryItem}>
-          <Users size={12} color={colors.textMuted} />
-          <Text style={[styles.cmdOverviewSecondaryText, { color: colors.textMuted }]}>
-            {activeMembers}/{totalMembers} active
-          </Text>
-        </View>
-      </View>
-    </Animated.View>
-  );
-}
-
-// ============================================================================
-// COMMANDER VIEW: MEMBER RANKINGS (expandable)
-// ============================================================================
-
-interface MemberRankingsProps {
-  members: TeamMemberStat[];
-  currentUserId: string;
-  colors: ReturnType<typeof useColors>;
-}
-
-function MemberRankings({ members, currentUserId, colors }: MemberRankingsProps) {
-  const [expanded, setExpanded] = useState(false);
-  if (members.length === 0) return null;
-
-  const displayMembers = expanded ? members : members.slice(0, 5);
+}) {
+  const pct = readiness.participationRate;
+  const ringColor = pct >= 70 ? colors.green : pct >= 40 ? (colors.orange || '#F59E0B') : colors.textMuted;
 
   return (
-    <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-      {/* Table header */}
-      <View style={[styles.tableHeader, { borderBottomColor: colors.border }]}>
-        <Text style={[styles.thRank, { color: colors.textMuted }]}>#</Text>
-        <Text style={[styles.thName, { color: colors.textMuted }]}>MEMBER</Text>
-        <Text style={[styles.thStat, { color: colors.textMuted }]}>SESS</Text>
-        <Text style={[styles.thStat, { color: colors.textMuted }]}>ACC</Text>
-      </View>
-      {/* Rows */}
-      {displayMembers.map((m, i) => {
-        const isMe = m.userId === currentUserId;
-        return (
-          <View
-            key={m.userId}
-            style={[
-              styles.tableRow,
-              isMe && { backgroundColor: `${colors.textMuted}06` },
-              i < displayMembers.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
-            ]}
-          >
-            <Text style={[styles.tdRank, { color: colors.textMuted }]}>{i + 1}</Text>
-            <Text style={[styles.tdName, { color: isMe ? colors.text : colors.textMuted }]} numberOfLines={1}>
-              {m.userName}{isMe ? ' (you)' : ''}
-            </Text>
-            <Text style={[styles.tdStat, { color: colors.text }]}>{m.sessions}</Text>
-            <Text style={[styles.tdStat, { color: m.accuracy && m.accuracy >= 70 ? colors.green : colors.text }]}>
-              {m.accuracy !== null ? `${m.accuracy.toFixed(0)}%` : '—'}
-            </Text>
+    <View style={[styles.readinessCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+      {/* Participation Ring */}
+      <View style={styles.readinessRingSection}>
+        <View style={[styles.readinessRingOuter, { borderColor: `${ringColor}20` }]}>
+          <View style={[styles.readinessRingInner, { borderColor: ringColor }]}>
+            <Text style={[styles.readinessRingPct, { color: ringColor }]}>{pct}</Text>
+            <Text style={[styles.readinessRingUnit, { color: colors.textMuted }]}>%</Text>
           </View>
-        );
-      })}
-      {/* Expand/collapse */}
-      {members.length > 5 && (
-        <TouchableOpacity
-          style={[styles.expandButton, { borderTopColor: colors.border }]}
-          onPress={() => setExpanded(!expanded)}
-        >
-          <Text style={[styles.expandText, { color: colors.textMuted }]}>
-            {expanded ? 'Show less' : `Show all ${members.length}`}
+        </View>
+        <Text style={[styles.readinessMainText, { color: colors.text }]}>
+          <Text style={{ fontWeight: '800', fontSize: 16 }}>{readiness.trainedThisWeek}</Text>
+          <Text style={{ color: colors.textMuted }}>{' / '}{readiness.totalMembers}</Text>
+          {'  trained this week'}
+        </Text>
+      </View>
+
+      {/* Compact stats row */}
+      <View style={[styles.readinessStatsRow, { borderTopColor: colors.border }]}>
+        <View style={styles.readinessStatItem}>
+          <BarChart3 size={11} color={colors.textMuted} />
+          <Text style={[styles.readinessStatValue, { color: colors.text }]}>
+            {readiness.avgSessionsPerMember.toFixed(1)}
           </Text>
-          {expanded ? <ChevronUp size={12} color={colors.textMuted} /> : <ChevronDown size={12} color={colors.textMuted} />}
-        </TouchableOpacity>
-      )}
+          <Text style={[styles.readinessStatLabel, { color: colors.textMuted }]}>avg/member</Text>
+        </View>
+        <View style={[styles.readinessStatDivider, { backgroundColor: colors.border }]} />
+        <View style={styles.readinessStatItem}>
+          <Target size={11} color={colors.textMuted} />
+          <Text style={[styles.readinessStatValue, { color: colors.text }]}>
+            {formatShots(readiness.totalShots)}
+          </Text>
+          <Text style={[styles.readinessStatLabel, { color: colors.textMuted }]}>total shots</Text>
+        </View>
+        <View style={[styles.readinessStatDivider, { backgroundColor: colors.border }]} />
+        <View style={styles.readinessStatItem}>
+          <Clock size={11} color={colors.orange || '#F59E0B'} />
+          <Text style={[styles.readinessStatValue, { color: colors.text }]}>
+            {readiness.daysSinceLeastActive !== null ? `${readiness.daysSinceLeastActive}d` : '—'}
+          </Text>
+          <Text style={[styles.readinessStatLabel, { color: colors.textMuted }]}>least active</Text>
+        </View>
+      </View>
     </View>
   );
 }
@@ -470,6 +462,241 @@ function QuickInsights({ topPerformers, needsAttention, inactiveCount, colors }:
 }
 
 // ============================================================================
+// COMMANDER VIEW: MEMBER DETAIL TABLE (expandable)
+// ============================================================================
+
+interface MemberDetailTableProps {
+  members: TeamMemberStat[];
+  currentUserId: string;
+  colors: ReturnType<typeof useColors>;
+}
+
+function MemberDetailTable({ members, currentUserId, colors }: MemberDetailTableProps) {
+  const [expanded, setExpanded] = useState(false);
+  if (members.length === 0) return null;
+
+  const displayMembers = expanded ? members : members.slice(0, 5);
+
+  const getAccuracyColor = (accuracy: number | null) => {
+    if (accuracy === null) return colors.textMuted;
+    if (accuracy >= 70) return colors.green;
+    if (accuracy >= 50) return colors.orange || '#F59E0B';
+    return colors.textMuted;
+  };
+
+  return (
+    <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+      {displayMembers.map((m, i) => {
+        const isMe = m.userId === currentUserId;
+        const accColor = getAccuracyColor(m.accuracy);
+        return (
+          <View
+            key={m.userId}
+            style={[
+              styles.memberCard,
+              isMe && { backgroundColor: `${colors.primary}06` },
+              i < displayMembers.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+            ]}
+          >
+            {/* Left: Rank + Initials */}
+            <View style={styles.memberCardLeft}>
+              <Text style={[styles.memberCardRank, { color: colors.textMuted }]}>{i + 1}</Text>
+              <View style={[styles.memberCardAvatar, { backgroundColor: `${accColor}18` }]}>
+                <Text style={[styles.memberCardInitials, { color: accColor }]}>
+                  {getInitials(m.userName)}
+                </Text>
+              </View>
+            </View>
+
+            {/* Center: Name + stats subtitle */}
+            <View style={styles.memberCardCenter}>
+              <Text style={[styles.memberCardName, { color: colors.text }]} numberOfLines={1}>
+                {m.userName}{isMe ? ' (you)' : ''}
+              </Text>
+              <Text style={[styles.memberCardSubtitle, { color: colors.textMuted }]} numberOfLines={1}>
+                {m.sessions} sessions · {formatShots(m.shots)} shots · {formatRelativeTime(m.lastActive)} ago
+              </Text>
+            </View>
+
+            {/* Right: Accuracy + Grouping */}
+            <View style={styles.memberCardRight}>
+              <Text style={[styles.memberCardAccuracy, { color: accColor }]}>
+                {m.accuracy !== null ? `${m.accuracy.toFixed(0)}%` : '—'}
+              </Text>
+              <Text style={[styles.memberCardGrouping, { color: colors.textMuted }]}>
+                {m.bestDispersion !== null ? `${m.bestDispersion.toFixed(1)}cm` : ''}
+              </Text>
+            </View>
+          </View>
+        );
+      })}
+
+      {/* Expand/collapse */}
+      {members.length > 5 && (
+        <TouchableOpacity
+          style={[styles.expandButton, { borderTopColor: colors.border }]}
+          onPress={() => setExpanded(!expanded)}
+        >
+          <Text style={[styles.expandText, { color: colors.textMuted }]}>
+            {expanded ? 'Show less' : `Show all ${members.length}`}
+          </Text>
+          {expanded ? <ChevronUp size={12} color={colors.textMuted} /> : <ChevronDown size={12} color={colors.textMuted} />}
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+}
+
+// ============================================================================
+// COMMANDER VIEW: MEMBER ACCURACY BARS
+// ============================================================================
+
+function MemberAccuracyBars({
+  members,
+  colors,
+}: {
+  members: TeamMemberStat[];
+  colors: ReturnType<typeof useColors>;
+}) {
+  if (members.length === 0) return null;
+
+  const getBarColor = (accuracy: number) => {
+    if (accuracy >= 70) return colors.green;
+    if (accuracy >= 50) return colors.orange || '#F59E0B';
+    return colors.textMuted;
+  };
+
+  const teamAvg = members.reduce((sum, m) => sum + (m.accuracy ?? 0), 0) / members.length;
+
+  return (
+    <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border, padding: 14 }]}>
+      {members.map((m, i) => {
+        const acc = m.accuracy ?? 0;
+        const barColor = getBarColor(acc);
+        return (
+          <View
+            key={m.userId}
+            style={[
+              styles.accuracyBarRow,
+              i < members.length - 1 && { marginBottom: 12 },
+            ]}
+          >
+            <View style={[styles.accBarAvatar, { backgroundColor: `${barColor}18` }]}>
+              <Text style={[styles.accBarInitials, { color: barColor }]}>
+                {getInitials(m.userName)}
+              </Text>
+            </View>
+            <Text style={[styles.accuracyBarName, { color: colors.text }]} numberOfLines={1}>
+              {m.userName}
+            </Text>
+            <View style={[styles.accuracyBarTrack, { backgroundColor: `${colors.textMuted}10` }]}>
+              <View
+                style={[
+                  styles.accuracyBarFill,
+                  {
+                    backgroundColor: barColor,
+                    width: `${Math.min(acc, 100)}%`,
+                  },
+                ]}
+              />
+            </View>
+            <Text style={[styles.accuracyBarValue, { color: barColor }]}>
+              {acc.toFixed(0)}%
+            </Text>
+          </View>
+        );
+      })}
+
+      {/* Team average indicator */}
+      <View style={[styles.accBarAvgRow, { borderTopColor: colors.border }]}>
+        <Minus size={10} color={colors.textMuted} />
+        <Text style={[styles.accBarAvgText, { color: colors.textMuted }]}>
+          Team avg: {teamAvg.toFixed(0)}%
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+// ============================================================================
+// COMMANDER VIEW: MATRIX TABLE (shared for distance, position, weapon)
+// ============================================================================
+
+interface MatrixRow {
+  label: string;
+  sessions: number;
+  totalShots: number;
+  avgAccuracy: number | null;
+  avgGrouping: number | null;
+  memberCount: number;
+}
+
+function MatrixTable({
+  rows,
+  colors,
+}: {
+  rows: MatrixRow[];
+  colors: ReturnType<typeof useColors>;
+}) {
+  if (rows.length === 0) return null;
+
+  const getAccColor = (accuracy: number | null) => {
+    if (accuracy === null) return colors.textMuted;
+    if (accuracy >= 70) return colors.green;
+    if (accuracy >= 50) return colors.orange || '#F59E0B';
+    return colors.textMuted;
+  };
+
+  return (
+    <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+      {rows.map((row, i) => {
+        const accColor = getAccColor(row.avgAccuracy);
+        return (
+          <View
+            key={row.label}
+            style={[
+              styles.matrixCardRow,
+              i < rows.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+            ]}
+          >
+            {/* Left: Category + subtitle */}
+            <View style={styles.matrixCardLeft}>
+              <Text style={[styles.matrixCardLabel, { color: colors.text }]} numberOfLines={1}>
+                {row.label}
+              </Text>
+              <Text style={[styles.matrixCardSubtitle, { color: colors.textMuted }]}>
+                {row.sessions} sessions · {row.memberCount} members
+              </Text>
+            </View>
+
+            {/* Right: Accuracy with mini bar + Grouping */}
+            <View style={styles.matrixCardRight}>
+              <Text style={[styles.matrixCardAccuracy, { color: accColor }]}>
+                {row.avgAccuracy !== null ? `${row.avgAccuracy.toFixed(0)}%` : '—'}
+              </Text>
+              <View style={styles.matrixMiniBarTrack}>
+                <View
+                  style={[
+                    styles.matrixMiniBarFill,
+                    {
+                      backgroundColor: accColor,
+                      width: row.avgAccuracy !== null ? `${Math.min(row.avgAccuracy, 100)}%` : '0%',
+                    },
+                  ]}
+                />
+              </View>
+              <Text style={[styles.matrixCardGrouping, { color: colors.textMuted }]}>
+                {row.avgGrouping !== null ? `${row.avgGrouping.toFixed(1)}cm` : '—'}
+              </Text>
+            </View>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
+// ============================================================================
 // COMMANDER VIEW: TRAINING FOCUS AREAS
 // ============================================================================
 
@@ -498,30 +725,61 @@ function TrainingFocus({ weakAreas, colors }: { weakAreas: TeamWeakArea[]; color
 }
 
 // ============================================================================
-// COMMANDER VIEW: BREAKDOWN GRID
+// COMMANDER VIEW: INACTIVE MEMBERS ALERT
 // ============================================================================
 
-interface BreakdownGridProps {
-  positionData: { label: string; sessions: number; avgAccuracy: number | null }[];
-  distanceData: { label: string; sessions: number; avgAccuracy: number | null }[];
+function InactiveMembersAlert({
+  inactiveMembers,
+  colors,
+}: {
+  inactiveMembers: InactiveMemberInfo[];
   colors: ReturnType<typeof useColors>;
-}
+}) {
+  if (inactiveMembers.length === 0) return null;
 
-function BreakdownGrid({ positionData, distanceData, colors }: BreakdownGridProps) {
-  const allData = [...positionData.slice(0, 2), ...distanceData.slice(0, 2)];
-  if (allData.length === 0) return null;
+  const warnColor = colors.orange || '#F59E0B';
 
   return (
-    <View style={styles.breakdownGrid}>
-      {allData.map((item) => (
-        <View key={item.label} style={[styles.breakdownItem, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Text style={[styles.breakdownLabel, { color: colors.textMuted }]}>{item.label}</Text>
-          <Text style={[styles.breakdownValue, { color: colors.text }]}>
-            {item.avgAccuracy !== null ? `${item.avgAccuracy.toFixed(0)}%` : '—'}
-          </Text>
-          <Text style={[styles.breakdownSessions, { color: colors.textMuted }]}>{item.sessions} sess</Text>
+    <View style={[styles.inactiveCard, { backgroundColor: colors.card, borderColor: `${warnColor}35` }]}>
+      {/* Header with warning icon */}
+      <View style={styles.inactiveHeader}>
+        <View style={[styles.inactiveIconBg, { backgroundColor: `${warnColor}14` }]}>
+          <AlertTriangle size={15} color={warnColor} />
         </View>
-      ))}
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.inactiveTitle, { color: colors.text }]}>
+            {inactiveMembers.length} member{inactiveMembers.length !== 1 ? 's' : ''} never trained
+          </Text>
+          <Text style={[styles.inactiveSubtitle, { color: colors.textMuted }]}>No sessions recorded</Text>
+        </View>
+      </View>
+
+      {/* Vertical member list */}
+      <View style={styles.inactiveList}>
+        {inactiveMembers.map((m, i) => (
+          <View
+            key={m.userId}
+            style={[
+              styles.inactiveMember,
+              i < inactiveMembers.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: `${colors.border}` },
+            ]}
+          >
+            <View style={[styles.inactiveAvatar, { backgroundColor: `${warnColor}12` }]}>
+              <Text style={[styles.inactiveInitials, { color: warnColor }]}>
+                {getInitials(m.userName)}
+              </Text>
+            </View>
+            <Text style={[styles.inactiveName, { color: colors.text }]} numberOfLines={1}>
+              {m.userName}
+            </Text>
+          </View>
+        ))}
+      </View>
+
+      {/* Hint text */}
+      <Text style={[styles.inactiveHint, { color: colors.textMuted }]}>
+        Consider reaching out to encourage participation
+      </Text>
     </View>
   );
 }
@@ -554,9 +812,13 @@ export function TeamInsights() {
     inactiveMembers,
     positionBreakdown,
     distanceBreakdown,
+    weaponCategoryBreakdown,
     teamWeakAreas,
     weeklyActivityData,
     performanceChartData,
+    teamReadiness,
+    memberAccuracyRanking,
+    inactiveMembersInfo,
     handleRefresh,
     goToStartSession,
     goToSessionHistory,
@@ -570,17 +832,34 @@ export function TeamInsights() {
     );
   }
 
-  // Format breakdown data
-  const positionData = positionBreakdown.map((p) => ({
+  // Format position breakdown for matrix
+  const positionRows: MatrixRow[] = positionBreakdown.map((p) => ({
     label: p.position.charAt(0).toUpperCase() + p.position.slice(1),
     sessions: p.sessions,
+    totalShots: p.totalShots,
     avgAccuracy: p.avgAccuracy,
+    avgGrouping: p.avgGrouping,
+    memberCount: p.memberCount,
   }));
 
-  const distanceData = distanceBreakdown.map((d) => ({
+  // Format distance breakdown for matrix
+  const distanceRows: MatrixRow[] = distanceBreakdown.map((d) => ({
     label: d.label,
     sessions: d.sessions,
+    totalShots: d.totalShots,
     avgAccuracy: d.avgAccuracy,
+    avgGrouping: d.avgGrouping,
+    memberCount: d.memberCount,
+  }));
+
+  // Format weapon category breakdown for matrix
+  const weaponRows: MatrixRow[] = weaponCategoryBreakdown.map((w) => ({
+    label: w.label,
+    sessions: w.sessions,
+    totalShots: w.totalShots,
+    avgAccuracy: w.avgAccuracy,
+    avgGrouping: w.avgGrouping,
+    memberCount: w.memberCount,
   }));
 
   return (
@@ -617,19 +896,14 @@ export function TeamInsights() {
           /* COMMANDER VIEW */
           /* ═══════════════════════════════════════════════════════════ */
           <>
-            {/* 1. Overview Stats - most important at a glance */}
-            <CommanderOverview
-              sessions={teamTotals.sessions}
-              shots={teamTotals.shots}
-              avgAccuracy={teamTotals.avgAccuracy}
-              activeMembers={teamTotals.activeMembers}
-              totalMembers={teamTotals.totalMembers}
-              participationRate={participationRate}
-              colors={colors}
-            />
+            {/* 1. Team Readiness Summary */}
+            <Animated.View entering={FadeIn.delay(50)}>
+              <SectionHeader title="READINESS" icon={<Shield size={12} color={colors.textMuted} />} colors={colors} />
+              <TeamReadinessSummary readiness={teamReadiness} colors={colors} />
+            </Animated.View>
 
             {/* 2. Quick Insights - actionable alerts (top/attention) */}
-            <Animated.View entering={FadeIn.delay(60)} style={styles.section}>
+            <Animated.View entering={FadeIn.delay(90)} style={styles.section}>
               <QuickInsights
                 topPerformers={topPerformers}
                 needsAttention={needsAttention}
@@ -638,47 +912,78 @@ export function TeamInsights() {
               />
             </Animated.View>
 
-            {/* 3. Rankings - who's performing */}
+            {/* 3. Member Detail Table */}
             {memberRankings.length > 0 && (
-              <Animated.View entering={FadeIn.delay(100)} style={styles.section}>
-                <SectionHeader title="RANKINGS" icon={<Users size={12} color={colors.textMuted} />} colors={colors} />
-                <MemberRankings members={memberRankings} currentUserId={userId} colors={colors} />
+              <Animated.View entering={FadeIn.delay(130)} style={styles.section}>
+                <SectionHeader title="MEMBER RANKINGS" icon={<Users size={12} color={colors.textMuted} />} colors={colors} />
+                <MemberDetailTable members={memberRankings} currentUserId={userId} colors={colors} />
               </Animated.View>
             )}
 
-            {/* 4. Training Focus - areas needing work */}
-            {teamWeakAreas.length > 0 && (
-              <Animated.View entering={FadeIn.delay(140)} style={styles.section}>
-                <SectionHeader title="TRAINING FOCUS" icon={<Target size={12} color={colors.textMuted} />} colors={colors} />
-                <TrainingFocus weakAreas={teamWeakAreas} colors={colors} />
+            {/* 4. Member Accuracy Bars */}
+            {memberAccuracyRanking.length > 0 && (
+              <Animated.View entering={FadeIn.delay(170)} style={styles.section}>
+                <SectionHeader title="ACCURACY COMPARISON" icon={<Target size={12} color={colors.textMuted} />} colors={colors} />
+                <MemberAccuracyBars members={memberAccuracyRanking} colors={colors} />
               </Animated.View>
             )}
 
-            {/* 5. Activity chart - weekly overview */}
+            {/* 5. Distance Matrix */}
+            {distanceRows.length > 0 && (
+              <Animated.View entering={FadeIn.delay(210)} style={styles.section}>
+                <SectionHeader title="BY DISTANCE" icon={<Crosshair size={12} color={colors.textMuted} />} colors={colors} />
+                <MatrixTable rows={distanceRows} colors={colors} />
+              </Animated.View>
+            )}
+
+            {/* 6. Position Matrix */}
+            {positionRows.length > 0 && (
+              <Animated.View entering={FadeIn.delay(250)} style={styles.section}>
+                <SectionHeader title="BY POSITION" colors={colors} />
+                <MatrixTable rows={positionRows} colors={colors} />
+              </Animated.View>
+            )}
+
+            {/* 7. Weapon Category Section */}
+            {weaponRows.length > 0 && (
+              <Animated.View entering={FadeIn.delay(290)} style={styles.section}>
+                <SectionHeader title="BY WEAPON" icon={<Zap size={12} color={colors.textMuted} />} colors={colors} />
+                <MatrixTable rows={weaponRows} colors={colors} />
+              </Animated.View>
+            )}
+
+            {/* 8. Activity chart - weekly overview */}
             {weeklyActivityData.some((d) => d.sessions > 0) && (
-              <Animated.View entering={FadeIn.delay(180)} style={styles.section}>
+              <Animated.View entering={FadeIn.delay(330)} style={styles.section}>
                 <SectionHeader title="ACTIVITY" icon={<BarChart3 size={12} color={colors.textMuted} />} colors={colors} />
                 <ActivityChart data={weeklyActivityData} title="" height={90} />
               </Animated.View>
             )}
 
-            {/* 6. Trends - accuracy over time */}
+            {/* 9. Trends - accuracy over time */}
             {performanceChartData.length >= 2 && (
-              <Animated.View entering={FadeIn.delay(220)} style={styles.section}>
+              <Animated.View entering={FadeIn.delay(370)} style={styles.section}>
                 <SectionHeader title="TRENDS" icon={<TrendingUp size={12} color={colors.textMuted} />} colors={colors} />
                 <PerformanceChart data={performanceChartData} height={130} />
               </Animated.View>
             )}
 
-            {/* 7. Breakdown by category - deep drill-down */}
-            {(positionData.length > 0 || distanceData.length > 0) && (
-              <Animated.View entering={FadeIn.delay(260)} style={styles.section}>
-                <SectionHeader title="BY CATEGORY" colors={colors} />
-                <BreakdownGrid positionData={positionData} distanceData={distanceData} colors={colors} />
+            {/* 10. Training Focus - areas needing work */}
+            {teamWeakAreas.length > 0 && (
+              <Animated.View entering={FadeIn.delay(410)} style={styles.section}>
+                <SectionHeader title="TRAINING FOCUS" icon={<Target size={12} color={colors.textMuted} />} colors={colors} />
+                <TrainingFocus weakAreas={teamWeakAreas} colors={colors} />
               </Animated.View>
             )}
 
-            {/* History link */}
+            {/* 11. Inactive Members Alert */}
+            {inactiveMembersInfo.length > 0 && (
+              <Animated.View entering={FadeIn.delay(450)} style={styles.section}>
+                <InactiveMembersAlert inactiveMembers={inactiveMembersInfo} colors={colors} />
+              </Animated.View>
+            )}
+
+            {/* 12. Session History link */}
             <TouchableOpacity
               style={[styles.linkCard, { backgroundColor: colors.card, borderColor: colors.border }]}
               onPress={goToSessionHistory}
@@ -703,20 +1008,7 @@ export function TeamInsights() {
               colors={colors}
             />
 
-            {/* 2. Team Context - where you stand */}
-            <Animated.View entering={FadeIn.delay(60)} style={styles.section}>
-              <SectionHeader title="TEAM TOTALS" icon={<Users size={12} color={colors.textMuted} />} colors={colors} />
-              <TeamContextCard
-                totalSessions={teamTotals.sessions}
-                totalShots={teamTotals.shots}
-                avgAccuracy={teamTotals.avgAccuracy}
-                activeMembers={teamTotals.activeMembers}
-                totalMembers={teamTotals.totalMembers}
-                colors={colors}
-              />
-            </Animated.View>
-
-            {/* 3. Your Activity */}
+            {/* 2. Your Activity */}
             {weeklyActivityData.some((d) => d.sessions > 0) && (
               <Animated.View entering={FadeIn.delay(100)} style={styles.section}>
                 <SectionHeader title="YOUR ACTIVITY" icon={<BarChart3 size={12} color={colors.textMuted} />} colors={colors} />
@@ -724,7 +1016,7 @@ export function TeamInsights() {
               </Animated.View>
             )}
 
-            {/* 4. Your Trends */}
+            {/* 3. Your Trends */}
             {performanceChartData.length >= 2 && (
               <Animated.View entering={FadeIn.delay(140)} style={styles.section}>
                 <SectionHeader title="YOUR TRENDS" icon={<TrendingUp size={12} color={colors.textMuted} />} colors={colors} />
@@ -813,7 +1105,7 @@ const styles = StyleSheet.create({
   teamContextFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderTopWidth: StyleSheet.hairlineWidth, paddingVertical: 10 },
   teamContextFooterText: { fontSize: 11 },
 
-  // Commander overview
+  // Commander overview (kept for legacy compat, unused)
   cmdOverview: { borderRadius: 12, borderWidth: 1 },
   cmdOverviewRow: { flexDirection: 'row', alignItems: 'center', padding: 16 },
   cmdOverviewStat: { flex: 1, alignItems: 'center' },
@@ -824,7 +1116,7 @@ const styles = StyleSheet.create({
   cmdOverviewSecondaryItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   cmdOverviewSecondaryText: { fontSize: 11 },
 
-  // Table (rankings)
+  // Old table (rankings) — kept for reference
   tableHeader: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 14, borderBottomWidth: StyleSheet.hairlineWidth },
   thRank: { width: 24, fontSize: 9, fontWeight: '600' },
   thName: { flex: 1, fontSize: 9, fontWeight: '600' },
@@ -853,13 +1145,6 @@ const styles = StyleSheet.create({
   focusDetail: { fontSize: 11, marginTop: 2 },
   focusAcc: { fontSize: 13, fontWeight: '700' },
 
-  // Breakdown grid
-  breakdownGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  breakdownItem: { width: '47%', borderWidth: 1, borderRadius: 8, padding: 12, alignItems: 'center' },
-  breakdownLabel: { fontSize: 10, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.4 },
-  breakdownValue: { fontSize: 20, fontWeight: '700', marginVertical: 4 },
-  breakdownSessions: { fontSize: 10 },
-
   // Link card
   linkCard: { flexDirection: 'row', alignItems: 'center', padding: 14, borderRadius: 10, borderWidth: 1, marginTop: 28, gap: 10 },
   linkText: { flex: 1, fontSize: 13, fontWeight: '500' },
@@ -873,6 +1158,147 @@ const styles = StyleSheet.create({
   emptyButtonText: { fontSize: 14, fontWeight: '600', color: '#fff' },
 
   bottomSpacer: { height: 90 },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // NEW: Team Readiness Summary (ring + stats)
+  // ═══════════════════════════════════════════════════════════════════════════
+  readinessCard: { borderRadius: 12, borderWidth: 1, overflow: 'hidden' },
+  readinessRingSection: { alignItems: 'center', paddingTop: 20, paddingBottom: 16, gap: 12 },
+  readinessRingOuter: {
+    width: 76,
+    height: 76,
+    borderRadius: 38,
+    borderWidth: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  readinessRingInner: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    borderWidth: 3,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+  },
+  readinessRingPct: { fontSize: 20, fontWeight: '800' },
+  readinessRingUnit: { fontSize: 11, fontWeight: '600', marginTop: 4 },
+  readinessMainText: { fontSize: 14, fontWeight: '500' },
+  readinessStatsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+  },
+  readinessStatItem: { flex: 1, alignItems: 'center', gap: 3 },
+  readinessStatValue: { fontSize: 15, fontWeight: '700' },
+  readinessStatLabel: { fontSize: 9, fontWeight: '500', textTransform: 'uppercase', letterSpacing: 0.3 },
+  readinessStatDivider: { width: 1, height: 24 },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // NEW: Member Detail Table (card-per-member)
+  // ═══════════════════════════════════════════════════════════════════════════
+  memberCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    gap: 10,
+  },
+  memberCardLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  memberCardRank: { fontSize: 12, fontWeight: '700', width: 18, textAlign: 'center' },
+  memberCardAvatar: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  memberCardInitials: { fontSize: 11, fontWeight: '700' },
+  memberCardCenter: { flex: 1 },
+  memberCardName: { fontSize: 14, fontWeight: '600' },
+  memberCardSubtitle: { fontSize: 11, marginTop: 2, fontWeight: '400' },
+  memberCardRight: { alignItems: 'flex-end', minWidth: 44 },
+  memberCardAccuracy: { fontSize: 18, fontWeight: '800' },
+  memberCardGrouping: { fontSize: 10, marginTop: 1, fontWeight: '500' },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // NEW: Member Accuracy Bars (taller, with initials + team avg)
+  // ═══════════════════════════════════════════════════════════════════════════
+  accuracyBarRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  accBarAvatar: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  accBarInitials: { fontSize: 9, fontWeight: '700' },
+  accuracyBarName: { width: 70, fontSize: 12, fontWeight: '500' },
+  accuracyBarTrack: {
+    flex: 1,
+    height: 14,
+    borderRadius: 7,
+    overflow: 'hidden',
+  },
+  accuracyBarFill: { height: '100%', borderRadius: 7 },
+  accuracyBarValue: { width: 38, fontSize: 13, fontWeight: '700', textAlign: 'right' },
+  accBarAvgRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: 14,
+    paddingTop: 10,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  accBarAvgText: { fontSize: 11, fontWeight: '500' },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // NEW: Matrix Table (card-per-row with mini bars)
+  // ═══════════════════════════════════════════════════════════════════════════
+  matrixCardRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 13,
+    paddingHorizontal: 14,
+  },
+  matrixCardLeft: { flex: 1, marginRight: 12 },
+  matrixCardLabel: { fontSize: 14, fontWeight: '600' },
+  matrixCardSubtitle: { fontSize: 11, marginTop: 2, fontWeight: '400' },
+  matrixCardRight: { alignItems: 'flex-end', minWidth: 70 },
+  matrixCardAccuracy: { fontSize: 16, fontWeight: '800' },
+  matrixMiniBarTrack: {
+    width: 60,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: 'rgba(128,128,128,0.08)',
+    overflow: 'hidden',
+    marginTop: 4,
+  },
+  matrixMiniBarFill: { height: '100%', borderRadius: 3 },
+  matrixCardGrouping: { fontSize: 10, marginTop: 3, fontWeight: '500' },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // NEW: Inactive Members Alert (orange-tinted, vertical)
+  // ═══════════════════════════════════════════════════════════════════════════
+  inactiveCard: { borderRadius: 12, borderWidth: 1.5, padding: 16 },
+  inactiveHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 14 },
+  inactiveIconBg: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  inactiveTitle: { fontSize: 14, fontWeight: '700' },
+  inactiveSubtitle: { fontSize: 11, marginTop: 2 },
+  inactiveList: { gap: 0 },
+  inactiveMember: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8 },
+  inactiveAvatar: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
+  inactiveInitials: { fontSize: 11, fontWeight: '700' },
+  inactiveName: { fontSize: 13, fontWeight: '500', flex: 1 },
+  inactiveHint: { fontSize: 11, fontWeight: '400', fontStyle: 'italic', textAlign: 'center', marginTop: 12, paddingTop: 10, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: 'rgba(128,128,128,0.1)' },
 });
 
 export default TeamInsights;

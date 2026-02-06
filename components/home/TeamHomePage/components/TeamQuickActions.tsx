@@ -6,7 +6,7 @@
  */
 
 import * as Haptics from 'expo-haptics';
-import { Activity, BarChart3, Calendar, Crosshair } from 'lucide-react-native';
+import { Activity, Calendar, Crosshair, Trophy } from 'lucide-react-native';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 
@@ -44,7 +44,7 @@ export function TeamQuickActions({
 
   const tabs: { id: ContentTab; icon: typeof Calendar; label: string; badge?: number }[] = [
     { id: 'schedule', icon: Calendar, label: 'Schedule', badge: upcomingCount > 0 ? upcomingCount : undefined },
-    { id: 'insights', icon: BarChart3, label: 'Insights' },
+    { id: 'insights', icon: Trophy, label: 'Rankings' },
     { id: 'activity', icon: Activity, label: 'Activity' },
   ];
 

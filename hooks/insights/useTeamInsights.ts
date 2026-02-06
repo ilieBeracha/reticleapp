@@ -36,7 +36,9 @@ export interface TeamMemberStat {
 export interface PositionBreakdown {
   position: string;
   sessions: number;
+  totalShots: number;
   avgAccuracy: number | null;
+  avgGrouping: number | null;
   memberCount: number;
 }
 
@@ -44,7 +46,36 @@ export interface DistanceBreakdown {
   range: string;
   label: string;
   sessions: number;
+  totalShots: number;
   avgAccuracy: number | null;
+  avgGrouping: number | null;
+  memberCount: number;
+}
+
+export interface WeaponCategoryBreakdown {
+  category: string;
+  label: string;
+  sessions: number;
+  totalShots: number;
+  avgAccuracy: number | null;
+  avgGrouping: number | null;
+  memberCount: number;
+}
+
+export interface TeamReadiness {
+  trainedThisWeek: number;
+  totalMembers: number;
+  participationRate: number;
+  avgSessionsPerMember: number;
+  daysSinceLeastActive: number | null;
+  totalSessions: number;
+  totalShots: number;
+}
+
+export interface InactiveMemberInfo {
+  userId: string;
+  userName: string;
+  avatarUrl: string | null;
 }
 
 export interface TeamWeakArea {
@@ -399,14 +430,23 @@ export function useTeamInsights() {
       const totalShots = posSessions.reduce((sum, s) => sum + (s.stats?.shots_fired || 0), 0);
       const totalHits = posSessions.reduce((sum, s) => sum + (s.stats?.hits_total || 0), 0);
       const uniqueMembers = new Set(posSessions.map((s) => s.user_id)).size;
+      const groupings = posSessions
+        .map((s) => s.stats?.best_dispersion_cm)
+        .filter((d): d is number => d != null && d > 0);
+      const avgGrouping = groupings.length > 0
+        ? groupings.reduce((a, b) => a + b, 0) / groupings.length
+        : null;
 
       return {
         position: pos,
         sessions: posSessions.length,
+        totalShots,
         avgAccuracy: totalShots > 0 ? (totalHits / totalShots) * 100 : null,
+        avgGrouping,
         memberCount: uniqueMembers,
       };
-    }).filter((p) => p.sessions > 0);
+    }).filter((p) => p.sessions > 0)
+      .sort((a, b) => b.sessions - a.sessions);
   }, [completedSessions]);
 
   const distanceBreakdown = useMemo((): DistanceBreakdown[] => {
@@ -420,18 +460,29 @@ export function useTeamInsights() {
     return ranges.map(({ range, label, min, max }) => {
       const rangeSessions = completedSessions.filter((s) => {
         const dist = s.drill_config?.distance_m ?? s.stats?.avg_distance_m;
-        return dist !== undefined && dist !== null && dist !== undefined && dist >= min && dist < max;
+        return dist != null && dist >= min && dist < max;
       });
       const totalShots = rangeSessions.reduce((sum, s) => sum + (s.stats?.shots_fired || 0), 0);
       const totalHits = rangeSessions.reduce((sum, s) => sum + (s.stats?.hits_total || 0), 0);
+      const uniqueMembers = new Set(rangeSessions.map((s) => s.user_id)).size;
+      const groupings = rangeSessions
+        .map((s) => s.stats?.best_dispersion_cm)
+        .filter((d): d is number => d != null && d > 0);
+      const avgGrouping = groupings.length > 0
+        ? groupings.reduce((a, b) => a + b, 0) / groupings.length
+        : null;
 
       return {
         range,
         label,
         sessions: rangeSessions.length,
+        totalShots,
         avgAccuracy: totalShots > 0 ? (totalHits / totalShots) * 100 : null,
+        avgGrouping,
+        memberCount: uniqueMembers,
       };
-    }).filter((d) => d.sessions > 0);
+    }).filter((d) => d.sessions > 0)
+      .sort((a, b) => b.sessions - a.sessions);
   }, [completedSessions]);
 
   // Team weak areas
@@ -466,6 +517,127 @@ export function useTeamInsights() {
 
     return weakAreas.sort((a, b) => a.avgAccuracy - b.avgAccuracy);
   }, [positionBreakdown, distanceBreakdown]);
+
+  // ============================================================================
+  // WEAPON CATEGORY BREAKDOWN (NEW)
+  // ============================================================================
+
+  const weaponCategoryBreakdown = useMemo((): WeaponCategoryBreakdown[] => {
+    const categoryLabels: Record<string, string> = {
+      rifle: 'Rifle',
+      carbine: 'Carbine',
+      precision_rifle: 'Precision Rifle',
+      sniper_rifle: 'Sniper Rifle',
+      shotgun: 'Shotgun',
+      pistol: 'Pistol',
+      smg: 'SMG',
+      lmg: 'LMG',
+      dmr: 'DMR',
+    };
+
+    const catMap = new Map<string, { shots: number; hits: number; sessions: number; users: Set<string>; groupings: number[] }>();
+
+    completedSessions.forEach((s) => {
+      const cat = s.weapon_category || 'unknown';
+      const existing = catMap.get(cat) || { shots: 0, hits: 0, sessions: 0, users: new Set<string>(), groupings: [] };
+      existing.sessions += 1;
+      existing.shots += s.stats?.shots_fired || 0;
+      existing.hits += s.stats?.hits_total || 0;
+      existing.users.add(s.user_id);
+      if (s.stats?.best_dispersion_cm && s.stats.best_dispersion_cm > 0) {
+        existing.groupings.push(s.stats.best_dispersion_cm);
+      }
+      catMap.set(cat, existing);
+    });
+
+    return Array.from(catMap.entries())
+      .map(([cat, data]) => ({
+        category: cat,
+        label: categoryLabels[cat] || cat.charAt(0).toUpperCase() + cat.slice(1),
+        sessions: data.sessions,
+        totalShots: data.shots,
+        avgAccuracy: data.shots > 0 ? (data.hits / data.shots) * 100 : null,
+        avgGrouping: data.groupings.length > 0
+          ? data.groupings.reduce((a, b) => a + b, 0) / data.groupings.length
+          : null,
+        memberCount: data.users.size,
+      }))
+      .filter((c) => c.category !== 'unknown')
+      .sort((a, b) => b.sessions - a.sessions);
+  }, [completedSessions]);
+
+  // ============================================================================
+  // TEAM READINESS (NEW)
+  // ============================================================================
+
+  const teamReadiness = useMemo((): TeamReadiness => {
+    const totalMembers = members?.length || 0;
+    const now = new Date();
+    const weekAgo = new Date(now);
+    weekAgo.setDate(weekAgo.getDate() - 7);
+
+    // Members who trained this week
+    const trainedThisWeekSet = new Set<string>();
+    completedSessions.forEach((s) => {
+      if (new Date(s.started_at) >= weekAgo) {
+        trainedThisWeekSet.add(s.user_id);
+      }
+    });
+    const trainedThisWeek = trainedThisWeekSet.size;
+
+    // Avg sessions per member (all time from loaded data)
+    const avgSessionsPerMember = totalMembers > 0
+      ? Math.round((completedSessions.length / totalMembers) * 10) / 10
+      : 0;
+
+    // Days since least-active member last trained
+    let daysSinceLeastActive: number | null = null;
+    if (memberStats.length > 0) {
+      const lastActiveDates = memberStats
+        .filter((m) => m.lastActive)
+        .map((m) => new Date(m.lastActive!).getTime());
+      if (lastActiveDates.length > 0) {
+        const oldestActive = Math.min(...lastActiveDates);
+        daysSinceLeastActive = Math.floor((now.getTime() - oldestActive) / (1000 * 60 * 60 * 24));
+      }
+    }
+
+    return {
+      trainedThisWeek,
+      totalMembers,
+      participationRate: totalMembers > 0 ? Math.round((trainedThisWeek / totalMembers) * 100) : 0,
+      avgSessionsPerMember,
+      daysSinceLeastActive,
+      totalSessions: completedSessions.length,
+      totalShots: teamTotals.shots,
+    };
+  }, [completedSessions, members, memberStats, teamTotals]);
+
+  // ============================================================================
+  // MEMBER ACCURACY RANKING (sorted by accuracy for visual comparison)
+  // ============================================================================
+
+  const memberAccuracyRanking = useMemo(() => {
+    return [...memberStats]
+      .filter((m) => m.accuracy !== null && m.shots > 0)
+      .sort((a, b) => (b.accuracy ?? 0) - (a.accuracy ?? 0));
+  }, [memberStats]);
+
+  // ============================================================================
+  // ENRICHED INACTIVE MEMBERS
+  // ============================================================================
+
+  const inactiveMembersInfo = useMemo((): InactiveMemberInfo[] => {
+    if (!members) return [];
+    const activeUserIds = new Set(memberStats.map((m) => m.userId));
+    return members
+      .filter((m) => !activeUserIds.has(m.user_id))
+      .map((m) => ({
+        userId: m.user_id,
+        userName: m.profile?.full_name || m.profile?.email || 'Unknown',
+        avatarUrl: m.profile?.avatar_url || null,
+      }));
+  }, [members, memberStats]);
 
   // ============================================================================
   // CHART DATA
@@ -598,7 +770,13 @@ export function useTeamInsights() {
     // Breakdown analytics (commander view)
     positionBreakdown,
     distanceBreakdown,
+    weaponCategoryBreakdown,
     teamWeakAreas,
+
+    // Readiness & accuracy (commander view)
+    teamReadiness,
+    memberAccuracyRanking,
+    inactiveMembersInfo,
 
     // Chart data
     weeklyActivityData,
