@@ -13,6 +13,7 @@ import {
   getDefaultWeaponId,
   getTeamWeapon,
   getUserWeapon,
+  getUserWeaponIdForTeamWeapon,
   getWeaponStats,
   setDefaultWeaponId,
   updateUserWeapon,
@@ -132,6 +133,8 @@ export default function WeaponDetailScreen() {
 
       // Track user_weapon ID for stats lookup (sessions are recorded against user_weapons.id)
       let statsLookupId = weaponId;
+      // Track the user ID whose stats we should fetch (for viewing other users' weapons)
+      let statsUserId: string | undefined;
 
       if (source === 'team_pool') {
         // Pure team pool weapon
@@ -185,7 +188,7 @@ export default function WeaponDetailScreen() {
             team_name: teamName ?? undefined,
           };
         } else {
-          // Not in user_weapons, try team_weapons
+          // Not in user_weapons, try team_weapons (viewing another user's assigned weapon)
           const teamWeapon = await getTeamWeapon(weaponId);
           if (teamWeapon) {
             const { data: teamData } = await supabase.from('teams').select('name').eq('id', teamWeapon.team_id).single();
@@ -199,14 +202,14 @@ export default function WeaponDetailScreen() {
               team_id: teamWeapon.team_id,
               team_name: teamData?.name || 'Team',
             };
-            // Find user's personal profile linked to this team weapon (for stats lookup)
-            const { data: linkedUserWeapon } = await supabase
-              .from('user_weapons')
-              .select('id')
-              .eq('team_weapon_id', weaponId)
-              .maybeSingle();
-            if (linkedUserWeapon) {
-              statsLookupId = linkedUserWeapon.id;
+
+            // If weapon is assigned to someone, look up their user_weapon for stats
+            if (teamWeapon.assigned_to) {
+              statsUserId = teamWeapon.assigned_to;
+              const linkedUserWeaponId = await getUserWeaponIdForTeamWeapon(weaponId, teamWeapon.assigned_to);
+              if (linkedUserWeaponId) {
+                statsLookupId = linkedUserWeaponId;
+              }
             }
           }
         }
@@ -235,7 +238,11 @@ export default function WeaponDetailScreen() {
         return;
       }
 
-      const [allStats, defaultId] = await Promise.all([getWeaponStats(), getDefaultWeaponId()]);
+      // Fetch stats - if viewing another user's weapon, fetch their stats
+      const [allStats, defaultId] = await Promise.all([
+        getWeaponStats(statsUserId ? { userId: statsUserId } : undefined),
+        getDefaultWeaponId(),
+      ]);
 
       setWeapon(weaponData);
       // Try statsLookupId first (user_weapons.id), then weaponId (team_weapons.id) for historical data
@@ -244,14 +251,21 @@ export default function WeaponDetailScreen() {
       setNotes(weaponData.personal_notes || '');
 
       // Fetch recent sessions - check both IDs to handle historical data
-      // New sessions use user_weapons.id, old sessions may have team_weapons.id
+      // If viewing another user's weapon, filter by their user_id
       const weaponIdsToCheck = statsLookupId !== weaponId ? [statsLookupId, weaponId] : [weaponId];
-      const { data: sessions } = await supabase
+      let sessionsQuery = supabase
         .from('sessions')
         .select('id, started_at, status, drill:drills(name)')
         .in('weapon_id', weaponIdsToCheck)
         .order('started_at', { ascending: false })
         .limit(5);
+
+      // If viewing another user's weapon, filter by their user_id
+      if (statsUserId) {
+        sessionsQuery = sessionsQuery.eq('user_id', statsUserId);
+      }
+
+      const { data: sessions } = await sessionsQuery;
 
       if (sessions) {
         setRecentSessions(

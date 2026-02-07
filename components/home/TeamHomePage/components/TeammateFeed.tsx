@@ -6,6 +6,7 @@
  */
 
 import { Check, Users } from 'lucide-react-native';
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 
@@ -33,15 +34,16 @@ interface TeammateFeedProps {
 }
 
 export function TeammateFeed({ activities, teamTotalSessions, teamTotalShots, activeMembers, colors }: TeammateFeedProps) {
+  const { t } = useTranslation();
   return (
     <Animated.View entering={FadeIn.delay(150)} style={s.container}>
       {/* Header with team totals */}
       <View style={s.header}>
-        <Text style={[s.headerText, { color: colors.textMuted }]}>TEAM PROGRESS</Text>
+        <Text style={[s.headerText, { color: colors.textMuted }]}>{t('teamHome.teamProgress')}</Text>
         <View style={s.headerStats}>
           <Users size={10} color={colors.textMuted} />
           <Text style={[s.headerStatText, { color: colors.textMuted }]}>
-            {activeMembers} active · {teamTotalSessions} sessions
+            {t('teamHome.activeSessionsSummary', { active: activeMembers, sessions: teamTotalSessions })}
           </Text>
         </View>
       </View>
@@ -65,14 +67,14 @@ export function TeammateFeed({ activities, teamTotalSessions, teamTotalShots, ac
                   {activity.userName}
                 </Text>
                 <Text style={[s.detail, { color: colors.textMuted }]}>
-                  completed {activity.shotCount > 0 ? `${activity.shotCount} shots` : 'a session'} · {activity.timeAgo}
+                  {activity.shotCount > 0 ? t('teamHome.completedShots', { count: activity.shotCount }) : t('teamHome.completedASession')} · {activity.timeAgo}
                 </Text>
               </View>
             </View>
           ))
         ) : (
           <View style={s.emptyRow}>
-            <Text style={[s.emptyText, { color: colors.textMuted }]}>No recent activity from teammates</Text>
+            <Text style={[s.emptyText, { color: colors.textMuted }]}>{t('teamHome.noRecentActivity')}</Text>
           </View>
         )}
 
@@ -80,7 +82,7 @@ export function TeammateFeed({ activities, teamTotalSessions, teamTotalShots, ac
         {teamTotalShots > 0 && (
           <View style={[s.footer, { borderTopColor: colors.border }]}>
             <Text style={[s.footerText, { color: colors.textMuted }]}>
-              Team total: <Text style={{ color: colors.text, fontWeight: '600' }}>{teamTotalShots}</Text> shots this week
+              {t('teamHome.teamTotalPrefix')} <Text style={{ color: colors.text, fontWeight: '600' }}>{teamTotalShots}</Text> {t('teamHome.shotsThisWeek')}
             </Text>
           </View>
         )}

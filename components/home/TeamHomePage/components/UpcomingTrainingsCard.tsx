@@ -7,6 +7,7 @@
 import { DirectionalChevron } from '@/components/shared/DirectionalChevron';
 import type { TrainingWithDetails } from '@/types/workspace';
 import { format, isToday, isTomorrow } from 'date-fns';
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 
@@ -23,10 +24,11 @@ interface UpcomingTrainingsCardProps {
 }
 
 export function UpcomingTrainingsCard({ trainings, teamColor, onTrainingPress, colors }: UpcomingTrainingsCardProps) {
+  const { t } = useTranslation();
   return (
     <Animated.View entering={FadeIn.delay(150)} style={s.container}>
       {/* Header */}
-      <Text style={[s.headerText, { color: colors.textMuted }]}>SCHEDULED</Text>
+      <Text style={[s.headerText, { color: colors.textMuted }]}>{t('teamHome.scheduled')}</Text>
 
       {/* Training List */}
       <View style={[s.list, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -56,7 +58,8 @@ interface TrainingRowProps {
 }
 
 function TrainingRow({ training, onPress, colors, isLast }: TrainingRowProps) {
-  const dateLabel = getDateLabel(training.scheduled_at);
+  const { t } = useTranslation();
+  const dateLabel = getDateLabel(training.scheduled_at, t);
 
   return (
     <TouchableOpacity
@@ -83,16 +86,16 @@ function TrainingRow({ training, onPress, colors, isLast }: TrainingRowProps) {
   );
 }
 
-function getDateLabel(dateStr: string | null): { day: string; month: string; time: string } {
-  if (!dateStr) return { day: '—', month: '', time: 'TBD' };
+function getDateLabel(dateStr: string | null, t: (key: string) => string): { day: string; month: string; time: string } {
+  if (!dateStr) return { day: '—', month: '', time: t('teamHome.tbd') };
 
   const date = new Date(dateStr);
 
   if (isToday(date)) {
-    return { day: 'Today', month: '', time: format(date, 'HH:mm') };
+    return { day: t('teamHome.today'), month: '', time: format(date, 'HH:mm') };
   }
   if (isTomorrow(date)) {
-    return { day: 'Tmrw', month: '', time: format(date, 'HH:mm') };
+    return { day: t('teamHome.tomorrow'), month: '', time: format(date, 'HH:mm') };
   }
 
   return {

@@ -6,6 +6,7 @@
  */
 
 import { Target, TrendingUp, Zap } from 'lucide-react-native';
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 
@@ -23,12 +24,13 @@ interface MyProgressCardProps {
 }
 
 export function MyProgressCard({ sessions, shots, accuracy, teamTotalSessions, colors }: MyProgressCardProps) {
+  const { t } = useTranslation();
   const contributionPercent = teamTotalSessions > 0 ? Math.round((sessions / teamTotalSessions) * 100) : 0;
 
   return (
     <Animated.View entering={FadeIn.delay(100)} style={s.container}>
       {/* Header */}
-      <Text style={[s.headerText, { color: colors.textMuted }]}>YOUR CONTRIBUTION</Text>
+      <Text style={[s.headerText, { color: colors.textMuted }]}>{t('teamHome.yourContribution')}</Text>
 
       {/* Stats Card */}
       <View style={[s.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -39,7 +41,7 @@ export function MyProgressCard({ sessions, shots, accuracy, teamTotalSessions, c
               <Zap size={12} color={colors.textMuted} />
             </View>
             <Text style={[s.statValue, { color: colors.text }]}>{sessions}</Text>
-            <Text style={[s.statLabel, { color: colors.textMuted }]}>sessions</Text>
+            <Text style={[s.statLabel, { color: colors.textMuted }]}>{t('teamHome.sessionsLower')}</Text>
           </View>
 
           <View style={[s.divider, { backgroundColor: colors.border }]} />
@@ -50,7 +52,7 @@ export function MyProgressCard({ sessions, shots, accuracy, teamTotalSessions, c
               <Target size={12} color={colors.textMuted} />
             </View>
             <Text style={[s.statValue, { color: colors.text }]}>{shots}</Text>
-            <Text style={[s.statLabel, { color: colors.textMuted }]}>shots</Text>
+            <Text style={[s.statLabel, { color: colors.textMuted }]}>{t('teamHome.shots')}</Text>
           </View>
 
           <View style={[s.divider, { backgroundColor: colors.border }]} />
@@ -61,7 +63,7 @@ export function MyProgressCard({ sessions, shots, accuracy, teamTotalSessions, c
               <TrendingUp size={12} color={colors.textMuted} />
             </View>
             <Text style={[s.statValue, { color: colors.text }]}>{Math.round(accuracy)}%</Text>
-            <Text style={[s.statLabel, { color: colors.textMuted }]}>accuracy</Text>
+            <Text style={[s.statLabel, { color: colors.textMuted }]}>{t('teamHome.accuracyLower')}</Text>
           </View>
         </View>
 
@@ -69,7 +71,7 @@ export function MyProgressCard({ sessions, shots, accuracy, teamTotalSessions, c
         {teamTotalSessions > 0 && (
           <View style={[s.footer, { borderTopColor: colors.border }]}>
             <Text style={[s.footerText, { color: colors.textMuted }]}>
-              {contributionPercent}% of team sessions this week
+              {t('teamHome.ofTeamSessionsWeek', { percent: contributionPercent })}
             </Text>
           </View>
         )}

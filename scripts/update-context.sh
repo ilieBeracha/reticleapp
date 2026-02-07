@@ -9,7 +9,7 @@ ROOT="$(git rev-parse --show-toplevel)"
 
 COMMIT_SHA=$(git -C "$ROOT" log -1 --pretty=format:"%h" 2>/dev/null)
 COMMIT_MSG=$(git -C "$ROOT" log -1 --pretty=format:"%s" 2>/dev/null)
-COMMIT_DATE=$(git -C "$ROOT" log -1 --pretty=format:"%Y-%m-%d" 2>/dev/null)
+COMMIT_DATE=$(git -C "$ROOT" log -1 --date=short --pretty=format:"%ad" 2>/dev/null)
 BRANCH=$(git -C "$ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null)
 FILES_CHANGED=$(git -C "$ROOT" diff HEAD~1..HEAD --name-only 2>/dev/null || echo "(first commit)")
 DIFF_STAT=$(git -C "$ROOT" diff HEAD~1..HEAD --stat 2>/dev/null || echo "")

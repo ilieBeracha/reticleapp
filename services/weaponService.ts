@@ -1163,6 +1163,28 @@ export async function getOrCreatePersonalProfile(teamWeaponId: string): Promise<
 // WEAPON STATISTICS
 // ============================================================================
 
+/**
+ * Get the user_weapon ID for a specific user linked to a team_weapon
+ * Used by commanders to look up stats for other users' weapons
+ */
+export async function getUserWeaponIdForTeamWeapon(
+  teamWeaponId: string,
+  userId: string
+): Promise<string | null> {
+  const { data, error } = await supabase
+    .from('user_weapons')
+    .select('id')
+    .eq('team_weapon_id', teamWeaponId)
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  if (error) {
+    console.error('[getUserWeaponIdForTeamWeapon] Error:', error);
+    return null;
+  }
+  return data?.id || null;
+}
+
 export interface WeaponStats {
   weapon_id: string;
   total_sessions: number;
@@ -1507,13 +1529,19 @@ export async function getArmoryOverview(teamId: string): Promise<ArmoryOverviewD
 // WEAPON STATISTICS
 // ============================================================================
 
-export async function getWeaponStats(): Promise<Map<string, WeaponStats>> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return new Map();
+export async function getWeaponStats(options?: { userId?: string }): Promise<Map<string, WeaponStats>> {
+  let userId = options?.userId;
 
-  // Get all sessions with weapon_id for current user
+  // If no userId provided, use current user
+  if (!userId) {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return new Map();
+    userId = user.id;
+  }
+
+  // Get all sessions with weapon_id for the specified user
   const { data: sessions, error } = await supabase
     .from('sessions')
     .select(
@@ -1524,7 +1552,7 @@ export async function getWeaponStats(): Promise<Map<string, WeaponStats>> {
       status
     `
     )
-    .eq('user_id', user.id)
+    .eq('user_id', userId)
     .not('weapon_id', 'is', null);
 
   if (error) {

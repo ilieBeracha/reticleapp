@@ -7,6 +7,7 @@
 
 import { BaseAvatar } from '@/components/shared/Avatar';
 import { ChevronRight } from 'lucide-react-native';
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 
@@ -31,10 +32,11 @@ interface ActiveMembersProps {
 }
 
 export function ActiveMembers({ members, totalMembers, teamColor, onViewAll, colors }: ActiveMembersProps) {
+  const { t } = useTranslation();
   return (
     <Animated.View entering={FadeIn.delay(150)} style={s.container}>
       {/* Header */}
-      <Text style={[s.headerText, { color: colors.textMuted }]}>MEMBERS</Text>
+      <Text style={[s.headerText, { color: colors.textMuted }]}>{t('teamHome.members')}</Text>
 
       {/* Members Row */}
       <TouchableOpacity
@@ -60,8 +62,8 @@ export function ActiveMembers({ members, totalMembers, teamColor, onViewAll, col
 
         {/* Member Count */}
         <View style={s.countSection}>
-          <Text style={[s.countText, { color: colors.text }]}>{totalMembers} members</Text>
-          <Text style={[s.countSubtext, { color: colors.textMuted }]}>View team</Text>
+          <Text style={[s.countText, { color: colors.text }]}>{t('teamHome.membersCount', { count: totalMembers })}</Text>
+          <Text style={[s.countSubtext, { color: colors.textMuted }]}>{t('teamHome.viewTeam')}</Text>
         </View>
 
         <ChevronRight size={14} color={colors.textMuted} />

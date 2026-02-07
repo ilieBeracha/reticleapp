@@ -23,19 +23,21 @@ import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { History } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { ActiveTrainingBanner } from './components/ActiveTrainingBanner';
-import { TeamWeeklyCalendar } from './components/TeamWeeklyCalendar';
 import { TeamActivityCard } from './components/TeamActivityCard';
 import { TeamDashboardHeader } from './components/TeamDashboardHeader';
 import { TeamHeroSection } from './components/TeamHeroSection';
 import { TeamLeaderboard } from './components/TeamLeaderboard';
 import { TeammateFeed } from './components/TeammateFeed';
 import { TeamQuickActions, type ContentTab } from './components/TeamQuickActions';
+import { TeamWeeklyCalendar } from './components/TeamWeeklyCalendar';
 import { UpcomingTrainingsCard } from './components/UpcomingTrainingsCard';
 
 export function TeamHomePage() {
+  const { t } = useTranslation();
   const colors = useColors();
   const {
     // User info
@@ -164,7 +166,7 @@ export function TeamHomePage() {
             <View style={s.multiLiveHeader}>
               <View style={[s.multiLiveDot, { backgroundColor: '#10B981' }]} />
               <Text style={[s.multiLiveTitle, { color: colors.text }]}>
-                {liveTrainings.length} LIVE TRAININGS
+                {t('teamHome.liveTrainingsCount', { count: liveTrainings.length })}
               </Text>
             </View>
             {liveTrainings.map((training, i) => (
@@ -181,7 +183,7 @@ export function TeamHomePage() {
                   {training.title}
                 </Text>
                 <View style={[s.multiLiveJoinBtn, { backgroundColor: colors.text }]}>
-                  <Text style={[s.multiLiveJoinText, { color: colors.background }]}>Join</Text>
+                  <Text style={[s.multiLiveJoinText, { color: colors.background }]}>{t('teamHome.join')}</Text>
                 </View>
               </TouchableOpacity>
             ))}
@@ -190,7 +192,7 @@ export function TeamHomePage() {
 
         {/* Merged Hero Card - team info + stats + commander insights */}
         <TeamHeroSection
-          teamName={activeTeam?.name || 'Team'}
+          teamName={activeTeam?.name || t('teamHome.team')}
           teamColor={teamColor}
           memberCount={memberCount}
           weeklyProgress={sessionsThisWeek}
@@ -232,9 +234,9 @@ export function TeamHomePage() {
                 />
               ) : (
                 <Animated.View entering={FadeIn} style={[s.emptyTabCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                  <Text style={[s.emptyTabTitle, { color: colors.text }]}>No upcoming trainings</Text>
+                  <Text style={[s.emptyTabTitle, { color: colors.text }]}>{t('teamHome.noUpcomingTrainings')}</Text>
                   <Text style={[s.emptyTabText, { color: colors.textMuted }]}>
-                    Scheduled trainings will appear here
+                    {t('teamHome.scheduledWillAppear')}
                   </Text>
                 </Animated.View>
               )
@@ -251,9 +253,9 @@ export function TeamHomePage() {
                 />
               ) : (
                 <Animated.View entering={FadeIn} style={[s.emptyTabCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                  <Text style={[s.emptyTabTitle, { color: colors.text }]}>No rankings yet</Text>
+                  <Text style={[s.emptyTabTitle, { color: colors.text }]}>{t('teamHome.noRankingsYet')}</Text>
                   <Text style={[s.emptyTabText, { color: colors.textMuted }]}>
-                    Complete sessions to see team rankings
+                    {t('teamHome.completeSessionsRankings')}
                   </Text>
                 </Animated.View>
               )
@@ -282,12 +284,12 @@ export function TeamHomePage() {
                 <View style={s.teamContextRow}>
                   <View style={s.teamContextStat}>
                     <Text style={[s.teamContextValue, { color: colors.text }]}>{teamTotals.activeMembers}</Text>
-                    <Text style={[s.teamContextLabel, { color: colors.textMuted }]}>active this week</Text>
+                    <Text style={[s.teamContextLabel, { color: colors.textMuted }]}>{t('teamHome.activeThisWeek')}</Text>
                   </View>
                   <View style={[s.teamContextDivider, { backgroundColor: colors.border }]} />
                   <View style={s.teamContextStat}>
                     <Text style={[s.teamContextValue, { color: colors.text }]}>{teamTotals.sessions}</Text>
-                    <Text style={[s.teamContextLabel, { color: colors.textMuted }]}>team sessions</Text>
+                    <Text style={[s.teamContextLabel, { color: colors.textMuted }]}>{t('teamHome.teamSessions')}</Text>
                   </View>
                   {myStats.sessions > 0 && teamTotals.sessions > 0 && (
                     <>
@@ -296,7 +298,7 @@ export function TeamHomePage() {
                         <Text style={[s.teamContextValue, { color: colors.text }]}>
                           {Math.round((myStats.sessions / teamTotals.sessions) * 100)}%
                         </Text>
-                        <Text style={[s.teamContextLabel, { color: colors.textMuted }]}>your share</Text>
+                        <Text style={[s.teamContextLabel, { color: colors.textMuted }]}>{t('teamHome.yourShare')}</Text>
                       </View>
                     </>
                   )}
@@ -324,14 +326,14 @@ export function TeamHomePage() {
           <View style={[s.historyIcon, { backgroundColor: colors.border }]}>
             <History size={14} color={colors.textMuted} />
           </View>
-          <Text style={[s.historyText, { color: colors.text }]}>Session History</Text>
+          <Text style={[s.historyText, { color: colors.text }]}>{t('teamHome.sessionHistory')}</Text>
         </TouchableOpacity>
 
         {/* Empty State */}
         {!hasActivity && !isCommander && (
           <Animated.View entering={FadeIn} style={[s.emptyState, { borderColor: colors.border }]}>
-            <Text style={[s.emptyTitle, { color: colors.text }]}>Ready to train</Text>
-            <Text style={[s.emptyText, { color: colors.textMuted }]}>Complete a session to track your progress.</Text>
+            <Text style={[s.emptyTitle, { color: colors.text }]}>{t('teamHome.readyToTrain')}</Text>
+            <Text style={[s.emptyText, { color: colors.textMuted }]}>{t('teamHome.readyToTrainSubtitle')}</Text>
           </Animated.View>
         )}
 

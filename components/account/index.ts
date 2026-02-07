@@ -1,1 +1,1 @@
-export { AccountSwitcherPill, AccountSwitcherSheet } from './AccountSwitcherSheet';
+export { AccountSwitcherSheet } from './AccountSwitcherSheet';

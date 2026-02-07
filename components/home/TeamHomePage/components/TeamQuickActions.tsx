@@ -7,6 +7,7 @@
 
 import * as Haptics from 'expo-haptics';
 import { Activity, Calendar, Crosshair, Trophy } from 'lucide-react-native';
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 
@@ -37,15 +38,16 @@ export function TeamQuickActions({
   teamColor,
   colors,
 }: TeamQuickActionsProps) {
+  const { t } = useTranslation();
   const handlePress = (action: () => void) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     action();
   };
 
   const tabs: { id: ContentTab; icon: typeof Calendar; label: string; badge?: number }[] = [
-    { id: 'schedule', icon: Calendar, label: 'Schedule', badge: upcomingCount > 0 ? upcomingCount : undefined },
-    { id: 'insights', icon: Trophy, label: 'Rankings' },
-    { id: 'activity', icon: Activity, label: 'Activity' },
+    { id: 'schedule', icon: Calendar, label: t('teamHome.schedule'), badge: upcomingCount > 0 ? upcomingCount : undefined },
+    { id: 'insights', icon: Trophy, label: t('teamHome.rankings') },
+    { id: 'activity', icon: Activity, label: t('teamHome.activity') },
   ];
 
   return (
@@ -58,7 +60,7 @@ export function TeamQuickActions({
       >
         <Crosshair size={14} color={hasLiveTraining ? colors.background : colors.text} strokeWidth={2.2} />
         <Text style={[s.primaryText, { color: hasLiveTraining ? colors.background : colors.text }]}>
-          {hasLiveTraining ? 'Join Live' : 'Train'}
+          {hasLiveTraining ? t('teamHome.joinLive') : t('teamHome.train')}
         </Text>
         {hasLiveTraining && <View style={[s.liveDot, { backgroundColor: '#10B981' }]} />}
       </TouchableOpacity>

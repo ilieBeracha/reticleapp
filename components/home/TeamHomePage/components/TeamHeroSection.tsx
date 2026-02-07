@@ -9,6 +9,7 @@
  */
 
 import { AlertTriangle, ChevronRight, TrendingUp, Users } from 'lucide-react-native';
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 
@@ -70,6 +71,7 @@ export function TeamHeroSection({
   myStats,
   colors,
 }: TeamHeroSectionProps) {
+  const { t } = useTranslation();
 
   // Commander insights
   const topPerformer = leaderboard[0];
@@ -88,7 +90,7 @@ export function TeamHeroSection({
           {/* Personal header with rank badge */}
           <View style={s.personalHeader}>
             <View style={s.personalHeaderLeft}>
-              <Text style={[s.personalTitle, { color: colors.text }]}>Your Progress</Text>
+              <Text style={[s.personalTitle, { color: colors.text }]}>{t('teamHome.yourProgress')}</Text>
               <View style={s.teamBadge}>
                 <Text style={[s.teamBadgeText, { color: colors.textMuted }]}>{teamName}</Text>
               </View>
@@ -97,7 +99,7 @@ export function TeamHeroSection({
               <View style={[s.rankBadge, { backgroundColor: `${colors.green}15` }]}>
                 <TrendingUp size={10} color={colors.green} />
                 <Text style={[s.rankText, { color: colors.green }]}>
-                  #{myRank} of {totalRanked}
+                  {t('teamHome.rankOf', { rank: myRank, total: totalRanked })}
                 </Text>
               </View>
             )}
@@ -107,17 +109,17 @@ export function TeamHeroSection({
           <View style={s.personalStatsRow}>
             <View style={s.personalStat}>
               <Text style={[s.personalStatValue, { color: colors.text }]}>{myStats.sessions}</Text>
-              <Text style={[s.personalStatLabel, { color: colors.textMuted }]}>sessions</Text>
+              <Text style={[s.personalStatLabel, { color: colors.textMuted }]}>{t('teamHome.sessionsLower')}</Text>
             </View>
             <View style={s.personalStat}>
               <Text style={[s.personalStatValue, { color: colors.text }]}>
                 {myStats.accuracy > 0 ? `${Math.round(myStats.accuracy)}%` : '—'}
               </Text>
-              <Text style={[s.personalStatLabel, { color: colors.textMuted }]}>accuracy</Text>
+              <Text style={[s.personalStatLabel, { color: colors.textMuted }]}>{t('teamHome.accuracyLower')}</Text>
             </View>
             <View style={s.personalStat}>
               <Text style={[s.personalStatValue, { color: colors.text }]}>{formatShots(myStats.shots)}</Text>
-              <Text style={[s.personalStatLabel, { color: colors.textMuted }]}>shots</Text>
+              <Text style={[s.personalStatLabel, { color: colors.textMuted }]}>{t('teamHome.shots')}</Text>
             </View>
           </View>
 
@@ -127,7 +129,7 @@ export function TeamHeroSection({
             onPress={onViewDetails}
             activeOpacity={0.6}
           >
-            <Text style={[s.insightsLinkText, { color: colors.textMuted }]}>View full insights</Text>
+            <Text style={[s.insightsLinkText, { color: colors.textMuted }]}>{t('teamHome.viewFullInsights')}</Text>
             <ChevronRight size={12} color={colors.textMuted} />
           </TouchableOpacity>
         </View>
@@ -152,21 +154,21 @@ export function TeamHeroSection({
               {streak > 0 && (
                 <>
                   <View style={[s.metaDivider, { backgroundColor: colors.border }]} />
-                  <Text style={[s.metaText, { color: colors.textMuted }]}>{streak}d streak</Text>
+                  <Text style={[s.metaText, { color: colors.textMuted }]}>{t('teamHome.streakDays', { count: streak })}</Text>
                 </>
               )}
               {totalShots > 0 && (
                 <>
                   <View style={[s.metaDivider, { backgroundColor: colors.border }]} />
                   <Text style={[s.metaText, { color: colors.textMuted }]}>
-                    {totalShots.toLocaleString()} shots
+                    {totalShots.toLocaleString()} {t('teamHome.shots')}
                   </Text>
                 </>
               )}
             </View>
           </View>
           <TouchableOpacity style={s.detailsBtn} onPress={onViewDetails} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Text style={[s.detailsBtnText, { color: colors.textMuted }]}>Insights</Text>
+            <Text style={[s.detailsBtnText, { color: colors.textMuted }]}>{t('teamHome.insights')}</Text>
             <ChevronRight size={12} color={colors.textMuted} />
           </TouchableOpacity>
         </View>
@@ -175,21 +177,21 @@ export function TeamHeroSection({
         <View style={[s.statsStrip, { borderTopColor: colors.border }]}>
           <View style={s.stat}>
             <Text style={[s.statValue, { color: colors.text }]}>{weeklyProgress}</Text>
-            <Text style={[s.statLabel, { color: colors.textMuted }]}>sessions</Text>
+            <Text style={[s.statLabel, { color: colors.textMuted }]}>{t('teamHome.sessionsLower')}</Text>
           </View>
           <View style={[s.statDivider, { backgroundColor: colors.border }]} />
           <View style={s.stat}>
             <Text style={[s.statValue, { color: colors.text }]}>
               {weeklyAccuracy > 0 ? `${Math.round(weeklyAccuracy)}%` : '—'}
             </Text>
-            <Text style={[s.statLabel, { color: colors.textMuted }]}>accuracy</Text>
+            <Text style={[s.statLabel, { color: colors.textMuted }]}>{t('teamHome.accuracyLower')}</Text>
           </View>
           <View style={[s.statDivider, { backgroundColor: colors.border }]} />
           <View style={s.stat}>
             <Text style={[s.statValue, { color: colors.text }]}>
               {totalShots > 0 ? formatShots(totalShots) : '—'}
             </Text>
-            <Text style={[s.statLabel, { color: colors.textMuted }]}>shots</Text>
+            <Text style={[s.statLabel, { color: colors.textMuted }]}>{t('teamHome.shots')}</Text>
           </View>
         </View>
 
@@ -201,7 +203,7 @@ export function TeamHeroSection({
                 <TrendingUp size={11} color={colors.green} />
                 <Text style={[s.insightText, { color: colors.textMuted }]}>
                   <Text style={{ color: colors.text, fontWeight: '600' }}>{topPerformer.userName}</Text>
-                  {' '}leads — {topPerformer.sessions} sessions, {Math.round(topPerformer.accuracy)}%
+                  {' '}{t('teamHome.leadsStats', { sessions: topPerformer.sessions, accuracy: Math.round(topPerformer.accuracy) })}
                 </Text>
               </View>
             )}
@@ -209,7 +211,9 @@ export function TeamHeroSection({
               <View style={s.insightRow}>
                 <AlertTriangle size={11} color={colors.textMuted} />
                 <Text style={[s.insightText, { color: colors.textMuted }]}>
-                  {needsAttention.length} member{needsAttention.length !== 1 ? 's' : ''} may need support
+                  {needsAttention.length === 1
+                    ? t('teamHome.membersNeedSupport', { count: needsAttention.length })
+                    : t('teamHome.membersNeedSupportPlural', { count: needsAttention.length })}
                 </Text>
               </View>
             )}

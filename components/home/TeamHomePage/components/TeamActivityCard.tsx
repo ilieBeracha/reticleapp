@@ -6,6 +6,7 @@
  */
 
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
@@ -59,6 +60,7 @@ function ActivityMetric({ activity, colors }: { activity: ActivityItem; colors: 
 }
 
 export function TeamActivityCard({ activities, colors }: TeamActivityCardProps) {
+  const { t } = useTranslation();
   if (activities.length === 0) {
     return (
       <Animated.View entering={FadeInDown.duration(250)}>
@@ -67,9 +69,9 @@ export function TeamActivityCard({ activities, colors }: TeamActivityCardProps) 
             <Ionicons name="pulse-outline" size={18} color={colors.textMuted} />
           </View>
           <View style={s.emptyContent}>
-            <Text style={[s.emptyTitle, { color: colors.text }]}>No activity yet</Text>
+            <Text style={[s.emptyTitle, { color: colors.text }]}>{t('teamHome.noActivityYet')}</Text>
             <Text style={[s.emptyText, { color: colors.textMuted }]}>
-              Team member sessions will appear here
+              {t('teamHome.teamMemberSessionsAppear')}
             </Text>
           </View>
         </View>

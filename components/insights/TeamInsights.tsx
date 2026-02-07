@@ -15,9 +15,9 @@ import {
   type TeamReadiness,
   type TeamWeakArea
 } from '@/hooks/insights/useTeamInsights';
-import type { MissPoint, SessionWithDetails } from '@/types/session';
 import { useColors } from '@/hooks/ui/useColors';
-import { milToClockHour, MIL_PER_CIRCLE } from '@/utils/missAnalyzer';
+import type { MissPoint, SessionWithDetails } from '@/types/session';
+import { MIL_PER_CIRCLE, milToClockHour } from '@/utils/missAnalyzer';
 import { Ionicons } from '@expo/vector-icons';
 import {
   AlertTriangle,
@@ -53,6 +53,7 @@ import Animated, { FadeIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle, Line, Text as SvgText } from 'react-native-svg';
 
+import { t } from 'i18next';
 import { ActivityChart } from './components/ActivityChart';
 import { PerformanceChart } from './components/PerformanceChart';
 
@@ -160,22 +161,23 @@ function TeamContextHeader({
   memberCount: number;
   colors: ReturnType<typeof useColors>;
 }) {
+  const { t } = useTranslation();
   return (
     <View style={[styles.contextHeader, { borderColor: colors.border }]}>
       <View style={[styles.contextIcon, { backgroundColor: `${colors.textMuted}10` }]}>
         <Users size={12} color={colors.textMuted} />
       </View>
       <Text style={[styles.contextTeamName, { color: colors.text }]} numberOfLines={1}>
-        {teamName || 'Team'}
+        {teamName || t('navigation.team')}
       </Text>
       {isCommander && (
         <View style={[styles.cmdBadge, { backgroundColor: `${colors.textMuted}15` }]}>
           <Shield size={9} color={colors.textMuted} />
-          <Text style={[styles.cmdBadgeText, { color: colors.textMuted }]}>CMD</Text>
+          <Text style={[styles.cmdBadgeText, { color: colors.textMuted }]}>{t('teamInsights.cmd')}</Text>
         </View>
       )}
       <Text style={[styles.memberCount, { color: colors.textMuted }]}>
-        {memberCount} members
+        {t('teams.membersCount', { count: memberCount })}
       </Text>
     </View>
   );
@@ -188,9 +190,9 @@ function EmptyState({ colors, onStartSession }: { colors: ReturnType<typeof useC
       <View style={[styles.emptyIcon, { backgroundColor: `${colors.primary}10` }]}>
         <Ionicons name="people" size={28} color={colors.primary} />
       </View>
-      <Text style={[styles.emptyTitle, { color: colors.text }]}>No team activity yet</Text>
+      <Text style={[styles.emptyTitle, { color: colors.text }]}>{t('teamInsights.noTeamActivity')}</Text>
       <Text style={[styles.emptyText, { color: colors.textMuted }]}>
-        Start training with your team to see insights.
+        {t('teamInsights.emptySubtitle')}
       </Text>
       <TouchableOpacity style={[styles.emptyButton, { backgroundColor: colors.primary }]} onPress={onStartSession}>
         <Text style={styles.emptyButtonText}>{t('insights.startTraining')}</Text>
@@ -231,7 +233,7 @@ function ComparisonRow({ label, myValue, teamValue, comparison, colors }: Compar
         <View style={[styles.compDivider, { backgroundColor: colors.border }]} />
         <View style={styles.compValueCol}>
           <Text style={[styles.compValue, { color: colors.textMuted }]}>{teamValue}</Text>
-          <Text style={[styles.compValueLabel, { color: colors.textMuted }]}>avg</Text>
+          <Text style={[styles.compValueLabel, { color: colors.textMuted }]}>{t('teamInsights.comparison.avg')}</Text>
         </View>
       </View>
     </View>
@@ -260,6 +262,7 @@ interface MemberComparisonCardProps {
 }
 
 function MemberComparisonCard({ myStats, teamAverages, myComparison, myPercentile, trend, colors }: MemberComparisonCardProps) {
+  const { t } = useTranslation();
   return (
     <Animated.View entering={FadeIn.delay(50)} style={[styles.compCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
       {/* Hero: big accuracy + trend + percentile */}
@@ -268,7 +271,7 @@ function MemberComparisonCard({ myStats, teamAverages, myComparison, myPercentil
           <Text style={[styles.compHeroAccuracy, { color: myStats.accuracy !== null && myStats.accuracy >= 70 ? colors.green : myStats.accuracy !== null && myStats.accuracy >= 50 ? colors.text : colors.textMuted }]}>
             {myStats.accuracy !== null ? `${myStats.accuracy.toFixed(0)}%` : '—'}
           </Text>
-          <Text style={[styles.compHeroLabel, { color: colors.textMuted }]}>accuracy</Text>
+          <Text style={[styles.compHeroLabel, { color: colors.textMuted }]}>{t('teamInsights.comparison.accuracy')}</Text>
         </View>
         <View style={styles.compHeroCenter}>
           {trend && (
@@ -296,30 +299,30 @@ function MemberComparisonCard({ myStats, teamAverages, myComparison, myPercentil
 
       {/* Column headers */}
       <View style={[styles.compColHeaders, { borderBottomColor: colors.border }]}>
-        <Text style={[styles.compColLabel, { color: colors.textMuted }]}>METRIC</Text>
+        <Text style={[styles.compColLabel, { color: colors.textMuted }]}>{t('teamInsights.comparison.metric')}</Text>
         <View style={styles.compColHeaderRight}>
-          <Text style={[styles.compColLabel, { color: colors.text }]}>YOU</Text>
-          <Text style={[styles.compColLabel, { color: colors.textMuted }]}>TEAM</Text>
+          <Text style={[styles.compColLabel, { color: colors.text }]}>{t('teamInsights.comparison.you')}</Text>
+          <Text style={[styles.compColLabel, { color: colors.textMuted }]}>{t('teamInsights.comparison.team')}</Text>
         </View>
       </View>
 
       {/* Comparison rows */}
       <ComparisonRow
-        label="Sessions"
+        label={t('teamInsights.comparison.sessions')}
         myValue={String(myStats.sessions)}
         teamValue={teamAverages.sessionsPerMember.toFixed(1)}
         comparison={myComparison.activity}
         colors={colors}
       />
       <ComparisonRow
-        label="Shots"
+        label={t('teamInsights.comparison.totalShots')}
         myValue={myStats.shots.toLocaleString()}
         teamValue={teamAverages.shotsPerMember.toFixed(0)}
         comparison={myComparison.volume}
         colors={colors}
       />
       <ComparisonRow
-        label="Accuracy"
+        label={t('teamInsights.comparison.accuracy')}
         myValue={myStats.accuracy !== null ? `${myStats.accuracy.toFixed(0)}%` : '—'}
         teamValue={teamAverages.accuracy !== null ? `${teamAverages.accuracy.toFixed(0)}%` : '—'}
         comparison={myComparison.accuracy}
@@ -327,7 +330,7 @@ function MemberComparisonCard({ myStats, teamAverages, myComparison, myPercentil
       />
       {(myStats.bestGrouping || teamAverages.grouping) && (
         <ComparisonRow
-          label="Best Group"
+          label={t('teamInsights.comparison.bestGrouping')}
           myValue={myStats.bestGrouping !== null ? `${myStats.bestGrouping.toFixed(1)}cm` : '—'}
           teamValue={teamAverages.grouping !== null ? `${teamAverages.grouping.toFixed(1)}cm` : '—'}
           comparison={myStats.bestGrouping && teamAverages.grouping
@@ -387,7 +390,7 @@ function TeamReadinessSummary({
           <Text style={[styles.readinessStatValue, { color: teamAccuracy !== null && teamAccuracy >= 70 ? colors.green : colors.text }]}>
             {teamAccuracy !== null ? `${teamAccuracy.toFixed(0)}%` : '—'}
           </Text>
-          <Text style={[styles.readinessStatLabel, { color: colors.textMuted }]}>team accuracy</Text>
+          <Text style={[styles.readinessStatLabel, { color: colors.textMuted }]}>{t('teamInsights.readiness.teamAccuracy')}</Text>
         </View>
         <View style={[styles.readinessStatDivider, { backgroundColor: colors.border }]} />
         <View style={styles.readinessStatItem}>
@@ -403,7 +406,7 @@ function TeamReadinessSummary({
           <Text style={[styles.readinessStatValue, { color: colors.text }]}>
             {formatShots(readiness.totalShots)}
           </Text>
-          <Text style={[styles.readinessStatLabel, { color: colors.textMuted }]}>total shots</Text>
+          <Text style={[styles.readinessStatLabel, { color: colors.textMuted }]}>{t('teamInsights.readiness.totalShots')}</Text>
         </View>
         <View style={[styles.readinessStatDivider, { backgroundColor: colors.border }]} />
         <View style={styles.readinessStatItem}>
@@ -411,7 +414,7 @@ function TeamReadinessSummary({
           <Text style={[styles.readinessStatValue, { color: colors.text }]}>
             {readiness.daysSinceLeastActive !== null ? `${readiness.daysSinceLeastActive}d` : '—'}
           </Text>
-          <Text style={[styles.readinessStatLabel, { color: colors.textMuted }]}>least active</Text>
+          <Text style={[styles.readinessStatLabel, { color: colors.textMuted }]}>{t('teamInsights.readiness.leastActive')}</Text>
         </View>
       </View>
     </View>
@@ -494,7 +497,7 @@ function MemberDetailTable({ members, currentUserId, colors, onMemberPress }: Me
           onPress={() => setExpanded(!expanded)}
         >
           <Text style={[styles.expandText, { color: colors.textMuted }]}>
-            {expanded ? 'Show less' : `Show all ${members.length}`}
+            {expanded ? t('teamInsights.members.showLess') : t('teamInsights.members.showAll', { count: members.length })}
           </Text>
           {expanded ? <ChevronUp size={12} color={colors.textMuted} /> : <ChevronDown size={12} color={colors.textMuted} />}
         </TouchableOpacity>
@@ -784,7 +787,7 @@ function InactiveMembersAlert({
           <Text style={[styles.inactiveTitle, { color: colors.text }]}>
             {inactiveMembers.length} member{inactiveMembers.length !== 1 ? 's' : ''} never trained
           </Text>
-          <Text style={[styles.inactiveSubtitle, { color: colors.textMuted }]}>No sessions recorded</Text>
+          <Text style={[styles.inactiveSubtitle, { color: colors.textMuted }]}>{t('teamInsights.members.noSessionsRecorded')}</Text>
         </View>
       </View>
 
@@ -1113,7 +1116,7 @@ function MissPatternRow({
               </Text>
               {/* Drill recommendations */}
               <View style={missStyles.drillsRow}>
-                <Text style={[missStyles.drillsLabel, { color: colors.textMuted }]}>TRY</Text>
+                <Text style={[missStyles.drillsLabel, { color: colors.textMuted }]}>{t('teamInsights.missPattern.try')}</Text>
                 {drills.map((drill, di) => (
                   <Text key={di} style={[missStyles.drillItem, { color: colors.text }]}>{'•  '}{drill}</Text>
                 ))}
@@ -1232,7 +1235,7 @@ function MemberImprovementCard({
       {/* Header */}
       <View style={improvStyles.header}>
         <View style={improvStyles.headerLeft}>
-          <Text style={[improvStyles.headerTitle, { color: colors.text }]}>Improvement Focus</Text>
+          <Text style={[improvStyles.headerTitle, { color: colors.text }]}>{t('teamInsights.improvement.title')}</Text>
           <Text style={[improvStyles.headerSub, { color: colors.textMuted }]}>
             Based on {missData.totalMisses} recorded misses
           </Text>
@@ -1242,7 +1245,7 @@ function MemberImprovementCard({
             <Text style={[improvStyles.accuracyValue, { color: accuracy >= 70 ? colors.green : colors.text }]}>
               {accuracy.toFixed(0)}%
             </Text>
-            <Text style={[improvStyles.accuracyLabel, { color: colors.textMuted }]}>accuracy</Text>
+            <Text style={[improvStyles.accuracyLabel, { color: colors.textMuted }]}>{t('teamInsights.comparison.accuracy')}</Text>
           </View>
         )}
       </View>
@@ -1250,13 +1253,13 @@ function MemberImprovementCard({
       {/* Primary weakness + consistency metrics */}
       <View style={[improvStyles.metricsRow, { borderTopColor: colors.border }]}>
         <View style={improvStyles.metricBox}>
-          <Text style={[improvStyles.metricLabel, { color: colors.textMuted }]}>PRIMARY WEAKNESS</Text>
+          <Text style={[improvStyles.metricLabel, { color: colors.textMuted }]}>{t('teamInsights.improvement.primaryWeakness')}</Text>
           <Text style={[improvStyles.metricValue, { color: '#EF4444' }]}>{topDirection}</Text>
           <Text style={[improvStyles.metricSub, { color: colors.textMuted }]}>{topPct}% of misses</Text>
         </View>
         <View style={[improvStyles.metricDivider, { backgroundColor: colors.border }]} />
         <View style={improvStyles.metricBox}>
-          <Text style={[improvStyles.metricLabel, { color: colors.textMuted }]}>PATTERN</Text>
+          <Text style={[improvStyles.metricLabel, { color: colors.textMuted }]}>{t('teamInsights.improvement.pattern')}</Text>
           <Text style={[improvStyles.metricValue, { color: consistency.color }]}>{consistency.label}</Text>
           <Text style={[improvStyles.metricSub, { color: colors.textMuted }]}>
             {topPct >= 60 ? 'Specific fix needed' : topPct >= 40 ? 'Work on this area' : 'Focus on fundamentals'}
@@ -1279,7 +1282,7 @@ function MemberImprovementCard({
 
       {/* Recommended drills */}
       <View style={improvStyles.drillsSection}>
-        <Text style={[improvStyles.drillsSectionLabel, { color: colors.textMuted }]}>RECOMMENDED DRILLS</Text>
+        <Text style={[improvStyles.drillsSectionLabel, { color: colors.textMuted }]}>{t('teamInsights.improvement.recommendedDrills')}</Text>
         {drills.map((drill, i) => (
           <View key={i} style={improvStyles.drillRow}>
             <View style={[improvStyles.drillDot, { backgroundColor: colors.primary }]} />
@@ -1348,7 +1351,7 @@ function TeamMissOverview({
       <View style={teamMissStyles.statsRow}>
         <View style={teamMissStyles.stat}>
           <Text style={[teamMissStyles.statValue, { color: colors.text }]}>{allPoints.length}</Text>
-          <Text style={[teamMissStyles.statLabel, { color: colors.textMuted }]}>total misses</Text>
+          <Text style={[teamMissStyles.statLabel, { color: colors.textMuted }]}>{t('teamInsights.missPattern.totalMisses')}</Text>
         </View>
         <View style={[teamMissStyles.statDivider, { backgroundColor: colors.border }]} />
         <View style={teamMissStyles.stat}>
@@ -1358,7 +1361,7 @@ function TeamMissOverview({
         <View style={[teamMissStyles.statDivider, { backgroundColor: colors.border }]} />
         <View style={teamMissStyles.stat}>
           <Text style={[teamMissStyles.statValue, { color: colors.text }]}>{membersWithSameDominant}/{data.length}</Text>
-          <Text style={[teamMissStyles.statLabel, { color: colors.textMuted }]}>same pattern</Text>
+          <Text style={[teamMissStyles.statLabel, { color: colors.textMuted }]}>{t('teamInsights.missPattern.samePattern')}</Text>
         </View>
       </View>
 
@@ -1403,34 +1406,35 @@ function KeyTakeaways({
   missData: MemberMissData | undefined;
   colors: ReturnType<typeof useColors>;
 }) {
+  const { t } = useTranslation();
   const takeaways: Array<{ type: 'positive' | 'neutral' | 'warning'; text: string }> = [];
 
   if (myStats.vsTeamAvg !== null) {
     if (myStats.vsTeamAvg > 2) {
-      takeaways.push({ type: 'positive', text: `Your accuracy is ${myStats.vsTeamAvg.toFixed(1)}% above team average` });
+      takeaways.push({ type: 'positive', text: t('teamInsights.takeaways.accuracyAboveAvg', { delta: myStats.vsTeamAvg.toFixed(1) }) });
     } else if (myStats.vsTeamAvg < -2) {
-      takeaways.push({ type: 'warning', text: `Your accuracy is ${Math.abs(myStats.vsTeamAvg).toFixed(1)}% below team average` });
+      takeaways.push({ type: 'warning', text: t('teamInsights.takeaways.accuracyBelowAvg', { delta: Math.abs(myStats.vsTeamAvg).toFixed(1) }) });
     } else {
-      takeaways.push({ type: 'neutral', text: 'Your accuracy is in line with team average' });
+      takeaways.push({ type: 'neutral', text: t('teamInsights.takeaways.accuracyInLine') });
     }
   }
 
   if (myStats.sessions >= 5) {
-    takeaways.push({ type: 'positive', text: `Active contributor with ${myStats.sessions} sessions and ${myStats.shots.toLocaleString()} shots` });
+    takeaways.push({ type: 'positive', text: t('teamInsights.takeaways.activeContributor', { sessions: myStats.sessions, shots: myStats.shots.toLocaleString() }) });
   } else if (myStats.sessions >= 2) {
-    takeaways.push({ type: 'neutral', text: `${myStats.sessions} sessions completed — keep building consistency` });
+    takeaways.push({ type: 'neutral', text: t('teamInsights.takeaways.sessionsCompleted', { sessions: myStats.sessions }) });
   }
 
   if (myStats.bestGrouping !== null && teamAverages.grouping !== null) {
     if (myStats.bestGrouping < teamAverages.grouping) {
-      takeaways.push({ type: 'positive', text: `Best grouping of ${myStats.bestGrouping.toFixed(1)}cm beats team avg of ${teamAverages.grouping.toFixed(1)}cm` });
+      takeaways.push({ type: 'positive', text: t('teamInsights.takeaways.bestGroupingBeats', { yours: myStats.bestGrouping.toFixed(1), team: teamAverages.grouping.toFixed(1) }) });
     }
   }
 
   if (missData && missData.totalMisses > 0) {
     const bd = getMissBreakdownFromPoints(missData.missPoints);
     if (bd.length > 0 && bd[0].pct >= 40) {
-      takeaways.push({ type: 'warning', text: `${bd[0].pct}% of misses are ${bd[0].direction} — see improvement focus below` });
+      takeaways.push({ type: 'warning', text: t('teamInsights.takeaways.missDirection', { pct: bd[0].pct, direction: bd[0].direction }) });
     }
   }
 
@@ -1471,28 +1475,29 @@ function CommanderKeyInsights({
   performanceTrend: { delta: number; direction: 'up' | 'down' | 'flat' } | null;
   colors: ReturnType<typeof useColors>;
 }) {
+  const { t } = useTranslation();
   const takeaways: Array<{ type: 'positive' | 'neutral' | 'warning'; text: string }> = [];
 
   if (teamReadiness.participationRate >= 80) {
-    takeaways.push({ type: 'positive', text: `High participation — ${teamReadiness.participationRate}% of team trained this week` });
+    takeaways.push({ type: 'positive', text: t('teamInsights.takeaways.highParticipation', { rate: teamReadiness.participationRate }) });
   } else if (teamReadiness.participationRate < 50) {
-    takeaways.push({ type: 'warning', text: `Low participation — only ${teamReadiness.participationRate}% trained this week` });
+    takeaways.push({ type: 'warning', text: t('teamInsights.takeaways.lowParticipation', { rate: teamReadiness.participationRate }) });
   }
 
   if (performanceTrend) {
     if (performanceTrend.direction === 'up') {
-      takeaways.push({ type: 'positive', text: `Team accuracy trending up by ${Math.abs(performanceTrend.delta).toFixed(1)}%` });
+      takeaways.push({ type: 'positive', text: t('teamInsights.takeaways.accuracyTrendingUp', { delta: Math.abs(performanceTrend.delta).toFixed(1) }) });
     } else if (performanceTrend.direction === 'down') {
-      takeaways.push({ type: 'warning', text: `Team accuracy declining by ${Math.abs(performanceTrend.delta).toFixed(1)}%` });
+      takeaways.push({ type: 'warning', text: t('teamInsights.takeaways.accuracyDeclining', { delta: Math.abs(performanceTrend.delta).toFixed(1) }) });
     }
   }
 
   if (teamWeakAreas.length > 0) {
-    takeaways.push({ type: 'warning', text: `Weak area: ${teamWeakAreas[0].label} — ${teamWeakAreas[0].detail}` });
+    takeaways.push({ type: 'warning', text: t('teamInsights.takeaways.weakArea', { label: teamWeakAreas[0].label, detail: teamWeakAreas[0].detail }) });
   }
 
   if (teamTotals.avgAccuracy !== null && teamTotals.avgAccuracy >= 70) {
-    takeaways.push({ type: 'positive', text: `Team accuracy at ${teamTotals.avgAccuracy.toFixed(0)}% — above standard` });
+    takeaways.push({ type: 'positive', text: t('teamInsights.takeaways.teamAccuracyAbove', { accuracy: teamTotals.avgAccuracy.toFixed(0) }) });
   }
 
   // Shared miss pattern across team
@@ -1501,7 +1506,7 @@ function CommanderKeyInsights({
     if (allPoints.length > 0) {
       const bd = getMissBreakdownFromPoints(allPoints);
       if (bd.length > 0 && bd[0].pct >= 40) {
-        takeaways.push({ type: 'warning', text: `Team-wide ${bd[0].direction} tendency (${bd[0].pct}%) — consider focused drills` });
+        takeaways.push({ type: 'warning', text: t('teamInsights.takeaways.teamMissDirection', { direction: bd[0].direction, pct: bd[0].pct }) });
       }
     }
   }
@@ -1574,7 +1579,7 @@ function ReadinessDetail({
           <View style={[detailStyles.statusDot, { backgroundColor: `${colors.textMuted}20` }]} />
           <Text style={[detailStyles.name, { color: colors.textMuted }]} numberOfLines={1}>{name}</Text>
           <Text style={[detailStyles.value, { color: colors.textMuted }]}>—</Text>
-          <Text style={[detailStyles.sub, { color: colors.textMuted }]}>never</Text>
+          <Text style={[detailStyles.sub, { color: colors.textMuted }]}>{t('teamInsights.detail.never')}</Text>
         </View>
       ))}
     </View>
@@ -1592,9 +1597,9 @@ function ActivityDetail({
   return (
     <View style={[detailStyles.panel, { backgroundColor: colors.card, borderColor: colors.border }]}>
       <View style={detailStyles.tableHeader}>
-        <Text style={[detailStyles.thLabel, { color: colors.textMuted }]}>DAY</Text>
-        <Text style={[detailStyles.thValue, { color: colors.textMuted }]}>SESSIONS</Text>
-        <Text style={[detailStyles.thValue, { color: colors.textMuted }]}>ROUNDS</Text>
+        <Text style={[detailStyles.thLabel, { color: colors.textMuted }]}>{t('teamInsights.detail.day')}</Text>
+        <Text style={[detailStyles.thValue, { color: colors.textMuted }]}>{t('teamInsights.detail.sessions')}</Text>
+        <Text style={[detailStyles.thValue, { color: colors.textMuted }]}>{t('teamInsights.detail.rounds')}</Text>
       </View>
       {data.map((d, i) => (
         <View key={i} style={[detailStyles.row, i < data.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }]}>
@@ -1623,9 +1628,9 @@ function TrendsDetail({
   return (
     <View style={[detailStyles.panel, { backgroundColor: colors.card, borderColor: colors.border }]}>
       <View style={detailStyles.tableHeader}>
-        <Text style={[detailStyles.thLabel, { color: colors.textMuted }]}>DATE</Text>
-        <Text style={[detailStyles.thValue, { color: colors.textMuted }]}>ACCURACY</Text>
-        <Text style={[detailStyles.thValue, { color: colors.textMuted }]}>GROUPING</Text>
+        <Text style={[detailStyles.thLabel, { color: colors.textMuted }]}>{t('teamInsights.detail.date')}</Text>
+        <Text style={[detailStyles.thValue, { color: colors.textMuted }]}>{t('teamInsights.detail.accuracy')}</Text>
+        <Text style={[detailStyles.thValue, { color: colors.textMuted }]}>{t('teamInsights.detail.grouping')}</Text>
       </View>
       {data.map((d, i) => (
         <View key={i} style={[detailStyles.row, i < data.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }]}>
@@ -1655,10 +1660,10 @@ function AccuracyDetail({
   return (
     <View style={[detailStyles.panel, { backgroundColor: colors.card, borderColor: colors.border }]}>
       <View style={detailStyles.tableHeader}>
-        <Text style={[detailStyles.thLabel, { color: colors.textMuted }]}>MEMBER</Text>
-        <Text style={[detailStyles.thValue, { color: colors.textMuted }]}>SESSIONS</Text>
-        <Text style={[detailStyles.thValue, { color: colors.textMuted }]}>SHOTS</Text>
-        <Text style={[detailStyles.thValue, { color: colors.textMuted }]}>GROUP</Text>
+        <Text style={[detailStyles.thLabel, { color: colors.textMuted }]}>{t('teamInsights.detail.member')}</Text>
+        <Text style={[detailStyles.thValue, { color: colors.textMuted }]}>{t('teamInsights.detail.sessions')}</Text>
+        <Text style={[detailStyles.thValue, { color: colors.textMuted }]}>{t('teamInsights.detail.shots')}</Text>
+        <Text style={[detailStyles.thValue, { color: colors.textMuted }]}>{t('teamInsights.detail.group')}</Text>
       </View>
       {members.map((m, i) => {
         const row = (
@@ -1729,9 +1734,9 @@ function RecentSessionsDetail({
   return (
     <View style={[detailStyles.panel, { backgroundColor: colors.card, borderColor: colors.border }]}>
       <View style={detailStyles.tableHeader}>
-        <Text style={[detailStyles.thLabel, { color: colors.textMuted }]}>DATE</Text>
-        <Text style={[detailStyles.thValue, { color: colors.textMuted }]}>ACCURACY</Text>
-        <Text style={[detailStyles.thValue, { color: colors.textMuted }]}>SHOTS</Text>
+        <Text style={[detailStyles.thLabel, { color: colors.textMuted }]}>{t('teamInsights.detail.date')}</Text>
+        <Text style={[detailStyles.thValue, { color: colors.textMuted }]}>{t('teamInsights.detail.accuracy')}</Text>
+        <Text style={[detailStyles.thValue, { color: colors.textMuted }]}>{t('teamInsights.detail.shots')}</Text>
       </View>
       {mySessions.map((s, i) => {
         const shots = s.stats?.shots_fired || 0;
@@ -1791,6 +1796,7 @@ function MemberDetailSheet({
 }) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  
 
   if (!data) return null;
 
@@ -1827,7 +1833,7 @@ function MemberDetailSheet({
             <View style={sheetStyles.statsGrid}>
               <View style={[sheetStyles.statCard, { backgroundColor: colors.card }]}>
                 <Text style={[sheetStyles.statValue, { color: accColor }]}>{accuracy !== null ? `${accuracy.toFixed(0)}%` : '—'}</Text>
-                <Text style={[sheetStyles.statLabel, { color: colors.textMuted }]}>Accuracy</Text>
+                <Text style={[sheetStyles.statLabel, { color: colors.textMuted }]}>{t('teamInsights.memberSheet.accuracy')}</Text>
               </View>
               <View style={[sheetStyles.statCard, { backgroundColor: colors.card }]}>
                 <Text style={[sheetStyles.statValue, { color: colors.text }]}>{stat.bestDispersion !== null ? `${stat.bestDispersion.toFixed(1)}` : '—'}</Text>
@@ -1837,11 +1843,11 @@ function MemberDetailSheet({
                 <Text style={[sheetStyles.statValue, { color: vsDelta !== null && vsDelta >= 0 ? colors.green : colors.textMuted }]}>
                   {vsDelta !== null ? `${vsDelta >= 0 ? '+' : ''}${vsDelta.toFixed(0)}%` : '—'}
                 </Text>
-                <Text style={[sheetStyles.statLabel, { color: colors.textMuted }]}>vs Team Avg</Text>
+                <Text style={[sheetStyles.statLabel, { color: colors.textMuted }]}>{t('teamInsights.memberSheet.vsTeamAvg')}</Text>
               </View>
               <View style={[sheetStyles.statCard, { backgroundColor: colors.card }]}>
                 <Text style={[sheetStyles.statValue, { color: colors.text }]}>{stat.lastActive ? formatRelativeTime(stat.lastActive) : '—'}</Text>
-                <Text style={[sheetStyles.statLabel, { color: colors.textMuted }]}>Last Active</Text>
+                <Text style={[sheetStyles.statLabel, { color: colors.textMuted }]}>{t('teamInsights.memberSheet.lastActive')}</Text>
               </View>
             </View>
           )}
@@ -1849,7 +1855,7 @@ function MemberDetailSheet({
           {/* Miss Patterns */}
           {missData && breakdown.length > 0 && (
             <View style={sheetStyles.sectionBlock}>
-              <Text style={[sheetStyles.sectionTitle, { color: colors.textMuted }]}>MISS PATTERNS</Text>
+              <Text style={[sheetStyles.sectionTitle, { color: colors.textMuted }]}>{t('teamInsights.memberSheet.missPatterns')}</Text>
               <View style={[sheetStyles.sectionCard, { backgroundColor: colors.card }]}>
                 <View style={{ alignItems: 'center', paddingVertical: 8 }}>
                   <MiniMissClock missPoints={missData.missPoints} colors={colors} showAllDots />
@@ -1868,7 +1874,7 @@ function MemberDetailSheet({
           {/* Recent Sessions */}
           {recentSessions.length > 0 && (
             <View style={sheetStyles.sectionBlock}>
-              <Text style={[sheetStyles.sectionTitle, { color: colors.textMuted }]}>RECENT SESSIONS</Text>
+              <Text style={[sheetStyles.sectionTitle, { color: colors.textMuted }]}>{t('teamInsights.memberSheet.recentSessions')}</Text>
               <View style={[sheetStyles.sectionCard, { backgroundColor: colors.card }]}>
                 {recentSessions.map((s, i) => {
                   const sAccColor = getAccuracyColor(s.accuracy, colors);
@@ -1890,7 +1896,7 @@ function MemberDetailSheet({
           {/* No data fallback for inactive members */}
           {!stat && recentSessions.length === 0 && (
             <View style={{ alignItems: 'center', paddingVertical: 40 }}>
-              <Text style={[sheetStyles.sectionTitle, { color: colors.textMuted, fontSize: 13 }]}>No training data yet</Text>
+              <Text style={[sheetStyles.sectionTitle, { color: colors.textMuted, fontSize: 13 }]}>{t('teamInsights.memberSheet.noTrainingData')}</Text>
             </View>
           )}
         </ScrollView>
@@ -2073,7 +2079,7 @@ export function TeamInsights() {
           <>
             {/* 1. Team Readiness Summary */}
             <Animated.View entering={FadeIn.delay(50)}>
-              <SectionHeader title="READINESS" icon={<Shield size={12} color={colors.textMuted} />} colors={colors} expanded={expandedSections['readiness']} onPress={() => toggleSection('readiness')} />
+              <SectionHeader title={t('teamInsights.sections.readiness')} icon={<Shield size={12} color={colors.textMuted} />} colors={colors} expanded={expandedSections['readiness']} onPress={() => toggleSection('readiness')} />
               <TeamReadinessSummary readiness={teamReadiness} teamAccuracy={teamTotals.avgAccuracy} colors={colors} />
               {expandedSections['readiness'] && (
                 <ReadinessDetail
@@ -2087,7 +2093,7 @@ export function TeamInsights() {
 
             {/* 2. Commander Key Insights */}
             <Animated.View entering={FadeIn.delay(70)} style={styles.section}>
-              <SectionHeader title="KEY INSIGHTS" icon={<Zap size={12} color={colors.textMuted} />} colors={colors} />
+              <SectionHeader title={t('teamInsights.sections.keyInsights')} icon={<Zap size={12} color={colors.textMuted} />} colors={colors} />
               <CommanderKeyInsights
                 teamTotals={teamTotals}
                 teamReadiness={teamReadiness}
@@ -2101,7 +2107,7 @@ export function TeamInsights() {
             {/* 3. Activity chart - weekly tempo */}
             {weeklyActivityData.some((d) => d.sessions > 0) && (
               <Animated.View entering={FadeIn.delay(130)} style={styles.section}>
-                <SectionHeader title="ACTIVITY" icon={<BarChart3 size={12} color={colors.textMuted} />} colors={colors} expanded={expandedSections['activity']} onPress={() => toggleSection('activity')} />
+                <SectionHeader title={t('teamInsights.sections.activity')} icon={<BarChart3 size={12} color={colors.textMuted} />} colors={colors} expanded={expandedSections['activity']} onPress={() => toggleSection('activity')} />
                 <ActivityChart data={weeklyActivityData} title="" height={90} />
                 {expandedSections['activity'] && (
                   <ActivityDetail data={weeklyActivityData} colors={colors} />
@@ -2112,7 +2118,7 @@ export function TeamInsights() {
             {/* 5. Trends - accuracy over time */}
             {performanceChartData.length >= 2 && (
               <Animated.View entering={FadeIn.delay(160)} style={styles.section}>
-                <SectionHeader title="TRENDS" icon={<TrendingUp size={12} color={colors.textMuted} />} colors={colors} expanded={expandedSections['trends']} onPress={() => toggleSection('trends')} />
+                <SectionHeader title={t('teamInsights.sections.trends')} icon={<TrendingUp size={12} color={colors.textMuted} />} colors={colors} expanded={expandedSections['trends']} onPress={() => toggleSection('trends')} />
                 <PerformanceChart data={performanceChartData} height={130} />
                 {expandedSections['trends'] && (
                   <TrendsDetail data={performanceChartData} colors={colors} />
@@ -2123,7 +2129,7 @@ export function TeamInsights() {
             {/* 6. Member Rankings */}
             {memberRankings.length > 0 && (
               <Animated.View entering={FadeIn.delay(190)} style={styles.section}>
-                <SectionHeader title="MEMBER RANKINGS" icon={<Users size={12} color={colors.textMuted} />} colors={colors} />
+                <SectionHeader title={t('teamInsights.sections.memberRankings')} icon={<Users size={12} color={colors.textMuted} />} colors={colors} />
                 <MemberDetailTable members={memberRankings} currentUserId={userId} colors={colors} onMemberPress={openMemberSheet} />
               </Animated.View>
             )}
@@ -2131,7 +2137,7 @@ export function TeamInsights() {
             {/* 7. Accuracy Comparison */}
             {memberAccuracyRanking.length > 0 && (
               <Animated.View entering={FadeIn.delay(220)} style={styles.section}>
-                <SectionHeader title="ACCURACY COMPARISON" icon={<Target size={12} color={colors.textMuted} />} colors={colors} expanded={expandedSections['accuracy']} onPress={() => toggleSection('accuracy')} />
+                <SectionHeader title={t('teamInsights.sections.accuracyComparison')} icon={<Target size={12} color={colors.textMuted} />} colors={colors} expanded={expandedSections['accuracy']} onPress={() => toggleSection('accuracy')} />
                 <MemberAccuracyBars members={memberAccuracyRanking} colors={colors} onMemberPress={openMemberSheet} />
                 {expandedSections['accuracy'] && (
                   <AccuracyDetail members={memberAccuracyRanking} colors={colors} onMemberPress={openMemberSheet} />
@@ -2142,7 +2148,7 @@ export function TeamInsights() {
             {/* 8. Miss Patterns + Training Focus (performance analysis) */}
             {memberMissData.length > 0 && (
               <Animated.View entering={FadeIn.delay(250)} style={styles.section}>
-                <SectionHeader title="MISS PATTERNS" icon={<Crosshair size={12} color={colors.textMuted} />} colors={colors} />
+                <SectionHeader title={t('teamInsights.sections.missPatterns')} icon={<Crosshair size={12} color={colors.textMuted} />} colors={colors} />
                 <TeamMissOverview data={memberMissData} colors={colors} />
                 <MemberMissPatterns data={memberMissData} currentUserId={userId} isCommander={true} colors={colors} onMemberPress={openMemberSheet} />
               </Animated.View>
@@ -2150,7 +2156,7 @@ export function TeamInsights() {
 
             {teamWeakAreas.length > 0 && (
               <Animated.View entering={FadeIn.delay(280)} style={styles.section}>
-                <SectionHeader title="TRAINING FOCUS" icon={<Target size={12} color={colors.textMuted} />} colors={colors} expanded={expandedSections['focus']} onPress={() => toggleSection('focus')} />
+                <SectionHeader title={t('teamInsights.sections.trainingFocus')} icon={<Target size={12} color={colors.textMuted} />} colors={colors} expanded={expandedSections['focus']} onPress={() => toggleSection('focus')} />
                 <TrainingFocus weakAreas={teamWeakAreas} colors={colors} />
                 {expandedSections['focus'] && (
                   <FocusDetail weakAreas={teamWeakAreas} colors={colors} />
@@ -2161,21 +2167,21 @@ export function TeamInsights() {
             {/* 9. Breakdowns - distance, position, weapon */}
             {distanceRows.length > 0 && (
               <Animated.View entering={FadeIn.delay(310)} style={styles.section}>
-                <SectionHeader title="BY DISTANCE" icon={<Crosshair size={12} color={colors.textMuted} />} colors={colors} expanded={expandedSections['distance']} onPress={() => toggleSection('distance')} />
+                <SectionHeader title={t('teamInsights.sections.byDistance')} icon={<Crosshair size={12} color={colors.textMuted} />} colors={colors} expanded={expandedSections['distance']} onPress={() => toggleSection('distance')} />
                 <MatrixTable rows={distanceRows} colors={colors} expanded={expandedSections['distance']} sessions={completedSessions} filterKey="distance" onMemberPress={openMemberSheet} />
               </Animated.View>
             )}
 
             {positionRows.length > 0 && (
               <Animated.View entering={FadeIn.delay(340)} style={styles.section}>
-                <SectionHeader title="BY POSITION" icon={<Target size={12} color={colors.textMuted} />} colors={colors} expanded={expandedSections['position']} onPress={() => toggleSection('position')} />
+                <SectionHeader title={t('teamInsights.sections.byPosition')} icon={<Target size={12} color={colors.textMuted} />} colors={colors} expanded={expandedSections['position']} onPress={() => toggleSection('position')} />
                 <MatrixTable rows={positionRows} colors={colors} expanded={expandedSections['position']} sessions={completedSessions} filterKey="position" onMemberPress={openMemberSheet} />
               </Animated.View>
             )}
 
             {weaponRows.length > 0 && (
               <Animated.View entering={FadeIn.delay(370)} style={styles.section}>
-                <SectionHeader title="BY WEAPON" icon={<Zap size={12} color={colors.textMuted} />} colors={colors} expanded={expandedSections['weapon']} onPress={() => toggleSection('weapon')} />
+                <SectionHeader title={t('teamInsights.sections.byWeapon')} icon={<Zap size={12} color={colors.textMuted} />} colors={colors} expanded={expandedSections['weapon']} onPress={() => toggleSection('weapon')} />
                 <MatrixTable rows={weaponRows} colors={colors} expanded={expandedSections['weapon']} sessions={completedSessions} filterKey="weapon" onMemberPress={openMemberSheet} />
               </Animated.View>
             )}
@@ -2194,7 +2200,7 @@ export function TeamInsights() {
               activeOpacity={0.7}
             >
               <Clock size={13} color={colors.textMuted} />
-              <Text style={[styles.linkText, { color: colors.text }]}>View all sessions</Text>
+              <Text style={[styles.linkText, { color: colors.text }]}>{t('teamInsights.viewAllSessions')}</Text>
               <ChevronRight size={13} color={colors.textMuted} />
             </TouchableOpacity>
           </>
@@ -2204,7 +2210,7 @@ export function TeamInsights() {
           /* ═══════════════════════════════════════════════════════════ */
           <>
             {/* 1. Your Performance vs Team */}
-            <SectionHeader title="YOUR STATS" icon={<BarChart3 size={12} color={colors.textMuted} />} colors={colors} expanded={expandedSections['comparison']} onPress={() => toggleSection('comparison')} />
+            <SectionHeader title={t('teamInsights.sections.yourStats')} icon={<BarChart3 size={12} color={colors.textMuted} />} colors={colors} expanded={expandedSections['comparison']} onPress={() => toggleSection('comparison')} />
             <MemberComparisonCard
               myStats={myStats}
               teamAverages={teamAverages}
@@ -2219,7 +2225,7 @@ export function TeamInsights() {
 
             {/* 1b. Key Takeaways */}
             <Animated.View entering={FadeIn.delay(70)} style={styles.section}>
-              <SectionHeader title="KEY TAKEAWAYS" icon={<Zap size={12} color={colors.textMuted} />} colors={colors} />
+              <SectionHeader title={t('teamInsights.sections.keyTakeaways')} icon={<Zap size={12} color={colors.textMuted} />} colors={colors} />
               <KeyTakeaways
                 myStats={myStats}
                 teamAverages={teamAverages}
@@ -2231,7 +2237,7 @@ export function TeamInsights() {
             {/* 2. Your Activity */}
             {weeklyActivityData.some((d) => d.sessions > 0) && (
               <Animated.View entering={FadeIn.delay(100)} style={styles.section}>
-                <SectionHeader title="YOUR ACTIVITY" icon={<BarChart3 size={12} color={colors.textMuted} />} colors={colors} expanded={expandedSections['m-activity']} onPress={() => toggleSection('m-activity')} />
+                <SectionHeader title={t('teamInsights.sections.yourActivity')} icon={<BarChart3 size={12} color={colors.textMuted} />} colors={colors} expanded={expandedSections['m-activity']} onPress={() => toggleSection('m-activity')} />
                 <ActivityChart data={weeklyActivityData} title="" height={90} />
                 {expandedSections['m-activity'] && (
                   <ActivityDetail data={weeklyActivityData} colors={colors} />
@@ -2242,7 +2248,7 @@ export function TeamInsights() {
             {/* 3. Your Trends */}
             {performanceChartData.length >= 2 && (
               <Animated.View entering={FadeIn.delay(140)} style={styles.section}>
-                <SectionHeader title="YOUR TRENDS" icon={<TrendingUp size={12} color={colors.textMuted} />} colors={colors} expanded={expandedSections['m-trends']} onPress={() => toggleSection('m-trends')} />
+                <SectionHeader title={t('teamInsights.sections.yourTrends')} icon={<TrendingUp size={12} color={colors.textMuted} />} colors={colors} expanded={expandedSections['m-trends']} onPress={() => toggleSection('m-trends')} />
                 <PerformanceChart data={performanceChartData} height={130} />
                 {expandedSections['m-trends'] && (
                   <TrendsDetail data={performanceChartData} colors={colors} />
@@ -2253,7 +2259,7 @@ export function TeamInsights() {
             {/* 4. Improvement Focus */}
             {memberMissData.some((d) => d.userId === userId) && (
               <Animated.View entering={FadeIn.delay(170)} style={styles.section}>
-                <SectionHeader title="IMPROVEMENT FOCUS" icon={<Target size={12} color={colors.textMuted} />} colors={colors} />
+                <SectionHeader title={t('teamInsights.sections.improvementFocus')} icon={<Target size={12} color={colors.textMuted} />} colors={colors} />
                 <MemberImprovementCard
                   missData={memberMissData.find((d) => d.userId === userId)!}
                   accuracy={myStats.accuracy}
@@ -2265,7 +2271,7 @@ export function TeamInsights() {
             {/* 5. Your Miss Patterns */}
             {memberMissData.some((d) => d.userId === userId) && (
               <Animated.View entering={FadeIn.delay(200)} style={styles.section}>
-                <SectionHeader title="YOUR MISS PATTERNS" icon={<Crosshair size={12} color={colors.textMuted} />} colors={colors} />
+                <SectionHeader title={t('teamInsights.sections.yourMissPatterns')} icon={<Crosshair size={12} color={colors.textMuted} />} colors={colors} />
                 <MemberMissPatterns data={memberMissData} currentUserId={userId} isCommander={false} colors={colors} />
               </Animated.View>
             )}
@@ -2277,7 +2283,7 @@ export function TeamInsights() {
               activeOpacity={0.7}
             >
               <Clock size={13} color={colors.textMuted} />
-              <Text style={[styles.linkText, { color: colors.text }]}>View your sessions</Text>
+              <Text style={[styles.linkText, { color: colors.text }]}>{t('teamInsights.viewYourSessions')}</Text>
               <ChevronRight size={13} color={colors.textMuted} />
             </TouchableOpacity>
           </>

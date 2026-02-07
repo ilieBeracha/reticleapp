@@ -6,6 +6,7 @@
  */
 
 import { AlertTriangle, ChevronRight, TrendingDown, TrendingUp } from 'lucide-react-native';
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 
@@ -45,6 +46,7 @@ export function CommanderInsights({
   onViewDetails,
   colors,
 }: CommanderInsightsProps) {
+  const { t } = useTranslation();
   // Calculate insights
   const activeMembers = leaderboard.length;
   const participationRate = memberCount > 0 ? Math.round((activeMembers / memberCount) * 100) : 0;
@@ -58,9 +60,9 @@ export function CommanderInsights({
     <Animated.View entering={FadeIn.delay(100)} style={s.container}>
       {/* Header */}
       <View style={s.header}>
-        <Text style={[s.headerText, { color: colors.textMuted }]}>COMMANDER VIEW</Text>
+        <Text style={[s.headerText, { color: colors.textMuted }]}>{t('teamHome.commanderView')}</Text>
         <TouchableOpacity style={s.detailsBtn} onPress={onViewDetails} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Text style={[s.detailsBtnText, { color: colors.textMuted }]}>Details</Text>
+          <Text style={[s.detailsBtnText, { color: colors.textMuted }]}>{t('teamHome.details')}</Text>
           <ChevronRight size={10} color={colors.textMuted} />
         </TouchableOpacity>
       </View>
@@ -71,17 +73,17 @@ export function CommanderInsights({
         <View style={s.metricsRow}>
           <View style={s.metric}>
             <Text style={[s.metricValue, { color: colors.text }]}>{participationRate}%</Text>
-            <Text style={[s.metricLabel, { color: colors.textMuted }]}>participation</Text>
+            <Text style={[s.metricLabel, { color: colors.textMuted }]}>{t('teamHome.participation')}</Text>
           </View>
           <View style={[s.metricDivider, { backgroundColor: colors.border }]} />
           <View style={s.metric}>
             <Text style={[s.metricValue, { color: colors.text }]}>{Math.round(avgAccuracy)}%</Text>
-            <Text style={[s.metricLabel, { color: colors.textMuted }]}>team avg</Text>
+            <Text style={[s.metricLabel, { color: colors.textMuted }]}>{t('teamHome.teamAvg')}</Text>
           </View>
           <View style={[s.metricDivider, { backgroundColor: colors.border }]} />
           <View style={s.metric}>
             <Text style={[s.metricValue, { color: colors.text }]}>{goalProgress}%</Text>
-            <Text style={[s.metricLabel, { color: colors.textMuted }]}>of goal</Text>
+            <Text style={[s.metricLabel, { color: colors.textMuted }]}>{t('teamHome.ofGoal')}</Text>
           </View>
         </View>
 
@@ -92,8 +94,7 @@ export function CommanderInsights({
             <View style={s.insightRow}>
               <TrendingUp size={12} color={colors.green} />
               <Text style={[s.insightText, { color: colors.textMuted }]}>
-                <Text style={{ color: colors.text, fontWeight: '600' }}>{topPerformer.userName}</Text> leads with{' '}
-                {topPerformer.sessions} sessions, {Math.round(topPerformer.accuracy)}% accuracy
+                {t('teamHome.leadsWithSessions', { name: topPerformer.userName, sessions: topPerformer.sessions, accuracy: Math.round(topPerformer.accuracy) })}
               </Text>
             </View>
           )}
@@ -103,7 +104,9 @@ export function CommanderInsights({
             <View style={s.insightRow}>
               <AlertTriangle size={12} color={colors.textMuted} />
               <Text style={[s.insightText, { color: colors.textMuted }]}>
-                {needsAttention.length} member{needsAttention.length !== 1 ? 's' : ''} may need support
+                {needsAttention.length === 1
+                  ? t('teamHome.membersNeedSupport', { count: needsAttention.length })
+                  : t('teamHome.membersNeedSupportPlural', { count: needsAttention.length })}
               </Text>
             </View>
           )}
@@ -113,7 +116,9 @@ export function CommanderInsights({
             <View style={s.insightRow}>
               <TrendingDown size={12} color={colors.textMuted} />
               <Text style={[s.insightText, { color: colors.textMuted }]}>
-                {memberCount - activeMembers} member{memberCount - activeMembers !== 1 ? 's' : ''} inactive this week
+                {(memberCount - activeMembers) === 1
+                  ? t('teamHome.memberInactiveThisWeek', { count: memberCount - activeMembers })
+                  : t('teamHome.membersInactiveThisWeek', { count: memberCount - activeMembers })}
               </Text>
             </View>
           )}

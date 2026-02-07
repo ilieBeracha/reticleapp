@@ -5,6 +5,7 @@
  */
 
 import { ChevronRight } from 'lucide-react-native';
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 
@@ -32,6 +33,7 @@ interface TeamLeaderboardProps {
 }
 
 export function TeamLeaderboard({ entries, currentUserId, teamColor, onViewAll, colors }: TeamLeaderboardProps) {
+  const { t } = useTranslation();
   if (entries.length === 0) return null;
 
   const topThree = entries.slice(0, 3);
@@ -40,9 +42,9 @@ export function TeamLeaderboard({ entries, currentUserId, teamColor, onViewAll, 
     <Animated.View entering={FadeIn.delay(100)} style={s.container}>
       {/* Header */}
       <View style={s.header}>
-        <Text style={[s.headerText, { color: colors.textMuted }]}>LEADERBOARD</Text>
+        <Text style={[s.headerText, { color: colors.textMuted }]}>{t('teamHome.leaderboard')}</Text>
         <TouchableOpacity style={s.viewAllBtn} onPress={onViewAll} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Text style={[s.viewAllText, { color: colors.textMuted }]}>All</Text>
+          <Text style={[s.viewAllText, { color: colors.textMuted }]}>{t('teamHome.all')}</Text>
           <ChevronRight size={10} color={colors.textMuted} />
         </TouchableOpacity>
       </View>
@@ -52,9 +54,9 @@ export function TeamLeaderboard({ entries, currentUserId, teamColor, onViewAll, 
         {/* Table Header */}
         <View style={[s.tableHeader, { borderBottomColor: colors.border }]}>
           <Text style={[s.thRank, { color: colors.textMuted }]}>#</Text>
-          <Text style={[s.thName, { color: colors.textMuted }]}>Name</Text>
-          <Text style={[s.thStat, { color: colors.textMuted }]}>Sessions</Text>
-          <Text style={[s.thStat, { color: colors.textMuted }]}>Accuracy</Text>
+          <Text style={[s.thName, { color: colors.textMuted }]}>{t('teamHome.name')}</Text>
+          <Text style={[s.thStat, { color: colors.textMuted }]}>{t('teamHome.sessions')}</Text>
+          <Text style={[s.thStat, { color: colors.textMuted }]}>{t('teamHome.accuracy')}</Text>
         </View>
 
         {/* Table Rows */}
@@ -74,7 +76,7 @@ export function TeamLeaderboard({ entries, currentUserId, teamColor, onViewAll, 
                 <Text style={[s.nameText, { color: colors.text }]} numberOfLines={1}>
                   {entry.userName}
                 </Text>
-                {isCurrentUser && <Text style={[s.youTag, { color: colors.textMuted }]}>you</Text>}
+                {isCurrentUser && <Text style={[s.youTag, { color: colors.textMuted }]}>{t('teamHome.you')}</Text>}
               </View>
               <Text style={[s.cellStat, { color: colors.text }]}>{entry.sessions}</Text>
               <Text style={[s.cellStat, s.cellAccuracy, { color: colors.text }]}>{Math.round(entry.accuracy)}%</Text>

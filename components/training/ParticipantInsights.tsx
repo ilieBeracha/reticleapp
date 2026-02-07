@@ -6,7 +6,6 @@
  */
 
 import { useColors } from '@/hooks/ui/useColors';
-import { useTranslation } from 'react-i18next';
 import type { SessionWithDetails } from '@/types/session';
 import {
   AlertTriangle,
@@ -27,6 +26,7 @@ import {
   Zap,
 } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 
@@ -368,10 +368,10 @@ function TeamSummaryStats({
         groupingCount++;
       } else if (engagementMode === 'squad' || engagementMode === 'group') {
         squadCount++;
-      } else if (engagementMode === 'team') {
-        teamCount++;
-      } else {
+      } else if (engagementMode === 'solo') {
         soloCount++;
+      } else {
+        teamCount++;
       }
     });
 

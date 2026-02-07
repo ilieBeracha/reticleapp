@@ -7,6 +7,7 @@
 import type { TrainingWithDetails } from '@/types/workspace';
 import { Radio } from 'lucide-react-native';
 import { useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeIn, useAnimatedStyle, useSharedValue, withRepeat, withSequence, withTiming } from 'react-native-reanimated';
 
@@ -24,6 +25,7 @@ interface ActiveTrainingBannerProps {
 }
 
 export function ActiveTrainingBanner({ training, teamColor, onJoin, colors }: ActiveTrainingBannerProps) {
+  const { t } = useTranslation();
   const pulseOpacity = useSharedValue(1);
 
   useEffect(() => {
@@ -39,7 +41,7 @@ export function ActiveTrainingBanner({ training, teamColor, onJoin, colors }: Ac
       {/* Live Indicator */}
       <View style={s.liveSection}>
         <Animated.View style={[s.liveDot, { backgroundColor: '#10B981' }, pulseStyle]} />
-        <Text style={[s.liveText, { color: colors.text }]}>LIVE</Text>
+        <Text style={[s.liveText, { color: colors.text }]}>{t('teamHome.live')}</Text>
       </View>
 
       {/* Training Info */}
@@ -50,7 +52,7 @@ export function ActiveTrainingBanner({ training, teamColor, onJoin, colors }: Ac
       {/* Join Button */}
       <TouchableOpacity style={[s.joinBtn, { backgroundColor: colors.text }]} onPress={onJoin} activeOpacity={0.7}>
         <Radio size={12} color={colors.background} strokeWidth={2.5} />
-        <Text style={[s.joinText, { color: colors.background }]}>Join</Text>
+        <Text style={[s.joinText, { color: colors.background }]}>{t('teamHome.join')}</Text>
       </TouchableOpacity>
     </Animated.View>
   );
