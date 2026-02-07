@@ -1155,6 +1155,74 @@ export async function getSessionTargetCount(sessionId: string): Promise<number> 
 }
 
 // ============================================================================
+// TEAM MISS DATA
+// ============================================================================
+
+export interface TeamMissDataRow {
+  sessionId: string;
+  missPoints: Array<{ ring: number; mil: number }>;
+}
+
+/**
+ * Fetch miss_points from tactical_target_results for a set of sessions.
+ * Used by team insights to show per-member miss patterns.
+ */
+export async function getTeamMissData(sessionIds: string[]): Promise<TeamMissDataRow[]> {
+  if (sessionIds.length === 0) return [];
+
+  const { data, error } = await supabase
+    .from('session_targets')
+    .select(`
+      session_id,
+      tactical_target_results(miss_points)
+    `)
+    .in('session_id', sessionIds);
+
+  if (error) {
+    console.error('[getTeamMissData] Error:', error);
+    return [];
+  }
+
+  const results: TeamMissDataRow[] = [];
+
+  for (const target of data ?? []) {
+    const tacticalResults = Array.isArray(target.tactical_target_results)
+      ? target.tactical_target_results
+      : target.tactical_target_results
+        ? [target.tactical_target_results]
+        : [];
+
+    for (const tr of tacticalResults) {
+      const raw = tr.miss_points;
+      if (!raw) continue;
+
+      // miss_points may be stored as JSON string or already parsed
+      let parsed: Array<{ ring: number; mil: number }>;
+      if (typeof raw === 'string') {
+        try {
+          parsed = JSON.parse(raw);
+        } catch {
+          continue;
+        }
+      } else if (Array.isArray(raw)) {
+        parsed = raw;
+      } else {
+        continue;
+      }
+
+      if (parsed.length > 0) {
+        results.push({
+          sessionId: target.session_id,
+          missPoints: parsed,
+        });
+      }
+    }
+  }
+
+  return results;
+}
+
+// ============================================================================
 // TRAINING REPORT DATA
 // ============================================================================
 

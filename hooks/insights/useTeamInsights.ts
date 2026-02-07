@@ -7,17 +7,16 @@
 
 import { DEFAULT_FILTERS } from '@/constants/insights';
 import { useAuth } from '@/contexts/AuthContext';
-import { applyFilters, computeContextProfiles, computeInsights, computeOverviewStatus } from '@/services/insights/dashboardEngine';
+import { applyFilters } from '@/services/insights/dashboardEngine';
 import { featuresToSessions } from '@/services/insights/insightsAdapter';
-import { getDashboardFeatures } from '@/services/session/queries';
+import { getDashboardFeatures, getTeamMissData } from '@/services/session/queries';
 import { useTeamStore } from '@/stores/teamStore';
-import type { ComputedInsights, EvidenceContext, InsightsFilters, OverviewStatus } from '@/types/insights';
-import type { SessionWithDetails } from '@/types/session';
+import type { InsightsFilters } from '@/types/insights';
+import type { MissPoint, SessionWithDetails } from '@/types/session';
 import { isGroupingSessionWithFallback } from '@/utils/drillGoal';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useTranslation } from 'react-i18next';
 
 // ============================================================================
 // TYPES
@@ -87,6 +86,13 @@ export interface TeamWeakArea {
   avgAccuracy: number;
 }
 
+export interface MemberMissData {
+  userId: string;
+  userName: string;
+  missPoints: MissPoint[];
+  totalMisses: number;
+}
+
 export type ComparisonLevel = 'above' | 'below' | 'average';
 
 export interface MyComparison {
@@ -96,11 +102,27 @@ export interface MyComparison {
 }
 
 // ============================================================================
+// HELPERS
+// ============================================================================
+
+/** Sum shots/hits from engagement-only sessions (excludes grouping drills). */
+function sumEngagement(sessions: SessionWithDetails[]): { shots: number; hits: number } {
+  let shots = 0;
+  let hits = 0;
+  for (const s of sessions) {
+    if (!isGroupingSessionWithFallback(s)) {
+      shots += s.stats?.shots_fired || 0;
+      hits += s.stats?.hits_total || 0;
+    }
+  }
+  return { shots, hits };
+}
+
+// ============================================================================
 // HOOK
 // ============================================================================
 
 export function useTeamInsights() {
-  const { t } = useTranslation();
   const router = useRouter();
   const { user } = useAuth();
 
@@ -123,10 +145,6 @@ export function useTeamInsights() {
 
   // Filter state
   const [filters, setFilters] = useState<InsightsFilters>(DEFAULT_FILTERS);
-
-  // Evidence sheet state
-  const [evidenceContext, setEvidenceContext] = useState<EvidenceContext | null>(null);
-  const [showEvidence, setShowEvidence] = useState(false);
 
   // Track initial load
   const initialLoadDone = useRef(false);
@@ -209,21 +227,13 @@ export function useTeamInsights() {
     const totalShots = completedSessions.reduce((sum, s) => sum + (s.stats?.shots_fired || 0), 0);
     const uniqueMembers = new Set(completedSessions.map((s) => s.user_id)).size;
 
-    // Only count hits/shots from engagement sessions for accuracy (not grouping)
-    let engagementShots = 0;
-    let engagementHits = 0;
-    completedSessions.forEach((s) => {
-      if (!isGroupingSessionWithFallback(s)) {
-        engagementShots += s.stats?.shots_fired || 0;
-        engagementHits += s.stats?.hits_total || 0;
-      }
-    });
-    const avgAccuracy = engagementShots > 0 ? (engagementHits / engagementShots) * 100 : null;
+    const engagement = sumEngagement(completedSessions);
+    const avgAccuracy = engagement.shots > 0 ? (engagement.hits / engagement.shots) * 100 : null;
 
     return {
       sessions: totalSessions,
       shots: totalShots,
-      hits: engagementHits,
+      hits: engagement.hits,
       avgAccuracy,
       activeMembers: uniqueMembers,
       totalMembers: members?.length || 0,
@@ -244,16 +254,8 @@ export function useTeamInsights() {
     const mySessions = completedSessions.filter((s) => s.user_id === user?.id);
     const myShots = mySessions.reduce((sum, s) => sum + (s.stats?.shots_fired || 0), 0);
 
-    // Only count hits/shots from engagement sessions for accuracy (not grouping)
-    let myEngagementShots = 0;
-    let myEngagementHits = 0;
-    mySessions.forEach((s) => {
-      if (!isGroupingSessionWithFallback(s)) {
-        myEngagementShots += s.stats?.shots_fired || 0;
-        myEngagementHits += s.stats?.hits_total || 0;
-      }
-    });
-    const myAccuracy = myEngagementShots > 0 ? (myEngagementHits / myEngagementShots) * 100 : null;
+    const myEngagement = sumEngagement(mySessions);
+    const myAccuracy = myEngagement.shots > 0 ? (myEngagement.hits / myEngagement.shots) * 100 : null;
 
     // Best dispersion
     const dispersions = mySessions
@@ -277,7 +279,7 @@ export function useTeamInsights() {
     return {
       sessions: mySessions.length,
       shots: myShots,
-      hits: myEngagementHits,
+      hits: myEngagement.hits,
       accuracy: myAccuracy,
       bestGrouping: myBestGrouping,
       contribution,
@@ -425,24 +427,6 @@ export function useTeamInsights() {
     });
   }, [memberStats]);
 
-  // Top performers (top 3 by accuracy with min 3 sessions)
-  const topPerformers = useMemo(() => {
-    return memberStats
-      .filter((m) => m.sessions >= 3 && m.accuracy !== null)
-      .sort((a, b) => (b.accuracy ?? 0) - (a.accuracy ?? 0))
-      .slice(0, 3);
-  }, [memberStats]);
-
-  // Members needing attention (low activity or low accuracy)
-  const needsAttention = useMemo(() => {
-    const avgSessionsPerMember = teamTotals.sessions / Math.max(teamTotals.activeMembers, 1);
-    return memberStats.filter((m) => {
-      const lowActivity = m.sessions < avgSessionsPerMember * 0.5;
-      const lowAccuracy = m.accuracy !== null && m.accuracy < 50;
-      return lowActivity || lowAccuracy;
-    });
-  }, [memberStats, teamTotals]);
-
   // Inactive members (in team but no sessions)
   const inactiveMembers = useMemo(() => {
     if (!members) return [];
@@ -469,21 +453,13 @@ export function useTeamInsights() {
         ? groupings.reduce((a, b) => a + b, 0) / groupings.length
         : null;
 
-      // Only count hits/shots from engagement sessions for accuracy
-      let engagementShots = 0;
-      let engagementHits = 0;
-      posSessions.forEach((s) => {
-        if (!isGroupingSessionWithFallback(s)) {
-          engagementShots += s.stats?.shots_fired || 0;
-          engagementHits += s.stats?.hits_total || 0;
-        }
-      });
+      const posEngagement = sumEngagement(posSessions);
 
       return {
         position: pos,
         sessions: posSessions.length,
         totalShots,
-        avgAccuracy: engagementShots > 0 ? (engagementHits / engagementShots) * 100 : null,
+        avgAccuracy: posEngagement.shots > 0 ? (posEngagement.hits / posEngagement.shots) * 100 : null,
         avgGrouping,
         memberCount: uniqueMembers,
       };
@@ -513,22 +489,14 @@ export function useTeamInsights() {
         ? groupings.reduce((a, b) => a + b, 0) / groupings.length
         : null;
 
-      // Only count hits/shots from engagement sessions for accuracy
-      let engagementShots = 0;
-      let engagementHits = 0;
-      rangeSessions.forEach((s) => {
-        if (!isGroupingSessionWithFallback(s)) {
-          engagementShots += s.stats?.shots_fired || 0;
-          engagementHits += s.stats?.hits_total || 0;
-        }
-      });
+      const rangeEngagement = sumEngagement(rangeSessions);
 
       return {
         range,
         label,
         sessions: rangeSessions.length,
         totalShots,
-        avgAccuracy: engagementShots > 0 ? (engagementHits / engagementShots) * 100 : null,
+        avgAccuracy: rangeEngagement.shots > 0 ? (rangeEngagement.hits / rangeEngagement.shots) * 100 : null,
         avgGrouping,
         memberCount: uniqueMembers,
       };
@@ -696,6 +664,59 @@ export function useTeamInsights() {
   }, [members, memberStats]);
 
   // ============================================================================
+  // MEMBER MISS DATA (aggregated from tactical_target_results)
+  // ============================================================================
+
+  const [missDataRaw, setMissDataRaw] = useState<Awaited<ReturnType<typeof getTeamMissData>>>([]);
+
+  useEffect(() => {
+    if (completedSessions.length === 0) {
+      setMissDataRaw([]);
+      return;
+    }
+    const sessionIds = completedSessions.map((s) => s.id);
+    getTeamMissData(sessionIds).then(setMissDataRaw).catch(() => setMissDataRaw([]));
+  }, [completedSessions]);
+
+  const memberMissData = useMemo((): MemberMissData[] => {
+    if (missDataRaw.length === 0) return [];
+
+    // Build session_id → user_id + userName map from completedSessions
+    const sessionUserMap = new Map<string, { userId: string; userName: string }>();
+    completedSessions.forEach((s) => {
+      sessionUserMap.set(s.id, {
+        userId: s.user_id,
+        userName: s.user_full_name || memberNameMap.get(s.user_id) || 'Unknown',
+      });
+    });
+
+    // Aggregate miss points per user
+    const userMissMap = new Map<string, { userName: string; points: MissPoint[] }>();
+    missDataRaw.forEach((row) => {
+      const userInfo = sessionUserMap.get(row.sessionId);
+      if (!userInfo) return;
+      const existing = userMissMap.get(userInfo.userId);
+      if (existing) {
+        existing.points.push(...row.missPoints);
+      } else {
+        userMissMap.set(userInfo.userId, {
+          userName: userInfo.userName,
+          points: [...row.missPoints],
+        });
+      }
+    });
+
+    return Array.from(userMissMap.entries())
+      .map(([userId, data]) => ({
+        userId,
+        userName: data.userName,
+        missPoints: data.points,
+        totalMisses: data.points.length,
+      }))
+      .sort((a, b) => b.totalMisses - a.totalMisses);
+  }, [missDataRaw, completedSessions, memberNameMap]);
+
+  // ============================================================================
   // CHART DATA
   // ============================================================================
 
@@ -760,22 +781,6 @@ export function useTeamInsights() {
   }, [completedSessions]);
 
   // ============================================================================
-  // COMPUTED INSIGHTS (reusing existing engine)
-  // ============================================================================
-
-  const insights: ComputedInsights = useMemo(() => {
-    return computeInsights(sessions, filters, undefined, t);
-  }, [sessions, filters, t]);
-
-  const contextProfiles = useMemo(() => {
-    return computeContextProfiles(completedSessions, undefined, t);
-  }, [completedSessions, t]);
-
-  const overviewStatus: OverviewStatus = useMemo(() => {
-    return computeOverviewStatus(insights, contextProfiles);
-  }, [insights, contextProfiles]);
-
-  // ============================================================================
   // NAVIGATION
   // ============================================================================
 
@@ -788,10 +793,6 @@ export function useTeamInsights() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     router.push('/(protected)/(tabs)');
   }, [router]);
-
-  const closeEvidence = useCallback(() => {
-    setShowEvidence(false);
-  }, []);
 
   return {
     // State
@@ -822,8 +823,6 @@ export function useTeamInsights() {
     // Member rankings (commander view)
     memberStats,
     memberRankings,
-    topPerformers,
-    needsAttention,
     inactiveMembers,
 
     // Breakdown analytics (commander view)
@@ -837,19 +836,15 @@ export function useTeamInsights() {
     memberAccuracyRanking,
     inactiveMembersInfo,
 
+    // Miss data (per member)
+    memberMissData,
+
+    // Raw data for expanded detail views
+    completedSessions,
+
     // Chart data
     weeklyActivityData,
     performanceChartData,
-
-    // Computed insights
-    insights,
-    contextProfiles,
-    overviewStatus,
-
-    // Evidence
-    evidenceContext,
-    showEvidence,
-    closeEvidence,
 
     // Handlers
     handleRefresh,
