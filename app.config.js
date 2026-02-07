@@ -72,6 +72,7 @@ export default ({ config }) => {
     plugins: [
       './plugins/strip-bitcode',
       './plugins/withGarminUrlHandler',
+      './plugins/withMicrophonePermission',
       'expo-build-properties',
       'expo-secure-store',
       'expo-web-browser',

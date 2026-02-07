@@ -130,6 +130,9 @@ export default function WeaponDetailScreen() {
       // For personal (no source), fetch from user_weapons
       let fromUserWeapons = false;
 
+      // Track user_weapon ID for stats lookup (sessions are recorded against user_weapons.id)
+      let statsLookupId = weaponId;
+
       if (source === 'team_pool') {
         // Pure team pool weapon
         const teamWeapon = await getTeamWeapon(weaponId);
@@ -145,6 +148,15 @@ export default function WeaponDetailScreen() {
             team_id: teamWeapon.team_id,
             team_name: teamData?.name || 'Team',
           };
+          // Find user's personal profile linked to this team weapon (for stats lookup)
+          const { data: linkedUserWeapon } = await supabase
+            .from('user_weapons')
+            .select('id')
+            .eq('team_weapon_id', weaponId)
+            .maybeSingle();
+          if (linkedUserWeapon) {
+            statsLookupId = linkedUserWeapon.id;
+          }
         }
       } else if (source === 'team_assigned') {
         // Team assigned - could be in user_weapons (linked) or team_weapons (unlinked)
@@ -187,6 +199,15 @@ export default function WeaponDetailScreen() {
               team_id: teamWeapon.team_id,
               team_name: teamData?.name || 'Team',
             };
+            // Find user's personal profile linked to this team weapon (for stats lookup)
+            const { data: linkedUserWeapon } = await supabase
+              .from('user_weapons')
+              .select('id')
+              .eq('team_weapon_id', weaponId)
+              .maybeSingle();
+            if (linkedUserWeapon) {
+              statsLookupId = linkedUserWeapon.id;
+            }
           }
         }
       } else {
@@ -217,15 +238,18 @@ export default function WeaponDetailScreen() {
       const [allStats, defaultId] = await Promise.all([getWeaponStats(), getDefaultWeaponId()]);
 
       setWeapon(weaponData);
-      setStats(allStats.get(weaponId) || null);
+      // Try statsLookupId first (user_weapons.id), then weaponId (team_weapons.id) for historical data
+      setStats(allStats.get(statsLookupId) || allStats.get(weaponId) || null);
       setIsDefault(defaultId === weaponId);
       setNotes(weaponData.personal_notes || '');
 
-      // Fetch recent sessions for this weapon
+      // Fetch recent sessions - check both IDs to handle historical data
+      // New sessions use user_weapons.id, old sessions may have team_weapons.id
+      const weaponIdsToCheck = statsLookupId !== weaponId ? [statsLookupId, weaponId] : [weaponId];
       const { data: sessions } = await supabase
         .from('sessions')
         .select('id, started_at, status, drill:drills(name)')
-        .eq('weapon_id', weaponId)
+        .in('weapon_id', weaponIdsToCheck)
         .order('started_at', { ascending: false })
         .limit(5);
 

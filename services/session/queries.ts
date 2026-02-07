@@ -5,10 +5,10 @@ import type { DashboardFeature } from '@/types/insights';
 import type { SessionAggregatedStats, SessionWithDetails } from '@/types/session';
 import { mapSession } from './mappers';
 import {
-  SESSION_SELECT_MINIMAL,
-  SESSION_SELECT_WITH_FULL_DRILL,
-  SESSION_SELECT_WITH_WEAPON,
-  TARGET_STATS_SELECT,
+    SESSION_SELECT_MINIMAL,
+    SESSION_SELECT_WITH_FULL_DRILL,
+    SESSION_SELECT_WITH_WEAPON,
+    TARGET_STATS_SELECT,
 } from './selectClauses';
 
 // ============================================================================
@@ -726,15 +726,16 @@ export async function getDashboardFeatures(options: {
   userId: string;
   days?: number;
   limit?: number;
+  teamId?: string | null;
 }): Promise<DashboardFeature[]> {
   return withQueryTiming('sessions.getDashboardFeatures', async () => {
-    const { userId, days = 365, limit = 500 } = options;
+    const { userId, days = 365, limit = 500, teamId } = options;
 
     const dateThreshold = new Date();
     dateThreshold.setDate(dateThreshold.getDate() - days);
     const dateThresholdISO = dateThreshold.toISOString();
 
-    const { data, error } = await supabase
+    let query = supabase
       .from('session_features')
       .select(
         `session_id,
@@ -755,10 +756,26 @@ export async function getDashboardFeatures(options: {
         has_weather,
         weather_wind_speed_mps`
       )
-      .eq('user_id', userId)
       .gte('created_at', dateThresholdISO)
       .order('created_at', { ascending: false })
       .limit(limit);
+
+    // Filter by team/user context
+    if (teamId !== undefined) {
+      if (teamId === null) {
+        // Personal mode: only this user's solo sessions
+        query = query.eq('user_id', userId).is('team_id', null);
+      } else {
+        // Team mode: ALL team members' sessions (no user_id filter)
+        // RLS policy handles access control via team membership
+        query = query.eq('team_id', teamId);
+      }
+    } else {
+      // No context specified: default to user's own sessions
+      query = query.eq('user_id', userId);
+    }
+
+    const { data, error } = await query;
 
     if (error) throw error;
 

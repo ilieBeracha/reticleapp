@@ -1,23 +1,23 @@
 import {
-  addTeamMember as addTeamMemberService,
-  createTeam as createTeamService,
-  deleteTeam as deleteTeamService,
-  getMyTeams,
-  getTeamMembers,
-  getTeamWithMembers,
-  removeTeamMember as removeTeamMemberService,
-  updateTeamMemberRole as updateMemberRoleService,
-  updateTeam as updateTeamService,
-  type AddTeamMemberInput,
-  type CreateTeamInput,
-  type UpdateTeamInput,
+    addTeamMember as addTeamMemberService,
+    createTeam as createTeamService,
+    deleteTeam as deleteTeamService,
+    getMyTeams,
+    getTeamMembers,
+    getTeamWithMembers,
+    removeTeamMember as removeTeamMemberService,
+    updateTeamMemberRole as updateMemberRoleService,
+    updateTeam as updateTeamService,
+    type AddTeamMemberInput,
+    type CreateTeamInput,
+    type UpdateTeamInput,
 } from '@/services/teamService';
 import { shouldShowInitialLoading } from '@/stores/_shared/asyncState';
 import type {
-  TeamMemberWithProfile,
-  TeamRole,
-  TeamWithMembers,
-  TeamWithRole
+    TeamMemberWithProfile,
+    TeamRole,
+    TeamWithMembers,
+    TeamWithRole
 } from '@/types/workspace';
 import { create } from 'zustand';
 import { useShallow } from 'zustand/react/shallow';
@@ -32,6 +32,7 @@ interface TeamStore {
   loading: boolean;
   membersLoading: boolean;  // Separate loading state for members
   initialized: boolean;     // Track if initial load happened
+  personalModeExplicit: boolean; // Track if user explicitly chose personal mode
   error: string | null;
 
   // Team actions
@@ -64,6 +65,7 @@ export const useTeamStore = create<TeamStore>((set, get) => ({
   loading: true,
   membersLoading: false,
   initialized: false,
+  personalModeExplicit: true, // Start in personal mode by default - user must explicitly select a team
   error: null,
 
   // =====================================================
@@ -86,22 +88,26 @@ export const useTeamStore = create<TeamStore>((set, get) => ({
       }
 
       const teams = await getMyTeams();
-      const { activeTeamId: currentActiveTeamId } = get();
+      const { activeTeamId: currentActiveTeamId, personalModeExplicit } = get();
 
       // ═══════════════════════════════════════════════════════════════════
       // TEAM CONTEXT AUTO-SELECTION RULES
       // ═══════════════════════════════════════════════════════════════════
       // 0 teams → activeTeamId = null (solo mode)
-      // 1 team  → activeTeamId = that team (auto-select)
-      // N teams → preserve current if valid, else first team
+      // User explicitly chose personal → keep null (respect user choice)
+      // 1 team (first load) → activeTeamId = that team (auto-select)
+      // N teams → preserve current if valid, else first team (only on first load)
       // ═══════════════════════════════════════════════════════════════════
       let newActiveTeamId: string | null = null;
       
       if (teams.length === 0) {
         // 0 teams: pure solo mode
         newActiveTeamId = null;
+      } else if (personalModeExplicit) {
+        // User explicitly chose personal mode - DON'T auto-select
+        newActiveTeamId = null;
       } else if (teams.length === 1) {
-        // 1 team: auto-select (no ambiguity)
+        // 1 team: auto-select (no ambiguity) - only if user hasn't explicitly chosen personal
         newActiveTeamId = teams[0].id;
       } else {
         // N teams: preserve valid selection, otherwise pick first
@@ -229,10 +235,18 @@ export const useTeamStore = create<TeamStore>((set, get) => ({
     // Don't clear data immediately - let new data replace it
     // Only clear if switching to null (personal mode)
     if (teamId === null) {
-      set({ activeTeamId: null, activeTeam: null, members: [], membersLoading: false });
+      // Mark that user EXPLICITLY chose personal mode - don't auto-select on next loadTeams
+      set({ 
+        activeTeamId: null, 
+        activeTeam: null, 
+        members: [], 
+        membersLoading: false,
+        personalModeExplicit: true, // User explicitly chose personal mode
+      });
     } else {
       // Set loading state but keep old data visible until new data arrives
-      set({ activeTeamId: teamId, membersLoading: true });
+      // Clear personalModeExplicit since user is now selecting a team
+      set({ activeTeamId: teamId, membersLoading: true, personalModeExplicit: false });
       get().loadActiveTeam();
     }
   },
@@ -350,6 +364,7 @@ export const useTeamStore = create<TeamStore>((set, get) => ({
       loading: false,
       membersLoading: false,
       initialized: false,
+      personalModeExplicit: false,
       error: null,
     });
   },

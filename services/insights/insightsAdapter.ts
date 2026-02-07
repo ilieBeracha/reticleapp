@@ -17,6 +17,11 @@ export function featuresToSessions(features: DashboardFeature[]): SessionWithDet
   return features.map(featureToSession);
 }
 
+/** Normalize legacy 'achievement' to 'engagement' */
+function normalizeDrillGoal(goal: string | null | undefined): 'grouping' | 'engagement' {
+  return goal === 'grouping' ? 'grouping' : 'engagement';
+}
+
 function featureToSession(f: DashboardFeature): SessionWithDetails {
   return {
     id: f.session_id,
@@ -36,7 +41,7 @@ function featureToSession(f: DashboardFeature): SessionWithDetails {
     drill_config: {
       id: '',
       name: '',
-      drill_goal: (f.drill_goal as any) ?? 'engagement',
+      drill_goal: normalizeDrillGoal(f.drill_goal),
       target_type: (f.target_type as 'paper' | 'tactical') ?? 'paper',
       distance_m: f.distance_m ?? 0,
       rounds_per_shooter: f.shots,

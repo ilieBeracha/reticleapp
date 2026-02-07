@@ -1,0 +1,1304 @@
+/**
+ * TeamInsights Component
+ *
+ * Team insights with role-based views:
+ * - Commander: Comprehensive team analytics with readiness, rankings, breakdowns, accuracy bars
+ * - Member: Personal stats + team context with comparison indicators
+ */
+
+import {
+  useTeamInsights,
+  type MyComparison,
+  type TeamMemberStat,
+  type TeamWeakArea,
+  type TeamReadiness,
+  type WeaponCategoryBreakdown,
+  type InactiveMemberInfo,
+  type PositionBreakdown,
+  type DistanceBreakdown,
+} from '@/hooks/insights/useTeamInsights';
+import { useColors } from '@/hooks/ui/useColors';
+import { Ionicons } from '@expo/vector-icons';
+import {
+    AlertTriangle,
+    BarChart3,
+    Calendar,
+    ChevronDown,
+    ChevronRight,
+    ChevronUp,
+    Clock,
+    Crosshair,
+    Minus,
+    Shield,
+    Target,
+    TrendingDown,
+    TrendingUp,
+    UserX,
+    Users,
+    Zap,
+} from 'lucide-react-native';
+import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import {
+    ActivityIndicator,
+    Platform,
+    RefreshControl,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
+} from 'react-native';
+import Animated, { FadeIn } from 'react-native-reanimated';
+
+import { ActivityChart } from './components/ActivityChart';
+import { PerformanceChart } from './components/PerformanceChart';
+
+// ============================================================================
+// HELPERS
+// ============================================================================
+
+function formatShots(n: number): string {
+  if (n >= 10000) return `${(n / 1000).toFixed(1)}k`;
+  if (n >= 1000) return `${(n / 1000).toFixed(1)}k`;
+  return n.toLocaleString();
+}
+
+function formatRelativeTime(dateStr: string | null): string {
+  if (!dateStr) return '—';
+  const now = Date.now();
+  const then = new Date(dateStr).getTime();
+  const diffMs = now - then;
+  const diffMins = Math.floor(diffMs / 60000);
+  if (diffMins < 60) return `${diffMins}m`;
+  const diffHours = Math.floor(diffMins / 60);
+  if (diffHours < 24) return `${diffHours}h`;
+  const diffDays = Math.floor(diffHours / 24);
+  if (diffDays < 7) return `${diffDays}d`;
+  const diffWeeks = Math.floor(diffDays / 7);
+  if (diffWeeks < 5) return `${diffWeeks}w`;
+  const diffMonths = Math.floor(diffDays / 30);
+  return `${diffMonths}mo`;
+}
+
+function getInitials(name: string): string {
+  return name
+    .split(' ')
+    .filter(Boolean)
+    .map((n) => n[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2);
+}
+
+// ============================================================================
+// SHARED COMPONENTS
+// ============================================================================
+
+interface SectionHeaderProps {
+  title: string;
+  icon?: React.ReactNode;
+  colors: ReturnType<typeof useColors>;
+  action?: React.ReactNode;
+}
+
+function SectionHeader({ title, icon, colors, action }: SectionHeaderProps) {
+  return (
+    <View style={styles.sectionHeader}>
+      {icon}
+      <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>{title}</Text>
+      <View style={{ flex: 1 }} />
+      {action}
+    </View>
+  );
+}
+
+function TeamContextHeader({
+  teamName,
+  isCommander,
+  memberCount,
+  colors,
+}: {
+  teamName?: string;
+  isCommander: boolean;
+  memberCount: number;
+  colors: ReturnType<typeof useColors>;
+}) {
+  return (
+    <View style={[styles.contextHeader, { borderColor: colors.border }]}>
+      <View style={[styles.contextIcon, { backgroundColor: `${colors.textMuted}10` }]}>
+        <Users size={12} color={colors.textMuted} />
+      </View>
+      <Text style={[styles.contextTeamName, { color: colors.text }]} numberOfLines={1}>
+        {teamName || 'Team'}
+      </Text>
+      {isCommander && (
+        <View style={[styles.cmdBadge, { backgroundColor: `${colors.textMuted}15` }]}>
+          <Shield size={9} color={colors.textMuted} />
+          <Text style={[styles.cmdBadgeText, { color: colors.textMuted }]}>CMD</Text>
+        </View>
+      )}
+      <Text style={[styles.memberCount, { color: colors.textMuted }]}>
+        {memberCount} members
+      </Text>
+    </View>
+  );
+}
+
+function EmptyState({ colors, onStartSession }: { colors: ReturnType<typeof useColors>; onStartSession: () => void }) {
+  const { t } = useTranslation();
+  return (
+    <View style={[styles.emptyContainer, { backgroundColor: colors.card }]}>
+      <View style={[styles.emptyIcon, { backgroundColor: `${colors.primary}10` }]}>
+        <Ionicons name="people" size={28} color={colors.primary} />
+      </View>
+      <Text style={[styles.emptyTitle, { color: colors.text }]}>No team activity yet</Text>
+      <Text style={[styles.emptyText, { color: colors.textMuted }]}>
+        Start training with your team to see insights.
+      </Text>
+      <TouchableOpacity style={[styles.emptyButton, { backgroundColor: colors.primary }]} onPress={onStartSession}>
+        <Text style={styles.emptyButtonText}>{t('insights.startTraining')}</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+// ============================================================================
+// MEMBER VIEW: COMPARISON CARD (Your Stats vs Team)
+// ============================================================================
+
+interface ComparisonRowProps {
+  label: string;
+  myValue: string;
+  teamValue: string;
+  comparison: 'above' | 'below' | 'average' | null;
+  colors: ReturnType<typeof useColors>;
+}
+
+function ComparisonRow({ label, myValue, teamValue, comparison, colors }: ComparisonRowProps) {
+  const getComparisonIcon = () => {
+    if (comparison === 'above') return <ChevronUp size={12} color={colors.green} />;
+    if (comparison === 'below') return <ChevronDown size={12} color={colors.orange || '#F59E0B'} />;
+    return <Minus size={12} color={colors.textMuted} />;
+  };
+
+  return (
+    <View style={[styles.compRow, { borderBottomColor: colors.border }]}>
+      <Text style={[styles.compLabel, { color: colors.textMuted }]}>{label}</Text>
+      <View style={styles.compValues}>
+        <View style={styles.compValueCol}>
+          <Text style={[styles.compValue, { color: colors.text }]}>{myValue}</Text>
+          <View style={[styles.compIndicator, { backgroundColor: comparison === 'above' ? `${colors.green}15` : comparison === 'below' ? `${colors.orange || '#F59E0B'}15` : `${colors.textMuted}10` }]}>
+            {getComparisonIcon()}
+          </View>
+        </View>
+        <View style={[styles.compDivider, { backgroundColor: colors.border }]} />
+        <View style={styles.compValueCol}>
+          <Text style={[styles.compValue, { color: colors.textMuted }]}>{teamValue}</Text>
+          <Text style={[styles.compValueLabel, { color: colors.textMuted }]}>avg</Text>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+interface MemberComparisonCardProps {
+  myStats: {
+    sessions: number;
+    shots: number;
+    accuracy: number | null;
+    bestGrouping: number | null;
+    contribution: number;
+    vsTeamAvg: number | null;
+  };
+  teamAverages: {
+    sessionsPerMember: number;
+    shotsPerMember: number;
+    accuracy: number | null;
+    grouping: number | null;
+  };
+  myComparison: MyComparison;
+  myPercentile: number | null;
+  colors: ReturnType<typeof useColors>;
+}
+
+function MemberComparisonCard({ myStats, teamAverages, myComparison, myPercentile, colors }: MemberComparisonCardProps) {
+  return (
+    <Animated.View entering={FadeIn.delay(50)} style={[styles.compCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+      {/* Header with percentile */}
+      <View style={styles.compCardHeader}>
+        <View>
+          <Text style={[styles.compCardTitle, { color: colors.text }]}>Your Performance</Text>
+          <Text style={[styles.compCardSubtitle, { color: colors.textMuted }]}>vs Team Average</Text>
+        </View>
+        {myPercentile !== null && (
+          <View style={[styles.percentileBadge, { backgroundColor: myPercentile >= 50 ? `${colors.green}15` : `${colors.textMuted}10` }]}>
+            <Text style={[styles.percentileValue, { color: myPercentile >= 50 ? colors.green : colors.textMuted }]}>
+              Top {100 - myPercentile}%
+            </Text>
+          </View>
+        )}
+      </View>
+
+      {/* Column headers */}
+      <View style={[styles.compColHeaders, { borderBottomColor: colors.border }]}>
+        <Text style={[styles.compColLabel, { color: colors.textMuted }]}>METRIC</Text>
+        <View style={styles.compColHeaderRight}>
+          <Text style={[styles.compColLabel, { color: colors.text }]}>YOU</Text>
+          <Text style={[styles.compColLabel, { color: colors.textMuted }]}>TEAM</Text>
+        </View>
+      </View>
+
+      {/* Comparison rows */}
+      <ComparisonRow
+        label="Sessions"
+        myValue={String(myStats.sessions)}
+        teamValue={teamAverages.sessionsPerMember.toFixed(1)}
+        comparison={myComparison.activity}
+        colors={colors}
+      />
+      <ComparisonRow
+        label="Shots"
+        myValue={myStats.shots.toLocaleString()}
+        teamValue={teamAverages.shotsPerMember.toFixed(0)}
+        comparison={myComparison.volume}
+        colors={colors}
+      />
+      <ComparisonRow
+        label="Accuracy"
+        myValue={myStats.accuracy !== null ? `${myStats.accuracy.toFixed(0)}%` : '—'}
+        teamValue={teamAverages.accuracy !== null ? `${teamAverages.accuracy.toFixed(0)}%` : '—'}
+        comparison={myComparison.accuracy}
+        colors={colors}
+      />
+      {(myStats.bestGrouping || teamAverages.grouping) && (
+        <ComparisonRow
+          label="Best Group"
+          myValue={myStats.bestGrouping !== null ? `${myStats.bestGrouping.toFixed(1)}cm` : '—'}
+          teamValue={teamAverages.grouping !== null ? `${teamAverages.grouping.toFixed(1)}cm` : '—'}
+          comparison={myStats.bestGrouping && teamAverages.grouping
+            ? myStats.bestGrouping < teamAverages.grouping ? 'above' : myStats.bestGrouping > teamAverages.grouping ? 'below' : 'average'
+            : null}
+          colors={colors}
+        />
+      )}
+
+      {/* Footer */}
+      <View style={[styles.compFooter, { borderTopColor: colors.border }]}>
+        <Text style={[styles.compFooterText, { color: colors.textMuted }]}>
+          Contributing <Text style={{ color: colors.text, fontWeight: '600' }}>{myStats.contribution}%</Text> of team sessions
+          {myStats.vsTeamAvg !== null && (
+            <Text style={{ color: myStats.vsTeamAvg >= 0 ? colors.green : colors.textMuted }}>
+              {' · '}{myStats.vsTeamAvg >= 0 ? '+' : ''}{myStats.vsTeamAvg.toFixed(1)}% vs avg
+            </Text>
+          )}
+        </Text>
+      </View>
+    </Animated.View>
+  );
+}
+
+// ============================================================================
+// MEMBER VIEW: TEAM TOTALS (context without rankings)
+// ============================================================================
+
+interface TeamContextCardProps {
+  totalSessions: number;
+  totalShots: number;
+  avgAccuracy: number | null;
+  activeMembers: number;
+  totalMembers: number;
+  colors: ReturnType<typeof useColors>;
+}
+
+function TeamContextCard({ totalSessions, totalShots, avgAccuracy, activeMembers, totalMembers, colors }: TeamContextCardProps) {
+  return (
+    <View style={[styles.teamContextCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+      <View style={styles.teamContextRow}>
+        <View style={styles.teamContextStat}>
+          <Text style={[styles.teamContextValue, { color: colors.text }]}>{totalSessions}</Text>
+          <Text style={[styles.teamContextLabel, { color: colors.textMuted }]}>sessions</Text>
+        </View>
+        <View style={[styles.teamContextDivider, { backgroundColor: colors.border }]} />
+        <View style={styles.teamContextStat}>
+          <Text style={[styles.teamContextValue, { color: colors.text }]}>{totalShots.toLocaleString()}</Text>
+          <Text style={[styles.teamContextLabel, { color: colors.textMuted }]}>shots</Text>
+        </View>
+        <View style={[styles.teamContextDivider, { backgroundColor: colors.border }]} />
+        <View style={styles.teamContextStat}>
+          <Text style={[styles.teamContextValue, { color: colors.text }]}>
+            {avgAccuracy !== null ? `${avgAccuracy.toFixed(0)}%` : '—'}
+          </Text>
+          <Text style={[styles.teamContextLabel, { color: colors.textMuted }]}>accuracy</Text>
+        </View>
+      </View>
+      <View style={[styles.teamContextFooter, { borderTopColor: colors.border }]}>
+        <Users size={11} color={colors.textMuted} />
+        <Text style={[styles.teamContextFooterText, { color: colors.textMuted }]}>
+          {activeMembers} of {totalMembers} members active
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+// ============================================================================
+// COMMANDER VIEW: TEAM READINESS SUMMARY (2x2 grid)
+// ============================================================================
+
+function TeamReadinessSummary({
+  readiness,
+  colors,
+}: {
+  readiness: TeamReadiness;
+  colors: ReturnType<typeof useColors>;
+}) {
+  const pct = readiness.participationRate;
+  const ringColor = pct >= 70 ? colors.green : pct >= 40 ? (colors.orange || '#F59E0B') : colors.textMuted;
+
+  return (
+    <View style={[styles.readinessCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+      {/* Participation Ring */}
+      <View style={styles.readinessRingSection}>
+        <View style={[styles.readinessRingOuter, { borderColor: `${ringColor}20` }]}>
+          <View style={[styles.readinessRingInner, { borderColor: ringColor }]}>
+            <Text style={[styles.readinessRingPct, { color: ringColor }]}>{pct}</Text>
+            <Text style={[styles.readinessRingUnit, { color: colors.textMuted }]}>%</Text>
+          </View>
+        </View>
+        <Text style={[styles.readinessMainText, { color: colors.text }]}>
+          <Text style={{ fontWeight: '800', fontSize: 16 }}>{readiness.trainedThisWeek}</Text>
+          <Text style={{ color: colors.textMuted }}>{' / '}{readiness.totalMembers}</Text>
+          {'  trained this week'}
+        </Text>
+      </View>
+
+      {/* Compact stats row */}
+      <View style={[styles.readinessStatsRow, { borderTopColor: colors.border }]}>
+        <View style={styles.readinessStatItem}>
+          <BarChart3 size={11} color={colors.textMuted} />
+          <Text style={[styles.readinessStatValue, { color: colors.text }]}>
+            {readiness.avgSessionsPerMember.toFixed(1)}
+          </Text>
+          <Text style={[styles.readinessStatLabel, { color: colors.textMuted }]}>avg/member</Text>
+        </View>
+        <View style={[styles.readinessStatDivider, { backgroundColor: colors.border }]} />
+        <View style={styles.readinessStatItem}>
+          <Target size={11} color={colors.textMuted} />
+          <Text style={[styles.readinessStatValue, { color: colors.text }]}>
+            {formatShots(readiness.totalShots)}
+          </Text>
+          <Text style={[styles.readinessStatLabel, { color: colors.textMuted }]}>total shots</Text>
+        </View>
+        <View style={[styles.readinessStatDivider, { backgroundColor: colors.border }]} />
+        <View style={styles.readinessStatItem}>
+          <Clock size={11} color={colors.orange || '#F59E0B'} />
+          <Text style={[styles.readinessStatValue, { color: colors.text }]}>
+            {readiness.daysSinceLeastActive !== null ? `${readiness.daysSinceLeastActive}d` : '—'}
+          </Text>
+          <Text style={[styles.readinessStatLabel, { color: colors.textMuted }]}>least active</Text>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+// ============================================================================
+// COMMANDER VIEW: QUICK INSIGHTS ROW
+// ============================================================================
+
+interface QuickInsightsProps {
+  topPerformers: TeamMemberStat[];
+  needsAttention: TeamMemberStat[];
+  inactiveCount: number;
+  colors: ReturnType<typeof useColors>;
+}
+
+function QuickInsights({ topPerformers, needsAttention, inactiveCount, colors }: QuickInsightsProps) {
+  const hasTop = topPerformers.length > 0;
+  const hasIssues = needsAttention.length > 0 || inactiveCount > 0;
+
+  if (!hasTop && !hasIssues) return null;
+
+  return (
+    <View style={styles.quickInsightsRow}>
+      {hasTop && (
+        <View style={[styles.quickCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={styles.quickCardHeader}>
+            <TrendingUp size={11} color={colors.green} />
+            <Text style={[styles.quickCardTitle, { color: colors.textMuted }]}>TOP</Text>
+          </View>
+          {topPerformers.slice(0, 2).map((p, i) => (
+            <View key={p.userId} style={styles.quickItem}>
+              <Text style={[styles.quickName, { color: colors.text }]} numberOfLines={1}>{p.userName}</Text>
+              <Text style={[styles.quickValue, { color: colors.green }]}>{p.accuracy?.toFixed(0)}%</Text>
+            </View>
+          ))}
+        </View>
+      )}
+      {hasIssues && (
+        <View style={[styles.quickCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={styles.quickCardHeader}>
+            <AlertTriangle size={11} color={colors.orange || '#F59E0B'} />
+            <Text style={[styles.quickCardTitle, { color: colors.textMuted }]}>ATTENTION</Text>
+          </View>
+          {needsAttention.slice(0, 2).map((m) => (
+            <View key={m.userId} style={styles.quickItem}>
+              <Text style={[styles.quickName, { color: colors.text }]} numberOfLines={1}>{m.userName}</Text>
+              <Text style={[styles.quickValue, { color: colors.orange || '#F59E0B' }]}>
+                {m.sessions < 3 ? 'Low' : `${m.accuracy?.toFixed(0)}%`}
+              </Text>
+            </View>
+          ))}
+          {inactiveCount > 0 && needsAttention.length < 2 && (
+            <View style={styles.quickItem}>
+              <Text style={[styles.quickName, { color: colors.textMuted }]}>{inactiveCount} inactive</Text>
+            </View>
+          )}
+        </View>
+      )}
+    </View>
+  );
+}
+
+// ============================================================================
+// COMMANDER VIEW: MEMBER DETAIL TABLE (expandable)
+// ============================================================================
+
+interface MemberDetailTableProps {
+  members: TeamMemberStat[];
+  currentUserId: string;
+  colors: ReturnType<typeof useColors>;
+}
+
+function MemberDetailTable({ members, currentUserId, colors }: MemberDetailTableProps) {
+  const [expanded, setExpanded] = useState(false);
+  if (members.length === 0) return null;
+
+  const displayMembers = expanded ? members : members.slice(0, 5);
+
+  const getAccuracyColor = (accuracy: number | null) => {
+    if (accuracy === null) return colors.textMuted;
+    if (accuracy >= 70) return colors.green;
+    if (accuracy >= 50) return colors.orange || '#F59E0B';
+    return colors.textMuted;
+  };
+
+  return (
+    <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+      {displayMembers.map((m, i) => {
+        const isMe = m.userId === currentUserId;
+        const accColor = getAccuracyColor(m.accuracy);
+        return (
+          <View
+            key={m.userId}
+            style={[
+              styles.memberCard,
+              isMe && { backgroundColor: `${colors.primary}06` },
+              i < displayMembers.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+            ]}
+          >
+            {/* Left: Rank + Initials */}
+            <View style={styles.memberCardLeft}>
+              <Text style={[styles.memberCardRank, { color: colors.textMuted }]}>{i + 1}</Text>
+              <View style={[styles.memberCardAvatar, { backgroundColor: `${accColor}18` }]}>
+                <Text style={[styles.memberCardInitials, { color: accColor }]}>
+                  {getInitials(m.userName)}
+                </Text>
+              </View>
+            </View>
+
+            {/* Center: Name + stats subtitle */}
+            <View style={styles.memberCardCenter}>
+              <Text style={[styles.memberCardName, { color: colors.text }]} numberOfLines={1}>
+                {m.userName}{isMe ? ' (you)' : ''}
+              </Text>
+              <Text style={[styles.memberCardSubtitle, { color: colors.textMuted }]} numberOfLines={1}>
+                {m.sessions} sessions · {formatShots(m.shots)} shots · {formatRelativeTime(m.lastActive)} ago
+              </Text>
+            </View>
+
+            {/* Right: Accuracy + Grouping */}
+            <View style={styles.memberCardRight}>
+              <Text style={[styles.memberCardAccuracy, { color: accColor }]}>
+                {m.accuracy !== null ? `${m.accuracy.toFixed(0)}%` : '—'}
+              </Text>
+              <Text style={[styles.memberCardGrouping, { color: colors.textMuted }]}>
+                {m.bestDispersion !== null ? `${m.bestDispersion.toFixed(1)}cm` : ''}
+              </Text>
+            </View>
+          </View>
+        );
+      })}
+
+      {/* Expand/collapse */}
+      {members.length > 5 && (
+        <TouchableOpacity
+          style={[styles.expandButton, { borderTopColor: colors.border }]}
+          onPress={() => setExpanded(!expanded)}
+        >
+          <Text style={[styles.expandText, { color: colors.textMuted }]}>
+            {expanded ? 'Show less' : `Show all ${members.length}`}
+          </Text>
+          {expanded ? <ChevronUp size={12} color={colors.textMuted} /> : <ChevronDown size={12} color={colors.textMuted} />}
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+}
+
+// ============================================================================
+// COMMANDER VIEW: MEMBER ACCURACY BARS
+// ============================================================================
+
+function MemberAccuracyBars({
+  members,
+  colors,
+}: {
+  members: TeamMemberStat[];
+  colors: ReturnType<typeof useColors>;
+}) {
+  if (members.length === 0) return null;
+
+  const getBarColor = (accuracy: number) => {
+    if (accuracy >= 70) return colors.green;
+    if (accuracy >= 50) return colors.orange || '#F59E0B';
+    return colors.textMuted;
+  };
+
+  const teamAvg = members.reduce((sum, m) => sum + (m.accuracy ?? 0), 0) / members.length;
+
+  return (
+    <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border, padding: 14 }]}>
+      {members.map((m, i) => {
+        const acc = m.accuracy ?? 0;
+        const barColor = getBarColor(acc);
+        return (
+          <View
+            key={m.userId}
+            style={[
+              styles.accuracyBarRow,
+              i < members.length - 1 && { marginBottom: 12 },
+            ]}
+          >
+            <View style={[styles.accBarAvatar, { backgroundColor: `${barColor}18` }]}>
+              <Text style={[styles.accBarInitials, { color: barColor }]}>
+                {getInitials(m.userName)}
+              </Text>
+            </View>
+            <Text style={[styles.accuracyBarName, { color: colors.text }]} numberOfLines={1}>
+              {m.userName}
+            </Text>
+            <View style={[styles.accuracyBarTrack, { backgroundColor: `${colors.textMuted}10` }]}>
+              <View
+                style={[
+                  styles.accuracyBarFill,
+                  {
+                    backgroundColor: barColor,
+                    width: `${Math.min(acc, 100)}%`,
+                  },
+                ]}
+              />
+            </View>
+            <Text style={[styles.accuracyBarValue, { color: barColor }]}>
+              {acc.toFixed(0)}%
+            </Text>
+          </View>
+        );
+      })}
+
+      {/* Team average indicator */}
+      <View style={[styles.accBarAvgRow, { borderTopColor: colors.border }]}>
+        <Minus size={10} color={colors.textMuted} />
+        <Text style={[styles.accBarAvgText, { color: colors.textMuted }]}>
+          Team avg: {teamAvg.toFixed(0)}%
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+// ============================================================================
+// COMMANDER VIEW: MATRIX TABLE (shared for distance, position, weapon)
+// ============================================================================
+
+interface MatrixRow {
+  label: string;
+  sessions: number;
+  totalShots: number;
+  avgAccuracy: number | null;
+  avgGrouping: number | null;
+  memberCount: number;
+}
+
+function MatrixTable({
+  rows,
+  colors,
+}: {
+  rows: MatrixRow[];
+  colors: ReturnType<typeof useColors>;
+}) {
+  if (rows.length === 0) return null;
+
+  const getAccColor = (accuracy: number | null) => {
+    if (accuracy === null) return colors.textMuted;
+    if (accuracy >= 70) return colors.green;
+    if (accuracy >= 50) return colors.orange || '#F59E0B';
+    return colors.textMuted;
+  };
+
+  return (
+    <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+      {rows.map((row, i) => {
+        const accColor = getAccColor(row.avgAccuracy);
+        return (
+          <View
+            key={row.label}
+            style={[
+              styles.matrixCardRow,
+              i < rows.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+            ]}
+          >
+            {/* Left: Category + subtitle */}
+            <View style={styles.matrixCardLeft}>
+              <Text style={[styles.matrixCardLabel, { color: colors.text }]} numberOfLines={1}>
+                {row.label}
+              </Text>
+              <Text style={[styles.matrixCardSubtitle, { color: colors.textMuted }]}>
+                {row.sessions} sessions · {row.memberCount} members
+              </Text>
+            </View>
+
+            {/* Right: Accuracy with mini bar + Grouping */}
+            <View style={styles.matrixCardRight}>
+              <Text style={[styles.matrixCardAccuracy, { color: accColor }]}>
+                {row.avgAccuracy !== null ? `${row.avgAccuracy.toFixed(0)}%` : '—'}
+              </Text>
+              <View style={styles.matrixMiniBarTrack}>
+                <View
+                  style={[
+                    styles.matrixMiniBarFill,
+                    {
+                      backgroundColor: accColor,
+                      width: row.avgAccuracy !== null ? `${Math.min(row.avgAccuracy, 100)}%` : '0%',
+                    },
+                  ]}
+                />
+              </View>
+              <Text style={[styles.matrixCardGrouping, { color: colors.textMuted }]}>
+                {row.avgGrouping !== null ? `${row.avgGrouping.toFixed(1)}cm` : '—'}
+              </Text>
+            </View>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
+// ============================================================================
+// COMMANDER VIEW: TRAINING FOCUS AREAS
+// ============================================================================
+
+function TrainingFocus({ weakAreas, colors }: { weakAreas: TeamWeakArea[]; colors: ReturnType<typeof useColors> }) {
+  if (weakAreas.length === 0) return null;
+
+  return (
+    <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+      {weakAreas.slice(0, 3).map((area, i) => (
+        <View
+          key={`${area.type}-${area.label}`}
+          style={[styles.focusRow, i < Math.min(weakAreas.length, 3) - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }]}
+        >
+          <View style={[styles.focusIcon, { backgroundColor: `${colors.red}08` }]}>
+            <TrendingDown size={10} color={colors.red} />
+          </View>
+          <View style={styles.focusContent}>
+            <Text style={[styles.focusLabel, { color: colors.text }]}>{area.label}</Text>
+            <Text style={[styles.focusDetail, { color: colors.textMuted }]}>{area.detail}</Text>
+          </View>
+          <Text style={[styles.focusAcc, { color: colors.red }]}>{area.avgAccuracy.toFixed(0)}%</Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+// ============================================================================
+// COMMANDER VIEW: INACTIVE MEMBERS ALERT
+// ============================================================================
+
+function InactiveMembersAlert({
+  inactiveMembers,
+  colors,
+}: {
+  inactiveMembers: InactiveMemberInfo[];
+  colors: ReturnType<typeof useColors>;
+}) {
+  if (inactiveMembers.length === 0) return null;
+
+  const warnColor = colors.orange || '#F59E0B';
+
+  return (
+    <View style={[styles.inactiveCard, { backgroundColor: colors.card, borderColor: `${warnColor}35` }]}>
+      {/* Header with warning icon */}
+      <View style={styles.inactiveHeader}>
+        <View style={[styles.inactiveIconBg, { backgroundColor: `${warnColor}14` }]}>
+          <AlertTriangle size={15} color={warnColor} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.inactiveTitle, { color: colors.text }]}>
+            {inactiveMembers.length} member{inactiveMembers.length !== 1 ? 's' : ''} never trained
+          </Text>
+          <Text style={[styles.inactiveSubtitle, { color: colors.textMuted }]}>No sessions recorded</Text>
+        </View>
+      </View>
+
+      {/* Vertical member list */}
+      <View style={styles.inactiveList}>
+        {inactiveMembers.map((m, i) => (
+          <View
+            key={m.userId}
+            style={[
+              styles.inactiveMember,
+              i < inactiveMembers.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: `${colors.border}` },
+            ]}
+          >
+            <View style={[styles.inactiveAvatar, { backgroundColor: `${warnColor}12` }]}>
+              <Text style={[styles.inactiveInitials, { color: warnColor }]}>
+                {getInitials(m.userName)}
+              </Text>
+            </View>
+            <Text style={[styles.inactiveName, { color: colors.text }]} numberOfLines={1}>
+              {m.userName}
+            </Text>
+          </View>
+        ))}
+      </View>
+
+      {/* Hint text */}
+      <Text style={[styles.inactiveHint, { color: colors.textMuted }]}>
+        Consider reaching out to encourage participation
+      </Text>
+    </View>
+  );
+}
+
+// ============================================================================
+// MAIN COMPONENT
+// ============================================================================
+
+export function TeamInsights() {
+  const { t } = useTranslation();
+  const colors = useColors();
+
+  const {
+    loading,
+    refreshing,
+    hasData,
+    userId,
+    activeTeam,
+    members,
+    isCommander,
+    teamTotals,
+    teamAverages,
+    participationRate,
+    myStats,
+    myPercentile,
+    myComparison,
+    memberRankings,
+    topPerformers,
+    needsAttention,
+    inactiveMembers,
+    positionBreakdown,
+    distanceBreakdown,
+    weaponCategoryBreakdown,
+    teamWeakAreas,
+    weeklyActivityData,
+    performanceChartData,
+    teamReadiness,
+    memberAccuracyRanking,
+    inactiveMembersInfo,
+    handleRefresh,
+    goToStartSession,
+    goToSessionHistory,
+  } = useTeamInsights();
+
+  if (loading) {
+    return (
+      <View style={[styles.container, styles.centered, { backgroundColor: colors.background }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
+
+  // Format position breakdown for matrix
+  const positionRows: MatrixRow[] = positionBreakdown.map((p) => ({
+    label: p.position.charAt(0).toUpperCase() + p.position.slice(1),
+    sessions: p.sessions,
+    totalShots: p.totalShots,
+    avgAccuracy: p.avgAccuracy,
+    avgGrouping: p.avgGrouping,
+    memberCount: p.memberCount,
+  }));
+
+  // Format distance breakdown for matrix
+  const distanceRows: MatrixRow[] = distanceBreakdown.map((d) => ({
+    label: d.label,
+    sessions: d.sessions,
+    totalShots: d.totalShots,
+    avgAccuracy: d.avgAccuracy,
+    avgGrouping: d.avgGrouping,
+    memberCount: d.memberCount,
+  }));
+
+  // Format weapon category breakdown for matrix
+  const weaponRows: MatrixRow[] = weaponCategoryBreakdown.map((w) => ({
+    label: w.label,
+    sessions: w.sessions,
+    totalShots: w.totalShots,
+    avgAccuracy: w.avgAccuracy,
+    avgGrouping: w.avgGrouping,
+    memberCount: w.memberCount,
+  }));
+
+  return (
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.text} />}
+      >
+        {/* Header */}
+        <View style={styles.headerSection}>
+          <Text style={[styles.pageTitle, { color: colors.text }]}>{t('insights.title')}</Text>
+          {hasData && (
+            <Text style={[styles.headerSubtitle, { color: colors.textMuted }]}>
+              {isCommander ? 'Team Overview' : 'Your Progress'}
+            </Text>
+          )}
+        </View>
+
+        {/* Context Header */}
+        <TeamContextHeader
+          teamName={activeTeam?.name}
+          isCommander={isCommander}
+          memberCount={members?.length || 0}
+          colors={colors}
+        />
+
+        {/* Content */}
+        {!hasData ? (
+          <EmptyState colors={colors} onStartSession={goToStartSession} />
+        ) : isCommander ? (
+          /* ═══════════════════════════════════════════════════════════ */
+          /* COMMANDER VIEW */
+          /* ═══════════════════════════════════════════════════════════ */
+          <>
+            {/* 1. Team Readiness Summary */}
+            <Animated.View entering={FadeIn.delay(50)}>
+              <SectionHeader title="READINESS" icon={<Shield size={12} color={colors.textMuted} />} colors={colors} />
+              <TeamReadinessSummary readiness={teamReadiness} colors={colors} />
+            </Animated.View>
+
+            {/* 2. Quick Insights - actionable alerts (top/attention) */}
+            <Animated.View entering={FadeIn.delay(90)} style={styles.section}>
+              <QuickInsights
+                topPerformers={topPerformers}
+                needsAttention={needsAttention}
+                inactiveCount={inactiveMembers.length}
+                colors={colors}
+              />
+            </Animated.View>
+
+            {/* 3. Member Detail Table */}
+            {memberRankings.length > 0 && (
+              <Animated.View entering={FadeIn.delay(130)} style={styles.section}>
+                <SectionHeader title="MEMBER RANKINGS" icon={<Users size={12} color={colors.textMuted} />} colors={colors} />
+                <MemberDetailTable members={memberRankings} currentUserId={userId} colors={colors} />
+              </Animated.View>
+            )}
+
+            {/* 4. Member Accuracy Bars */}
+            {memberAccuracyRanking.length > 0 && (
+              <Animated.View entering={FadeIn.delay(170)} style={styles.section}>
+                <SectionHeader title="ACCURACY COMPARISON" icon={<Target size={12} color={colors.textMuted} />} colors={colors} />
+                <MemberAccuracyBars members={memberAccuracyRanking} colors={colors} />
+              </Animated.View>
+            )}
+
+            {/* 5. Distance Matrix */}
+            {distanceRows.length > 0 && (
+              <Animated.View entering={FadeIn.delay(210)} style={styles.section}>
+                <SectionHeader title="BY DISTANCE" icon={<Crosshair size={12} color={colors.textMuted} />} colors={colors} />
+                <MatrixTable rows={distanceRows} colors={colors} />
+              </Animated.View>
+            )}
+
+            {/* 6. Position Matrix */}
+            {positionRows.length > 0 && (
+              <Animated.View entering={FadeIn.delay(250)} style={styles.section}>
+                <SectionHeader title="BY POSITION" colors={colors} />
+                <MatrixTable rows={positionRows} colors={colors} />
+              </Animated.View>
+            )}
+
+            {/* 7. Weapon Category Section */}
+            {weaponRows.length > 0 && (
+              <Animated.View entering={FadeIn.delay(290)} style={styles.section}>
+                <SectionHeader title="BY WEAPON" icon={<Zap size={12} color={colors.textMuted} />} colors={colors} />
+                <MatrixTable rows={weaponRows} colors={colors} />
+              </Animated.View>
+            )}
+
+            {/* 8. Activity chart - weekly overview */}
+            {weeklyActivityData.some((d) => d.sessions > 0) && (
+              <Animated.View entering={FadeIn.delay(330)} style={styles.section}>
+                <SectionHeader title="ACTIVITY" icon={<BarChart3 size={12} color={colors.textMuted} />} colors={colors} />
+                <ActivityChart data={weeklyActivityData} title="" height={90} />
+              </Animated.View>
+            )}
+
+            {/* 9. Trends - accuracy over time */}
+            {performanceChartData.length >= 2 && (
+              <Animated.View entering={FadeIn.delay(370)} style={styles.section}>
+                <SectionHeader title="TRENDS" icon={<TrendingUp size={12} color={colors.textMuted} />} colors={colors} />
+                <PerformanceChart data={performanceChartData} height={130} />
+              </Animated.View>
+            )}
+
+            {/* 10. Training Focus - areas needing work */}
+            {teamWeakAreas.length > 0 && (
+              <Animated.View entering={FadeIn.delay(410)} style={styles.section}>
+                <SectionHeader title="TRAINING FOCUS" icon={<Target size={12} color={colors.textMuted} />} colors={colors} />
+                <TrainingFocus weakAreas={teamWeakAreas} colors={colors} />
+              </Animated.View>
+            )}
+
+            {/* 11. Inactive Members Alert */}
+            {inactiveMembersInfo.length > 0 && (
+              <Animated.View entering={FadeIn.delay(450)} style={styles.section}>
+                <InactiveMembersAlert inactiveMembers={inactiveMembersInfo} colors={colors} />
+              </Animated.View>
+            )}
+
+            {/* 12. Session History link */}
+            <TouchableOpacity
+              style={[styles.linkCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+              onPress={goToSessionHistory}
+              activeOpacity={0.7}
+            >
+              <Clock size={13} color={colors.textMuted} />
+              <Text style={[styles.linkText, { color: colors.text }]}>View all sessions</Text>
+              <ChevronRight size={13} color={colors.textMuted} />
+            </TouchableOpacity>
+          </>
+        ) : (
+          /* ═══════════════════════════════════════════════════════════ */
+          /* MEMBER VIEW */
+          /* ═══════════════════════════════════════════════════════════ */
+          <>
+            {/* 1. Your Performance vs Team */}
+            <MemberComparisonCard
+              myStats={myStats}
+              teamAverages={teamAverages}
+              myComparison={myComparison}
+              myPercentile={myPercentile}
+              colors={colors}
+            />
+
+            {/* 2. Your Activity */}
+            {weeklyActivityData.some((d) => d.sessions > 0) && (
+              <Animated.View entering={FadeIn.delay(100)} style={styles.section}>
+                <SectionHeader title="YOUR ACTIVITY" icon={<BarChart3 size={12} color={colors.textMuted} />} colors={colors} />
+                <ActivityChart data={weeklyActivityData} title="" height={90} />
+              </Animated.View>
+            )}
+
+            {/* 3. Your Trends */}
+            {performanceChartData.length >= 2 && (
+              <Animated.View entering={FadeIn.delay(140)} style={styles.section}>
+                <SectionHeader title="YOUR TRENDS" icon={<TrendingUp size={12} color={colors.textMuted} />} colors={colors} />
+                <PerformanceChart data={performanceChartData} height={130} />
+              </Animated.View>
+            )}
+
+            {/* History link */}
+            <TouchableOpacity
+              style={[styles.linkCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+              onPress={goToSessionHistory}
+              activeOpacity={0.7}
+            >
+              <Clock size={13} color={colors.textMuted} />
+              <Text style={[styles.linkText, { color: colors.text }]}>View your sessions</Text>
+              <ChevronRight size={13} color={colors.textMuted} />
+            </TouchableOpacity>
+          </>
+        )}
+
+        <View style={styles.bottomSpacer} />
+      </ScrollView>
+    </View>
+  );
+}
+
+// ============================================================================
+// STYLES
+// ============================================================================
+
+const styles = StyleSheet.create({
+  container: { flex: 1 },
+  centered: { justifyContent: 'center', alignItems: 'center' },
+  scroll: { flex: 1 },
+  scrollContent: { paddingHorizontal: 16, paddingTop: Platform.OS === 'ios' ? 8 : 14 },
+
+  // Header
+  headerSection: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 14 },
+  pageTitle: { fontSize: 22, fontWeight: '700', letterSpacing: -0.4 },
+  headerSubtitle: { fontSize: 11, fontWeight: '500' },
+
+  // Context header
+  contextHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8, paddingHorizontal: 10, borderRadius: 8, borderWidth: 1, marginBottom: 20 },
+  contextIcon: { width: 22, height: 22, borderRadius: 6, alignItems: 'center', justifyContent: 'center' },
+  contextTeamName: { fontSize: 13, fontWeight: '600', flex: 1 },
+  cmdBadge: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 6, paddingVertical: 3, borderRadius: 4 },
+  cmdBadgeText: { fontSize: 9, fontWeight: '700', letterSpacing: 0.5 },
+  memberCount: { fontSize: 11, fontWeight: '500' },
+
+  // Section
+  section: { marginTop: 28 },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12 },
+  sectionTitle: { fontSize: 11, fontWeight: '700', letterSpacing: 0.8 },
+
+  // Card base
+  card: { borderRadius: 10, borderWidth: 1 },
+
+  // Comparison card (member)
+  compCard: { borderRadius: 12, borderWidth: 1 },
+  compCardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', padding: 16, paddingBottom: 12 },
+  compCardTitle: { fontSize: 15, fontWeight: '700' },
+  compCardSubtitle: { fontSize: 11, marginTop: 2 },
+  percentileBadge: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 6 },
+  percentileValue: { fontSize: 11, fontWeight: '700' },
+  compColHeaders: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 16, paddingBottom: 8, borderBottomWidth: StyleSheet.hairlineWidth },
+  compColLabel: { fontSize: 9, fontWeight: '600', letterSpacing: 0.5 },
+  compColHeaderRight: { flexDirection: 'row', gap: 40 },
+  compRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12, paddingHorizontal: 16, borderBottomWidth: StyleSheet.hairlineWidth },
+  compLabel: { fontSize: 12, fontWeight: '500' },
+  compValues: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  compValueCol: { alignItems: 'center', width: 50 },
+  compValue: { fontSize: 14, fontWeight: '700' },
+  compValueLabel: { fontSize: 9, marginTop: 2 },
+  compIndicator: { width: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center', marginTop: 4 },
+  compDivider: { width: 1, height: 24 },
+  compFooter: { borderTopWidth: StyleSheet.hairlineWidth, padding: 12 },
+  compFooterText: { fontSize: 11, textAlign: 'center' },
+
+  // Team context card (member)
+  teamContextCard: { borderRadius: 10, borderWidth: 1 },
+  teamContextRow: { flexDirection: 'row', alignItems: 'center', padding: 14 },
+  teamContextStat: { flex: 1, alignItems: 'center' },
+  teamContextValue: { fontSize: 18, fontWeight: '700' },
+  teamContextLabel: { fontSize: 10, marginTop: 2 },
+  teamContextDivider: { width: 1, height: 28 },
+  teamContextFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderTopWidth: StyleSheet.hairlineWidth, paddingVertical: 10 },
+  teamContextFooterText: { fontSize: 11 },
+
+  // Commander overview (kept for legacy compat, unused)
+  cmdOverview: { borderRadius: 12, borderWidth: 1 },
+  cmdOverviewRow: { flexDirection: 'row', alignItems: 'center', padding: 16 },
+  cmdOverviewStat: { flex: 1, alignItems: 'center' },
+  cmdOverviewValue: { fontSize: 24, fontWeight: '700' },
+  cmdOverviewLabel: { fontSize: 10, marginTop: 2 },
+  cmdOverviewDivider: { width: 1, height: 36 },
+  cmdOverviewSecondary: { flexDirection: 'row', justifyContent: 'center', gap: 24, borderTopWidth: StyleSheet.hairlineWidth, paddingVertical: 10 },
+  cmdOverviewSecondaryItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  cmdOverviewSecondaryText: { fontSize: 11 },
+
+  // Old table (rankings) — kept for reference
+  tableHeader: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 14, borderBottomWidth: StyleSheet.hairlineWidth },
+  thRank: { width: 24, fontSize: 9, fontWeight: '600' },
+  thName: { flex: 1, fontSize: 9, fontWeight: '600' },
+  thStat: { width: 44, fontSize: 9, fontWeight: '600', textAlign: 'right' },
+  tableRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 14 },
+  tdRank: { width: 24, fontSize: 12, fontWeight: '600' },
+  tdName: { flex: 1, fontSize: 12, fontWeight: '500' },
+  tdStat: { width: 44, fontSize: 12, fontWeight: '600', textAlign: 'right' },
+  expandButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: 10, borderTopWidth: StyleSheet.hairlineWidth },
+  expandText: { fontSize: 11, fontWeight: '500' },
+
+  // Quick insights
+  quickInsightsRow: { flexDirection: 'row', gap: 12 },
+  quickCard: { flex: 1, borderRadius: 10, borderWidth: 1, padding: 12 },
+  quickCardHeader: { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 10 },
+  quickCardTitle: { fontSize: 9, fontWeight: '700', letterSpacing: 0.6 },
+  quickItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 4 },
+  quickName: { flex: 1, fontSize: 12, fontWeight: '500' },
+  quickValue: { fontSize: 12, fontWeight: '700' },
+
+  // Training focus
+  focusRow: { flexDirection: 'row', alignItems: 'center', padding: 12, gap: 10 },
+  focusIcon: { width: 26, height: 26, borderRadius: 6, alignItems: 'center', justifyContent: 'center' },
+  focusContent: { flex: 1 },
+  focusLabel: { fontSize: 13, fontWeight: '600' },
+  focusDetail: { fontSize: 11, marginTop: 2 },
+  focusAcc: { fontSize: 13, fontWeight: '700' },
+
+  // Link card
+  linkCard: { flexDirection: 'row', alignItems: 'center', padding: 14, borderRadius: 10, borderWidth: 1, marginTop: 28, gap: 10 },
+  linkText: { flex: 1, fontSize: 13, fontWeight: '500' },
+
+  // Empty state
+  emptyContainer: { alignItems: 'center', padding: 32, borderRadius: 14, marginTop: 20, gap: 14 },
+  emptyIcon: { width: 52, height: 52, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  emptyTitle: { fontSize: 16, fontWeight: '700' },
+  emptyText: { fontSize: 13, textAlign: 'center', lineHeight: 18 },
+  emptyButton: { paddingHorizontal: 20, paddingVertical: 10, borderRadius: 8, marginTop: 8 },
+  emptyButtonText: { fontSize: 14, fontWeight: '600', color: '#fff' },
+
+  bottomSpacer: { height: 90 },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // NEW: Team Readiness Summary (ring + stats)
+  // ═══════════════════════════════════════════════════════════════════════════
+  readinessCard: { borderRadius: 12, borderWidth: 1, overflow: 'hidden' },
+  readinessRingSection: { alignItems: 'center', paddingTop: 20, paddingBottom: 16, gap: 12 },
+  readinessRingOuter: {
+    width: 76,
+    height: 76,
+    borderRadius: 38,
+    borderWidth: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  readinessRingInner: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    borderWidth: 3,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+  },
+  readinessRingPct: { fontSize: 20, fontWeight: '800' },
+  readinessRingUnit: { fontSize: 11, fontWeight: '600', marginTop: 4 },
+  readinessMainText: { fontSize: 14, fontWeight: '500' },
+  readinessStatsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+  },
+  readinessStatItem: { flex: 1, alignItems: 'center', gap: 3 },
+  readinessStatValue: { fontSize: 15, fontWeight: '700' },
+  readinessStatLabel: { fontSize: 9, fontWeight: '500', textTransform: 'uppercase', letterSpacing: 0.3 },
+  readinessStatDivider: { width: 1, height: 24 },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // NEW: Member Detail Table (card-per-member)
+  // ═══════════════════════════════════════════════════════════════════════════
+  memberCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    gap: 10,
+  },
+  memberCardLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  memberCardRank: { fontSize: 12, fontWeight: '700', width: 18, textAlign: 'center' },
+  memberCardAvatar: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  memberCardInitials: { fontSize: 11, fontWeight: '700' },
+  memberCardCenter: { flex: 1 },
+  memberCardName: { fontSize: 14, fontWeight: '600' },
+  memberCardSubtitle: { fontSize: 11, marginTop: 2, fontWeight: '400' },
+  memberCardRight: { alignItems: 'flex-end', minWidth: 44 },
+  memberCardAccuracy: { fontSize: 18, fontWeight: '800' },
+  memberCardGrouping: { fontSize: 10, marginTop: 1, fontWeight: '500' },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // NEW: Member Accuracy Bars (taller, with initials + team avg)
+  // ═══════════════════════════════════════════════════════════════════════════
+  accuracyBarRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  accBarAvatar: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  accBarInitials: { fontSize: 9, fontWeight: '700' },
+  accuracyBarName: { width: 70, fontSize: 12, fontWeight: '500' },
+  accuracyBarTrack: {
+    flex: 1,
+    height: 14,
+    borderRadius: 7,
+    overflow: 'hidden',
+  },
+  accuracyBarFill: { height: '100%', borderRadius: 7 },
+  accuracyBarValue: { width: 38, fontSize: 13, fontWeight: '700', textAlign: 'right' },
+  accBarAvgRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: 14,
+    paddingTop: 10,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  accBarAvgText: { fontSize: 11, fontWeight: '500' },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // NEW: Matrix Table (card-per-row with mini bars)
+  // ═══════════════════════════════════════════════════════════════════════════
+  matrixCardRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 13,
+    paddingHorizontal: 14,
+  },
+  matrixCardLeft: { flex: 1, marginRight: 12 },
+  matrixCardLabel: { fontSize: 14, fontWeight: '600' },
+  matrixCardSubtitle: { fontSize: 11, marginTop: 2, fontWeight: '400' },
+  matrixCardRight: { alignItems: 'flex-end', minWidth: 70 },
+  matrixCardAccuracy: { fontSize: 16, fontWeight: '800' },
+  matrixMiniBarTrack: {
+    width: 60,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: 'rgba(128,128,128,0.08)',
+    overflow: 'hidden',
+    marginTop: 4,
+  },
+  matrixMiniBarFill: { height: '100%', borderRadius: 3 },
+  matrixCardGrouping: { fontSize: 10, marginTop: 3, fontWeight: '500' },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // NEW: Inactive Members Alert (orange-tinted, vertical)
+  // ═══════════════════════════════════════════════════════════════════════════
+  inactiveCard: { borderRadius: 12, borderWidth: 1.5, padding: 16 },
+  inactiveHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 14 },
+  inactiveIconBg: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  inactiveTitle: { fontSize: 14, fontWeight: '700' },
+  inactiveSubtitle: { fontSize: 11, marginTop: 2 },
+  inactiveList: { gap: 0 },
+  inactiveMember: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8 },
+  inactiveAvatar: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
+  inactiveInitials: { fontSize: 11, fontWeight: '700' },
+  inactiveName: { fontSize: 13, fontWeight: '500', flex: 1 },
+  inactiveHint: { fontSize: 11, fontWeight: '400', fontStyle: 'italic', textAlign: 'center', marginTop: 12, paddingTop: 10, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: 'rgba(128,128,128,0.1)' },
+});
+
+export default TeamInsights;

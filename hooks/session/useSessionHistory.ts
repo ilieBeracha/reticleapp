@@ -1,5 +1,6 @@
 import { getRecentSessionsWithStats } from '@/services/session/queries';
 import type { SessionWithDetails } from '@/types/session';
+import { useTeamStore } from '@/stores/teamStore';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { DEFAULT_FILTERS, DEFAULT_SORT, PAGE_SIZE } from '@/constants/sessionHistory';
@@ -40,6 +41,9 @@ export function useSessionHistory(
   // UI state
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
 
+  // Team context for filtering
+  const activeTeamId = useTeamStore((state) => state.activeTeamId);
+
   // ============================================================================
   // DATA FETCHING
   // ============================================================================
@@ -55,6 +59,7 @@ export function useSessionHistory(
       const data = await getRecentSessionsWithStats({
         days: 365 * 2, // 2 years
         limit: 500,
+        teamId: activeTeamId, // Filter by current context
       });
       
       setSessions(data);
@@ -68,12 +73,18 @@ export function useSessionHistory(
       setIsRefreshing(false);
       setIsLoadingMore(false);
     }
-  }, []);
+  }, [activeTeamId]);
 
   // Initial load
   useEffect(() => {
     fetchSessions(true);
   }, [fetchSessions]);
+
+  // Refetch when team context changes
+  useEffect(() => {
+    setSessions([]); // Clear stale data immediately
+    fetchSessions(true);
+  }, [activeTeamId]);
 
   // ============================================================================
   // COMPUTED - Apply filters, search, and sorting

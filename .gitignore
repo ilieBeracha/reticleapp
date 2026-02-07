@@ -43,3 +43,6 @@ yarn-error.*
 coverage/
 
 app-example
+
+# Claude Code hooks temp files
+.claude/hooks/.last-commit-diff

@@ -1,20 +1,17 @@
 /**
  * HomeHeader Component
  *
- * Clean header with user greeting and status.
- * Avatar is tappable to navigate to profile.
- * Garmin badge is tappable to navigate to settings.
+ * Compact header with user greeting and status.
+ * Matches TeamDashboardHeader design: clean, professional, minimal.
  */
 
 import { BaseAvatar } from '@/components/shared/Avatar';
+import type { HomeHeaderProps } from '@/types/home';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import Animated, { FadeIn, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
-import type { HomeHeaderProps } from '@/types/home';
-
-const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
+import Animated, { FadeIn } from 'react-native-reanimated';
 
 export function HomeHeader({
   greeting,
@@ -24,59 +21,38 @@ export function HomeHeader({
   isGarminConnected,
   colors,
 }: HomeHeaderProps) {
-  const avatarScale = useSharedValue(1);
-  const badgeScale = useSharedValue(1);
-
-  const avatarAnimStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: avatarScale.value }],
-  }));
-
-  const badgeAnimStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: badgeScale.value }],
-  }));
-
   const handleAvatarPress = () => {
-    avatarScale.value = withSpring(0.95, {}, () => {
-      avatarScale.value = withSpring(1);
-    });
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     router.push('/(protected)/profileSheet');
   };
 
   const handleGarminPress = () => {
-    badgeScale.value = withSpring(0.9, {}, () => {
-      badgeScale.value = withSpring(1);
-    });
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     router.push('/(protected)/(tabs)');
   };
 
   return (
-    <Animated.View entering={FadeIn.duration(300)} style={s.header}>
-      <TouchableOpacity style={s.left} onPress={handleAvatarPress} activeOpacity={0.8}>
-        <Animated.View style={[s.avatar, { backgroundColor: colors.secondary }, avatarAnimStyle]}>
+    <Animated.View entering={FadeIn.duration(200)} style={s.container}>
+      <TouchableOpacity style={s.userInfo} onPress={handleAvatarPress} activeOpacity={0.7}>
+        <View style={[s.avatar, { backgroundColor: colors.border }]}>
           {avatarUrl ? (
             <BaseAvatar source={{ uri: avatarUrl }} fallbackText={fallbackInitial} size="sm" borderWidth={0} />
           ) : (
             <Text style={[s.avatarText, { color: colors.text }]}>{fallbackInitial}</Text>
           )}
-        </Animated.View>
+        </View>
         <View>
           <Text style={[s.greeting, { color: colors.textMuted }]}>{greeting}</Text>
           <Text style={[s.name, { color: colors.text }]}>{firstName}</Text>
         </View>
       </TouchableOpacity>
 
-      <View style={s.rightActions}>
+      <View style={s.rightSection}>
         {isGarminConnected && (
-          <AnimatedTouchable
-            style={[s.watchBadge, { backgroundColor: `${colors.green}12` }, badgeAnimStyle]}
-            onPress={handleGarminPress}
-            activeOpacity={0.7}
-          >
-            <View style={s.watchDot} />
-            <Ionicons name="watch" size={15} color={colors.green} />
-          </AnimatedTouchable>
+          <TouchableOpacity style={s.watchBadge} onPress={handleGarminPress} activeOpacity={0.7}>
+            <View style={[s.watchDot, { backgroundColor: colors.green }]} />
+            <Ionicons name="watch" size={14} color={colors.textMuted} />
+          </TouchableOpacity>
         )}
       </View>
     </Animated.View>
@@ -84,65 +60,53 @@ export function HomeHeader({
 }
 
 const s = StyleSheet.create({
-  header: {
+  container: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 14,
-    paddingTop: 4,
+    marginBottom: 12,
   },
-  left: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  rightActions: {
+  userInfo: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
   },
   avatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-  },
-  avatarText: {
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  greeting: {
-    fontSize: 11,
-    fontWeight: '500',
-    marginBottom: 1,
-    opacity: 0.7,
-  },
-  name: {
-    fontSize: 17,
-    fontWeight: '700',
-    letterSpacing: -0.3,
-  },
-  watchBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 20,
-  },
-  watchDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#10B981',
-  },
-  iconButton: {
     width: 36,
     height: 36,
     borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  avatarText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  greeting: {
+    fontSize: 10,
+    fontWeight: '500',
+  },
+  name: {
+    fontSize: 14,
+    fontWeight: '600',
+    letterSpacing: -0.2,
+  },
+  rightSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  watchBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+  },
+  watchDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
   },
 });

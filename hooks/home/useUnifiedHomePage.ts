@@ -8,31 +8,34 @@
 import { useFocusEffect } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
-import { useTranslation } from 'react-i18next';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Alert } from 'react-native';
 
+import {
+    CONTEXT_SWITCH_LOADING_DELAY_MS,
+    getFetchConfig,
+} from '@/constants/unifiedHomePage';
 import { useAuth } from '@/contexts/AuthContext';
 import { useModals } from '@/contexts/ModalContext';
+import { useHomeState } from '@/hooks/home/useHomeState';
 import { deleteSession } from '@/services/session/mutations';
 import { getMyActivePersonalSession, getRecentSessionsWithStats } from '@/services/session/queries';
-import type { SessionWithDetails } from '@/types/session';
 import { getDefaultWeapon, getWeaponStats, type UserWeapon, type WeaponStats } from '@/services/weaponService';
 import { useGarminStore } from '@/stores/garminStore';
 import { useSessionStore } from '@/stores/sessionStore';
 import { useTeamStore } from '@/stores/teamStore';
 import { useTrainingStore } from '@/stores/trainingStore';
-import { mapSessionToHomeSession, type HomeSession } from '@/types/home.viewmodel';
-import { useHomeState } from '@/hooks/home/useHomeState';
-import { RECENT_SESSIONS_LIMIT, SESSION_FETCH_DAYS, SESSION_FETCH_LIMIT } from '@/constants/unifiedHomePage';
-import {
-  calculateLastSessionDaysAgo,
-  calculateStreak,
-  calculateWeeklyStats,
-  getCoachMessage,
-  getGreeting,
-} from '@/utils/unifiedHomePage.helpers';
 import type { HeroMode, WeeklyStats } from '@/types/home';
+import { mapSessionToHomeSession, type HomeSession } from '@/types/home.viewmodel';
+import type { SessionWithDetails } from '@/types/session';
+import {
+    calculateLastSessionDaysAgo,
+    calculateStreak,
+    calculateWeeklyStats,
+    getCoachMessage,
+    getGreeting,
+} from '@/utils/unifiedHomePage.helpers';
 
 export function useUnifiedHomePage() {
   // ═══════════════════════════════════════════════════════════════════════════
@@ -55,7 +58,7 @@ export function useUnifiedHomePage() {
   // STORES
   // ═══════════════════════════════════════════════════════════════════════════
   const { sessions, loading: sessionsLoading, initialized } = useSessionStore();
-  const { teams, loadTeams } = useTeamStore();
+  const { teams, loadTeams, activeTeamId, activeTeam } = useTeamStore();
   const { myUpcomingTrainings, loadMyUpcomingTrainings, loadMyStats } = useTrainingStore();
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -67,24 +70,37 @@ export function useUnifiedHomePage() {
   const [loadingAllSessions, setLoadingAllSessions] = useState(true);
   const [defaultWeapon, setDefaultWeapon] = useState<UserWeapon | null>(null);
   const [weaponStatsMap, setWeaponStatsMap] = useState<Map<string, WeaponStats>>(new Map());
+  const [isContextSwitching, setIsContextSwitching] = useState(false);
   const initialLoadDone = useRef(false);
+  const prevTeamIdRef = useRef<string | null | undefined>(undefined);
+  const contextSwitchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ═══════════════════════════════════════════════════════════════════════════
   // DATA LOADING
   // ═══════════════════════════════════════════════════════════════════════════
+  // DATA LOADING
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  // Get fetch configuration based on mode
+  const isTeamMode = activeTeamId !== null;
+  const fetchConfig = getFetchConfig(isTeamMode);
+
   const loadAllSessions = useCallback(async () => {
     try {
-      const sessions = await getRecentSessionsWithStats({ 
-        days: SESSION_FETCH_DAYS, 
-        limit: SESSION_FETCH_LIMIT 
+      const config = getFetchConfig(activeTeamId !== null);
+      const sessions = await getRecentSessionsWithStats({
+        days: config.days,
+        limit: config.limit,
+        teamId: activeTeamId,
       });
       setAllSessions(sessions);
     } catch (error) {
       console.error('Failed to load all sessions:', error);
     } finally {
       setLoadingAllSessions(false);
+      setIsContextSwitching(false);
     }
-  }, []);
+  }, [activeTeamId]);
 
   const loadWeaponData = useCallback(async () => {
     try {
@@ -126,18 +142,86 @@ export function useUnifiedHomePage() {
     };
   }, [loadAllSessions, loadTeams, setOnSessionCreated, setOnTeamCreated]);
 
+  // Reload all data when account context changes (personal <-> team switch)
+  useEffect(() => {
+    // Skip on initial render
+    if (prevTeamIdRef.current === undefined) {
+      prevTeamIdRef.current = activeTeamId;
+      return;
+    }
+
+    // Only trigger if actually changed
+    if (prevTeamIdRef.current === activeTeamId) {
+      return;
+    }
+
+    prevTeamIdRef.current = activeTeamId;
+
+    // Clear any pending timeout
+    if (contextSwitchTimeoutRef.current) {
+      clearTimeout(contextSwitchTimeoutRef.current);
+    }
+
+    // Small delay to prevent flash on quick switches
+    contextSwitchTimeoutRef.current = setTimeout(() => {
+      setIsContextSwitching(true);
+      setLoadingAllSessions(true);
+      setAllSessions([]); // Clear old data to show fresh state
+
+      // Reload everything for the new context
+      Promise.all([
+        loadAllSessions(),
+        loadMyUpcomingTrainings(),
+        loadMyStats(),
+        loadWeaponData(),
+      ]).finally(() => {
+        setIsContextSwitching(false);
+      });
+    }, CONTEXT_SWITCH_LOADING_DELAY_MS);
+
+    return () => {
+      if (contextSwitchTimeoutRef.current) {
+        clearTimeout(contextSwitchTimeoutRef.current);
+      }
+    };
+  }, [activeTeamId, loadAllSessions, loadMyUpcomingTrainings, loadMyStats, loadWeaponData]);
+
   // ═══════════════════════════════════════════════════════════════════════════
   // DERIVED DATA
   // ═══════════════════════════════════════════════════════════════════════════
   const hasTeams = teams.length > 0;
 
-  // Filter upcoming trainings
+  // Filter upcoming trainings by account context
+  // Personal mode: No trainings (trainings are team-only)
+  // Team mode: Only show trainings from the active team
   const upcomingTrainings = useMemo(() => {
+    // In personal mode, don't show any team trainings
+    if (activeTeamId === null) {
+      return [];
+    }
+    
     return myUpcomingTrainings
+      .filter((t) => t.team_id === activeTeamId) // Only from active team
       .filter((t) => t.status === 'planned' || t.status === 'ongoing')
       .filter((t) => !allSessions.some((s) => s.training_id === t.id && s.status === 'active'))
       .slice(0, 3);
-  }, [myUpcomingTrainings, allSessions]);
+  }, [myUpcomingTrainings, allSessions, activeTeamId]);
+
+  // All upcoming trainings from ALL teams — for personal mode home page
+  // Sorted by closest date, includes team name for display
+  const allTeamsUpcoming = useMemo(() => {
+    return myUpcomingTrainings
+      .filter((t) => t.status === 'planned' || t.status === 'ongoing')
+      .filter((t) => t.scheduled_at) // Must have a date
+      .sort((a, b) => new Date(a.scheduled_at!).getTime() - new Date(b.scheduled_at!).getTime());
+  }, [myUpcomingTrainings]);
+
+  // Map of team IDs to team names for display
+  const teamNameMap = useMemo(() => {
+    const map = new Map<string, string>();
+    teams.forEach((t) => map.set(t.id, t.name));
+    return map;
+  }, [teams]);
 
   const homeState = useHomeState({
     sessions: allSessions,
@@ -157,8 +241,8 @@ export function useUnifiedHomePage() {
   const recentSessions = useMemo(() => {
     return timelineSessions
       .filter((s) => s.state === 'completed' || s.state === 'unreviewed')
-      .slice(0, RECENT_SESSIONS_LIMIT);
-  }, [timelineSessions]);
+      .slice(0, fetchConfig.recentLimit);
+  }, [timelineSessions, fetchConfig.recentLimit]);
 
   // Weekly stats
   const weeklyStats: WeeklyStats = useMemo(() => {
@@ -198,10 +282,12 @@ export function useUnifiedHomePage() {
     return weaponStatsMap.get(defaultWeapon.id) || null;
   }, [defaultWeapon, weaponStatsMap]);
 
-  // Active team training (ongoing status)
+  // Active team training (ongoing status) - only from active team
   const activeTeamTraining = useMemo(() => {
-    return myUpcomingTrainings.find((t) => t.status === 'ongoing') ?? null;
-  }, [myUpcomingTrainings]);
+    // In personal mode, no active team training
+    if (activeTeamId === null) return null;
+    return myUpcomingTrainings.find((t) => t.status === 'ongoing' && t.team_id === activeTeamId) ?? null;
+  }, [myUpcomingTrainings, activeTeamId]);
 
   // Is the current user the commander of the active team training?
   const isTrainingCommander = !!(activeTeamTraining && user && activeTeamTraining.created_by === user.id);
@@ -216,16 +302,27 @@ export function useUnifiedHomePage() {
     return 'idle';
   }, [activeTeamTraining, activeSoloSession]);
 
-  // Next upcoming training (planned, not ongoing) for secondary row
+  // Next upcoming training (planned, not ongoing) for secondary row - only from active team
   const nextUpcomingTraining = useMemo(() => {
-    return myUpcomingTrainings.find((t) => t.status === 'planned' && t.scheduled_at) ?? null;
-  }, [myUpcomingTrainings]);
+    // In personal mode, no upcoming trainings
+    if (activeTeamId === null) return null;
+    return myUpcomingTrainings.find((t) => t.status === 'planned' && t.scheduled_at && t.team_id === activeTeamId) ?? null;
+  }, [myUpcomingTrainings, activeTeamId]);
+
+  // All upcoming trainings filtered by account context (for timeline strip in HeroActions)
+  const filteredUpcomingTrainings = useMemo(() => {
+    // In personal mode, no trainings
+    if (activeTeamId === null) return [];
+    return myUpcomingTrainings.filter((t) => t.team_id === activeTeamId);
+  }, [myUpcomingTrainings, activeTeamId]);
 
   // UI state
   const hasActiveSession = !!homeState.activeSession;
   const hasTeamContent = upcomingTrainings.length > 0 || hasTeams;
   const shouldShowLoading =
-    (loadingAllSessions && allSessions.length === 0) || (!initialized && sessionsLoading);
+    isContextSwitching || // Show loading during team/account switch
+    (loadingAllSessions && allSessions.length === 0) ||
+    (!initialized && sessionsLoading);
 
   // ═══════════════════════════════════════════════════════════════════════════
   // HANDLERS
@@ -288,10 +385,16 @@ export function useUnifiedHomePage() {
     }
   }, []);
 
+  const setActiveTeam = useTeamStore((s) => s.setActiveTeam);
+
   const handleTrainingPress = useCallback((training: any) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    // Set team context before navigating to training from personal mode
+    if (training.team_id) {
+      setActiveTeam(training.team_id);
+    }
     router.push(`/(protected)/trainingDetail?id=${training.id}`);
-  }, []);
+  }, [setActiveTeam]);
 
   // ═══════════════════════════════════════════════════════════════════════════
   // RETURN
@@ -317,15 +420,18 @@ export function useUnifiedHomePage() {
     coachMessage,
     recentSessions,
     upcomingTrainings,
-    myUpcomingTrainings, // Full list for timeline strip
+    myUpcomingTrainings: filteredUpcomingTrainings, // Filtered by account context for timeline strip
     hasActiveSession,
     hasTeamContent,
     hasTeams,
     heroMode,
+    activeTeam, // Current active team (for team colors)
     activeTeamTraining,
     isTrainingCommander,
     nextUpcomingTraining,
     allSessions, // Raw session data for charts
+    allTeamsUpcoming, // All upcoming trainings from all teams (for personal mode)
+    teamNameMap, // Map of team IDs to names
     defaultWeapon, // Default weapon info
     defaultWeaponStats, // Stats for default weapon
 

@@ -545,6 +545,44 @@ function sendSessionAck(
 }
 
 // ============================================================================
+// SHOT_RECORDED HANDLER
+// ============================================================================
+
+/**
+ * Handle SHOT_RECORDED messages from the watch.
+ * Watch payload format:
+ * {
+ *   "type": "SHOT_RECORDED",
+ *   "payload": {
+ *     "sid": "session-id",
+ *     "shot": 1,
+ *     "ts": 1738627200000
+ *   }
+ * }
+ *
+ * The timestamp captured here is the phone's Date.now() when the message arrived,
+ * which is on the same clock as audio detections - no offset calculation needed!
+ */
+export function handleShotRecordedMessage(
+    parsedPayload: Record<string, unknown>,
+    ctx: MessageHandlerContext
+): void {
+    // Capture phone timestamp immediately (same clock as audio detections)
+    const phoneTimestamp = Date.now();
+
+    // Extract fields from watch payload
+    const sessionId = parsedPayload?.sid as string | undefined;
+    const shotNumber = (parsedPayload?.shot as number) ?? 0;
+    const watchTimestamp = parsedPayload?.ts as number | undefined;
+
+    console.log(`[GarminHandlers] 🎯 SHOT_RECORDED #${shotNumber} for session ${sessionId?.slice(0, 8)}...`);
+    console.log(`[GarminHandlers] 🎯 Phone time: ${phoneTimestamp}, Watch time: ${watchTimestamp}`);
+
+    // Emit event for the store to accumulate (using phone timestamp for correlation)
+    ctx.emit({ event: 'shot_recorded', sessionId, timestamp: phoneTimestamp, shotNumber });
+}
+
+// ============================================================================
 // WATCH ERROR HANDLER
 // ============================================================================
 
@@ -674,6 +712,12 @@ export function routeMessage(
     // Timeline chunks (Phase 3)
     if (isTimelineMessage(type)) {
         handleTimelineChunkMessage(parsedPayload as Record<string, unknown>, ctx);
+        return true;
+    }
+
+    // Real-time shot detection from watch
+    if (type === 'SHOT_RECORDED') {
+        handleShotRecordedMessage(parsedPayload as Record<string, unknown>, ctx);
         return true;
     }
 

@@ -1054,6 +1054,12 @@
     "removeFromSquadTitle": "הסר מחוליה",
     "removeFromSquadConfirm": "הסר את החייל הזה מהחוליה?"
   },
+  "account": {
+    "personal": "אישי",
+    "switchAccount": "החלף חשבון",
+    "mySessions": "האימונים שלי",
+    "teams": "קבוצות"
+  },
   "weapons": {
     "title": "נשקים",
     "weapon": "נשק",

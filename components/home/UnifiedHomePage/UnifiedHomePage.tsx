@@ -1,105 +1,39 @@
 /**
  * UnifiedHomePage
  *
- * Elegant, flowing layout with personal overview first,
- * team content below, and coach-like guidance throughout.
+ * Personal mode home page. Clean, professional, compact.
+ * Mirrors TeamHomePage design language.
  *
- * This component is the main orchestrator - it uses the hook for state
- * and delegates rendering to sub-components.
+ * Layout:
+ * - Header (compact)
+ * - Active Session Banner (if active)
+ * - Personal Hero Section (stats summary)
+ * - Quick Actions toolbar
+ * - Weekly Stats card
+ * - Recent Activity list
+ * - View All Sessions link
  */
 
+import { useUnifiedHomePage } from '@/hooks/home/useUnifiedHomePage';
 import { useColors } from '@/hooks/ui/useColors';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
-import { Clock, HelpCircle, History } from 'lucide-react-native';
-import { useCallback, useState } from 'react';
+import { History } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import Animated, {
-    FadeIn,
-    FadeInDown,
-    FadeOut,
-    useAnimatedStyle,
-    useSharedValue,
-    withSpring,
-} from 'react-native-reanimated';
-import { styles } from './UnifiedHomePage.styles';
-import { CoachMessage } from './components/CoachMessage';
-import { DailyTip } from './components/DailyTip';
-import { HeroActions } from './components/HeroActions';
+import Animated, { FadeIn } from 'react-native-reanimated';
+import { ActiveSessionBanner } from './components/ActiveSessionBanner';
+import { AllTeamsUpcomingCard } from './components/AllTeamsUpcomingCard';
 import { HomeHeader } from './components/HomeHeader';
+import { PersonalHeroSection } from './components/PersonalHeroSection';
+import { PersonalQuickActions } from './components/PersonalQuickActions';
 import { RecentActivitySection } from './components/RecentActivitySection';
 import { WeeklyStatsCard } from './components/WeeklyStatsCard';
-import { useUnifiedHomePage } from '@/hooks/home/useUnifiedHomePage';
-
-const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
-
-// ════════════════════════════════════════════════════════════════════════════
-// SECTION HEADER WITH TOOLTIP
-// ════════════════════════════════════════════════════════════════════════════
-
-interface SectionHeaderProps {
-  title: string;
-  tooltip: string;
-  colors: ReturnType<typeof useColors>;
-}
-
-function SectionHeader({ title, tooltip, colors }: SectionHeaderProps) {
-  const [showTooltip, setShowTooltip] = useState(false);
-
-  const handlePress = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setShowTooltip(!showTooltip);
-  }, [showTooltip]);
-
-  return (
-    <View style={localStyles.sectionBlock}>
-      <View style={[localStyles.sectionDivider, { backgroundColor: colors.border }]} />
-      <View style={localStyles.sectionHeader}>
-        <Text style={[localStyles.sectionTitle, { color: colors.textMuted }]}>{title}</Text>
-        <TouchableOpacity
-          onPress={handlePress}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          style={[localStyles.helpButton, { backgroundColor: showTooltip ? `${colors.primary}15` : colors.secondary }]}
-        >
-          <HelpCircle size={12} color={showTooltip ? colors.primary : colors.textMuted} />
-        </TouchableOpacity>
-      </View>
-      {showTooltip && (
-        <Animated.View
-          entering={FadeInDown.duration(200)}
-          exiting={FadeOut.duration(150)}
-          style={[localStyles.tooltipBubble, { backgroundColor: colors.text, borderColor: colors.text }]}
-        >
-          <Text style={[localStyles.tooltipText, { color: colors.background }]}>{tooltip}</Text>
-        </Animated.View>
-      )}
-    </View>
-  );
-}
 
 export function UnifiedHomePage() {
   const colors = useColors();
   const router = useRouter();
   const { t } = useTranslation();
-  const viewAllScale = useSharedValue(1);
-
-  const viewAllAnimStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: viewAllScale.value }],
-  }));
-
-  const handleViewAllPressIn = () => {
-    viewAllScale.value = withSpring(0.98);
-  };
-
-  const handleViewAllPressOut = () => {
-    viewAllScale.value = withSpring(1);
-  };
-
-  const handleViewAllPress = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    router.push('/sessionHistory');
-  };
 
   const {
     // User info
@@ -118,19 +52,13 @@ export function UnifiedHomePage() {
     homeState,
     weeklyStats,
     streak,
-    lastSessionDaysAgo,
-    coachMessage,
     recentSessions,
-    myUpcomingTrainings,
     hasActiveSession,
-    hasTeams,
-    heroMode,
-    activeTeamTraining,
-    isTrainingCommander,
-    nextUpcomingTraining,
     allSessions,
-    defaultWeapon,
-    defaultWeaponStats,
+
+    // All-teams upcoming (personal mode)
+    allTeamsUpcoming,
+    teamNameMap,
 
     // Handlers
     onRefresh,
@@ -140,39 +68,42 @@ export function UnifiedHomePage() {
     handleTrainingPress,
   } = useUnifiedHomePage();
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // LOADING STATE
-  // ═══════════════════════════════════════════════════════════════════════════
+  const handleViewHistory = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    router.push('/sessionHistory');
+  };
+
+  const handleViewInsights = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    router.push('/(protected)/(tabs)/insights');
+  };
+
+  // Loading state - matches TeamHomePage
   if (shouldShowLoading) {
     return (
-      <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
-        <ActivityIndicator size="large" color={colors.primary} />
+      <View style={[s.loadingContainer, { backgroundColor: colors.background }]}>
+        <ActivityIndicator size="small" color={colors.textMuted} />
       </View>
     );
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // MAIN RENDER
-  // ═══════════════════════════════════════════════════════════════════════════
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={[s.container, { backgroundColor: colors.background }]}>
       <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
+        style={s.scrollView}
+        contentContainerStyle={s.scrollContent}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor={colors.text}
-            colors={[colors.primary]}
+            tintColor={colors.textMuted}
+            colors={[colors.textMuted]}
             progressBackgroundColor={colors.card}
           />
         }
       >
-        {/* ─────────────────────────────────────────────────────────────────── */}
-        {/* HEADER */}
-        {/* ─────────────────────────────────────────────────────────────────── */}
+        {/* Header */}
         <HomeHeader
           greeting={greeting}
           firstName={firstName}
@@ -182,166 +113,154 @@ export function UnifiedHomePage() {
           colors={colors}
         />
 
-        {/* ─────────────────────────────────────────────────────────────────── */}
-        {/* COACH MESSAGE */}
-        {/* ─────────────────────────────────────────────────────────────────── */}
-        <CoachMessage message={coachMessage} colors={colors} />
+        {/* Active Session Banner */}
+        {hasActiveSession && homeState.activeSession && (
+          <ActiveSessionBanner
+            session={homeState.activeSession}
+            onPress={handleActiveSessionPress}
+            colors={colors}
+          />
+        )}
 
-        {/* ─────────────────────────────────────────────────────────────────── */}
-        {/* SECTION: QUICK ACTIONS */}
-        {/* ─────────────────────────────────────────────────────────────────── */}
-        <SectionHeader title={t('home.quickActions')} tooltip={t('home.quickActionsTooltip')} colors={colors} />
-        <HeroActions
-          colors={colors}
-          heroMode={heroMode}
-          activeSession={homeState.activeSession}
-          hasActiveSession={!!hasActiveSession}
-          starting={starting}
-          onStartSession={handleStartSession}
-          onActiveSessionPress={handleActiveSessionPress}
-          activeTeamTraining={activeTeamTraining}
-          isTrainingCommander={isTrainingCommander}
-          hasTeams={hasTeams}
-          onTrainingPress={handleTrainingPress}
-          nextUpcomingTraining={nextUpcomingTraining}
-          defaultWeapon={defaultWeapon}
-          defaultWeaponStats={defaultWeaponStats}
-          upcomingTrainings={myUpcomingTrainings}
-        />
-
-        {/* ─────────────────────────────────────────────────────────────────── */}
-        {/* SECTION: THIS WEEK */}
-        {/* ─────────────────────────────────────────────────────────────────── */}
-        <SectionHeader title={t('home.thisWeek')} tooltip={t('home.thisWeekTooltip')} colors={colors} />
-        <DailyTip
-          colors={colors}
-          streak={streak}
+        {/* Personal Stats Summary */}
+        <PersonalHeroSection
+          sessions={weeklyStats.sessions}
           accuracy={weeklyStats.accuracy}
-          sessionsThisWeek={weeklyStats.sessions}
-          totalSessions={allSessions.length}
+          streak={streak}
+          totalShots={weeklyStats.shots}
+          onViewInsights={handleViewInsights}
+          colors={colors}
         />
+
+        {/* Quick Actions */}
+        <PersonalQuickActions
+          onStartSession={handleStartSession}
+          onViewHistory={handleViewHistory}
+          onViewInsights={handleViewInsights}
+          hasActiveSession={hasActiveSession}
+          starting={starting}
+          colors={colors}
+        />
+
+        {/* Upcoming Trainings from all teams */}
+        {allTeamsUpcoming.length > 0 && (
+          <AllTeamsUpcomingCard
+            trainings={allTeamsUpcoming}
+            teamNameMap={teamNameMap}
+            onTrainingPress={handleTrainingPress}
+            colors={colors}
+          />
+        )}
+
+        {/* Section: This Week */}
+        <Text style={[s.sectionLabel, { color: colors.textMuted }]}>
+          {t('home.thisWeek').toUpperCase()}
+        </Text>
         <WeeklyStatsCard stats={weeklyStats} streak={streak} colors={colors} sessionsData={allSessions} />
 
-        {/* ─────────────────────────────────────────────────────────────────── */}
-        {/* SECTION: RECENT ACTIVITY */}
-        {/* ─────────────────────────────────────────────────────────────────── */}
-        <SectionHeader title={t('home.recentActivity')} tooltip={t('home.recentActivityTooltip')} colors={colors} />
+        {/* Section: Recent Activity */}
+        <Text style={[s.sectionLabel, { color: colors.textMuted }]}>
+          {t('home.recentActivity').toUpperCase()}
+        </Text>
         <RecentActivitySection sessions={recentSessions} colors={colors} onSessionPress={handleSessionPress} />
 
-        {/* ─────────────────────────────────────────────────────────────────── */}
-        {/* VIEW ALL SESSIONS LINK */}
-        {/* ─────────────────────────────────────────────────────────────────── */}
-        <Animated.View entering={FadeIn.delay(200)}>
-          <AnimatedTouchable
-            style={[
-              localStyles.viewAllLink,
-              { backgroundColor: colors.card, borderColor: colors.border },
-              viewAllAnimStyle,
-            ]}
-            onPress={handleViewAllPress}
-            onPressIn={handleViewAllPressIn}
-            onPressOut={handleViewAllPressOut}
-            activeOpacity={1}
+        {/* View All Sessions */}
+        <Animated.View entering={FadeIn.delay(100)}>
+          <TouchableOpacity
+            style={[s.viewAllLink, { backgroundColor: colors.card, borderColor: colors.border }]}
+            onPress={handleViewHistory}
+            activeOpacity={0.7}
           >
-            <View style={localStyles.viewAllContent}>
-              <View style={[localStyles.viewAllIcon, { backgroundColor: `${colors.primary}12` }]}>
-                <History size={16} color={colors.primary} />
+            <View style={s.viewAllContent}>
+              <View style={[s.viewAllIcon, { backgroundColor: colors.border }]}>
+                <History size={14} color={colors.textMuted} />
               </View>
-              <View>
-                <Text style={[localStyles.viewAllTitle, { color: colors.text }]}>
-                  {recentSessions.length > 0 ? t('home.viewAllSessions') : t('home.sessionHistory')}
-                </Text>
-                <Text style={[localStyles.viewAllSubtitle, { color: colors.textMuted }]}>
-                  {recentSessions.length > 0 ? t('home.browseFullHistory') : t('home.yourTrainingLog')}
-                </Text>
-              </View>
+              <Text style={[s.viewAllText, { color: colors.text }]}>
+                {recentSessions.length > 0 ? t('home.viewAllSessions') : t('home.sessionHistory')}
+              </Text>
             </View>
-            <View style={[localStyles.viewAllArrow, { backgroundColor: colors.secondary }]}>
-              <Clock size={13} color={colors.textMuted} />
-            </View>
-          </AnimatedTouchable>
+          </TouchableOpacity>
         </Animated.View>
 
-        {/* Bottom spacing */}
+        {/* Empty State */}
+        {allSessions.length === 0 && !shouldShowLoading && (
+          <Animated.View entering={FadeIn} style={[s.emptyState, { borderColor: colors.border }]}>
+            <Text style={[s.emptyTitle, { color: colors.text }]}>Ready to train</Text>
+            <Text style={[s.emptyText, { color: colors.textMuted }]}>
+              Complete a session to track your progress.
+            </Text>
+          </Animated.View>
+        )}
+
         <View style={{ height: 100 }} />
       </ScrollView>
     </View>
   );
 }
 
-const localStyles = StyleSheet.create({
-  sectionBlock: {
-    marginTop: 16,
-    marginBottom: 8,
-    gap: 8,
+const s = StyleSheet.create({
+  container: {
+    flex: 1,
   },
-  sectionDivider: {
-    height: StyleSheet.hairlineWidth,
-    opacity: 0.4,
+  scrollView: {
+    flex: 1,
   },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+  scrollContent: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
   },
-  sectionTitle: {
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 0.8,
-  },
-  helpButton: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    alignItems: 'center',
+  loadingContainer: {
+    flex: 1,
     justifyContent: 'center',
+    alignItems: 'center',
   },
-  tooltipBubble: {
-    marginTop: 10,
-    padding: 12,
-    borderRadius: 10,
-  },
-  tooltipText: {
-    fontSize: 13,
-    lineHeight: 18,
-    fontWeight: '500',
+  sectionLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    letterSpacing: 0.8,
+    marginBottom: 6,
+    marginTop: 4,
   },
   viewAllLink: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 12,
-    borderRadius: 12,
+    padding: 10,
+    borderRadius: 8,
     borderWidth: 1,
-    marginTop: 16,
+    marginTop: 12,
   },
   viewAllContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 8,
   },
   viewAllIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
+    width: 28,
+    height: 28,
+    borderRadius: 7,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  viewAllTitle: {
+  viewAllText: {
     fontSize: 13,
-    fontWeight: '600',
-    letterSpacing: -0.2,
+    fontWeight: '500',
   },
-  viewAllSubtitle: {
-    fontSize: 11,
-    marginTop: 1,
-  },
-  viewAllArrow: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+  emptyState: {
+    borderRadius: 8,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    padding: 20,
     alignItems: 'center',
-    justifyContent: 'center',
+    marginTop: 12,
+  },
+  emptyTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  emptyText: {
+    fontSize: 12,
+    textAlign: 'center',
   },
 });
 

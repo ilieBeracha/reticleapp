@@ -210,6 +210,19 @@ export default function SessionDetailScreen() {
       slowestSplitMs: data.slowest_split_ms as number | undefined,
       shotTimestamps: data.shot_timestamps as number[] | undefined,
       durationMs: data.duration_ms as number | undefined,
+      // Audio-watch correlation data
+      correlation: data.correlation as
+        | {
+            user_shots?: number;
+            distant_shots?: number;
+            correlation_rate?: number;
+            matched_shots?: number;
+            watch_only_shots?: number;
+            audio_only_shots?: number;
+          }
+        | undefined,
+      // Raw counts for display
+      shotsRecorded: data.shots_recorded as number | undefined,
     };
   }, [targets]);
 
@@ -953,6 +966,94 @@ export default function SessionDetailScreen() {
           )}
         </Animated.View>
       )}
+
+      {/* ═══════════════════════════════════════════════════════════════════ */}
+      {/* DETECTION VERIFICATION - Dual-sensor shot confirmation */}
+      {/* ═══════════════════════════════════════════════════════════════════ */}
+      {watchData?.correlation ? (
+        <Animated.View entering={FadeInDown.delay(175).duration(300)} style={styles.correlationSection}>
+          <View style={styles.correlationHeader}>
+            <Scan size={14} color={colors.primary} />
+            <Text style={[styles.sectionTitle, { color: colors.text, marginBottom: 0 }]}>Detection Verification</Text>
+          </View>
+
+          <View style={[styles.correlationCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            {/* Verification Rate Badge */}
+            {watchData.correlation.correlation_rate !== undefined && (
+              <View style={[styles.verificationBadge, { backgroundColor: `${watchData.correlation.correlation_rate >= 0.8 ? colors.green : watchData.correlation.correlation_rate >= 0.5 ? colors.orange : colors.red}15` }]}>
+                <Text style={[styles.verificationRate, { color: watchData.correlation.correlation_rate >= 0.8 ? colors.green : watchData.correlation.correlation_rate >= 0.5 ? colors.orange : colors.red }]}>
+                  {Math.round(watchData.correlation.correlation_rate * 100)}% Verified
+                </Text>
+              </View>
+            )}
+
+            {/* Comparison Row */}
+            <View style={styles.correlationComparison}>
+              {/* Confirmed - Both sensors matched */}
+              <View style={styles.correlationMetric}>
+                <View style={[styles.correlationIconBg, { backgroundColor: `${colors.green}22` }]}>
+                  <CheckCircle size={20} color={colors.green} />
+                </View>
+                <Text style={[styles.correlationValue, { color: colors.green }]}>
+                  {watchData.correlation.user_shots ?? 0}
+                </Text>
+                <Text style={[styles.correlationLabel, { color: colors.textMuted }]}>Confirmed</Text>
+              </View>
+
+              {/* + divider */}
+              <View style={styles.correlationDivider}>
+                <Text style={[styles.correlationVs, { color: colors.textMuted }]}>+</Text>
+              </View>
+
+              {/* Watch Only - Watch detected but audio missed */}
+              <View style={styles.correlationMetric}>
+                <View style={[styles.correlationIconBg, { backgroundColor: `${colors.orange}22` }]}>
+                  <Watch size={20} color={colors.orange} />
+                </View>
+                <Text style={[styles.correlationValue, { color: colors.orange }]}>
+                  {watchData.correlation.watch_only_shots ?? 0}
+                </Text>
+                <Text style={[styles.correlationLabel, { color: colors.textMuted }]}>Watch Only</Text>
+              </View>
+            </View>
+
+            {/* Breakdown */}
+            <View style={[styles.correlationBreakdown, { borderTopColor: colors.border }]}>
+              <View style={styles.correlationBreakdownRow}>
+                <Text style={[styles.correlationBreakdownLabel, { color: colors.textMuted }]}>Watch (recoil):</Text>
+                <Text style={[styles.correlationBreakdownValue, { color: colors.text }]}>
+                  {watchData.shotsRecorded ?? 0} shots
+                </Text>
+              </View>
+              <View style={styles.correlationBreakdownRow}>
+                <Text style={[styles.correlationBreakdownLabel, { color: colors.textMuted }]}>Audio (sound):</Text>
+                <Text style={[styles.correlationBreakdownValue, { color: colors.text }]}>
+                  {(watchData.correlation.user_shots ?? 0) + (watchData.correlation.distant_shots ?? 0)} shots
+                </Text>
+              </View>
+            </View>
+
+            {/* Info note */}
+            <Text style={[styles.correlationNote, { color: colors.textMuted }]}>
+              Dual-sensor verification: shots confirmed by both watch accelerometer and phone microphone.
+            </Text>
+          </View>
+        </Animated.View>
+      ) : watchData && session?.watch_controlled ? (
+        // Show placeholder for watch sessions without correlation (older sessions)
+        <Animated.View entering={FadeInDown.delay(175).duration(300)} style={styles.correlationSection}>
+          <View style={styles.correlationHeader}>
+            <Scan size={14} color={colors.textMuted} />
+            <Text style={[styles.sectionTitle, { color: colors.text, marginBottom: 0 }]}>Detection Verification</Text>
+          </View>
+          <View style={[styles.correlationCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Text style={[styles.correlationNote, { color: colors.textMuted, textAlign: 'center', marginTop: 0 }]}>
+              Audio detection was not enabled for this session.{'\n'}
+              Start a new session with audio enabled for dual-sensor verification.
+            </Text>
+          </View>
+        </Animated.View>
+      ) : null}
 
       {/* ═══════════════════════════════════════════════════════════════════ */}
       {/* SESSION INSIGHTS (only show notable insights - anomalies & high-score) */}
@@ -2371,5 +2472,93 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700',
     color: '#fff',
+  },
+
+  // Correlation Section (Range Activity)
+  correlationSection: {
+    marginBottom: 24,
+    gap: 12,
+  },
+  correlationHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 4,
+  },
+  correlationCard: {
+    padding: 16,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  correlationComparison: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-around',
+    paddingBottom: 16,
+  },
+  correlationMetric: {
+    alignItems: 'center',
+    gap: 8,
+  },
+  correlationIconBg: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  correlationValue: {
+    fontSize: 28,
+    fontWeight: '800',
+  },
+  correlationLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  correlationDivider: {
+    paddingHorizontal: 12,
+  },
+  correlationVs: {
+    fontSize: 14,
+    fontWeight: '600',
+    fontStyle: 'italic',
+  },
+  correlationBreakdown: {
+    borderTopWidth: 1,
+    paddingTop: 12,
+    gap: 6,
+  },
+  correlationBreakdownRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  correlationBreakdownLabel: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  correlationBreakdownValue: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  correlationNote: {
+    fontSize: 10,
+    fontStyle: 'italic',
+    marginTop: 12,
+    textAlign: 'center',
+    lineHeight: 14,
+  },
+  verificationBadge: {
+    alignSelf: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    marginBottom: 12,
+  },
+  verificationRate: {
+    fontSize: 14,
+    fontWeight: '700',
   },
 });

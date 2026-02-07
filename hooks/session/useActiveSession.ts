@@ -21,6 +21,7 @@ import { getSessionTargetsWithResults } from '@/services/session/targets';
 import type { SessionStats, SessionTargetWithResults, SessionWithDetails } from '@/types/session';
 import { useGarminStore, useIsGarminConnected, useSessionStartStatus } from '@/stores/garminStore';
 import { useSessionStore } from '@/stores/sessionStore';
+import { useAudioStore } from '@/stores/audioStore';
 import { isGroupingDrill } from '@/utils/drillGoal';
 import { isInfiniteShots } from '@/utils/drillShots';
 
@@ -352,6 +353,7 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
 
     console.log('[Garmin] Sending SESSION_START...');
     const success = await startSessionWithRetry(payload);
+    console.log('[Garmin] startSessionWithRetry returned:', success, 'type:', typeof success);
     setWatchStarting(false);
 
     if (!success) {
@@ -362,6 +364,22 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
       console.log('[Garmin] Watch acknowledged SESSION_START');
       setWatchStartFailed(false);
       setWatchPreviewQueued(true);
+
+      // Start audio session for shot correlation
+      // Audio will capture all shots while watch session is active
+      try {
+        const audioStore = useAudioStore.getState();
+        console.log('[Garmin] Starting audio session for shot correlation');
+        console.log('[Garmin] Audio store state before start:', {
+          isListening: audioStore.isListening,
+          isModuleLoaded: audioStore.isModuleLoaded,
+          sessionStartTime: audioStore.sessionStartTime,
+        });
+        audioStore.startSession();
+        console.log('[Garmin] Audio session started successfully');
+      } catch (error) {
+        console.error('[Garmin] Failed to start audio session:', error);
+      }
     }
   }, [session, garminStatus, startSessionWithRetry]);
 
@@ -439,6 +457,7 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
             performance: data.performance,
             biometrics: data.biometrics,
             steadiness: data.steadiness,
+            correlation: data.correlation, // Audio-watch shot correlation
           },
           false
         ); // false = don't end session

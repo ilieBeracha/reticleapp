@@ -6,6 +6,7 @@
  */
 
 import { DirectionalChevron } from '@/components/shared/DirectionalChevron';
+import { useTeamStore } from '@/stores/teamStore';
 import type { Colors } from '@/types/home';
 import type { TrainingWithDetails } from '@/types/workspace';
 import * as Haptics from 'expo-haptics';
@@ -244,11 +245,16 @@ function DayColumn({
 
 function ExpandedTrainingItem({ training, colors }: { training: TrainingWithDetails; colors: Colors }) {
   const { t } = useTranslation();
+  const setActiveTeam = useTeamStore((s) => s.setActiveTeam);
   const isLive = training.status === 'ongoing';
   const timeStr = formatTrainingTime(training, t);
 
   const handlePress = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    // Set team context before navigating to training
+    if (training.team_id) {
+      setActiveTeam(training.team_id);
+    }
     router.push(`/(protected)/trainingDetail?id=${training.id}` as any);
   };
 
