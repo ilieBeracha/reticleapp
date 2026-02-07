@@ -421,8 +421,8 @@ export async function updateSession(
     soldier_bullets?: number | null;
     /** Soldier's chosen position (when commander allows flexibility) */
     soldier_position?: string | null;
-    /** Change weapon for session (always allowed) */
-    weapon_id?: string;
+    /** Change weapon for session (always allowed, null to clear) */
+    weapon_id?: string | null;
   }
 ) {
   const updatePayload: Record<string, any> = {

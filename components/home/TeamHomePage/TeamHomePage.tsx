@@ -26,7 +26,7 @@ import { useMemo, useState } from 'react';
 import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { ActiveTrainingBanner } from './components/ActiveTrainingBanner';
-import { MyProgressCard } from './components/MyProgressCard';
+import { TeamWeeklyCalendar } from './components/TeamWeeklyCalendar';
 import { TeamActivityCard } from './components/TeamActivityCard';
 import { TeamDashboardHeader } from './components/TeamDashboardHeader';
 import { TeamHeroSection } from './components/TeamHeroSection';
@@ -61,6 +61,7 @@ export function TeamHomePage() {
     // Data
     liveTrainings,
     upcomingTrainings,
+    teamTrainings,
     weeklyStats,
     streak,
     recentActivity,
@@ -97,6 +98,7 @@ export function TeamHomePage() {
       detail: a.action || `${a.shotCount || 0} shots`,
       timestamp: a.timeAgo || '',
       accuracy: a.accuracy,
+      groupingCm: a.groupingCm,
     }));
   }, [recentActivity]);
 
@@ -145,6 +147,9 @@ export function TeamHomePage() {
           onTeamSettings={handleTeamSettings}
           colors={colors}
         />
+
+        {/* Weekly Calendar */}
+        <TeamWeeklyCalendar colors={colors} trainings={teamTrainings} teamColor={teamColor} />
 
         {/* Live Training Banner(s) */}
         {liveTrainings.length === 1 ? (
@@ -195,6 +200,8 @@ export function TeamHomePage() {
           leaderboard={leaderboard}
           totalShots={teamTotals.shots}
           onViewDetails={handleViewTeamInsights}
+          userId={userId}
+          myStats={myStats}
           colors={colors}
         />
 
@@ -257,7 +264,7 @@ export function TeamHomePage() {
             )}
           </>
         ) : (
-          /* ─── MEMBER: upcoming trainings + progress ─── */
+          /* ─── MEMBER: upcoming trainings + team context ─── */
           <>
             {/* Upcoming Trainings - shown directly, no tabs */}
             {upcomingTrainings.length > 0 && (
@@ -269,14 +276,33 @@ export function TeamHomePage() {
               />
             )}
 
-            {/* My Progress */}
-            <MyProgressCard
-              sessions={myStats.sessions}
-              shots={myStats.shots}
-              accuracy={myStats.accuracy}
-              teamTotalSessions={teamTotals.sessions}
-              colors={colors}
-            />
+            {/* Team Context - compact summary of team activity */}
+            <Animated.View entering={FadeIn.delay(100)} style={s.teamContext}>
+              <View style={[s.teamContextCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <View style={s.teamContextRow}>
+                  <View style={s.teamContextStat}>
+                    <Text style={[s.teamContextValue, { color: colors.text }]}>{teamTotals.activeMembers}</Text>
+                    <Text style={[s.teamContextLabel, { color: colors.textMuted }]}>active this week</Text>
+                  </View>
+                  <View style={[s.teamContextDivider, { backgroundColor: colors.border }]} />
+                  <View style={s.teamContextStat}>
+                    <Text style={[s.teamContextValue, { color: colors.text }]}>{teamTotals.sessions}</Text>
+                    <Text style={[s.teamContextLabel, { color: colors.textMuted }]}>team sessions</Text>
+                  </View>
+                  {myStats.sessions > 0 && teamTotals.sessions > 0 && (
+                    <>
+                      <View style={[s.teamContextDivider, { backgroundColor: colors.border }]} />
+                      <View style={s.teamContextStat}>
+                        <Text style={[s.teamContextValue, { color: colors.text }]}>
+                          {Math.round((myStats.sessions / teamTotals.sessions) * 100)}%
+                        </Text>
+                        <Text style={[s.teamContextLabel, { color: colors.textMuted }]}>your share</Text>
+                      </View>
+                    </>
+                  )}
+                </View>
+              </View>
+            </Animated.View>
 
             {/* Teammate Activity */}
             <TeammateFeed
@@ -428,6 +454,38 @@ const s = StyleSheet.create({
   emptyTabText: {
     fontSize: 11,
     textAlign: 'center',
+  },
+  // ─── Team Context (soldier view) ───
+  teamContext: {
+    marginBottom: 12,
+  },
+  teamContextCard: {
+    borderRadius: 8,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  teamContextRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+  },
+  teamContextStat: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  teamContextValue: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  teamContextLabel: {
+    fontSize: 10,
+    fontWeight: '500',
+    marginTop: 1,
+  },
+  teamContextDivider: {
+    width: 1,
+    height: 20,
   },
 });
 

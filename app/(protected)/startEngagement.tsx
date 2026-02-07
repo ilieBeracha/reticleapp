@@ -38,7 +38,7 @@ import {
   type TrainingDrillData,
 } from '@/services/session/queries';
 import { supabase } from '@/services/supabase';
-import { getUserWeapon, type UserWeapon } from '@/services/weaponService';
+import { getOrCreatePersonalProfile, getTeamWeaponForUser, getUserWeapon, type UserWeapon } from '@/services/weaponService';
 import { toSessionWeatherData } from '@/services/weather/openWeatherDecoder';
 import { useGarminDevice, useIsGarminConnected } from '@/stores/garminStore';
 import { useSessionStore } from '@/stores/sessionStore';
@@ -75,6 +75,27 @@ const POSITIONS: { value: Position; label: string }[] = [
 ];
 
 const COMMON_DISTANCES = [10, 15, 25, 50, 100, 200, 300];
+
+const DISTANCE_CATEGORY_CONFIG: Record<string, { label: string; hint: string; quickDistances: number[] }> = {
+  short: { label: 'Short (0–300m)', hint: 'Short range: 0–300m', quickDistances: [25, 50, 100, 150, 200, 300] },
+  medium: { label: 'Medium (300–600m)', hint: 'Medium range: 300–600m', quickDistances: [300, 350, 400, 450, 500, 600] },
+  long: { label: 'Long (600m+)', hint: 'Long range: 600m+', quickDistances: [600, 700, 800, 900, 1000] },
+};
+
+function getDistanceCategoryLabel(category: string | null): string | null {
+  if (!category) return null;
+  return DISTANCE_CATEGORY_CONFIG[category]?.label ?? null;
+}
+
+function getDistanceCategoryHint(category: string | null): string | null {
+  if (!category) return null;
+  return DISTANCE_CATEGORY_CONFIG[category]?.hint ?? null;
+}
+
+function getQuickDistances(category: string | null): number[] {
+  if (!category) return COMMON_DISTANCES;
+  return DISTANCE_CATEGORY_CONFIG[category]?.quickDistances ?? COMMON_DISTANCES;
+}
 
 export default function StartEngagementScreen() {
   const colors = useColors();
@@ -142,8 +163,6 @@ export default function StartEngagementScreen() {
   // DERIVED VALUES (prefer drillData from DB, fall back to legacy params)
   // ═══════════════════════════════════════════════════════════════════════════
 
-  // Execution Policy - always locked (soldiers can only change weapon)
-  const executionPolicy: 'locked' = 'locked';
   const drillName = drillData?.name || params.drillName || null;
 
   // Range category (soldier picks exact distance within this range)
@@ -170,9 +189,8 @@ export default function StartEngagementScreen() {
   const hasExplicitDistance = commanderDistance !== null;
   const hasExplicitPosition = commanderPosition !== null;
 
-  // Derived flags from policy - always locked
+  // Config is always locked for training drills
   const isConfigLocked = true;
-  const hasPrefilledConfig = true;
 
   // Goal is ALWAYS locked when coming from a training drill (regardless of policy)
   const isFromTrainingDrill = !!trainingId && (!!drillData || !!params.drillId);
@@ -256,13 +274,28 @@ export default function StartEngagementScreen() {
   useEffect(() => {
     async function loadDefaultWeapon() {
       try {
-        const weaponId = await getUserDefaultWeaponId();
-        if (!weaponId) {
-          setLoadingWeapon(false);
-          return;
+        let w: UserWeapon | null = null;
+
+        // In team context, load assigned team weapon
+        if (teamId) {
+          const assignedTeamWeapon = await getTeamWeaponForUser(teamId);
+          if (assignedTeamWeapon) {
+            // Get/create personal profile for the team weapon
+            w = await getOrCreatePersonalProfile(assignedTeamWeapon.id);
+          }
+          // If no assigned weapon in team context, don't fall back to personal default
+        } else {
+          // Solo mode: load personal default weapon
+          const weaponId = await getUserDefaultWeaponId();
+          if (weaponId) {
+            const userWeapon = await getUserWeapon(weaponId);
+            // Only use if it's a pure personal weapon (not linked to a team)
+            if (userWeapon && !userWeapon.team_weapon_id) {
+              w = userWeapon;
+            }
+          }
         }
 
-        const w = await getUserWeapon(weaponId);
         if (w) {
           setWeapon(w);
           // Apply weapon defaults (don't override drill-specified distance)
@@ -281,7 +314,7 @@ export default function StartEngagementScreen() {
       }
     }
     loadDefaultWeapon();
-  }, [distanceCategory, hasExplicitDistance, hasExplicitPosition]);
+  }, [teamId, distanceCategory, hasExplicitDistance, hasExplicitPosition]);
 
   // ═══════════════════════════════════════════════════════════════════════════
   // CHECK FOR ACTIVE SESSION OR EXISTING SQUAD ENGAGEMENT
@@ -481,7 +514,7 @@ export default function StartEngagementScreen() {
               distance_m: distance,
               rounds_per_shooter: rounds,
               position,
-              execution_policy: executionPolicy,
+              execution_policy: 'locked',
               ...(timeLimit && { time_limit_seconds: timeLimit }),
               ...(isWatchMode && { detection_sensitivity: sensitivity }),
               ...(distanceCategory && { distance_category: distanceCategory }),
@@ -569,7 +602,6 @@ export default function StartEngagementScreen() {
     loadSessions,
     params,
     isSubmitting,
-    executionPolicy,
   ]);
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -742,13 +774,7 @@ export default function StartEngagementScreen() {
                   <View style={styles.overviewItem}>
                     <Text style={[styles.overviewLabel, { color: colors.textMuted }]}>Distance</Text>
                     <Text style={[styles.overviewValue, { color: colors.text }]}>
-                      {distanceCategory
-                        ? distanceCategory === 'short'
-                          ? 'Short (0–300m)'
-                          : distanceCategory === 'medium'
-                            ? 'Medium (300–600m)'
-                            : 'Long (600m+)'
-                        : `${distance}m`}
+                      {getDistanceCategoryLabel(distanceCategory) ?? `${distance}m`}
                     </Text>
                   </View>
 
@@ -805,12 +831,7 @@ export default function StartEngagementScreen() {
                     </TouchableOpacity>
                   </View>
                   <View style={styles.quickDistances}>
-                    {(distanceCategory === 'short'
-                      ? [25, 50, 100, 150, 200, 300]
-                      : distanceCategory === 'medium'
-                        ? [300, 350, 400, 450, 500, 600]
-                        : [600, 700, 800, 900, 1000]
-                    ).map((d) => (
+                    {getQuickDistances(distanceCategory).map((d) => (
                       <TouchableOpacity
                         key={d}
                         style={[
@@ -879,20 +900,6 @@ export default function StartEngagementScreen() {
                   EDITABLE CONFIG: Normal configuration form
                   ═══════════════════════════════════════════════════════════════════════════ */}
 
-              {/* Banner removed - always locked */}
-              {false && (
-                <View
-                  style={[styles.lockedBanner, { backgroundColor: colors.green + '15', borderColor: colors.green }]}
-                >
-                  <Target size={16} color={colors.green} />
-                  <View style={styles.lockedBannerText}>
-                    <Text style={[styles.lockedTitle, { color: colors.text }]}>{drillName}</Text>
-                    <Text style={[styles.lockedHint, { color: colors.textMuted }]}>
-                      Guided drill — you may adjust settings
-                    </Text>
-                  </View>
-                </View>
-              )}
 
               {/* Goal Toggle - locked when from training drill (any policy) */}
               <View style={[styles.section, isGoalLocked && styles.lockedSection]}>
@@ -986,11 +993,7 @@ export default function StartEngagementScreen() {
                 </Text>
                 {distanceCategory && (
                   <Text style={[styles.rangeHint, { color: colors.blue }]}>
-                    {distanceCategory === 'short'
-                      ? 'Short range: 0–300m'
-                      : distanceCategory === 'medium'
-                        ? 'Medium range: 300–600m'
-                        : 'Long range: 600m+'}
+                    {getDistanceCategoryHint(distanceCategory)}
                   </Text>
                 )}
                 <View style={[styles.counterRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -1016,14 +1019,7 @@ export default function StartEngagementScreen() {
                   </TouchableOpacity>
                 </View>
                 <View style={styles.quickDistances}>
-                  {(distanceCategory === 'short'
-                    ? [25, 50, 100, 150, 200, 300]
-                    : distanceCategory === 'medium'
-                      ? [300, 350, 400, 450, 500, 600]
-                      : distanceCategory === 'long'
-                        ? [600, 700, 800, 900, 1000]
-                        : COMMON_DISTANCES
-                  ).map((d) => (
+                  {getQuickDistances(distanceCategory).map((d) => (
                     <TouchableOpacity
                       key={d}
                       style={[
@@ -1232,19 +1228,6 @@ const styles = StyleSheet.create({
   sectionLabel: { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 10 },
   rangeHint: { fontSize: 12, fontWeight: '600', marginBottom: 8 },
   lockedSection: { opacity: 0.8 },
-
-  // Locked drill banner
-  lockedBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 14,
-    borderRadius: 12,
-    borderWidth: 1,
-    marginBottom: 20,
-    gap: 12,
-  },
-  lockedBannerText: { flex: 1, gap: 2 },
-  lockedTitle: { fontSize: 15, fontWeight: '600', letterSpacing: -0.3 },
   lockedHint: { fontSize: 12, fontWeight: '500' },
 
   // Overview card (for locked drills)

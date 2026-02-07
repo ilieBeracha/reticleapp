@@ -19,7 +19,14 @@ import { useColors } from '@/hooks/ui/useColors';
 import { useOpenWeather } from '@/hooks/useOpenWeather';
 import { updateSession } from '@/services/session/mutations';
 import { supabase } from '@/services/supabase';
-import { getUserWeapons, markWeaponUsed, type UserWeapon } from '@/services/weaponService';
+import {
+  getOrCreatePersonalProfile,
+  getWeaponPickerData,
+  getUserWeapons,
+  markWeaponUsed,
+  type TeamWeapon,
+  type UserWeapon,
+} from '@/services/weaponService';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -112,29 +119,113 @@ export default function ActiveSessionScreen() {
   // WEAPON SELECTION
   // ═══════════════════════════════════════════════════════════════════════════
 
+  // For team training: show team weapons (assigned + pool)
+  // For solo: show personal weapons
   const [weapons, setWeapons] = useState<UserWeapon[]>([]);
+  const [teamWeaponsAssigned, setTeamWeaponsAssigned] = useState<TeamWeapon[]>([]);
+  const [teamWeaponsPool, setTeamWeaponsPool] = useState<TeamWeapon[]>([]);
   const [showWeaponPicker, setShowWeaponPicker] = useState(false);
   const [changingWeapon, setChangingWeapon] = useState(false);
+  const [teamWeaponsLoaded, setTeamWeaponsLoaded] = useState(false);
+  // Track the current team_weapon_id for proper selection comparison
+  const [currentTeamWeaponId, setCurrentTeamWeaponId] = useState<string | null>(null);
 
   // Load weapons when session is available
+  // For team training: auto-select assigned weapon if no weapon is set
   useEffect(() => {
     if (!session?.id) return;
 
     const loadWeapons = async () => {
       try {
-        const userWeapons = await getUserWeapons();
-        setWeapons(userWeapons);
+        if (isTeamTraining && session.team_id) {
+          // Team training: load team weapons (assigned first, then pool)
+          console.log('[ActiveSession] Loading team weapons for team:', session.team_id);
+          const pickerData = await getWeaponPickerData({ teamId: session.team_id });
+          console.log('[ActiveSession] Team weapons loaded:', {
+            assignedToMe: pickerData.assignedToMe.length,
+            poolWeapons: pickerData.poolWeapons.length,
+            currentWeaponId: session.weapon_id,
+          });
+          setTeamWeaponsAssigned(pickerData.assignedToMe);
+          setTeamWeaponsPool(pickerData.poolWeapons);
+          setWeapons([]); // Clear personal weapons
+          setTeamWeaponsLoaded(true);
+
+          // Fetch current weapon's team_weapon_id for selection comparison
+          let needsAutoSelect = !session.weapon_id;
+          if (session.weapon_id) {
+            const { data: currentWeapon } = await supabase
+              .from('user_weapons')
+              .select('team_weapon_id')
+              .eq('id', session.weapon_id)
+              .single();
+
+            if (currentWeapon?.team_weapon_id) {
+              // Current weapon is linked to a team weapon - valid
+              setCurrentTeamWeaponId(currentWeapon.team_weapon_id);
+            } else {
+              // Current weapon is NOT a team weapon - need to clear and auto-select
+              console.log('[ActiveSession] Current weapon is not a team weapon, will auto-select');
+              setCurrentTeamWeaponId(null);
+              needsAutoSelect = true;
+            }
+          } else {
+            setCurrentTeamWeaponId(null);
+          }
+
+          // Auto-select assigned weapon if session has no weapon or wrong weapon type
+          if (needsAutoSelect) {
+            if (pickerData.assignedToMe.length > 0) {
+              const assignedWeapon = pickerData.assignedToMe[0];
+              try {
+                // Create personal profile for the team weapon
+                const personalProfile = await getOrCreatePersonalProfile(assignedWeapon.id);
+                await updateSession(session.id, { weapon_id: personalProfile.id });
+                setCurrentTeamWeaponId(assignedWeapon.id); // Track the team weapon id
+                markWeaponUsed(personalProfile.id).catch(console.warn);
+                await handleRefresh();
+              } catch (err) {
+                console.error('[ActiveSession] Failed to auto-select assigned weapon:', err);
+              }
+            } else if (session.weapon_id) {
+              // No assigned weapons but session has wrong (personal) weapon - clear it
+              console.log('[ActiveSession] Clearing invalid personal weapon from team session');
+              try {
+                await updateSession(session.id, { weapon_id: null });
+                handleRefresh();
+              } catch (err) {
+                console.error('[ActiveSession] Failed to clear weapon:', err);
+              }
+            }
+          }
+        } else {
+          // Solo: load personal weapons
+          const userWeapons = await getUserWeapons();
+          setWeapons(userWeapons);
+          setTeamWeaponsAssigned([]);
+          setTeamWeaponsPool([]);
+          setTeamWeaponsLoaded(false);
+          setCurrentTeamWeaponId(null);
+        }
       } catch (err) {
         console.error('[ActiveSession] Failed to load weapons:', err);
       }
     };
 
     loadWeapons();
-  }, [session?.id]);
+  }, [session?.id, session?.team_id, session?.weapon_id, isTeamTraining]);
+
+  // For team training: no assigned weapon = cannot start session
+  const hasNoAssignedWeapon = isTeamTraining && teamWeaponsLoaded && teamWeaponsAssigned.length === 0;
 
   const handleWeaponChange = useCallback(
     async (weaponId: string) => {
-      if (!session?.id || weaponId === session.weapon_id) {
+      // For team weapons, compare against currentTeamWeaponId
+      const isAlreadySelected = isTeamTraining
+        ? weaponId === currentTeamWeaponId
+        : weaponId === session?.weapon_id;
+
+      if (!session?.id || isAlreadySelected) {
         setShowWeaponPicker(false);
         return;
       }
@@ -143,9 +234,26 @@ export default function ActiveSessionScreen() {
       setChangingWeapon(true);
 
       try {
-        await updateSession(session.id, { weapon_id: weaponId });
+        let userWeaponId = weaponId;
+
+        // Check if this is a team weapon (needs personal profile for sessions.weapon_id FK)
+        const isTeamWeaponSelected =
+          teamWeaponsAssigned.some((tw) => tw.id === weaponId) ||
+          teamWeaponsPool.some((tw) => tw.id === weaponId);
+
+        if (isTeamWeaponSelected) {
+          // Get or create a user_weapon linked to this team_weapon
+          const personalProfile = await getOrCreatePersonalProfile(weaponId);
+          userWeaponId = personalProfile.id;
+          // Track the team weapon id for selection comparison
+          setCurrentTeamWeaponId(weaponId);
+        } else {
+          setCurrentTeamWeaponId(null);
+        }
+
+        await updateSession(session.id, { weapon_id: userWeaponId });
         // Mark weapon as used (non-blocking)
-        markWeaponUsed(weaponId).catch(console.warn);
+        markWeaponUsed(userWeaponId).catch(console.warn);
         await handleRefresh();
       } catch (err) {
         console.error('[ActiveSession] Failed to change weapon:', err);
@@ -154,7 +262,7 @@ export default function ActiveSessionScreen() {
         setShowWeaponPicker(false);
       }
     },
-    [session?.id, session?.weapon_id, handleRefresh]
+    [session?.id, session?.weapon_id, currentTeamWeaponId, isTeamTraining, handleRefresh, teamWeaponsAssigned, teamWeaponsPool]
   );
 
   const handleOpenWeaponPicker = useCallback(() => {
@@ -214,54 +322,177 @@ export default function ActiveSessionScreen() {
             contentContainerStyle={[localStyles.pickerContent, { paddingBottom: insets.bottom + 20 }]}
             showsVerticalScrollIndicator={false}
           >
-            {weapons.length === 0 ? (
-              <View style={localStyles.emptyWeapons}>
-                <Text style={[localStyles.emptyWeaponsText, { color: colors.textMuted }]}>
-                  {t('session.noWeapons', 'No weapons found')}
-                </Text>
-              </View>
-            ) : (
-              weapons.map((weapon) => {
-                const isSelected = weapon.id === session?.weapon_id;
-                return (
-                  <TouchableOpacity
-                    key={weapon.id}
-                    style={[
-                      localStyles.weaponItem,
-                      {
-                        backgroundColor: isSelected ? `${colors.primary}15` : colors.card,
-                        borderColor: isSelected ? colors.primary : colors.border,
-                      },
-                    ]}
-                    onPress={() => handleWeaponChange(weapon.id)}
-                    disabled={changingWeapon}
-                  >
-                    <View style={[localStyles.weaponIcon, { backgroundColor: `${colors.primary}12` }]}>
-                      <Crosshair size={18} color={colors.primary} />
-                    </View>
-                    <View style={localStyles.weaponInfo}>
-                      <Text
-                        style={[
-                          localStyles.weaponName,
-                          { color: isSelected ? colors.primary : colors.text },
-                        ]}
-                        numberOfLines={1}
-                      >
-                        {weapon.name}
-                      </Text>
-                      {weapon.caliber && (
-                        <Text style={[localStyles.weaponCaliber, { color: colors.textMuted }]}>
-                          {weapon.caliber}
+            {isTeamTraining ? (
+              // Team training: show assigned weapons first, then pool
+              <>
+                {teamWeaponsAssigned.length === 0 && teamWeaponsPool.length === 0 ? (
+                  <View style={localStyles.emptyWeapons}>
+                    <Text style={[localStyles.emptyWeaponsText, { color: colors.textMuted }]}>
+                      {t('session.noTeamWeapons', 'No team weapons available')}
+                    </Text>
+                  </View>
+                ) : (
+                  <>
+                    {/* Assigned weapons section */}
+                    {teamWeaponsAssigned.length > 0 && (
+                      <>
+                        <Text style={[localStyles.sectionLabel, { color: colors.textMuted }]}>
+                          {t('session.assignedToYou', 'Assigned to you')}
                         </Text>
-                      )}
-                    </View>
-                    {isSelected && <Check size={20} color={colors.primary} />}
-                    {changingWeapon && weapon.id === session?.weapon_id && (
-                      <ActivityIndicator size="small" color={colors.primary} />
+                        {teamWeaponsAssigned.map((weapon) => {
+                          const isSelected = weapon.id === currentTeamWeaponId;
+                          return (
+                            <TouchableOpacity
+                              key={weapon.id}
+                              style={[
+                                localStyles.weaponItem,
+                                {
+                                  backgroundColor: isSelected ? `${colors.primary}15` : colors.card,
+                                  borderColor: isSelected ? colors.primary : colors.border,
+                                },
+                              ]}
+                              onPress={() => handleWeaponChange(weapon.id)}
+                              disabled={changingWeapon}
+                            >
+                              <View style={[localStyles.weaponIcon, { backgroundColor: `${colors.primary}12` }]}>
+                                <Crosshair size={18} color={colors.primary} />
+                              </View>
+                              <View style={localStyles.weaponInfo}>
+                                <Text
+                                  style={[
+                                    localStyles.weaponName,
+                                    { color: isSelected ? colors.primary : colors.text },
+                                  ]}
+                                  numberOfLines={1}
+                                >
+                                  {weapon.name}
+                                </Text>
+                                {weapon.caliber && (
+                                  <Text style={[localStyles.weaponCaliber, { color: colors.textMuted }]}>
+                                    {weapon.caliber}
+                                  </Text>
+                                )}
+                              </View>
+                              <View style={[localStyles.assignedBadge, { backgroundColor: `${colors.primary}15` }]}>
+                                <Text style={[localStyles.assignedBadgeText, { color: colors.primary }]}>
+                                  {t('session.assigned', 'Assigned')}
+                                </Text>
+                              </View>
+                              {isSelected && <Check size={20} color={colors.primary} />}
+                              {changingWeapon && weapon.id === currentTeamWeaponId && (
+                                <ActivityIndicator size="small" color={colors.primary} />
+                              )}
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </>
                     )}
-                  </TouchableOpacity>
-                );
-              })
+
+                    {/* Pool weapons section */}
+                    {teamWeaponsPool.length > 0 && (
+                      <>
+                        <Text style={[localStyles.sectionLabel, { color: colors.textMuted, marginTop: teamWeaponsAssigned.length > 0 ? 16 : 0 }]}>
+                          {t('session.teamPool', 'Team Pool')}
+                        </Text>
+                        {teamWeaponsPool.map((weapon) => {
+                          const isSelected = weapon.id === currentTeamWeaponId;
+                          return (
+                            <TouchableOpacity
+                              key={weapon.id}
+                              style={[
+                                localStyles.weaponItem,
+                                {
+                                  backgroundColor: isSelected ? `${colors.primary}15` : colors.card,
+                                  borderColor: isSelected ? colors.primary : colors.border,
+                                },
+                              ]}
+                              onPress={() => handleWeaponChange(weapon.id)}
+                              disabled={changingWeapon}
+                            >
+                              <View style={[localStyles.weaponIcon, { backgroundColor: colors.secondary }]}>
+                                <Crosshair size={18} color={colors.textMuted} />
+                              </View>
+                              <View style={localStyles.weaponInfo}>
+                                <Text
+                                  style={[
+                                    localStyles.weaponName,
+                                    { color: isSelected ? colors.primary : colors.text },
+                                  ]}
+                                  numberOfLines={1}
+                                >
+                                  {weapon.name}
+                                </Text>
+                                {weapon.caliber && (
+                                  <Text style={[localStyles.weaponCaliber, { color: colors.textMuted }]}>
+                                    {weapon.caliber}
+                                  </Text>
+                                )}
+                              </View>
+                              {isSelected && <Check size={20} color={colors.primary} />}
+                              {changingWeapon && weapon.id === currentTeamWeaponId && (
+                                <ActivityIndicator size="small" color={colors.primary} />
+                              )}
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </>
+                    )}
+                  </>
+                )}
+              </>
+            ) : (
+              // Solo: show personal weapons
+              <>
+                {weapons.length === 0 ? (
+                  <View style={localStyles.emptyWeapons}>
+                    <Text style={[localStyles.emptyWeaponsText, { color: colors.textMuted }]}>
+                      {t('session.noWeapons', 'No weapons found')}
+                    </Text>
+                  </View>
+                ) : (
+                  weapons.map((weapon) => {
+                    const isSelected = weapon.id === session?.weapon_id;
+                    return (
+                      <TouchableOpacity
+                        key={weapon.id}
+                        style={[
+                          localStyles.weaponItem,
+                          {
+                            backgroundColor: isSelected ? `${colors.primary}15` : colors.card,
+                            borderColor: isSelected ? colors.primary : colors.border,
+                          },
+                        ]}
+                        onPress={() => handleWeaponChange(weapon.id)}
+                        disabled={changingWeapon}
+                      >
+                        <View style={[localStyles.weaponIcon, { backgroundColor: `${colors.primary}12` }]}>
+                          <Crosshair size={18} color={colors.primary} />
+                        </View>
+                        <View style={localStyles.weaponInfo}>
+                          <Text
+                            style={[
+                              localStyles.weaponName,
+                              { color: isSelected ? colors.primary : colors.text },
+                            ]}
+                            numberOfLines={1}
+                          >
+                            {weapon.name}
+                          </Text>
+                          {weapon.caliber && (
+                            <Text style={[localStyles.weaponCaliber, { color: colors.textMuted }]}>
+                              {weapon.caliber}
+                            </Text>
+                          )}
+                        </View>
+                        {isSelected && <Check size={20} color={colors.primary} />}
+                        {changingWeapon && weapon.id === session?.weapon_id && (
+                          <ActivityIndicator size="small" color={colors.primary} />
+                        )}
+                      </TouchableOpacity>
+                    );
+                  })
+                )}
+              </>
             )}
           </ScrollView>
         </Pressable>
@@ -494,6 +725,33 @@ export default function ActiveSessionScreen() {
   // ═══════════════════════════════════════════════════════════════════════════
 
   if (isTeamTraining) {
+    // Block session if no assigned weapon
+    if (hasNoAssignedWeapon) {
+      return (
+        <View style={[styles.centerContainer, { backgroundColor: colors.background }]}>
+          <View style={[localStyles.noWeaponCard, { backgroundColor: colors.card }]}>
+            <View style={[localStyles.noWeaponIcon, { backgroundColor: `${colors.orange}15` }]}>
+              <Ionicons name="alert-circle" size={32} color={colors.orange} />
+            </View>
+            <Text style={[localStyles.noWeaponTitle, { color: colors.text }]}>
+              {t('session.noAssignedWeapon', 'No Weapon Assigned')}
+            </Text>
+            <Text style={[localStyles.noWeaponText, { color: colors.textMuted }]}>
+              {t('session.noAssignedWeaponDesc', 'You need an assigned weapon to participate in team training. Contact your commander to get a weapon assigned.')}
+            </Text>
+            <TouchableOpacity
+              style={[localStyles.noWeaponBtn, { backgroundColor: colors.secondary }]}
+              onPress={handleClose}
+            >
+              <Text style={[localStyles.noWeaponBtnText, { color: colors.text }]}>
+                {t('common.goBack', 'Go Back')}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      );
+    }
+
     return (
       <>
         <TeamTrainingView
@@ -510,7 +768,7 @@ export default function ActiveSessionScreen() {
           onEndSession={handleEndSession}
           onRefresh={handleRefresh}
           ending={ending}
-          onWeaponPress={handleOpenWeaponPicker}
+          onWeaponPress={teamWeaponsAssigned.length > 0 ? handleOpenWeaponPicker : undefined}
           onDistanceSet={handleDistanceSet}
           weather={weather}
           weatherLoading={weatherLoading}
@@ -679,5 +937,59 @@ const localStyles = StyleSheet.create({
   weaponCaliber: {
     fontSize: 12,
     fontWeight: '500',
+  },
+  sectionLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 8,
+    marginTop: 4,
+  },
+  assignedBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    marginRight: 4,
+  },
+  assignedBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  // No assigned weapon blocking view
+  noWeaponCard: {
+    marginHorizontal: 24,
+    padding: 24,
+    borderRadius: 16,
+    alignItems: 'center',
+    gap: 12,
+  },
+  noWeaponIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  noWeaponTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  noWeaponText: {
+    fontSize: 14,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  noWeaponBtn: {
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 10,
+    marginTop: 8,
+  },
+  noWeaponBtnText: {
+    fontSize: 15,
+    fontWeight: '600',
   },
 });

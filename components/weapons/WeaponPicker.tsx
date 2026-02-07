@@ -16,6 +16,7 @@ import { useColors } from '@/hooks/ui/useColors';
 import type { WeaponCategory } from '@/services/weaponService';
 import {
   getCategoryLabel,
+  getOrCreatePersonalProfile,
   getWeaponPickerData,
   type GlobalWeapon,
   type TeamWeapon,
@@ -187,7 +188,7 @@ export function WeaponPicker({
   }, [sections, searchQuery]);
 
   const handleSelectWeapon = useCallback(
-    (weapon: AnyWeapon, type: WeaponSection['type']) => {
+    async (weapon: AnyWeapon, type: WeaponSection['type']) => {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
       if (type === 'global') {
@@ -199,9 +200,16 @@ export function WeaponPicker({
           onAddNew();
         }
       } else if (type === 'assigned' || type === 'pool' || type === 'team') {
-        // Team weapons (assigned, pool) - cast to UserWeapon for callback
-        // The parent component handles team weapon IDs appropriately
-        onSelect(weapon as UserWeapon);
+        // Team weapons - create/get personal profile so sessions are linked to user_weapons
+        // This ensures stats are tracked correctly per user
+        try {
+          const userWeapon = await getOrCreatePersonalProfile(weapon.id);
+          onSelect(userWeapon);
+        } catch (error) {
+          console.error('[WeaponPicker] Failed to get personal profile:', error);
+          // Fallback: pass team weapon directly (stats won't work but session can start)
+          onSelect(weapon as UserWeapon);
+        }
       } else {
         // Personal, recent - these are actual user weapons
         onSelect(weapon as UserWeapon);

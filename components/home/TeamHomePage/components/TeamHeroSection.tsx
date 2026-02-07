@@ -32,6 +32,13 @@ interface TeamHeroSectionProps {
   leaderboard: LeaderboardEntry[];
   totalShots: number;
   onViewDetails: () => void;
+  // Personal stats for soldiers
+  userId?: string;
+  myStats?: {
+    sessions: number;
+    shots: number;
+    accuracy: number;
+  };
   colors: {
     text: string;
     textMuted: string;
@@ -59,6 +66,8 @@ export function TeamHeroSection({
   leaderboard,
   totalShots,
   onViewDetails,
+  userId,
+  myStats,
   colors,
 }: TeamHeroSectionProps) {
 
@@ -66,6 +75,67 @@ export function TeamHeroSection({
   const topPerformer = leaderboard[0];
   const needsAttention = leaderboard.filter((e) => e.accuracy < 50 || e.sessions < 2);
 
+  // Soldier: find my rank
+  const myRank = userId ? leaderboard.find((e) => e.userId === userId)?.rank : null;
+  const totalRanked = leaderboard.length;
+
+  // Different layout for soldiers (personal-focused)
+  if (!isCommander && myStats) {
+    return (
+      <Animated.View entering={FadeIn.duration(300)} style={s.container}>
+        {/* Personal Stats Card - prominent focus on user */}
+        <View style={[s.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          {/* Personal header with rank badge */}
+          <View style={s.personalHeader}>
+            <View style={s.personalHeaderLeft}>
+              <Text style={[s.personalTitle, { color: colors.text }]}>Your Progress</Text>
+              <View style={s.teamBadge}>
+                <Text style={[s.teamBadgeText, { color: colors.textMuted }]}>{teamName}</Text>
+              </View>
+            </View>
+            {myRank && totalRanked > 1 && (
+              <View style={[s.rankBadge, { backgroundColor: `${colors.green}15` }]}>
+                <TrendingUp size={10} color={colors.green} />
+                <Text style={[s.rankText, { color: colors.green }]}>
+                  #{myRank} of {totalRanked}
+                </Text>
+              </View>
+            )}
+          </View>
+
+          {/* Big personal stats */}
+          <View style={s.personalStatsRow}>
+            <View style={s.personalStat}>
+              <Text style={[s.personalStatValue, { color: colors.text }]}>{myStats.sessions}</Text>
+              <Text style={[s.personalStatLabel, { color: colors.textMuted }]}>sessions</Text>
+            </View>
+            <View style={s.personalStat}>
+              <Text style={[s.personalStatValue, { color: colors.text }]}>
+                {myStats.accuracy > 0 ? `${Math.round(myStats.accuracy)}%` : '—'}
+              </Text>
+              <Text style={[s.personalStatLabel, { color: colors.textMuted }]}>accuracy</Text>
+            </View>
+            <View style={s.personalStat}>
+              <Text style={[s.personalStatValue, { color: colors.text }]}>{formatShots(myStats.shots)}</Text>
+              <Text style={[s.personalStatLabel, { color: colors.textMuted }]}>shots</Text>
+            </View>
+          </View>
+
+          {/* View insights link */}
+          <TouchableOpacity
+            style={[s.insightsLink, { borderTopColor: colors.border }]}
+            onPress={onViewDetails}
+            activeOpacity={0.6}
+          >
+            <Text style={[s.insightsLinkText, { color: colors.textMuted }]}>View full insights</Text>
+            <ChevronRight size={12} color={colors.textMuted} />
+          </TouchableOpacity>
+        </View>
+      </Animated.View>
+    );
+  }
+
+  // Commander layout (unchanged)
   return (
     <Animated.View entering={FadeIn.duration(300)} style={s.container}>
       <View style={[s.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -160,6 +230,7 @@ const s = StyleSheet.create({
     borderWidth: 1,
     overflow: 'hidden',
   },
+  // ─── Commander layout ───
   identityRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -250,5 +321,76 @@ const s = StyleSheet.create({
     fontSize: 11,
     fontWeight: '400',
     lineHeight: 15,
+  },
+  // ─── Soldier (personal) layout ───
+  personalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 12,
+    paddingBottom: 8,
+  },
+  personalHeaderLeft: {
+    gap: 2,
+  },
+  personalTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    letterSpacing: -0.3,
+  },
+  teamBadge: {
+    marginTop: 2,
+  },
+  teamBadgeText: {
+    fontSize: 11,
+    fontWeight: '500',
+  },
+  rankBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  rankText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  personalStatsRow: {
+    flexDirection: 'row',
+    paddingHorizontal: 12,
+    paddingBottom: 12,
+    gap: 8,
+  },
+  personalStat: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  personalStatValue: {
+    fontSize: 22,
+    fontWeight: '700',
+    letterSpacing: -0.5,
+  },
+  personalStatLabel: {
+    fontSize: 10,
+    fontWeight: '500',
+    marginTop: 2,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  insightsLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    borderTopWidth: 1,
+    paddingVertical: 10,
+  },
+  insightsLinkText: {
+    fontSize: 12,
+    fontWeight: '500',
   },
 });

@@ -27,7 +27,7 @@ import { createEngagement } from '@/services/session/participants';
 import { getActiveSquadEngagement, getMyActiveSessionForTraining, getTrainingSessionsWithStats } from '@/services/session/queries';
 import { saveMissPoints } from '@/services/session/targets';
 import { finishTraining, startTraining } from '@/services/trainingService';
-import { getMyMostRecentWeaponId } from '@/services/weaponService';
+import { getMyMostRecentWeaponId, getOrCreatePersonalProfile, getTeamWeaponForUser } from '@/services/weaponService';
 import { useGarminStore } from '@/stores/garminStore';
 import { useTeamStore } from '@/stores/teamStore';
 import type { MissPoint, SessionWithDetails } from '@/types/session';
@@ -1554,9 +1554,12 @@ export default function TrainingDetailScreen() {
         // Run ALL independent queries in parallel for speed
         // Pass userId to queries that need it to avoid redundant auth calls
         const isSquad = drill.engagement_mode === 'squad';
-        const [existingEngagement, weaponId, existingTrainingSession] = await Promise.all([
+        const isTeamTraining = !!training.team_id;
+
+        const [existingEngagement, assignedTeamWeapon, recentWeaponId, existingTrainingSession] = await Promise.all([
           isSquad ? getActiveSquadEngagement(training.id) : Promise.resolve(null),
-          getMyMostRecentWeaponId(), // Uses RLS, no userId needed
+          isTeamTraining ? getTeamWeaponForUser(training.team_id!) : Promise.resolve(null),
+          !isTeamTraining ? getMyMostRecentWeaponId() : Promise.resolve(null), // Only for non-team
           getMyActiveSessionForTraining(training.id, userId),
         ]);
 
@@ -1593,9 +1596,29 @@ export default function TrainingDetailScreen() {
           return;
         }
 
+        // Get weapon ID - for team training, use assigned weapon; for personal, use recent
+        let weaponId: string | null = null;
+        if (isTeamTraining) {
+          if (assignedTeamWeapon) {
+            // Create/get personal profile for the team weapon
+            const personalProfile = await getOrCreatePersonalProfile(assignedTeamWeapon.id);
+            weaponId = personalProfile.id;
+          }
+          // If no assigned weapon in team training, weaponId stays null
+        } else {
+          weaponId = recentWeaponId;
+        }
+
         // Check weapon
         if (!weaponId) {
-          Alert.alert(t('training.noWeapon', 'No Weapon'), t('training.configureWeaponFirst', 'Please configure a weapon first.'));
+          if (isTeamTraining) {
+            Alert.alert(
+              t('training.noAssignedWeapon', 'No Assigned Weapon'),
+              t('training.contactCommanderForWeapon', 'You need an assigned weapon to participate in team training. Contact your commander.')
+            );
+          } else {
+            Alert.alert(t('training.noWeapon', 'No Weapon'), t('training.configureWeaponFirst', 'Please configure a weapon first.'));
+          }
           return;
         }
 

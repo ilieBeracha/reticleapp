@@ -21,6 +21,7 @@ import { useTrainingStore } from '@/stores/trainingStore';
 import type { WeeklyStats } from '@/types/home';
 import type { SessionWithDetails } from '@/types/session';
 import type { TeamMemberWithProfile, TrainingWithDetails } from '@/types/workspace';
+import { isGroupingSessionWithFallback } from '@/utils/drillGoal';
 import { calculateStreak, calculateWeeklyStats, getGreeting } from '@/utils/unifiedHomePage.helpers';
 
 export function useTeamHomePage() {
@@ -95,7 +96,7 @@ export function useTeamHomePage() {
       loadTeamSessions();
       loadMyUpcomingTrainings();
       loadMyStats();
-      if (activeTeamId) loadActiveTeam(activeTeamId);
+      if (activeTeamId) loadActiveTeam();
     }, [loadTeamSessions, loadMyUpcomingTrainings, loadMyStats, activeTeamId, loadActiveTeam])
   );
 
@@ -169,36 +170,44 @@ export function useTeamHomePage() {
     return teamSessions
       .filter((s) => s.status === 'completed')
       .slice(0, 5)
-      .map((s) => ({
-        id: s.id,
-        userName: s.user_full_name || 'Unknown',
-        action: 'completed session',
-        timeAgo: getTimeAgo(new Date(s.ended_at || s.created_at)),
-        shotCount: s.stats?.shots_fired || 0,
-        accuracy: s.stats?.accuracy_pct,
-      }));
+      .map((s) => {
+        const isGrouping = isGroupingSessionWithFallback(s);
+        return {
+          id: s.id,
+          userName: s.user_full_name || 'Unknown',
+          action: 'completed session',
+          timeAgo: getTimeAgo(new Date(s.ended_at || s.created_at)),
+          shotCount: s.stats?.shots_fired || 0,
+          // For grouping drills: show dispersion in cm; for engagement: show accuracy %
+          accuracy: isGrouping ? undefined : s.stats?.accuracy_pct,
+          groupingCm: isGrouping ? s.stats?.best_dispersion_cm : undefined,
+        };
+      });
   }, [teamSessions]);
 
   // Weekly goal (default to 10 sessions)
   const weeklyGoal = 10;
 
   // Leaderboard data - aggregate stats per user
+  // Only engagement sessions count for accuracy (not grouping drills)
   const leaderboard = useMemo(() => {
     const userStats = new Map<
       string,
-      { userName: string; sessions: number; shots: number; hits: number }
+      { userName: string; sessions: number; engagementShots: number; hits: number }
     >();
 
     completedSessions.forEach((s) => {
       const userId = s.user_id;
       const userName = s.user_full_name || 'Unknown';
-      const existing = userStats.get(userId) || { userName, sessions: 0, shots: 0, hits: 0 };
+      const existing = userStats.get(userId) || { userName, sessions: 0, engagementShots: 0, hits: 0 };
+      const isGrouping = isGroupingSessionWithFallback(s);
 
       userStats.set(userId, {
         userName,
         sessions: existing.sessions + 1,
-        shots: existing.shots + (s.stats?.shots_fired || 0),
-        hits: existing.hits + (s.stats?.hits_total || 0),
+        // Only count shots/hits from engagement sessions for accuracy
+        engagementShots: existing.engagementShots + (isGrouping ? 0 : (s.stats?.shots_fired || 0)),
+        hits: existing.hits + (isGrouping ? 0 : (s.stats?.hits_total || 0)),
       });
     });
 
@@ -208,8 +217,8 @@ export function useTeamHomePage() {
         userId,
         userName: data.userName,
         sessions: data.sessions,
-        shots: data.shots,
-        accuracy: data.shots > 0 ? (data.hits / data.shots) * 100 : 0,
+        shots: data.engagementShots,
+        accuracy: data.engagementShots > 0 ? (data.hits / data.engagementShots) * 100 : 0,
         rank: 0,
       }))
       .sort((a, b) => {
@@ -280,7 +289,7 @@ export function useTeamHomePage() {
       router.push(`/(protected)/createTraining?teamId=${activeTeamId}` as any);
     } else {
       // Member: start a solo session
-      router.push('/(protected)/sessionNew');
+      router.push('/(protected)/startEngagement');
     }
   }, [liveTrainings, isCommander, activeTeamId]);
 
@@ -350,6 +359,7 @@ export function useTeamHomePage() {
     // Data
     liveTrainings,
     upcomingTrainings,
+    teamTrainings, // All trainings for the current team (for calendar)
     weeklyStats,
     streak,
     recentActivity,

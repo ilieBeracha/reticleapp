@@ -16,19 +16,46 @@ interface ActivityItem {
   detail: string;
   timestamp: string;
   accuracy?: number;
+  groupingCm?: number | null;
+}
+
+interface ActivityColors {
+  text: string;
+  textMuted: string;
+  card: string;
+  border: string;
+  green: string;
+  blue: string;
+  secondary: string;
 }
 
 interface TeamActivityCardProps {
   activities: ActivityItem[];
-  colors: {
-    text: string;
-    textMuted: string;
-    card: string;
-    border: string;
-    green: string;
-    blue: string;
-    secondary: string;
-  };
+  colors: ActivityColors;
+}
+
+/** Renders grouping (cm) or accuracy (%) based on activity type */
+function ActivityMetric({ activity, colors }: { activity: ActivityItem; colors: ActivityColors }) {
+  const hasGrouping = activity.groupingCm != null && activity.groupingCm > 0;
+  const hasAccuracy = activity.accuracy != null && activity.accuracy > 0;
+
+  if (hasGrouping) {
+    return (
+      <Text style={[s.accuracy, { color: colors.blue }]}>
+        {activity.groupingCm!.toFixed(1)} cm
+      </Text>
+    );
+  }
+
+  if (hasAccuracy) {
+    return (
+      <Text style={[s.accuracy, { color: colors.green }]}>
+        {Math.round(activity.accuracy!)}%
+      </Text>
+    );
+  }
+
+  return null;
 }
 
 export function TeamActivityCard({ activities, colors }: TeamActivityCardProps) {
@@ -80,11 +107,7 @@ export function TeamActivityCard({ activities, colors }: TeamActivityCardProps) 
 
                 {/* Meta */}
                 <View style={s.meta}>
-                  {activity.accuracy !== undefined && activity.accuracy > 0 && (
-                    <Text style={[s.accuracy, { color: colors.green }]}>
-                      {Math.round(activity.accuracy)}%
-                    </Text>
-                  )}
+                  <ActivityMetric activity={activity} colors={colors} />
                   <Text style={[s.timeAgo, { color: colors.textMuted }]}>{timeAgo}</Text>
                 </View>
               </View>

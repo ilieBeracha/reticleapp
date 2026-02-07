@@ -287,7 +287,8 @@ export async function getTeamWeapon(id: string): Promise<TeamWeapon | null> {
     .select(
       `
       *,
-      base_weapon:weapons(*)
+      base_weapon:weapons(*),
+      assigned_user:profiles!team_weapons_assigned_to_fkey(id, full_name, avatar_url)
     `
     )
     .eq('id', id)

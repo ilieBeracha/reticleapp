@@ -4,5 +4,19 @@
     "expo-deployment@expo-plugins": true,
     "upgrading-expo@expo-plugins": true,
     "code-simplifier@claude-plugins-official": true
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/detect-commit.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
   }
 }

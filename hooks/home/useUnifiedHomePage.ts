@@ -385,10 +385,16 @@ export function useUnifiedHomePage() {
     }
   }, []);
 
+  const setActiveTeam = useTeamStore((s) => s.setActiveTeam);
+
   const handleTrainingPress = useCallback((training: any) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    // Set team context before navigating to training from personal mode
+    if (training.team_id) {
+      setActiveTeam(training.team_id);
+    }
     router.push(`/(protected)/trainingDetail?id=${training.id}`);
-  }, []);
+  }, [setActiveTeam]);
 
   // ═══════════════════════════════════════════════════════════════════════════
   // RETURN

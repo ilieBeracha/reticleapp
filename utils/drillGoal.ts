@@ -129,6 +129,53 @@ export function isEngagementDrill(drill: DrillLike | null | undefined): boolean 
 }
 
 // ============================================================================
+// SESSION ANALYSIS - Determine goal from session data (with legacy fallback)
+// ============================================================================
+
+/**
+ * Stats shape for session analysis.
+ */
+interface SessionStats {
+  best_dispersion_cm?: number | null;
+}
+
+/**
+ * Session shape for grouping analysis.
+ */
+interface SessionForGroupingCheck {
+  drill_config?: {
+    drill_goal?: DrillGoal | string | null;
+    target_type?: 'paper' | 'tactical' | string | null;
+  } | null;
+  stats?: SessionStats | null;
+}
+
+/**
+ * Determine if a session is a grouping session.
+ *
+ * This handles both:
+ * - Explicit drill_goal === 'grouping'
+ * - Legacy fallback: paper target with dispersion data
+ *
+ * Use this for analytics/calculations where grouping sessions should be
+ * excluded from accuracy calculations (they measure dispersion, not hits).
+ */
+export function isGroupingSessionWithFallback(session: SessionForGroupingCheck | null | undefined): boolean {
+  if (!session) return false;
+
+  // Explicit grouping goal
+  if (session.drill_config?.drill_goal === 'grouping') {
+    return true;
+  }
+
+  // Legacy fallback: paper target with dispersion data indicates grouping
+  const isPaperTarget = session.drill_config?.target_type === 'paper';
+  const hasDispersion = session.stats?.best_dispersion_cm != null;
+
+  return isPaperTarget && hasDispersion;
+}
+
+// ============================================================================
 // DISPLAY HELPERS
 // ============================================================================
 

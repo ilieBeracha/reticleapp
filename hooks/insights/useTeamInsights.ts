@@ -13,6 +13,7 @@ import { getDashboardFeatures } from '@/services/session/queries';
 import { useTeamStore } from '@/stores/teamStore';
 import type { ComputedInsights, EvidenceContext, InsightsFilters, OverviewStatus } from '@/types/insights';
 import type { SessionWithDetails } from '@/types/session';
+import { isGroupingSessionWithFallback } from '@/utils/drillGoal';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -206,14 +207,23 @@ export function useTeamInsights() {
   const teamTotals = useMemo(() => {
     const totalSessions = completedSessions.length;
     const totalShots = completedSessions.reduce((sum, s) => sum + (s.stats?.shots_fired || 0), 0);
-    const totalHits = completedSessions.reduce((sum, s) => sum + (s.stats?.hits_total || 0), 0);
-    const avgAccuracy = totalShots > 0 ? (totalHits / totalShots) * 100 : null;
     const uniqueMembers = new Set(completedSessions.map((s) => s.user_id)).size;
+
+    // Only count hits/shots from engagement sessions for accuracy (not grouping)
+    let engagementShots = 0;
+    let engagementHits = 0;
+    completedSessions.forEach((s) => {
+      if (!isGroupingSessionWithFallback(s)) {
+        engagementShots += s.stats?.shots_fired || 0;
+        engagementHits += s.stats?.hits_total || 0;
+      }
+    });
+    const avgAccuracy = engagementShots > 0 ? (engagementHits / engagementShots) * 100 : null;
 
     return {
       sessions: totalSessions,
       shots: totalShots,
-      hits: totalHits,
+      hits: engagementHits,
       avgAccuracy,
       activeMembers: uniqueMembers,
       totalMembers: members?.length || 0,
@@ -233,8 +243,17 @@ export function useTeamInsights() {
   const myStats = useMemo(() => {
     const mySessions = completedSessions.filter((s) => s.user_id === user?.id);
     const myShots = mySessions.reduce((sum, s) => sum + (s.stats?.shots_fired || 0), 0);
-    const myHits = mySessions.reduce((sum, s) => sum + (s.stats?.hits_total || 0), 0);
-    const myAccuracy = myShots > 0 ? (myHits / myShots) * 100 : null;
+
+    // Only count hits/shots from engagement sessions for accuracy (not grouping)
+    let myEngagementShots = 0;
+    let myEngagementHits = 0;
+    mySessions.forEach((s) => {
+      if (!isGroupingSessionWithFallback(s)) {
+        myEngagementShots += s.stats?.shots_fired || 0;
+        myEngagementHits += s.stats?.hits_total || 0;
+      }
+    });
+    const myAccuracy = myEngagementShots > 0 ? (myEngagementHits / myEngagementShots) * 100 : null;
 
     // Best dispersion
     const dispersions = mySessions
@@ -258,7 +277,7 @@ export function useTeamInsights() {
     return {
       sessions: mySessions.length,
       shots: myShots,
-      hits: myHits,
+      hits: myEngagementHits,
       accuracy: myAccuracy,
       bestGrouping: myBestGrouping,
       contribution,
@@ -332,14 +351,20 @@ export function useTeamInsights() {
   // ============================================================================
 
   const memberStats = useMemo((): TeamMemberStat[] => {
-    const statsMap = new Map<string, TeamMemberStat>();
+    // Track both total shots and engagement-only shots/hits for accuracy
+    const statsMap = new Map<string, TeamMemberStat & { engagementShots: number; engagementHits: number }>();
 
     completedSessions.forEach((s) => {
+      const isGrouping = isGroupingSessionWithFallback(s);
       const existing = statsMap.get(s.user_id);
+
       if (existing) {
         existing.sessions += 1;
         existing.shots += s.stats?.shots_fired || 0;
-        existing.hits += s.stats?.hits_total || 0;
+        if (!isGrouping) {
+          existing.engagementShots += s.stats?.shots_fired || 0;
+          existing.engagementHits += s.stats?.hits_total || 0;
+        }
         if (s.stats?.best_dispersion_cm && (!existing.bestDispersion || s.stats.best_dispersion_cm < existing.bestDispersion)) {
           existing.bestDispersion = s.stats.best_dispersion_cm;
         }
@@ -352,7 +377,9 @@ export function useTeamInsights() {
           userName: s.user_full_name || 'Unknown',
           sessions: 1,
           shots: s.stats?.shots_fired || 0,
-          hits: s.stats?.hits_total || 0,
+          hits: isGrouping ? 0 : (s.stats?.hits_total || 0),
+          engagementShots: isGrouping ? 0 : (s.stats?.shots_fired || 0),
+          engagementHits: isGrouping ? 0 : (s.stats?.hits_total || 0),
           accuracy: null,
           bestDispersion: s.stats?.best_dispersion_cm || null,
           lastActive: s.started_at,
@@ -360,10 +387,16 @@ export function useTeamInsights() {
       }
     });
 
-    // Calculate accuracy
+    // Calculate accuracy from engagement sessions only
     return Array.from(statsMap.values()).map((m) => ({
-      ...m,
-      accuracy: m.shots > 0 ? (m.hits / m.shots) * 100 : null,
+      userId: m.userId,
+      userName: m.userName,
+      sessions: m.sessions,
+      shots: m.shots,
+      hits: m.engagementHits,
+      accuracy: m.engagementShots > 0 ? (m.engagementHits / m.engagementShots) * 100 : null,
+      bestDispersion: m.bestDispersion,
+      lastActive: m.lastActive,
     }));
   }, [completedSessions]);
 
@@ -428,7 +461,6 @@ export function useTeamInsights() {
         (s) => s.drill_config?.position === pos
       );
       const totalShots = posSessions.reduce((sum, s) => sum + (s.stats?.shots_fired || 0), 0);
-      const totalHits = posSessions.reduce((sum, s) => sum + (s.stats?.hits_total || 0), 0);
       const uniqueMembers = new Set(posSessions.map((s) => s.user_id)).size;
       const groupings = posSessions
         .map((s) => s.stats?.best_dispersion_cm)
@@ -437,11 +469,21 @@ export function useTeamInsights() {
         ? groupings.reduce((a, b) => a + b, 0) / groupings.length
         : null;
 
+      // Only count hits/shots from engagement sessions for accuracy
+      let engagementShots = 0;
+      let engagementHits = 0;
+      posSessions.forEach((s) => {
+        if (!isGroupingSessionWithFallback(s)) {
+          engagementShots += s.stats?.shots_fired || 0;
+          engagementHits += s.stats?.hits_total || 0;
+        }
+      });
+
       return {
         position: pos,
         sessions: posSessions.length,
         totalShots,
-        avgAccuracy: totalShots > 0 ? (totalHits / totalShots) * 100 : null,
+        avgAccuracy: engagementShots > 0 ? (engagementHits / engagementShots) * 100 : null,
         avgGrouping,
         memberCount: uniqueMembers,
       };
@@ -463,7 +505,6 @@ export function useTeamInsights() {
         return dist != null && dist >= min && dist < max;
       });
       const totalShots = rangeSessions.reduce((sum, s) => sum + (s.stats?.shots_fired || 0), 0);
-      const totalHits = rangeSessions.reduce((sum, s) => sum + (s.stats?.hits_total || 0), 0);
       const uniqueMembers = new Set(rangeSessions.map((s) => s.user_id)).size;
       const groupings = rangeSessions
         .map((s) => s.stats?.best_dispersion_cm)
@@ -472,12 +513,22 @@ export function useTeamInsights() {
         ? groupings.reduce((a, b) => a + b, 0) / groupings.length
         : null;
 
+      // Only count hits/shots from engagement sessions for accuracy
+      let engagementShots = 0;
+      let engagementHits = 0;
+      rangeSessions.forEach((s) => {
+        if (!isGroupingSessionWithFallback(s)) {
+          engagementShots += s.stats?.shots_fired || 0;
+          engagementHits += s.stats?.hits_total || 0;
+        }
+      });
+
       return {
         range,
         label,
         sessions: rangeSessions.length,
         totalShots,
-        avgAccuracy: totalShots > 0 ? (totalHits / totalShots) * 100 : null,
+        avgAccuracy: engagementShots > 0 ? (engagementHits / engagementShots) * 100 : null,
         avgGrouping,
         memberCount: uniqueMembers,
       };
@@ -535,14 +586,19 @@ export function useTeamInsights() {
       dmr: 'DMR',
     };
 
-    const catMap = new Map<string, { shots: number; hits: number; sessions: number; users: Set<string>; groupings: number[] }>();
+    const catMap = new Map<string, { shots: number; engagementShots: number; engagementHits: number; sessions: number; users: Set<string>; groupings: number[] }>();
 
     completedSessions.forEach((s) => {
       const cat = s.weapon_category || 'unknown';
-      const existing = catMap.get(cat) || { shots: 0, hits: 0, sessions: 0, users: new Set<string>(), groupings: [] };
+      const existing = catMap.get(cat) || { shots: 0, engagementShots: 0, engagementHits: 0, sessions: 0, users: new Set<string>(), groupings: [] };
+      const isGrouping = isGroupingSessionWithFallback(s);
+
       existing.sessions += 1;
       existing.shots += s.stats?.shots_fired || 0;
-      existing.hits += s.stats?.hits_total || 0;
+      if (!isGrouping) {
+        existing.engagementShots += s.stats?.shots_fired || 0;
+        existing.engagementHits += s.stats?.hits_total || 0;
+      }
       existing.users.add(s.user_id);
       if (s.stats?.best_dispersion_cm && s.stats.best_dispersion_cm > 0) {
         existing.groupings.push(s.stats.best_dispersion_cm);
@@ -556,7 +612,7 @@ export function useTeamInsights() {
         label: categoryLabels[cat] || cat.charAt(0).toUpperCase() + cat.slice(1),
         sessions: data.sessions,
         totalShots: data.shots,
-        avgAccuracy: data.shots > 0 ? (data.hits / data.shots) * 100 : null,
+        avgAccuracy: data.engagementShots > 0 ? (data.engagementHits / data.engagementShots) * 100 : null,
         avgGrouping: data.groupings.length > 0
           ? data.groupings.reduce((a, b) => a + b, 0) / data.groupings.length
           : null,
@@ -672,16 +728,19 @@ export function useTeamInsights() {
 
   // Performance chart data (team accuracy over time)
   const performanceChartData = useMemo(() => {
-    // Group sessions by date and calculate daily team accuracy
-    const dailyMap = new Map<string, { shots: number; hits: number; dispersion: number[] }>();
+    // Group sessions by date and calculate daily team accuracy (engagement only)
+    const dailyMap = new Map<string, { engagementShots: number; engagementHits: number; dispersion: number[] }>();
 
     completedSessions
       .sort((a, b) => new Date(a.started_at).getTime() - new Date(b.started_at).getTime())
       .forEach((s) => {
         const dateKey = new Date(s.started_at).toISOString().split('T')[0];
-        const existing = dailyMap.get(dateKey) || { shots: 0, hits: 0, dispersion: [] };
-        existing.shots += s.stats?.shots_fired || 0;
-        existing.hits += s.stats?.hits_total || 0;
+        const existing = dailyMap.get(dateKey) || { engagementShots: 0, engagementHits: 0, dispersion: [] };
+
+        if (!isGroupingSessionWithFallback(s)) {
+          existing.engagementShots += s.stats?.shots_fired || 0;
+          existing.engagementHits += s.stats?.hits_total || 0;
+        }
         if (s.stats?.best_dispersion_cm) {
           existing.dispersion.push(s.stats.best_dispersion_cm);
         }
@@ -692,7 +751,7 @@ export function useTeamInsights() {
     return Array.from(dailyMap.entries())
       .map(([date, data]) => ({
         date,
-        accuracy: data.shots > 0 ? (data.hits / data.shots) * 100 : undefined,
+        accuracy: data.engagementShots > 0 ? (data.engagementHits / data.engagementShots) * 100 : undefined,
         grouping: data.dispersion.length > 0
           ? data.dispersion.reduce((a, b) => a + b, 0) / data.dispersion.length
           : undefined,

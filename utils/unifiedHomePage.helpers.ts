@@ -5,8 +5,9 @@
  * No side effects, state, or React dependencies.
  */
 
-import type { SessionWithDetails } from '@/types/session';
 import type { CoachMessageContext, WeeklyStats } from '@/types/home';
+import type { SessionWithDetails } from '@/types/session';
+import { isGroupingSessionWithFallback } from '@/utils/drillGoal';
 
 type TFunction = (key: string, options?: any) => string;
 
@@ -14,7 +15,7 @@ type TFunction = (key: string, options?: any) => string;
  * Get contextual coach message based on user state
  */
 export function getCoachMessage(context: CoachMessageContext, t: TFunction): string {
-  const { sessions, shots, accuracy, hasActiveSession, hasUpcoming, streak } = context;
+  const { sessions, accuracy, hasActiveSession, hasUpcoming, streak } = context;
 
   if (hasActiveSession) {
     return t('home.coachMessage.activeSession');
@@ -99,7 +100,7 @@ export function getStartPracticeSubtitle(lastSessionDaysAgo: number | null, t: T
  */
 export function calculateWeeklyStats(completedSessions: SessionWithDetails[]): WeeklyStats {
   let shots = 0;
-  let accuracyShots = 0; // Shots from sessions that track hits (for accuracy calc)
+  let accuracyShots = 0; // Shots from engagement sessions only (for accuracy calc)
   let hits = 0;
   let totalTimeMs = 0;
   let minDispersion = 1000;
@@ -109,17 +110,18 @@ export function calculateWeeklyStats(completedSessions: SessionWithDetails[]): W
     // Check if this is a squad/group engagement (no hit tracking)
     const engagementMode = s.engagement?.engagement_mode;
     const isSquadOrGroup = engagementMode === 'squad' || engagementMode === 'group';
+    const isGrouping = isGroupingSessionWithFallback(s);
 
     if (s.stats) {
       // Total shots includes ALL sessions
       shots += s.stats.shots_fired || 0;
-      
-      // Only count hits and accuracy shots from non-squad/group sessions
-      if (!isSquadOrGroup) {
+
+      // Only count hits from engagement sessions (not grouping, not squad/group)
+      if (!isSquadOrGroup && !isGrouping) {
         accuracyShots += s.stats.shots_fired || 0;
         hits += s.stats.hits_total || 0;
       }
-      
+
       if (s.stats.best_dispersion_cm && s.stats.best_dispersion_cm > 0) {
         hasDispersion = true;
         minDispersion = Math.min(minDispersion, s.stats.best_dispersion_cm);
@@ -132,7 +134,7 @@ export function calculateWeeklyStats(completedSessions: SessionWithDetails[]): W
     }
   });
 
-  // Accuracy based only on sessions that track hits (not squad/group)
+  // Accuracy based only on engagement sessions (not grouping, not squad/group)
   const accuracy = accuracyShots > 0 ? Math.round((hits / accuracyShots) * 100) : 0;
   const bestGroup = hasDispersion ? `${minDispersion.toFixed(1)}cm` : '—';
   const totalTimeMinutes = Math.round(totalTimeMs / 60000);
