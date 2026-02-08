@@ -16,9 +16,11 @@
 
 import { useUnifiedHomePage } from '@/hooks/home/useUnifiedHomePage';
 import { useColors } from '@/hooks/ui/useColors';
+import { useTeamStore } from '@/stores/teamStore';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { History } from 'lucide-react-native';
+import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
@@ -34,6 +36,7 @@ export function UnifiedHomePage() {
   const colors = useColors();
   const router = useRouter();
   const { t } = useTranslation();
+  const hideContextSwitchOverlay = useTeamStore((s) => s.hideContextSwitchOverlay);
 
   const {
     // User info
@@ -77,6 +80,17 @@ export function UnifiedHomePage() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     router.push('/(protected)/(tabs)/insights');
   };
+
+  // Hide context switch overlay when page is ready
+  useEffect(() => {
+    if (!shouldShowLoading) {
+      // Small delay to ensure animations are visible
+      const timer = setTimeout(() => {
+        hideContextSwitchOverlay();
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [shouldShowLoading, hideContextSwitchOverlay]);
 
   // Loading state - matches TeamHomePage
   if (shouldShowLoading) {

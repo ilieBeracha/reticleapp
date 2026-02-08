@@ -1061,7 +1061,9 @@
     "personal": "אישי",
     "switchAccount": "החלף חשבון",
     "mySessions": "האימונים שלי",
-    "teams": "קבוצות"
+    "teams": "קבוצות",
+    "switching": "עובר אל",
+    "loadingData": "טוען נתונים..."
   },
   "weapons": {
     "title": "נשקים",
@@ -2216,6 +2218,8 @@
     "tbd": "טרם נקבע",
     "teamMemberSessionsAppear": "מפגשי חברי הצוות יופיעו כאן",
     "team": "צוות",
-    "leadsWithSessions": "{{name}} מוביל עם {{sessions}} מפגשים, {{accuracy}}% דיוק"
+    "leadsWithSessions": "{{name}} מוביל עם {{sessions}} מפגשים, {{accuracy}}% דיוק",
+    "participantsActive": "{{count}} משתתפים פעילים",
+    "active": "פעילים"
   }
 }

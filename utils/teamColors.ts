@@ -9,20 +9,20 @@
  */
 
 // Professional color palette - military/tactical inspired
-// These are base hues that look professional and distinct
+// Masculine, professional colors only - no pink, yellow, or bright pastels
 const TEAM_COLOR_PALETTE = [
   '#3B82F6', // Blue - tactical
   '#10B981', // Emerald - tactical green
   '#8B5CF6', // Violet - command
-  '#F59E0B', // Amber - alert/caution
   '#EF4444', // Red - priority
   '#06B6D4', // Cyan - tech
-  '#EC4899', // Pink - distinct
-  '#84CC16', // Lime - active
   '#F97316', // Orange - warm
   '#6366F1', // Indigo - deep
   '#14B8A6', // Teal - balanced
   '#A855F7', // Purple - royal
+  '#64748B', // Slate - steel
+  '#0EA5E9', // Sky blue - air force
+  '#DC2626', // Crimson - tactical red
 ];
 
 /**

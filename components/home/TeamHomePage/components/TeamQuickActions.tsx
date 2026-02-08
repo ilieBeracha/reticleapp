@@ -1,8 +1,8 @@
 /**
  * TeamQuickActions Component
  *
- * Primary "Train" button + content tab selector.
- * Secondary icons act as tabs that change the content card below.
+ * Compact action bar with primary button and tab switcher.
+ * Clean, functional design.
  */
 
 import * as Haptics from 'expo-haptics';
@@ -39,36 +39,31 @@ export function TeamQuickActions({
   colors,
 }: TeamQuickActionsProps) {
   const { t } = useTranslation();
+
   const handlePress = (action: () => void) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     action();
   };
 
-  const tabs: { id: ContentTab; icon: typeof Calendar; label: string; badge?: number }[] = [
-    { id: 'schedule', icon: Calendar, label: t('teamHome.schedule'), badge: upcomingCount > 0 ? upcomingCount : undefined },
-    { id: 'insights', icon: Trophy, label: t('teamHome.rankings') },
-    { id: 'activity', icon: Activity, label: t('teamHome.activity') },
+  const tabs: { id: ContentTab; icon: typeof Calendar; badge?: number }[] = [
+    { id: 'activity', icon: Activity },
+    { id: 'insights', icon: Trophy },
   ];
 
   return (
     <Animated.View entering={FadeIn.delay(50)} style={[s.container, { backgroundColor: colors.card, borderColor: colors.border }]}>
-      {/* Primary Action - always navigates */}
+      {/* Primary Action */}
       <TouchableOpacity
-        style={[s.primaryAction, { backgroundColor: hasLiveTraining ? colors.text : colors.border }]}
+        style={[s.primaryBtn, { backgroundColor: hasLiveTraining ? '#10B981' : teamColor }]}
         onPress={() => handlePress(onStartTraining)}
-        activeOpacity={0.7}
+        activeOpacity={0.8}
       >
-        <Crosshair size={14} color={hasLiveTraining ? colors.background : colors.text} strokeWidth={2.2} />
-        <Text style={[s.primaryText, { color: hasLiveTraining ? colors.background : colors.text }]}>
-          {hasLiveTraining ? t('teamHome.joinLive') : t('teamHome.train')}
-        </Text>
-        {hasLiveTraining && <View style={[s.liveDot, { backgroundColor: '#10B981' }]} />}
+        {hasLiveTraining && <View style={s.liveDot} />}
+        <Crosshair size={14} color="#fff" strokeWidth={2.2} />
+        <Text style={s.primaryText}>{hasLiveTraining ? t('teamHome.joinLive') : t('teamHome.train')}</Text>
       </TouchableOpacity>
 
-      {/* Divider */}
-      <View style={[s.divider, { backgroundColor: colors.border }]} />
-
-      {/* Content Tabs */}
+      {/* Tabs */}
       <View style={s.tabsRow}>
         {tabs.map((tab) => {
           const isActive = activeTab === tab.id;
@@ -83,12 +78,10 @@ export function TeamQuickActions({
               }}
               activeOpacity={0.6}
             >
-              <Icon size={13} color={isActive ? colors.text : colors.textMuted} />
+              <Icon size={14} color={isActive ? colors.text : colors.textMuted} strokeWidth={isActive ? 2 : 1.5} />
               {tab.badge !== undefined && (
-                <View style={[s.badge, { backgroundColor: isActive ? colors.text : colors.border }]}>
-                  <Text style={[s.badgeText, { color: isActive ? colors.background : colors.text }]}>
-                    {tab.badge}
-                  </Text>
+                <View style={[s.badge, { backgroundColor: isActive ? colors.text : colors.textMuted }]}>
+                  <Text style={[s.badgeText, { color: colors.background }]}>{tab.badge}</Text>
                 </View>
               )}
             </TouchableOpacity>
@@ -105,11 +98,11 @@ const s = StyleSheet.create({
     alignItems: 'center',
     borderRadius: 8,
     borderWidth: 1,
-    padding: 6,
-    marginBottom: 12,
+    padding: 5,
+    marginBottom: 10,
     gap: 6,
   },
-  primaryAction: {
+  primaryBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 12,
@@ -120,16 +113,13 @@ const s = StyleSheet.create({
   primaryText: {
     fontSize: 13,
     fontWeight: '600',
+    color: '#fff',
   },
   liveDot: {
-    width: 5,
-    height: 5,
-    borderRadius: 2.5,
-    marginLeft: 2,
-  },
-  divider: {
-    width: 1,
-    height: 20,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#fff',
   },
   tabsRow: {
     flex: 1,
@@ -151,7 +141,6 @@ const s = StyleSheet.create({
     borderRadius: 7,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 3,
   },
   badgeText: {
     fontSize: 9,

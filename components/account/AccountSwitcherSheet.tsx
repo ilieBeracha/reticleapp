@@ -86,23 +86,35 @@ export function AccountSwitcherSheet({ visible, onClose }: AccountSwitcherSheetP
   const { t } = useTranslation();
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { teams, activeTeamId, setActiveTeam } = useTeamStore();
+  const { teams, activeTeamId, setActiveTeam, showContextSwitchOverlay } = useTeamStore();
 
   const isPersonalMode = activeTeamId === null;
 
   const handleSelectPersonal = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (isPersonalMode) {
+      onClose();
+      return;
+    }
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    // Show full-screen overlay, switch team, close modal
+    showContextSwitchOverlay(t('account.personal'));
     setActiveTeam(null);
     onClose();
-  }, [setActiveTeam, onClose]);
+  }, [setActiveTeam, onClose, isPersonalMode, t, showContextSwitchOverlay]);
 
   const handleSelectTeam = useCallback(
     (team: TeamWithRole) => {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      if (team.id === activeTeamId) {
+        onClose();
+        return;
+      }
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      // Show full-screen overlay, switch team, close modal
+      showContextSwitchOverlay(team.name);
       setActiveTeam(team.id);
       onClose();
     },
-    [setActiveTeam, onClose]
+    [setActiveTeam, onClose, activeTeamId, showContextSwitchOverlay]
   );
 
   const handleCreateTeam = useCallback(() => {

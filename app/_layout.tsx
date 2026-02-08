@@ -1,3 +1,4 @@
+import { ContextSwitchOverlay } from '@/components/account';
 import { LoadingScreen } from '@/components/shared/LoadingScreen';
 import { GluestackUIProvider } from '@/components/shared/ui/gluestack-ui-provider';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
@@ -113,6 +114,9 @@ function LayoutWithLoadingOverlay({ colorScheme }: { colorScheme: 'light' | 'dar
 
           {/* Global loading overlay for auth transitions */}
           {transitioning && <LoadingScreen overlay />}
+
+          {/* Global overlay for account/team context switching */}
+          <ContextSwitchOverlay />
         </BottomSheetModalProvider>
       </GestureHandlerRootView>
     </SafeAreaProvider>

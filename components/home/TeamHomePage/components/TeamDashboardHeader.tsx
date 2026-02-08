@@ -1,7 +1,7 @@
 /**
  * TeamDashboardHeader Component
  *
- * Compact header with user greeting and team context.
+ * Compact header with user greeting and quick actions.
  */
 
 import { BaseAvatar } from '@/components/shared/Avatar';
@@ -55,9 +55,9 @@ export function TeamDashboardHeader({
 
   return (
     <Animated.View entering={FadeIn.duration(200)} style={s.container}>
-      {/* User Row */}
-      <View style={s.userRow}>
-        <TouchableOpacity style={s.userInfo} onPress={handleAvatarPress} activeOpacity={0.7}>
+      <View style={s.row}>
+        {/* User */}
+        <TouchableOpacity style={s.userSection} onPress={handleAvatarPress} activeOpacity={0.7}>
           <View style={[s.avatar, { backgroundColor: colors.border }]}>
             {avatarUrl ? (
               <BaseAvatar source={{ uri: avatarUrl }} fallbackText={fallbackInitial} size="sm" borderWidth={0} />
@@ -71,15 +71,19 @@ export function TeamDashboardHeader({
           </View>
         </TouchableOpacity>
 
-        <View style={s.rightSection}>
+        {/* Actions */}
+        <View style={s.actions}>
           {isGarminConnected && (
-            <TouchableOpacity style={s.watchBadge} onPress={handleGarminPress} activeOpacity={0.7}>
-              <View style={[s.watchDot, { backgroundColor: colors.green }]} />
+            <TouchableOpacity style={s.iconBtn} onPress={handleGarminPress} activeOpacity={0.7}>
+              <View style={[s.connectedDot, { backgroundColor: colors.green }]} />
               <Ionicons name="watch" size={14} color={colors.textMuted} />
             </TouchableOpacity>
           )}
-
-          <TouchableOpacity style={[s.settingsBtn, { borderColor: colors.border }]} onPress={onTeamSettings} activeOpacity={0.7}>
+          <TouchableOpacity
+            style={[s.settingsBtn, { borderColor: colors.border }]}
+            onPress={onTeamSettings}
+            activeOpacity={0.7}
+          >
             <Settings size={14} color={colors.textMuted} />
           </TouchableOpacity>
         </View>
@@ -89,63 +93,15 @@ export function TeamDashboardHeader({
 }
 
 const s = StyleSheet.create({
-  container: {
-    marginBottom: 12,
-  },
-  userRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  userInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  avatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-  },
-  avatarText: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  greeting: {
-    fontSize: 10,
-    fontWeight: '500',
-  },
-  name: {
-    fontSize: 14,
-    fontWeight: '600',
-    letterSpacing: -0.2,
-  },
-  rightSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  watchBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 6,
-    paddingVertical: 4,
-  },
-  watchDot: {
-    width: 5,
-    height: 5,
-    borderRadius: 2.5,
-  },
-  settingsBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  container: { marginBottom: 10 },
+  row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  userSection: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  avatar: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  avatarText: { fontSize: 13, fontWeight: '600' },
+  greeting: { fontSize: 10, fontWeight: '500' },
+  name: { fontSize: 14, fontWeight: '600', letterSpacing: -0.2 },
+  actions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  iconBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, padding: 6 },
+  connectedDot: { width: 5, height: 5, borderRadius: 2.5 },
+  settingsBtn: { width: 32, height: 32, borderRadius: 8, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
 });

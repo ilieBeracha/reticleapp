@@ -39,7 +39,7 @@ export function useTeamHomePage() {
     profileFullName?.charAt(0)?.toUpperCase() ?? user?.email?.charAt(0)?.toUpperCase() ?? '?';
 
   // Stores
-  const { activeTeam, activeTeamId, loadActiveTeam, members } = useTeamStore();
+  const { activeTeam, activeTeamId, loadActiveTeam, members, membersLoading } = useTeamStore();
   const { myUpcomingTrainings, loadMyUpcomingTrainings, loadMyStats } = useTrainingStore();
 
   // Get user's role in this team
@@ -118,18 +118,22 @@ export function useTeamHomePage() {
       clearTimeout(contextSwitchTimeoutRef.current);
     }
 
-    contextSwitchTimeoutRef.current = setTimeout(() => {
-      setIsContextSwitching(true);
-      setLoading(true);
-      setRawTeamSessions([]);
+    // Immediately clear old data and set loading state
+    setIsContextSwitching(true);
+    setLoading(true);
+    setRawTeamSessions([]);
 
+    // Debounce the actual data fetch
+    contextSwitchTimeoutRef.current = setTimeout(() => {
       Promise.all([loadTeamSessions(), loadMyUpcomingTrainings(), loadMyStats()]).finally(() => {
         setIsContextSwitching(false);
+        setLoading(false);
       });
     }, CONTEXT_SWITCH_LOADING_DELAY_MS);
 
     return () => {
       if (contextSwitchTimeoutRef.current) {
+
         clearTimeout(contextSwitchTimeoutRef.current);
       }
     };
@@ -248,8 +252,12 @@ export function useTeamHomePage() {
     return completedSessions.reduce((sum, s) => sum + (s.stats?.shots_fired || 0), 0);
   }, [completedSessions]);
 
-  // Loading state
-  const shouldShowLoading = isContextSwitching || (loading && teamSessions.length === 0);
+  // Loading state - wait for all data including activeTeam details
+  const shouldShowLoading =
+    isContextSwitching ||
+    membersLoading || // Wait for activeTeam and members to load
+    (loading && teamSessions.length === 0) ||
+    (activeTeamId && !activeTeam); // Team selected but details not yet loaded
 
   // Handlers
   const onRefresh = useCallback(async () => {

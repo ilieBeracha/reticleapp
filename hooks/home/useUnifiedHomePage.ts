@@ -162,12 +162,13 @@ export function useUnifiedHomePage() {
       clearTimeout(contextSwitchTimeoutRef.current);
     }
 
-    // Small delay to prevent flash on quick switches
-    contextSwitchTimeoutRef.current = setTimeout(() => {
-      setIsContextSwitching(true);
-      setLoadingAllSessions(true);
-      setAllSessions([]); // Clear old data to show fresh state
+    // Immediately clear old data and set loading state
+    setIsContextSwitching(true);
+    setLoadingAllSessions(true);
+    setAllSessions([]); // Clear old data to show fresh state
 
+    // Debounce the actual data fetch
+    contextSwitchTimeoutRef.current = setTimeout(() => {
       // Reload everything for the new context
       Promise.all([
         loadAllSessions(),
@@ -426,6 +427,7 @@ export function useUnifiedHomePage() {
     hasTeams,
     heroMode,
     activeTeam, // Current active team (for team colors)
+    activeTeamId, // Sync team ID for instant color (no async delay)
     activeTeamTraining,
     isTrainingCommander,
     nextUpcomingTraining,

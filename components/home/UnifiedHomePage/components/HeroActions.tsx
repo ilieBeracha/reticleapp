@@ -42,6 +42,7 @@ interface HeroActionsProps {
   onActiveSessionPress: () => void;
   // Team context
   activeTeam: TeamWithMembers | null;
+  activeTeamId?: string | null; // For instant color (sync) - falls back to activeTeam?.id
   activeTeamTraining: TrainingWithDetails | null;
   isTrainingCommander: boolean;
   hasTeams: boolean;
@@ -73,6 +74,7 @@ export function HeroActions({
   onStartSession,
   onActiveSessionPress,
   activeTeam,
+  activeTeamId,
   activeTeamTraining,
   isTrainingCommander,
   onTrainingPress,
@@ -85,13 +87,14 @@ export function HeroActions({
   const statsScale = useSharedValue(1);
   const pulseOpacity = useSharedValue(1);
 
-  // Get team-specific accent color
+  // Get team-specific accent color - prefer activeTeamId (sync) over activeTeam?.id (async)
   const teamColor = useMemo(() => {
-    if (activeTeam?.id) {
-      return getTeamColor(activeTeam.id);
+    const teamId = activeTeamId ?? activeTeam?.id;
+    if (teamId) {
+      return getTeamColor(teamId);
     }
     return colors.primary; // Fallback to primary color
-  }, [activeTeam?.id, colors.primary]);
+  }, [activeTeamId, activeTeam?.id, colors.primary]);
 
   useEffect(() => {
     if (heroMode === 'team-live' || heroMode === 'solo-active') {

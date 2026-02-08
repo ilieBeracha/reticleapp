@@ -35,6 +35,10 @@ interface TeamStore {
   personalModeExplicit: boolean; // Track if user explicitly chose personal mode
   error: string | null;
 
+  // Context switch overlay (full-screen loading when switching accounts)
+  contextSwitchOverlay: boolean;
+  contextSwitchTarget: string;
+
   // Team actions
   loadTeams: () => Promise<void>;
   createTeam: (input: CreateTeamInput) => Promise<TeamWithRole>;
@@ -44,6 +48,10 @@ interface TeamStore {
   // Active team
   setActiveTeam: (teamId: string | null) => void;
   loadActiveTeam: () => Promise<void>;
+
+  // Context switch overlay controls
+  showContextSwitchOverlay: (targetName: string) => void;
+  hideContextSwitchOverlay: () => void;
 
   // Members
   loadMembers: () => Promise<void>;
@@ -67,6 +75,21 @@ export const useTeamStore = create<TeamStore>((set, get) => ({
   initialized: false,
   personalModeExplicit: true, // Start in personal mode by default - user must explicitly select a team
   error: null,
+
+  // Context switch overlay
+  contextSwitchOverlay: false,
+  contextSwitchTarget: '',
+
+  // =====================================================
+  // CONTEXT SWITCH OVERLAY
+  // =====================================================
+  showContextSwitchOverlay: (targetName: string) => {
+    set({ contextSwitchOverlay: true, contextSwitchTarget: targetName });
+  },
+
+  hideContextSwitchOverlay: () => {
+    set({ contextSwitchOverlay: false, contextSwitchTarget: '' });
+  },
 
   // =====================================================
   // LOAD TEAMS

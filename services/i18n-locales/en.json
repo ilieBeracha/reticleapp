@@ -1068,7 +1068,9 @@
     "personal": "Personal",
     "switchAccount": "Switch Account",
     "mySessions": "My Sessions",
-    "teams": "Teams"
+    "teams": "Teams",
+    "switching": "Switching to",
+    "loadingData": "Loading data..."
   },
   "weapons": {
     "title": "Weapons",
@@ -2223,6 +2225,8 @@
     "tbd": "TBD",
     "teamMemberSessionsAppear": "Team member sessions will appear here",
     "team": "Team",
-    "leadsWithSessions": "{{name}} leads with {{sessions}} sessions, {{accuracy}}% accuracy"
+    "leadsWithSessions": "{{name}} leads with {{sessions}} sessions, {{accuracy}}% accuracy",
+    "participantsActive": "{{count}} participants active",
+    "active": "active"
   }
 }

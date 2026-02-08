@@ -18,16 +18,16 @@
 
 import { useTeamHomePage } from '@/hooks/home/useTeamHomePage';
 import { useColors } from '@/hooks/ui/useColors';
+import { useTeamStore } from '@/stores/teamStore';
 import { getTeamColor } from '@/utils/teamColors';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { History, Plus } from 'lucide-react-native';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { ActiveTrainingBanner } from './components/ActiveTrainingBanner';
-import { TeamActivityCard } from './components/TeamActivityCard';
 import { TeamDashboardHeader } from './components/TeamDashboardHeader';
 import { TeamHeroSection } from './components/TeamHeroSection';
 import { TeamLeaderboard } from './components/TeamLeaderboard';
@@ -39,6 +39,9 @@ import { UpcomingTrainingsCard } from './components/UpcomingTrainingsCard';
 export function TeamHomePage() {
   const { t } = useTranslation();
   const colors = useColors();
+  // Get activeTeamId directly from store for immediate color access (no async delay)
+  const activeTeamId = useTeamStore((s) => s.activeTeamId);
+  const hideContextSwitchOverlay = useTeamStore((s) => s.hideContextSwitchOverlay);
   const {
     // User info
     greeting,
@@ -85,25 +88,24 @@ export function TeamHomePage() {
     handleViewAllMembers,
   } = useTeamHomePage();
 
+  // Use activeTeamId directly (sync) instead of activeTeam?.id (async) for instant color
   const teamColor = useMemo(() => {
-    return activeTeam?.id ? getTeamColor(activeTeam.id) : colors.primary;
-  }, [activeTeam?.id, colors.primary]);
+    return activeTeamId ? getTeamColor(activeTeamId) : colors.primary;
+  }, [activeTeamId, colors.primary]);
 
   // Content tab state (commander only)
-  const [contentTab, setContentTab] = useState<ContentTab>('schedule');
+  const [contentTab, setContentTab] = useState<ContentTab>('activity');
 
-  // Map recentActivity for TeamActivityCard
-  const activityItems = useMemo(() => {
-    return recentActivity.map((a: any) => ({
-      id: a.id || `${a.userName}-${a.timeAgo}`,
-      userName: a.userName || 'Unknown',
-      type: 'session' as const,
-      detail: a.action || `${a.shotCount || 0} shots`,
-      timestamp: a.timeAgo || '',
-      accuracy: a.accuracy,
-      groupingCm: a.groupingCm,
-    }));
-  }, [recentActivity]);
+  // Hide context switch overlay when page is ready
+  useEffect(() => {
+    if (!shouldShowLoading) {
+      // Small delay to ensure animations are visible
+      const timer = setTimeout(() => {
+        hideContextSwitchOverlay();
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [shouldShowLoading, hideContextSwitchOverlay]);
 
   const router = useRouter();
 
@@ -263,7 +265,13 @@ export function TeamHomePage() {
             )}
 
             {contentTab === 'activity' && (
-              <TeamActivityCard activities={activityItems} colors={colors} />
+              <TeammateFeed
+              activities={recentActivity}
+              teamTotalSessions={teamTotals.sessions}
+              teamTotalShots={teamTotals.shots}
+              activeMembers={teamTotals.activeMembers}
+              colors={colors}
+            />
             )}
           </>
         ) : (
@@ -291,44 +299,6 @@ export function TeamHomePage() {
                 </TouchableOpacity>
               </Animated.View>
             )}
-
-            {/* Upcoming Trainings - shown directly, no tabs */}
-            {upcomingTrainings.length > 0 && (
-              <UpcomingTrainingsCard
-                trainings={upcomingTrainings}
-                teamColor={teamColor}
-                onTrainingPress={handleTrainingPress}
-                colors={colors}
-              />
-            )}
-
-            {/* Team Context - compact summary of team activity */}
-            <Animated.View entering={FadeIn.delay(100)} style={s.teamContext}>
-              <View style={[s.teamContextCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                <View style={s.teamContextRow}>
-                  <View style={s.teamContextStat}>
-                    <Text style={[s.teamContextValue, { color: colors.text }]}>{teamTotals.activeMembers}</Text>
-                    <Text style={[s.teamContextLabel, { color: colors.textMuted }]}>{t('teamHome.activeThisWeek')}</Text>
-                  </View>
-                  <View style={[s.teamContextDivider, { backgroundColor: colors.border }]} />
-                  <View style={s.teamContextStat}>
-                    <Text style={[s.teamContextValue, { color: colors.text }]}>{teamTotals.sessions}</Text>
-                    <Text style={[s.teamContextLabel, { color: colors.textMuted }]}>{t('teamHome.teamSessions')}</Text>
-                  </View>
-                  {myStats.sessions > 0 && teamTotals.sessions > 0 && (
-                    <>
-                      <View style={[s.teamContextDivider, { backgroundColor: colors.border }]} />
-                      <View style={s.teamContextStat}>
-                        <Text style={[s.teamContextValue, { color: colors.text }]}>
-                          {Math.round((myStats.sessions / teamTotals.sessions) * 100)}%
-                        </Text>
-                        <Text style={[s.teamContextLabel, { color: colors.textMuted }]}>{t('teamHome.yourShare')}</Text>
-                      </View>
-                    </>
-                  )}
-                </View>
-              </View>
-            </Animated.View>
 
             {/* Teammate Activity */}
             <TeammateFeed
