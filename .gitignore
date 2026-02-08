@@ -46,3 +46,4 @@ app-example
 
 # Claude Code hooks temp files
 .claude/hooks/.last-commit-diff
+.claude/skills/
