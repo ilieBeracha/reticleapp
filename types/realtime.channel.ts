@@ -14,6 +14,36 @@ import type { RealtimeChannel } from '@supabase/supabase-js';
 export type ChannelStatus = 'SUBSCRIBED' | 'TIMED_OUT' | 'CLOSED' | 'CHANNEL_ERROR';
 
 // ═══════════════════════════════════════════════════════════════════════════
+// CHANGE PAYLOAD (generic)
+// ═══════════════════════════════════════════════════════════════════════════
+
+/** Generic change payload. Default uses Record<string, unknown> for untyped usage. */
+export interface ChannelChangePayload<T = Record<string, unknown>> {
+  eventType: 'INSERT' | 'UPDATE' | 'DELETE';
+  new: T;
+  old: T;
+  errors: string[] | null;
+  schema: string;
+  table: string;
+  commit_timestamp: string;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CHANNEL SUBSCRIPTION (generic)
+// ═══════════════════════════════════════════════════════════════════════════
+
+export interface ChannelSubscription<T = Record<string, unknown>> {
+  /** Table name to subscribe to */
+  table: string;
+  /** Event type to listen for */
+  event?: 'INSERT' | 'UPDATE' | 'DELETE' | '*';
+  /** Filter expression (e.g., 'user_id=eq.123') */
+  filter?: string;
+  /** Callback when change occurs. Accepts typed payloads from domain hooks. */
+  onData: (payload: ChannelChangePayload<T>) => void;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // CHANNEL CONFIGURATION
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -21,32 +51,11 @@ export interface ChannelConfig {
   /** Unique channel name */
   name: string;
   /** Table subscriptions to attach to this channel */
-  subscriptions: ChannelSubscription[];
+  subscriptions: ChannelSubscription<any>[];
   /** Called when channel status changes */
   onStatusChange?: (status: ChannelStatus) => void;
   /** Called on any error */
   onError?: (error: Error) => void;
-}
-
-export interface ChannelSubscription {
-  /** Table name to subscribe to */
-  table: string;
-  /** Event type to listen for */
-  event?: 'INSERT' | 'UPDATE' | 'DELETE' | '*';
-  /** Filter expression (e.g., 'user_id=eq.123') */
-  filter?: string;
-  /** Callback when change occurs */
-  onData: (payload: ChannelChangePayload) => void;
-}
-
-export interface ChannelChangePayload {
-  eventType: 'INSERT' | 'UPDATE' | 'DELETE';
-  new: Record<string, unknown>;
-  old: Record<string, unknown>;
-  errors: string[] | null;
-  schema: string;
-  table: string;
-  commit_timestamp: string;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

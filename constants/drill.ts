@@ -143,10 +143,10 @@ export const RANGE_CATEGORY = {
 
 export type RangeCategory = (typeof RANGE_CATEGORY)[keyof typeof RANGE_CATEGORY];
 
-export const RANGE_CATEGORIES: { value: RangeCategory; min: number; max: number | null }[] = [
-  { value: 'short', min: 0, max: 300 },
-  { value: 'medium', min: 300, max: 600 },
-  { value: 'long', min: 600, max: null },
+export const RANGE_CATEGORIES: { value: RangeCategory; label: string; min: number; max: number | null }[] = [
+  { value: 'short', label: 'Short Range', min: 0, max: 300 },
+  { value: 'medium', label: 'Medium Range', min: 300, max: 600 },
+  { value: 'long', label: 'Long Range', min: 600, max: null },
 ];
 
 // =============================================================================

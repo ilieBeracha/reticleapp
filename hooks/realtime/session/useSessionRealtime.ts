@@ -49,11 +49,9 @@ export function useSessionRealtime(options: UseSessionRealtimeOptions): UseSessi
         const newSession = payload.new;
         const oldSession = payload.old;
 
-        console.log(`[SessionRealtime] Session updated:`, newSession.id);
         onSessionUpdate?.(newSession);
 
         if (newSession.status !== oldSession.status) {
-          console.log(`[SessionRealtime] Status changed: ${oldSession.status} → ${newSession.status}`);
           onStatusChange?.(newSession.status, newSession);
         }
       }
@@ -63,8 +61,6 @@ export function useSessionRealtime(options: UseSessionRealtimeOptions): UseSessi
 
   const handleTargetData = useCallback(
     (payload: ChangePayload<SessionTargetRecord>) => {
-      console.log(`[SessionRealtime] Target ${payload.eventType}:`, payload.new?.id || payload.old?.id);
-
       switch (payload.eventType) {
         case 'INSERT':
           onTargetAdded?.(payload.new);
@@ -112,11 +108,7 @@ export function useSessionRealtime(options: UseSessionRealtimeOptions): UseSessi
   const { status, isConnected, error, reconnect } = useRealtimeChannel({
     name: channelName,
     subscriptions,
-    onStatusChange: (newStatus) => {
-      if (newStatus === 'SUBSCRIBED') {
-        console.log(`[SessionRealtime] ✓ Subscribed to session ${sessionId}`);
-      }
-    },
+    onStatusChange: (newStatus) => {},
   });
 
   return {

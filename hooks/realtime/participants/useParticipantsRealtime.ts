@@ -48,8 +48,6 @@ export function useParticipantsRealtime(options: UseParticipantsRealtimeOptions)
 
   const handleParticipantData = useCallback(
     (payload: ChangePayload<ParticipantRecord>) => {
-      console.log(`[ParticipantsRealtime] ${payload.eventType}:`, payload.new?.id || payload.old?.id);
-
       switch (payload.eventType) {
         case 'INSERT':
           onParticipantAdded?.(payload.new);
@@ -95,11 +93,7 @@ export function useParticipantsRealtime(options: UseParticipantsRealtimeOptions)
   const { status, isConnected, error, reconnect } = useRealtimeChannel({
     name: channelName,
     subscriptions,
-    onStatusChange: (newStatus) => {
-      if (newStatus === 'SUBSCRIBED') {
-        console.log(`[ParticipantsRealtime] ✓ Subscribed to engagement ${effectiveId}`);
-      }
-    },
+    onStatusChange: (newStatus) => {},
   });
 
   return {

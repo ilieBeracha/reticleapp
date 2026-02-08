@@ -56,9 +56,7 @@ export const useAudioStore = create<AudioState>((set, get) => ({
     if (get().isListening) return;
 
     const moduleLoaded = isModuleAvailable();
-    console.log('[AudioStore] Module loaded:', moduleLoaded);
     if (!moduleLoaded) {
-      console.warn('[AudioStore] Native module not available - run `npx expo run:ios` to rebuild');
       return;
     }
 
@@ -89,7 +87,6 @@ export const useAudioStore = create<AudioState>((set, get) => ({
 
     startShotAudio();
     set({ isListening: true });
-    console.log('[AudioStore] Started listening - waiting for native module events');
   },
 
   stop: () => {
@@ -100,12 +97,10 @@ export const useAudioStore = create<AudioState>((set, get) => ({
 
     stopShotAudio();
     set({ isListening: false });
-    console.log('[AudioStore] Stopped listening');
   },
 
   setConfig: (config: AudioDetectionConfig) => {
     setConfig(config);
-    console.log('[AudioStore] Config updated:', config);
   },
 
   setShotDetectedCallback: (cb) => {
@@ -127,7 +122,6 @@ export const useAudioStore = create<AudioState>((set, get) => ({
       sessionDetections: [],
       sessionStartTime: null,
     });
-    console.log('[AudioStore] Reset');
   },
 
   startSession: () => {
@@ -137,13 +131,11 @@ export const useAudioStore = create<AudioState>((set, get) => ({
       detectionCount: 0,
     });
     get().start();
-    console.log('[AudioStore] Session started');
   },
 
   endSession: () => {
     get().stop();
     const detections = get().sessionDetections;
-    console.log(`[AudioStore] Session ended with ${detections.length} detections`);
     return detections;
   },
 

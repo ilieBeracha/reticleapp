@@ -4,6 +4,7 @@ const STATUS_CONFIGS: Record<TrainingStatus, StatusConfig> = {
   planned: { color: '#3B82F6', bg: '#3B82F615', icon: 'calendar', label: 'Planned' },
   ongoing: { color: '#22C55E', bg: '#22C55E15', icon: 'play-circle', label: 'In Progress' },
   finished: { color: '#6B7280', bg: '#6B728015', icon: 'checkmark-circle', label: 'Finished' },
+  completed: { color: '#6B7280', bg: '#6B728015', icon: 'checkmark-circle', label: 'Completed' },
   cancelled: { color: '#EF4444', bg: '#EF444415', icon: 'close-circle', label: 'Cancelled' },
 };
 

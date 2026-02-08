@@ -237,7 +237,7 @@ export default function NotificationsSheet() {
       {notifications.length > 0 ? (
         <View style={styles.list}>
           {notifications.map((notification, index) => {
-            const config = TYPE_CONFIG[notification.type] || TYPE_CONFIG.default;
+            const config = TYPE_CONFIG[notification.type as keyof typeof TYPE_CONFIG] || TYPE_CONFIG.default;
             const isUnread = !notification.read;
 
             return (

@@ -62,12 +62,6 @@ export function useRealtimeChannel(config: ChannelConfig): UseRealtimeChannelRet
 
   const handleError = useCallback((err: Error, isFatal = false) => {
     if (!isMountedRef.current) return;
-    const channelName = nameRef.current;
-    if (isFatal) {
-      console.error(`[Realtime:${channelName}] Error:`, err.message);
-    } else {
-      console.warn(`[Realtime:${channelName}] Reconnecting after:`, err.message);
-    }
     setError(err);
     onErrorRef.current?.(err);
   }, []);
@@ -86,7 +80,6 @@ export function useRealtimeChannel(config: ChannelConfig): UseRealtimeChannelRet
     }
 
     if (channelRef.current) {
-      console.log(`[Realtime:${nameRef.current}] Disconnecting...`);
       supabase.removeChannel(channelRef.current);
       channelRef.current = null;
     }
@@ -102,8 +95,6 @@ export function useRealtimeChannel(config: ChannelConfig): UseRealtimeChannelRet
     reconnectAttempts.current += 1;
     const delay = RECONNECT_DELAY_MS * reconnectAttempts.current;
 
-    console.log(`[Realtime:${nameRef.current}] Reconnecting in ${delay}ms (attempt ${reconnectAttempts.current})`);
-
     reconnectTimeout.current = setTimeout(() => {
       if (isMountedRef.current) {
         connectRef.current();
@@ -114,20 +105,14 @@ export function useRealtimeChannel(config: ChannelConfig): UseRealtimeChannelRet
   const connect = useCallback(() => {
     if (!isMountedRef.current) return;
 
-    const channelName = nameRef.current;
     const subs = subscriptionsRef.current;
 
     // Don't connect if no subscriptions
-    if (subs.length === 0) {
-      console.log(`[Realtime:${channelName}] Skipping connection (no subscriptions)`);
-      return;
-    }
+    if (subs.length === 0) return;
 
     disconnect();
 
-    console.log(`[Realtime:${channelName}] Connecting... (subscriptions: ${subs.length})`);
-
-    const channel = supabase.channel(channelName);
+    const channel = supabase.channel(nameRef.current);
 
     // Attach each subscription - use ref for callbacks
     subs.forEach((sub) => {
@@ -154,8 +139,6 @@ export function useRealtimeChannel(config: ChannelConfig): UseRealtimeChannelRet
             commit_timestamp: payload.commit_timestamp,
           };
 
-          console.log(`[Realtime:${nameRef.current}] ${payload.eventType} on ${sub.table}`);
-
           // Find matching subscription in current ref and call its callback
           const currentSub = subscriptionsRef.current.find(
             (s) => s.table === sub.table && s.filter === sub.filter
@@ -170,17 +153,13 @@ export function useRealtimeChannel(config: ChannelConfig): UseRealtimeChannelRet
       if (!isMountedRef.current) return;
 
       if (subscribeStatus === 'SUBSCRIBED') {
-        console.log(`[Realtime:${nameRef.current}] ✓ Subscribed successfully`);
         updateStatus('SUBSCRIBED');
       } else if (subscribeStatus === 'TIMED_OUT') {
-        console.warn(`[Realtime:${nameRef.current}] ⚠ Subscription timed out`);
         updateStatus('TIMED_OUT');
         scheduleReconnect();
       } else if (subscribeStatus === 'CLOSED') {
-        console.log(`[Realtime:${nameRef.current}] Channel closed`);
         updateStatus('CLOSED');
       } else if (subscribeStatus === 'CHANNEL_ERROR') {
-        console.warn(`[Realtime:${nameRef.current}] Channel error, will reconnect:`, err?.message || 'unknown');
         updateStatus('CHANNEL_ERROR');
         handleError(new Error(err?.message || 'Channel error'), false);
         scheduleReconnect();

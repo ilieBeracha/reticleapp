@@ -51,8 +51,6 @@ export function useTeamRealtime(options: UseTeamRealtimeOptions): UseTeamRealtim
 
   const handleMemberData = useCallback(
     (payload: ChangePayload<TeamMemberRecord>) => {
-      console.log(`[TeamRealtime] Member ${payload.eventType}:`, payload.new?.user_id || payload.old?.user_id);
-
       if (payload.eventType === 'INSERT') {
         onMemberJoined?.(payload.new);
       } else if (payload.eventType === 'UPDATE') {
@@ -66,8 +64,6 @@ export function useTeamRealtime(options: UseTeamRealtimeOptions): UseTeamRealtim
 
   const handleInviteData = useCallback(
     (payload: ChangePayload<TeamInvitationRecord>) => {
-      console.log(`[TeamRealtime] Invite ${payload.eventType}:`, payload.new?.status);
-
       onInviteChange?.(payload);
 
       if (payload.eventType === 'INSERT') {
@@ -89,8 +85,6 @@ export function useTeamRealtime(options: UseTeamRealtimeOptions): UseTeamRealtim
 
   const handleTrainingData = useCallback(
     (payload: ChangePayload<TeamTrainingRecord>) => {
-      console.log(`[TeamRealtime] Training ${payload.eventType}:`, payload.new?.name || payload.old?.name);
-
       onTrainingChange?.(payload);
 
       if (payload.eventType === 'INSERT') {
@@ -116,19 +110,19 @@ export function useTeamRealtime(options: UseTeamRealtimeOptions): UseTeamRealtim
         table: 'team_members',
         event: '*' as const,
         filter: `team_id=eq.${teamId}`,
-        onData: handleMemberData as (payload: ChangePayload<TeamMemberRecord>) => void,
+        onData: handleMemberData as any,
       },
       {
         table: 'team_invitations',
         event: '*' as const,
         filter: `team_id=eq.${teamId}`,
-        onData: handleInviteData as (payload: ChangePayload<TeamInvitationRecord>) => void,
+        onData: handleInviteData as any,
       },
       {
         table: 'trainings',
         event: '*' as const,
         filter: `team_id=eq.${teamId}`,
-        onData: handleTrainingData as (payload: ChangePayload<TeamTrainingRecord>) => void,
+        onData: handleTrainingData as any,
       },
     ];
   }, [isEnabled, teamId, handleMemberData, handleInviteData, handleTrainingData]);
@@ -142,11 +136,7 @@ export function useTeamRealtime(options: UseTeamRealtimeOptions): UseTeamRealtim
   const { status, isConnected, error, reconnect } = useRealtimeChannel({
     name: channelName,
     subscriptions,
-    onStatusChange: (newStatus) => {
-      if (newStatus === 'SUBSCRIBED') {
-        console.log(`[TeamRealtime] ✓ Subscribed to team ${teamId}`);
-      }
-    },
+    onStatusChange: (newStatus) => {},
   });
 
   return {

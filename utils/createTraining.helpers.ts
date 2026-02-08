@@ -51,7 +51,7 @@ export function formatDisplayTime(date: Date): string {
  * Calculates total shots for a list of drills
  */
 export function calculateTotalShots(drills: TrainingDrillItem[]): number {
-  return drills.reduce((sum, d) => sum + d.rounds_per_shooter * (d.strings_count || 1), 0);
+  return drills.reduce((sum, d) => sum + (d.rounds_per_shooter ?? 0) * (d.strings_count || 1), 0);
 }
 
 /**

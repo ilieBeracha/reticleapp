@@ -89,7 +89,7 @@ export default function TabsLayout() {
       const currentTab = pathname.split('/').pop();
       if (currentTab && TEAM_ONLY_TABS.includes(currentTab)) {
         // Redirect to home tab
-        router.replace('/(protected)/(tabs)/');
+        router.replace('/(protected)/(tabs)/' as any);
       }
     }
     prevIsTeamMode.current = isTeamMode;

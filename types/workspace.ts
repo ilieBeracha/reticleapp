@@ -102,7 +102,7 @@ export interface TeamInvitationWithDetails extends TeamInvitation {
 // TRAINING TYPES
 // =====================================================
 
-export type TrainingStatus = 'planned' | 'ongoing' | 'finished' | 'cancelled';
+export type TrainingStatus = 'planned' | 'ongoing' | 'finished' | 'cancelled' | 'completed';
 
 // =====================================================
 // TRAINING REPORT TYPES (Hebrew Military Format)

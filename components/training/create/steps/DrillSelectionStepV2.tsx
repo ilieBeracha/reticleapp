@@ -186,7 +186,7 @@ function ProgramItem({
               </Text>
             </View>
             <Text style={[styles.programParams, { color: colors.textMuted }]}>
-              {drill.config.distance_m}m · {t('training.roundsCount', { count: drill.config.rounds })}
+              {drill.config.distance_m}m · {t('training.roundsCount', { count: drill.config.rounds ?? 0 })}
             </Text>
           </View>
         </View>
@@ -630,7 +630,7 @@ export function DrillSelectionStepV2({
   };
 
   // Total rounds calculation
-  const totalRounds = drills.reduce((sum, d) => sum + d.config.rounds * d.config.strings_count, 0);
+  const totalRounds = drills.reduce((sum, d) => sum + (d.config.rounds ?? 0) * d.config.strings_count, 0);
 
   // Categories to show (in order)
   const categoryOrder: DrillCategory[] = ['zeroing', 'grouping', 'speed', 'qualification'];

@@ -199,16 +199,16 @@ export const useTeamStore = create<TeamStore>((set, get) => ({
           : t
       );
       
-      set({ teams: updatedTeams });
-      
+      set({ teams: updatedTeams as TeamWithRole[] });
+
       // Update active team if it's the one being updated
       if (activeTeam?.id === input.team_id) {
-        set({ 
-          activeTeam: { 
-            ...activeTeam, 
-            ...input, 
-            updated_at: new Date().toISOString() 
-          } 
+        set({
+          activeTeam: {
+            ...activeTeam,
+            ...input,
+            updated_at: new Date().toISOString()
+          } as TeamWithMembers
         });
       }
     } catch (error: any) {

@@ -30,7 +30,7 @@ export function TeamContextBanner({ team, memberCount, colors }: TeamContextBann
       <Users size={12} color={colors.textMuted} />
       <Text style={[s.label, { color: colors.textMuted }]}>Team</Text>
       <Text style={[s.teamName, { color: colors.text }]}>{team.name}</Text>
-      {(memberCount ?? team.member_count) > 0 && (
+      {(memberCount ?? team.member_count ?? 0) > 0 && (
         <Text style={[s.count, { color: colors.textMuted }]}>· {memberCount ?? team.member_count}</Text>
       )}
     </View>

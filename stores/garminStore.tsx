@@ -208,7 +208,6 @@ export const useGarminStore = create<GarminState>((set, get) => ({
     try {
       await AsyncStorage.setItem(WATCH_ENABLED_KEY, JSON.stringify(enabled));
       set({ watchEnabled: enabled });
-      console.log(`[GarminStore] Watch enabled set to: ${enabled}`);
     } catch (error) {
       console.error('[GarminStore] Failed to save watchEnabled:', error);
     }
@@ -220,7 +219,6 @@ export const useGarminStore = create<GarminState>((set, get) => ({
       // Default to true if never set (for existing users with watches)
       const enabled = stored !== null ? JSON.parse(stored) : true;
       set({ watchEnabled: enabled, watchEnabledLoaded: true });
-      console.log(`[GarminStore] Watch enabled loaded: ${enabled}`);
       return enabled;
     } catch (error) {
       console.error('[GarminStore] Failed to load watchEnabled:', error);
@@ -365,11 +363,8 @@ export function useGarminInitialize() {
       const watchEnabled = await loadWatchEnabled();
       
       if (!watchEnabled) {
-        console.log('[GarminStore] Watch disabled by user preference - skipping init');
         return;
       }
-      
-      console.log('[GarminStore] Watch enabled - initializing SDK');
       
       // Initialize the native SDK (uses GARMIN_DEFAULT_CONFIG)
       cleanupRef.current = initialize();
@@ -395,11 +390,8 @@ export function useGarminInitialize() {
             break;
 
           case 'message_received':
-            console.log('[GarminStore] 📩 MESSAGE_RECEIVED event');
-            console.log('[GarminStore] 📩 Message:', JSON.stringify(event.message, null, 2));
             useGarminStore.setState((state) => {
               const newMessages = [...state.messages, event.message].slice(-MAX_MESSAGES);
-              console.log('[GarminStore] 📩 Total messages now:', newMessages.length);
               return { messages: newMessages };
             });
             break;
@@ -417,8 +409,6 @@ export function useGarminInitialize() {
           // TWO-PHASE SYNC: SESSION_SUMMARY (Phase 1 - Instant, show results fast)
           // =========================================================================
           case 'session_summary':
-            console.log('[GarminStore] 📩 SESSION_SUMMARY received (Phase 1)');
-
             // =========================================================================
             // AUDIO-WATCH CORRELATION (must happen BEFORE callback so it's included)
             // =========================================================================
@@ -429,21 +419,12 @@ export function useGarminInitialize() {
               const { shotRecordedTimestamps } = useGarminStore.getState();
               let correlationResult: CorrelationResult | null = null;
 
-              console.log('[GarminStore] 🎤 Audio session state at summary:', {
-                sessionStartTime,
-                audioDetectionsCount: audioDetections.length,
-                isListening: audioStore.isListening,
-                isModuleLoaded: audioStore.isModuleLoaded,
-                shotRecordedTimestampsCount: shotRecordedTimestamps.length,
-              });
-
               if (audioDetections.length > 0 && shotRecordedTimestamps.length > 0) {
                 // =========================================================================
                 // Use real SHOT_RECORDED timestamps from watch
                 // Both use Date.now() but SHOT_RECORDED has Bluetooth delay (~100-500ms)
                 // We align by assuming first audio detection = first watch detection = same shot
                 // =========================================================================
-                console.log('[GarminStore] 🎯 Using SHOT_RECORDED timestamps with first-shot alignment');
 
                 // Both are absolute timestamps (Date.now())
                 // SHOT_RECORDED arrives later due to Bluetooth transmission delay
@@ -465,39 +446,8 @@ export function useGarminInitialize() {
                 // Now both timelines start at 0 (the first shot)
                 const watchTimestamps = shotRecordedTimestamps.map(t => t - firstWatchTs);
 
-                console.log('[GarminStore] 🔧 Aligned timestamps (both start at 0):', {
-                  firstAudioTs,
-                  firstWatchTs,
-                  bluetoothDelay: Math.round(firstWatchTs - firstAudioTs),
-                  watchTimestamps: watchTimestamps.map(t => Math.round(t)),
-                  audioTimestamps: relativeAudioDetections.map(d => Math.round(d.timestamp)),
-                  shotRecordedCount: shotRecordedTimestamps.length,
-                  audioCount: audioDetections.length,
-                });
-
                 // Correlate using aligned timestamps
                 correlationResult = correlateShots(watchTimestamps, relativeAudioDetections);
-
-                console.log('[GarminStore] 🎯 Shot correlation complete:', {
-                  userShots: correlationResult.summary.totalUserShots,
-                  distantShots: correlationResult.summary.totalDistantShots,
-                  correlationRate: `${(correlationResult.summary.correlationRate * 100).toFixed(0)}%`,
-                  audioDetections: audioDetections.length,
-                  matchedShots: correlationResult.userShots.length,
-                  watchOnlyShots: correlationResult.watchOnlyShots.length,
-                });
-
-                // Debug: show the actual deltas for matched and unmatched shots
-                if (correlationResult.userShots.length > 0) {
-                  console.log('[GarminStore] 🎯 Matched shot deltas:',
-                    correlationResult.userShots.map(s => `${s.correlationDeltaMs}ms`).join(', ')
-                  );
-                }
-                if (correlationResult.watchOnlyShots.length > 0) {
-                  console.log('[GarminStore] ⚠️ Watch-only shots (no audio match):',
-                    correlationResult.watchOnlyShots.map(s => `@${s.watchTimestamp}ms`).join(', ')
-                  );
-                }
 
                 // Update state
                 useGarminStore.setState({ lastCorrelationResult: correlationResult });
@@ -509,13 +459,11 @@ export function useGarminInitialize() {
 
                 // End audio session (stops listening)
                 audioStore.endSession();
-                console.log('[GarminStore] 🔇 Audio session ended');
               } else if (sessionStartTime && audioDetections.length > 0) {
                 // =========================================================================
                 // FALLBACK: Use splitTimes reconstruction when SHOT_RECORDED not available
                 // (e.g., older watch firmware or Bluetooth issues)
                 // =========================================================================
-                console.log('[GarminStore] ⚠️ No SHOT_RECORDED timestamps, falling back to splitTimes');
 
                 // Convert watch splitTimes to cumulative timestamps (relative to first shot at t=0)
                 const rawWatchTimestamps = splitTimesToTimestamps(
@@ -537,19 +485,7 @@ export function useGarminInitialize() {
                 const alignmentOffset = firstAudioTs - firstWatchTs;
                 const watchTimestamps = rawWatchTimestamps.map(t => t + alignmentOffset);
 
-                console.log('[GarminStore] 🔧 Fallback timestamp alignment:', {
-                  firstAudioTs: Math.round(firstAudioTs),
-                  firstWatchTs,
-                  alignmentOffset: Math.round(alignmentOffset),
-                  watchTimestamps: watchTimestamps.map(t => Math.round(t)),
-                  audioTimestamps: relativeAudioDetections.map(d => Math.round(d.timestamp)),
-                });
-
                 correlationResult = correlateShots(watchTimestamps, relativeAudioDetections);
-
-                console.log('[GarminStore] 🎯 Fallback correlation complete:', {
-                  correlationRate: `${(correlationResult.summary.correlationRate * 100).toFixed(0)}%`,
-                });
 
                 useGarminStore.setState({ lastCorrelationResult: correlationResult });
 
@@ -558,9 +494,8 @@ export function useGarminInitialize() {
                 }
 
                 audioStore.endSession();
-                console.log('[GarminStore] 🔇 Audio session ended');
               } else {
-                console.log('[GarminStore] ⚠️ Skipping correlation - no audio session data');
+                // No audio session data - skip correlation
               }
 
               // Enhance event data with correlation result for downstream consumers
@@ -581,7 +516,6 @@ export function useGarminInitialize() {
             // SESSION_SUMMARY = session is DONE! (Timeline syncs in background)
             // This is Phase 1 - instant, user shouldn't wait for timeline
             if (event.data?.completed && event.data?.sessionId) {
-              console.log('[GarminStore] 🏁 Session complete (from SESSION_SUMMARY)');
               if (store.onWatchSessionComplete) {
                 store.onWatchSessionComplete(event.data.sessionId, event.data.shotsRecorded || 0);
               }
@@ -595,11 +529,9 @@ export function useGarminInitialize() {
             // SESSION_DETAILS is Phase 2 - background data
             // DO NOT update lastSessionData - this would cause UI glitches
             // Just save to DB silently and show a toast
-            console.log('[GarminStore] 📩 SESSION_DETAILS received (Phase 2 - background only)');
-            
+
             const sessionIdForMerge = event.data.sessionId;
             if (sessionIdForMerge) {
-              console.log('[GarminStore] 📩 Saving details to DB silently...');
               
               // Check if this is the new compact format (has shotBiometrics from transformer)
               const hasCompactFormat = event.data.steadiness?.shots?.[0]?.flinch !== undefined ||
@@ -627,11 +559,9 @@ export function useGarminInitialize() {
               mergePromise
                 .then((success) => {
                   if (success) {
-                    console.log('[GarminStore] ✅ Details synced to DB');
                     // TODO: Show toast "Detailed biometrics synced ✓"
                   } else {
                     // No existing target - store details for when user saves
-                    console.log('[GarminStore] ℹ️ No existing target, caching details');
                     // Cache the details so they can be included when summary is saved
                     useGarminStore.setState((state) => {
                       const existing = state.lastSessionData;
@@ -661,7 +591,6 @@ export function useGarminInitialize() {
           // THREE-PHASE SYNC: TIMELINE_CHUNK (Phase 3 - Progress update)
           // =========================================================================
           case 'timeline_chunk':
-            console.log(`[GarminStore] 📩 TIMELINE_CHUNK ${event.chunk + 1}/${event.total}`);
             useGarminStore.setState({
               timelineProgress: { chunk: event.chunk + 1, total: event.total },
             });
@@ -671,9 +600,6 @@ export function useGarminInitialize() {
           // THREE-PHASE SYNC: TIMELINE_COMPLETE (Phase 3 - All chunks received)
           // =========================================================================
           case 'timeline_complete':
-            console.log('[GarminStore] 📩 TIMELINE_COMPLETE received');
-            console.log('[GarminStore] 📩 Timeline summary:', event.data.summary);
-            
             // Update state with timeline data
             useGarminStore.setState({
               lastTimelineData: event.data,
@@ -688,10 +614,8 @@ export function useGarminInitialize() {
             // Save to database (background - user already sees results from SESSION_SUMMARY)
             const timelineSessionId = event.data.sessionId;
             if (timelineSessionId) {
-              console.log('[GarminStore] 📩 Saving timeline to DB...');
               saveSessionTimeline(event.data)
-                .then((saved) => {
-                  console.log('[GarminStore] ✅ Timeline saved to DB:', saved.id);
+                .then((_saved) => {
                   // Timeline syncs silently - session completion already triggered by SESSION_SUMMARY
                 })
                 .catch((err) => {
@@ -704,7 +628,6 @@ export function useGarminInitialize() {
           // SHOT_RECORDED: Real-time shot detection from watch
           // =========================================================================
           case 'shot_recorded':
-            console.log(`[GarminStore] 🎯 SHOT_RECORDED #${event.shotNumber} for ${event.sessionId?.slice(0, 8)}... at ${event.timestamp}`);
             useGarminStore.setState((state) => ({
               shotRecordedTimestamps: [...state.shotRecordedTimestamps, event.timestamp],
             }));
@@ -733,9 +656,8 @@ export function useGarminInitialize() {
           
           // Only try to reconnect if watch enabled, SDK ready, and not already connected
           if (watchEnabled && isReady && status !== 'CONNECTED') {
-            console.log('[GarminStore] App resumed - attempting silent reconnect');
-            serviceRefreshDevices().catch((err) => {
-              console.log('[GarminStore] Silent reconnect failed:', err);
+            serviceRefreshDevices().catch(() => {
+              // Silent reconnect failed
             });
           }
         }

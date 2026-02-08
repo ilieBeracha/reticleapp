@@ -59,8 +59,6 @@ export function useWeaponRealtime(options: UseWeaponRealtimeOptions): UseWeaponR
 
   const handleRequestData = useCallback(
     (payload: ChangePayload<WeaponRequestRecord>) => {
-      console.log(`[WeaponRealtime] Request ${payload.eventType}:`, payload.new?.status || payload.old?.status);
-
       onRequestChange?.(payload);
 
       if (payload.eventType === 'INSERT') {
@@ -86,8 +84,6 @@ export function useWeaponRealtime(options: UseWeaponRealtimeOptions): UseWeaponR
 
   const handleWeaponData = useCallback(
     (payload: ChangePayload<TeamWeaponRecord>) => {
-      console.log(`[WeaponRealtime] Weapon ${payload.eventType}:`, payload.new?.name || payload.old?.name);
-
       onWeaponChange?.(payload);
 
       if (payload.eventType === 'UPDATE' && userId) {
@@ -117,13 +113,13 @@ export function useWeaponRealtime(options: UseWeaponRealtimeOptions): UseWeaponR
         table: 'weapon_requests',
         event: '*' as const,
         filter: `team_id=eq.${teamId}`,
-        onData: handleRequestData as (payload: ChangePayload) => void,
+        onData: handleRequestData as any,
       },
       {
         table: 'team_weapons',
         event: '*' as const,
         filter: `team_id=eq.${teamId}`,
-        onData: handleWeaponData as (payload: ChangePayload) => void,
+        onData: handleWeaponData as any,
       },
     ];
   }, [isEnabled, teamId, handleRequestData, handleWeaponData]);
@@ -137,11 +133,7 @@ export function useWeaponRealtime(options: UseWeaponRealtimeOptions): UseWeaponR
   const { status, isConnected, error, reconnect } = useRealtimeChannel({
     name: channelName,
     subscriptions,
-    onStatusChange: (newStatus) => {
-      if (newStatus === 'SUBSCRIBED') {
-        console.log(`[WeaponRealtime] ✓ Subscribed to team ${teamId} weapons`);
-      }
-    },
+    onStatusChange: (newStatus) => {},
   });
 
   return {

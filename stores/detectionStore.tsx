@@ -96,18 +96,7 @@ export const useDetectionStore = create<DetectionState & DetectionActions>(
       set({ status: "analyzing", error: null });
 
       try {
-        console.log("[DetectionStore] Starting document analysis...");
         const result = await analyzeDocumentService(imageUri, options);
-
-        // Log rectification info
-        if (result.rectification_info) {
-          console.log(
-            "[DetectionStore] Rectification:",
-            result.rectification_info.success
-              ? `✅ ${result.rectification_info.method}`
-              : `⚠️ ${result.rectification_info.message}`
-          );
-        }
 
         set({ status: "success", result });
         return result;
@@ -135,23 +124,18 @@ export const useDetectionStore = create<DetectionState & DetectionActions>(
       // Try document analysis first if enabled
       if (useDocumentAnalysis) {
         try {
-          console.log("[DetectionStore] Trying document analysis...");
           const docResult = await get().analyzeDocument();
           if (docResult && docResult.detections) {
-            console.log("[DetectionStore] Document analysis succeeded with", docResult.detections.length, "detections");
             return docResult as unknown as AnalyzeResponse;
           }
         } catch (err: any) {
-          console.warn("[DetectionStore] Document analysis failed, falling back to legacy:", err.message);
           // Fall through to legacy analysis
         }
       }
 
       // Legacy analysis (fallback or if document analysis is disabled)
       try {
-        console.log("[DetectionStore] Using legacy analysis...");
         const result = await uploadForDetection(imageUri);
-        console.log("[DetectionStore] Legacy analysis succeeded with", result.detections?.length || 0, "detections");
         set({ status: "success", result });
         return result;
       } catch (err: any) {

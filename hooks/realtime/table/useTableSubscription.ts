@@ -61,7 +61,7 @@ export function useTableSubscription<T = Record<string, unknown>>(
               table,
               event,
               filter,
-              onData: handleData as (payload: ChangePayload) => void,
+              onData: handleData as any,
             },
           ]
         : [],

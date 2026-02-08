@@ -62,7 +62,7 @@ export function ActiveTrainingBanner({ training, teamColor, onJoin, colors }: Ac
     transform: [{ scale: pulseScale.value }],
   }));
 
-  const participantCount = training.participants?.length || 0;
+  const participantCount = (training as any).participants?.length || 0;
 
   return (
     <Animated.View entering={FadeIn.duration(200)}>

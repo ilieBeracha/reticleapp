@@ -94,8 +94,8 @@ export function DrillAdjustModal({ visible, drill, onClose, onSave }: DrillAdjus
   // Sync state when drill changes
   useEffect(() => {
     if (drill) {
-      setDistance(drill.distance_m);
-      setRounds(drill.rounds_per_shooter);
+      setDistance(drill.distance_m ?? 100);
+      setRounds(drill.rounds_per_shooter ?? 5);
       setTimeLimit(drill.time_limit_seconds ?? null);
     }
   }, [drill]);

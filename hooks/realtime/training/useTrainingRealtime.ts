@@ -41,7 +41,6 @@ export function useTrainingRealtime(options: UseTrainingRealtimeOptions): UseTra
   const handleTrainingData = useCallback(
     (payload: ChangePayload<TrainingRecord>) => {
       if (payload.eventType === 'UPDATE' && payload.new) {
-        console.log(`[TrainingRealtime] Training updated: status=${payload.new.status}`);
         onTrainingUpdate?.(payload.new);
       }
     },
@@ -50,8 +49,6 @@ export function useTrainingRealtime(options: UseTrainingRealtimeOptions): UseTra
 
   const handleSessionData = useCallback(
     (payload: ChangePayload<SessionRecord>) => {
-      console.log(`[TrainingRealtime] Session ${payload.eventType}:`, payload.new?.id);
-
       onSessionChange?.(payload);
 
       if (payload.eventType === 'INSERT') {
@@ -66,7 +63,6 @@ export function useTrainingRealtime(options: UseTrainingRealtimeOptions): UseTra
   const handleTargetData = useCallback(
     (payload: ChangePayload<SessionTargetRecord>) => {
       if (payload.eventType === 'INSERT') {
-        console.log(`[TrainingRealtime] New target added:`, payload.new?.id);
         onNewTarget?.(payload.new);
       }
     },
@@ -113,11 +109,7 @@ export function useTrainingRealtime(options: UseTrainingRealtimeOptions): UseTra
   const { status, isConnected, error, reconnect } = useRealtimeChannel({
     name: channelName,
     subscriptions,
-    onStatusChange: (newStatus) => {
-      if (newStatus === 'SUBSCRIBED') {
-        console.log(`[TrainingRealtime] ✓ Subscribed to training ${trainingId}`);
-      }
-    },
+    onStatusChange: (newStatus) => {},
   });
 
   return {

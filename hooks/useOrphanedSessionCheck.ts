@@ -55,15 +55,12 @@ export function useOrphanedSessionCheck(): OrphanCheckResult {
           return;
         }
 
-        console.log(`[OrphanCheck] Found ${activeSessions.length} active session(s)`);
-        
         let orphaned = 0;
         let mostRecent: SessionWithDetails | null = null;
 
         for (const session of activeSessions) {
           // Auto-cancel extremely old sessions (24h+)
           if (shouldAutoCancelSession(session)) {
-            console.log(`[OrphanCheck] Auto-cancelling session ${session.id} (${getSessionAge(session)} old)`);
             try {
               await deleteSession(session.id);
               orphaned++;
@@ -95,7 +92,6 @@ export function useOrphanedSessionCheck(): OrphanCheckResult {
                   onPress: async () => {
                     try {
                       await endSession(session.id);
-                      console.log(`[OrphanCheck] Ended stale session ${session.id}`);
                       // Update state
                       if (mostRecent?.id === session.id) {
                         setActiveSession(null);
