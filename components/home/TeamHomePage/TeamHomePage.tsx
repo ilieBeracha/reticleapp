@@ -21,7 +21,7 @@ import { useColors } from '@/hooks/ui/useColors';
 import { getTeamColor } from '@/utils/teamColors';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
-import { History } from 'lucide-react-native';
+import { History, Plus } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -50,6 +50,7 @@ export function TeamHomePage() {
 
     // Role
     isCommander,
+    canCreateTraining,
 
     // Team info
     activeTeam,
@@ -268,6 +269,29 @@ export function TeamHomePage() {
         ) : (
           /* ─── MEMBER: upcoming trainings + team context ─── */
           <>
+            {/* Create Training button for members with granted permission */}
+            {canCreateTraining && !isCommander && (
+              <Animated.View entering={FadeIn.delay(50)} style={s.createTrainingSection}>
+                <TouchableOpacity
+                  style={[s.createTrainingCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+                  onPress={handleStartTraining}
+                  activeOpacity={0.7}
+                >
+                  <View style={[s.createTrainingIcon, { backgroundColor: teamColor }]}>
+                    <Plus size={18} color="#fff" strokeWidth={2.5} />
+                  </View>
+                  <View style={s.createTrainingContent}>
+                    <Text style={[s.createTrainingTitle, { color: colors.text }]}>
+                      {t('teamHome.createTraining')}
+                    </Text>
+                    <Text style={[s.createTrainingSubtitle, { color: colors.textMuted }]}>
+                      {t('teamHome.createTrainingDesc')}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              </Animated.View>
+            )}
+
             {/* Upcoming Trainings - shown directly, no tabs */}
             {upcomingTrainings.length > 0 && (
               <UpcomingTrainingsCard
@@ -488,6 +512,36 @@ const s = StyleSheet.create({
   teamContextDivider: {
     width: 1,
     height: 20,
+  },
+  // ─── Create Training (member with permission) ───
+  createTrainingSection: {
+    marginBottom: 12,
+  },
+  createTrainingCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    gap: 12,
+  },
+  createTrainingIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  createTrainingContent: {
+    flex: 1,
+  },
+  createTrainingTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  createTrainingSubtitle: {
+    fontSize: 12,
+    marginTop: 2,
   },
 });
 

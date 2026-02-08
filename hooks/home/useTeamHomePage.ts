@@ -13,6 +13,7 @@ import { useTranslation } from 'react-i18next';
 
 import { CONTEXT_SWITCH_LOADING_DELAY_MS } from '@/constants/unifiedHomePage';
 import { useAuth } from '@/contexts/AuthContext';
+import { usePermissions } from '@/hooks/usePermissions';
 import { featuresToSessions } from '@/services/insights/insightsAdapter';
 import { getDashboardFeatures } from '@/services/session/queries';
 import { useGarminStore } from '@/stores/garminStore';
@@ -47,6 +48,9 @@ export function useTeamHomePage() {
     return team?.my_role || null;
   });
   const isCommander = myRole === 'owner' || myRole === 'commander';
+
+  // Get permissions (including granted overrides)
+  const { canCreateTraining } = usePermissions();
 
   // Local state
   const [refreshing, setRefreshing] = useState(false);
@@ -284,14 +288,14 @@ export function useTeamHomePage() {
     } else if (liveTrainings.length > 1) {
       // Multiple live trainings - go to the first one (banners show all)
       router.push(`/(protected)/trainingDetail?id=${liveTrainings[0].id}`);
-    } else if (isCommander && activeTeamId) {
-      // Commander: create a team training
+    } else if (canCreateTraining && activeTeamId) {
+      // User with training creation permission: create a team training
       router.push(`/(protected)/createTraining?teamId=${activeTeamId}` as any);
     } else {
-      // Member: start a solo session
+      // Member without permission: start a solo session
       router.push('/(protected)/startEngagement');
     }
-  }, [liveTrainings, isCommander, activeTeamId]);
+  }, [liveTrainings, canCreateTraining, activeTeamId]);
 
   const handleViewSchedule = useCallback(() => {
     if (!activeTeamId) return;
@@ -346,6 +350,7 @@ export function useTeamHomePage() {
     // Role
     myRole,
     isCommander,
+    canCreateTraining,
 
     // Team info
     activeTeam,

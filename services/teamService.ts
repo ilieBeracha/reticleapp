@@ -6,6 +6,7 @@
 
 import { supabase } from '@/services/supabase';
 import type {
+    MemberPermissions,
     Team,
     TeamInvitation,
     TeamMember,
@@ -45,6 +46,7 @@ function normalizeTeamMemberWithProfile(row: any): TeamMemberWithProfile {
     user_id: row.user_id,
     joined_at: row.joined_at,
     details: row.details ?? null,
+    permissions: row.permissions ?? {},
     role: {
       role: rawRole as any,
       squad_id: rawSquadId ?? undefined,
@@ -153,23 +155,15 @@ export async function getTeamWithMembers(teamId: string): Promise<TeamWithMember
 
   if (!data) return null;
 
-  // Normalize members returned by RPC (may have partial profile fields)
-  let members: TeamMemberWithProfile[] = (data.members || []).map(normalizeTeamMemberWithProfile);
-
-  // Some RPCs don't include `profiles.avatar_url` (or even profile at all).
-  // If profile data looks incomplete, fetch members via direct select to ensure
-  // consistent UI (avatars + names) across screens like TeamHomePage.
-  const hasCompleteProfiles =
-    members.length === 0 ||
-    members.every((m: TeamMemberWithProfile) => m.profile && ('avatar_url' in m.profile || 'full_name' in m.profile));
-
-  if (!hasCompleteProfiles) {
-    try {
-      members = await getTeamMembers(teamId);
-    } catch (e) {
-      // Keep RPC members if the fallback fetch fails.
-      console.warn('Failed to hydrate member profiles, using RPC members:', e);
-    }
+  // Always fetch members via direct query to ensure we have complete data
+  // including profiles and permissions (RPC may not return all fields)
+  let members: TeamMemberWithProfile[];
+  try {
+    members = await getTeamMembers(teamId);
+  } catch (e) {
+    // Fallback to RPC members if direct query fails
+    console.warn('Failed to fetch members directly, using RPC members:', e);
+    members = (data.members || []).map(normalizeTeamMemberWithProfile);
   }
 
   return {
@@ -352,6 +346,7 @@ export async function getTeamMembers(teamId: string): Promise<TeamMemberWithProf
       squad_id,
       joined_at,
       details,
+      permissions,
       profile:profiles!user_id(id, email, full_name, avatar_url)
     `
     )
@@ -369,6 +364,7 @@ export async function getTeamMembers(teamId: string): Promise<TeamMemberWithProf
     user_id: m.user_id,
     joined_at: m.joined_at,
     details: m.details,
+    permissions: m.permissions || {},
     role: {
       role: m.role, // DB stores as text, type expects { role: TeamRole }
       squad_id: m.squad_id || m.details?.squad_id, // Prefer column, fallback to details
@@ -619,4 +615,148 @@ export async function getMyRoleInTeam(teamId: string): Promise<TeamRole | null> 
     .single();
 
   return (data?.role as TeamRole) || null;
+}
+
+// =====================================================
+// MEMBER PERMISSIONS
+// =====================================================
+
+/**
+ * Grant a permission to a team member
+ * Only commanders/owners can grant permissions
+ */
+export async function grantMemberPermission(
+  teamId: string,
+  userId: string,
+  permission: keyof MemberPermissions
+): Promise<MemberPermissions> {
+  // Get current permissions (handle duplicates)
+  const { data: members, error: fetchError } = await supabase
+    .from('team_members')
+    .select('permissions')
+    .eq('team_id', teamId)
+    .eq('user_id', userId)
+    .limit(1);
+
+  if (fetchError) {
+    console.error('Failed to fetch member permissions:', fetchError);
+    throw new Error(fetchError.message || 'Failed to fetch member');
+  }
+
+  const member = members?.[0];
+  const currentPermissions = (member?.permissions || {}) as MemberPermissions;
+  const updatedPermissions = { ...currentPermissions, [permission]: true };
+
+  // Update all matching rows (handles duplicates)
+  const { error } = await supabase
+    .from('team_members')
+    .update({ permissions: updatedPermissions })
+    .eq('team_id', teamId)
+    .eq('user_id', userId);
+
+  if (error) {
+    console.error('Failed to grant permission:', error);
+    throw new Error(error.message || 'Failed to grant permission');
+  }
+
+  return updatedPermissions;
+}
+
+/**
+ * Revoke a permission from a team member
+ * Only commanders/owners can revoke permissions
+ */
+export async function revokeMemberPermission(
+  teamId: string,
+  userId: string,
+  permission: keyof MemberPermissions
+): Promise<MemberPermissions> {
+  // Get current permissions (handle duplicates)
+  const { data: members, error: fetchError } = await supabase
+    .from('team_members')
+    .select('permissions')
+    .eq('team_id', teamId)
+    .eq('user_id', userId)
+    .limit(1);
+
+  if (fetchError) {
+    console.error('Failed to fetch member permissions:', fetchError);
+    throw new Error(fetchError.message || 'Failed to fetch member');
+  }
+
+  const member = members?.[0];
+  const currentPermissions = (member?.permissions || {}) as MemberPermissions;
+  const { [permission]: _, ...updatedPermissions } = currentPermissions;
+
+  // Update all matching rows (handles duplicates)
+  const { error } = await supabase
+    .from('team_members')
+    .update({ permissions: updatedPermissions })
+    .eq('team_id', teamId)
+    .eq('user_id', userId);
+
+  if (error) {
+    console.error('Failed to revoke permission:', error);
+    throw new Error(error.message || 'Failed to revoke permission');
+  }
+
+  return updatedPermissions;
+}
+
+/**
+ * Toggle a permission for a team member
+ */
+export async function toggleMemberPermission(
+  teamId: string,
+  userId: string,
+  permission: keyof MemberPermissions
+): Promise<MemberPermissions> {
+  // Get current permissions (use maybeSingle to handle duplicates gracefully)
+  const { data: members, error: fetchError } = await supabase
+    .from('team_members')
+    .select('permissions')
+    .eq('team_id', teamId)
+    .eq('user_id', userId)
+    .limit(1);
+
+  if (fetchError) {
+    console.error('Failed to fetch member permissions:', fetchError);
+    throw new Error(fetchError.message || 'Failed to fetch member');
+  }
+
+  const member = members?.[0];
+  if (!member) {
+    throw new Error('Member not found');
+  }
+
+  const currentPermissions = (member.permissions || {}) as MemberPermissions;
+  const hasPermission = currentPermissions[permission] === true;
+
+  if (hasPermission) {
+    return revokeMemberPermission(teamId, userId, permission);
+  } else {
+    return grantMemberPermission(teamId, userId, permission);
+  }
+}
+
+/**
+ * Get permissions for a team member
+ */
+export async function getMemberPermissions(
+  teamId: string,
+  userId: string
+): Promise<MemberPermissions> {
+  const { data, error } = await supabase
+    .from('team_members')
+    .select('permissions')
+    .eq('team_id', teamId)
+    .eq('user_id', userId)
+    .single();
+
+  if (error) {
+    console.error('Failed to fetch member permissions:', error);
+    return {};
+  }
+
+  return (data?.permissions || {}) as MemberPermissions;
 }

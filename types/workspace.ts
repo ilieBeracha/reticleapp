@@ -34,6 +34,15 @@ export interface TeamWithRole extends Team {
 }
 
 // Team member
+// Per-user permission overrides (granted by commander)
+export interface MemberPermissions {
+  canCreateTraining?: boolean;
+  // Add more grantable permissions here as needed
+}
+
+// List of all grantable permission keys
+export const GRANTABLE_PERMISSIONS: (keyof MemberPermissions)[] = ['canCreateTraining'];
+
 export interface TeamMember {
   team_id: string;
   user_id: string;
@@ -42,6 +51,7 @@ export interface TeamMember {
     squad_id?: string;
   };
   details?: { squad_id?: string }; // Squad assignment from team's squads array
+  permissions?: MemberPermissions; // Per-user permission overrides
   joined_at: string;
 }
 

@@ -185,7 +185,7 @@ const s = StyleSheet.create({
     gap: 10,
   },
   dateBadge: {
-    width: 38,
+    width: 50,
     alignItems: 'center',
     paddingVertical: 4,
     borderRadius: 6,
