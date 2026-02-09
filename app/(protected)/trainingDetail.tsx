@@ -12,6 +12,7 @@
  *   - Results tab: Summary card, completed sessions history
  */
 import { MissMarker } from '@/components/targets/MissMarker';
+import { DrillCreator } from '@/components/training/create/steps/DrillCreator';
 import { TrainingSettingsModal } from '@/components/training/detail/TrainingSettingsModal';
 import { SquadInvitationBanner } from '@/components/training/SquadInvitationBanner';
 import { SquadLobbyBanner } from '@/components/training/SquadLobbyBanner';
@@ -22,16 +23,18 @@ import { useTrainingDetail } from '@/hooks/training/useTrainingDetail';
 import { useColors } from '@/hooks/ui/useColors';
 import { usePermissions } from '@/hooks/usePermissions';
 import { requireCurrentUserId } from '@/services/authService';
+import { getTeamDrills } from '@/services/drillService';
 import { getOrCreateSetupSession } from '@/services/session/mutations';
 import { createEngagement } from '@/services/session/participants';
 import { getActiveSquadEngagement, getMyActiveSessionForTraining, getTrainingSessionsWithStats } from '@/services/session/queries';
 import { saveMissPoints } from '@/services/session/targets';
-import { finishTraining, startTraining } from '@/services/trainingService';
+import { addDrill, finishTraining, getTrainingById, startTraining } from '@/services/trainingService';
 import { getMyMostRecentWeaponId, getOrCreatePersonalProfile, getTeamWeaponForUser } from '@/services/weaponService';
 import { useGarminStore } from '@/stores/garminStore';
 import { useTeamStore } from '@/stores/teamStore';
+import type { DrillConfig, TrainingDrillItem } from '@/types/createTraining';
 import type { MissPoint, SessionWithDetails } from '@/types/session';
-import type { TrainingDrill } from '@/types/workspace';
+import type { Drill, TrainingDrill } from '@/types/workspace';
 import { useFocusEffect } from '@react-navigation/native';
 import { formatDistanceToNow } from 'date-fns';
 import * as Haptics from 'expo-haptics';
@@ -46,6 +49,7 @@ import {
   Flag,
   Lock,
   Play,
+  Plus,
   Settings,
   ShieldAlert,
   Target,
@@ -907,6 +911,8 @@ function PlannedDrillsList({
   currentUserId,
   disabled = false,
   startingDrillId = null,
+  isCreator = false,
+  onAddDrill,
 }: {
   training: any;
   colors: any;
@@ -915,11 +921,13 @@ function PlannedDrillsList({
   currentUserId: string | null;
   disabled?: boolean;
   startingDrillId?: string | null;
+  isCreator?: boolean;
+  onAddDrill?: () => void;
 }) {
   const { t } = useTranslation();
-  if (!training.drills || training.drills.length === 0) return null;
-
+  const hasDrills = training.drills && training.drills.length > 0;
   const canStart = training.status === 'ongoing' && !disabled;
+  const canAddDrills = isCreator && (training.status === 'planned' || training.status === 'ongoing');
 
   // Calculate completion count per drill for current user
   const getCompletedCount = (drillId: string) => {
@@ -927,32 +935,67 @@ function PlannedDrillsList({
     return completedSessions.filter((s) => s.drill_id === drillId && s.user_id === currentUserId).length;
   };
 
+  if (!hasDrills && !canAddDrills) return null;
+
   return (
     <View style={styles.section}>
-      <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>
-        {canStart ? t('training.availableDrills') : t('training.plannedDrills')}
-      </Text>
-
-      <View style={[styles.sessionsList, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        {training.drills
-          .sort((a: any, b: any) => (a.order_index ?? 0) - (b.order_index ?? 0))
-          .map((drill: any, idx: number) => (
-            <DrillRow
-              key={drill.id}
-              drill={drill}
-              index={idx}
-              colors={colors}
-              canStart={canStart && !startingDrillId}
-              isLast={idx === training.drills!.length - 1}
-              onStart={() => onStartDrill(drill)}
-              completedCount={getCompletedCount(drill.id)}
-              maxExecutions={drill.max_executions ?? 1}
-              isLoading={startingDrillId === drill.id}
-            />
-          ))}
+      <View style={styles.sectionHeaderRow}>
+        <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>
+          {canStart ? t('training.availableDrills') : t('training.plannedDrills')}
+        </Text>
+        {hasDrills && (
+          <View style={[styles.drillCountBadge, { backgroundColor: colors.primary + '15' }]}>
+            <Text style={[styles.drillCountText, { color: colors.primary }]}>
+              {training.drills.length}
+            </Text>
+          </View>
+        )}
       </View>
 
-      {training.status === 'planned' && (
+      {hasDrills && (
+        <View style={[styles.sessionsList, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          {training.drills
+            .sort((a: any, b: any) => (a.order_index ?? 0) - (b.order_index ?? 0))
+            .map((drill: any, idx: number) => (
+              <DrillRow
+                key={drill.id}
+                drill={drill}
+                index={idx}
+                colors={colors}
+                canStart={canStart && !startingDrillId}
+                isLast={idx === training.drills!.length - 1}
+                onStart={() => onStartDrill(drill)}
+                completedCount={getCompletedCount(drill.id)}
+                maxExecutions={drill.max_executions ?? 1}
+                isLoading={startingDrillId === drill.id}
+              />
+            ))}
+        </View>
+      )}
+
+      {/* Add Drill button - only for training creator */}
+      {canAddDrills && onAddDrill && (
+        <TouchableOpacity
+          style={[styles.addDrillBtn, { borderColor: colors.border, backgroundColor: colors.card }]}
+          onPress={onAddDrill}
+          activeOpacity={0.7}
+        >
+          <View style={[styles.addDrillIcon, { backgroundColor: colors.primary + '12' }]}>
+            <Plus size={16} color={colors.primary} strokeWidth={2.5} />
+          </View>
+          <View style={styles.addDrillContent}>
+            <Text style={[styles.addDrillTitle, { color: colors.text }]}>
+              {t('training.addDrill')}
+            </Text>
+            <Text style={[styles.addDrillSubtitle, { color: colors.textMuted }]}>
+              {t('training.addDrillMidSession', 'Add a new drill to this training')}
+            </Text>
+          </View>
+          <Plus size={14} color={colors.textMuted} />
+        </TouchableOpacity>
+      )}
+
+      {training.status === 'planned' && hasDrills && (
         <Text style={[styles.drillsHint, { color: colors.textMuted }]}>{t('training.startTrainingToEnable')}</Text>
       )}
     </View>
@@ -1053,12 +1096,18 @@ function EmptyState({
   training,
   completedSessions,
   colors,
+  isCreator,
+  onAddDrill,
 }: {
   training: any;
   completedSessions: SessionWithDetails[];
   colors: any;
+  isCreator?: boolean;
+  onAddDrill?: () => void;
 }) {
   const { t } = useTranslation();
+  const canAddDrills = isCreator && (training.status === 'planned' || training.status === 'ongoing');
+
   // Show pending notice if drills exist but no sessions
   if (completedSessions.length === 0 && training.drills?.length > 0) {
     return (
@@ -1077,6 +1126,16 @@ function EmptyState({
         </View>
         <Text style={[styles.emptyTitle, { color: colors.text }]}>{t('training.noDrillsYet')}</Text>
         <Text style={[styles.emptySubtitle, { color: colors.textMuted }]}>{t('training.noDrillsConfigured')}</Text>
+        {canAddDrills && onAddDrill && (
+          <TouchableOpacity
+            style={[styles.emptyAddBtn, { backgroundColor: colors.primary }]}
+            onPress={onAddDrill}
+            activeOpacity={0.8}
+          >
+            <Plus size={16} color="#fff" strokeWidth={2.5} />
+            <Text style={styles.emptyAddBtnText}>{t('training.addDrill')}</Text>
+          </TouchableOpacity>
+        )}
       </View>
     );
   }
@@ -1095,11 +1154,13 @@ function TrainingSummaryContent({
   completedSessions,
   canManageTraining,
   isInvited,
+  isCreator,
   onBack,
   onOpenSettings,
   onStartTraining,
   onEndTraining,
   onStartDrill,
+  onAddDrill,
   isUpdatingStatus,
   currentUserId,
   onRefresh,
@@ -1111,11 +1172,13 @@ function TrainingSummaryContent({
   completedSessions: SessionWithDetails[];
   canManageTraining: boolean;
   isInvited: boolean;
+  isCreator: boolean;
   onBack: () => void;
   onOpenSettings: () => void;
   onStartTraining: () => void;
   onEndTraining: () => void;
   onStartDrill: (drill: TrainingDrill) => void;
+  onAddDrill: () => void;
   isUpdatingStatus: boolean;
   currentUserId: string | null;
   onRefresh: () => void;
@@ -1300,10 +1363,18 @@ function TrainingSummaryContent({
                 currentUserId={currentUserId}
                 disabled={!isInvited}
                 startingDrillId={startingDrillId}
+                isCreator={isCreator}
+                onAddDrill={onAddDrill}
               />
 
               {/* Empty State for drills */}
-              <EmptyState training={training} completedSessions={completedSessions} colors={colors} />
+              <EmptyState
+                training={training}
+                completedSessions={completedSessions}
+                colors={colors}
+                isCreator={isCreator}
+                onAddDrill={onAddDrill}
+              />
             </>
           ) : (
             <>
@@ -1372,6 +1443,8 @@ export default function TrainingDetailScreen() {
   // State
   // ─────────────────────────────────────────────────────────────────────────────
   const [showSettings, setShowSettings] = useState(false);
+  const [showDrillCreator, setShowDrillCreator] = useState(false);
+  const [teamDrills, setTeamDrills] = useState<Drill[]>([]);
   const [completedSessions, setCompletedSessions] = useState<SessionWithDetails[]>([]);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   // Starting drill loading state (drill ID that's currently being started)
@@ -1492,6 +1565,82 @@ export default function TrainingDetailScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setShowSettings(true);
   }, []);
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Drill Creator Handlers (Creator Only)
+  // ─────────────────────────────────────────────────────────────────────────────
+  const handleOpenDrillCreator = useCallback(async () => {
+    if (!training?.team_id) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    try {
+      const drills = await getTeamDrills(training.team_id);
+      setTeamDrills(drills);
+    } catch (error) {
+      console.error('[TrainingDetail] Failed to load team drills:', error);
+      setTeamDrills([]);
+    }
+    setShowDrillCreator(true);
+  }, [training?.team_id]);
+
+  const handleAddDrillToTraining = useCallback(async (drill: TrainingDrillItem) => {
+    if (!training?.id) return;
+    try {
+      await addDrill(training.id, {
+        drill_id: drill.drill_id,
+        name: drill.name,
+        drill_goal: drill.drill_goal,
+        target_type: drill.target_type,
+        input_method: drill.input_method,
+        distance_m: drill.distance_m,
+        distance_category: drill.distance_category,
+        rounds_per_shooter: drill.rounds_per_shooter,
+        time_limit_seconds: drill.time_limit_seconds,
+        strings_count: drill.strings_count,
+        weapon_category: drill.weapon_category,
+        execution_policy: 'locked',
+        engagement_mode: 'solo',
+      });
+      // Refresh training data to show the new drill
+      const updated = await getTrainingById(training.id);
+      if (updated) {
+        setTraining(updated);
+      }
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (error) {
+      console.error('[TrainingDetail] Failed to add drill:', error);
+      Alert.alert(t('common.error', 'Error'), t('training.addDrillFailed', 'Failed to add drill. Please try again.'));
+    }
+  }, [training?.id, setTraining, t]);
+
+  const handleSaveAndAddDrill = useCallback(async (_drillData: any, config: DrillConfig) => {
+    // For now, just add to training without saving to library from this context
+    // The DrillCreator handles the save + add flow
+    if (!training?.id) return;
+    try {
+      await addDrill(training.id, {
+        name: _drillData.name,
+        drill_goal: _drillData.drill_goal,
+        target_type: _drillData.target_type,
+        input_method: _drillData.drill_goal === 'grouping' ? 'scan' : 'manual',
+        distance_m: config.distance_m,
+        distance_category: config.distance_category,
+        rounds_per_shooter: config.rounds_per_shooter,
+        time_limit_seconds: config.time_limit_seconds,
+        strings_count: config.strings_count,
+        weapon_category: config.weapon_category,
+        execution_policy: 'locked',
+        engagement_mode: 'solo',
+      });
+      const updated = await getTrainingById(training.id);
+      if (updated) {
+        setTraining(updated);
+      }
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (error) {
+      console.error('[TrainingDetail] Failed to save and add drill:', error);
+      Alert.alert(t('common.error', 'Error'), t('training.addDrillFailed', 'Failed to add drill. Please try again.'));
+    }
+  }, [training?.id, setTraining, t]);
 
   // ─────────────────────────────────────────────────────────────────────────────
   // Training Status Handlers (Commander Only)
@@ -1719,11 +1868,13 @@ export default function TrainingDetailScreen() {
         completedSessions={completedSessions}
         canManageTraining={canManageTraining}
         isInvited={isInvited}
+        isCreator={isCreator}
         onBack={handleBack}
         onOpenSettings={handleOpenSettings}
         onStartTraining={handleStartTraining}
         onEndTraining={handleEndTraining}
         onStartDrill={handleStartDrill}
+        onAddDrill={handleOpenDrillCreator}
         isUpdatingStatus={isUpdatingStatus}
         currentUserId={session?.user?.id || null}
         onRefresh={loadCompletedSessions}
@@ -1738,6 +1889,15 @@ export default function TrainingDetailScreen() {
         colors={colors}
       />
 
+      {/* Drill Creator Modal - Only for training creator */}
+      <DrillCreator
+        visible={showDrillCreator}
+        teamDrills={teamDrills}
+        canSaveToLibrary={false}
+        onAddToTraining={handleAddDrillToTraining}
+        onSaveAndAdd={handleSaveAndAddDrill}
+        onClose={() => setShowDrillCreator(false)}
+      />
     </View>
   );
 }
@@ -2083,12 +2243,28 @@ const styles = StyleSheet.create({
 
   // Sections
   section: { gap: 8 },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
   sectionLabel: {
     fontSize: 10,
     fontWeight: '700',
     textTransform: 'uppercase',
     letterSpacing: 0.8,
     marginBottom: 1,
+  },
+  drillCountBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+    minWidth: 20,
+    alignItems: 'center',
+  },
+  drillCountText: {
+    fontSize: 10,
+    fontWeight: '700',
   },
 
   // Squad participant rows
@@ -2173,6 +2349,35 @@ const styles = StyleSheet.create({
   },
   drillsHint: { fontSize: 11, textAlign: 'center', marginTop: 6, fontStyle: 'italic' },
 
+  // Add Drill Button
+  addDrillBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    gap: 10,
+  },
+  addDrillIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  addDrillContent: {
+    flex: 1,
+    gap: 1,
+  },
+  addDrillTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  addDrillSubtitle: {
+    fontSize: 11,
+  },
+
   // Empty States
   pendingNotice: { padding: 14, borderRadius: 12, borderWidth: 1 },
   pendingText: { fontSize: 12, textAlign: 'center', lineHeight: 18 },
@@ -2193,6 +2398,20 @@ const styles = StyleSheet.create({
   },
   emptyTitle: { fontSize: 15, fontWeight: '700' },
   emptySubtitle: { fontSize: 12, textAlign: 'center' },
+  emptyAddBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 10,
+    marginTop: 4,
+  },
+  emptyAddBtnText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
 
   // Empty Results (for Results tab)
   emptyResults: {

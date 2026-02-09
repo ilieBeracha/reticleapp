@@ -743,6 +743,8 @@
     "noDrillsConfigured": "This training has no drills configured",
     "noCompletedSessions": "No completed sessions yet",
     "startTrainingToEnable": "Start the training to enable drill execution",
+    "addDrillMidSession": "Add a new drill to this training",
+    "addDrillFailed": "Failed to add drill. Please try again.",
     "commanderOnlyTitle": "Commander Access Only",
     "commanderOnlyMessage": "Training reports are only available to commanders and team owners.",
     "loadingReport": "Loading report...",
