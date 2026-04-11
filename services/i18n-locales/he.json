@@ -734,6 +734,8 @@
     "noDrillsConfigured": "לאימון זה לא הוגדרו תרגילים",
     "noCompletedSessions": "עדיין אין אימונים שהושלמו",
     "startTrainingToEnable": "התחל את האימון כדי לאפשר ביצוע תרגילים",
+    "addDrillMidSession": "הוסף תרגיל חדש לאימון",
+    "addDrillFailed": "הוספת התרגיל נכשלה. נסה שוב.",
     "commanderOnlyTitle": "גישה למפקדים בלבד",
     "commanderOnlyMessage": "דוחות אימון זמינים רק למפקדים ובעלי צוות.",
     "loadingReport": "טוען דוח...",
