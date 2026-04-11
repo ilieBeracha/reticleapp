@@ -16,10 +16,12 @@ import { useAuth } from '@/contexts/AuthContext';
 import { usePermissions } from '@/hooks/usePermissions';
 import { featuresToSessions } from '@/services/insights/insightsAdapter';
 import { getDashboardFeatures } from '@/services/session/queries';
+import { syncHomeWidgets } from '@/services/widgets/widgetSyncService';
 import { useGarminStore } from '@/stores/garminStore';
 import { useTeamStore } from '@/stores/teamStore';
 import { useTrainingStore } from '@/stores/trainingStore';
 import type { WeeklyStats } from '@/types/home';
+import { mapSessionToHomeSession } from '@/types/home.viewmodel';
 import type { SessionWithDetails } from '@/types/session';
 import type { TeamMemberWithProfile, TrainingWithDetails } from '@/types/workspace';
 import { isGroupingSessionWithFallback } from '@/utils/drillGoal';
@@ -251,6 +253,50 @@ export function useTeamHomePage() {
   const totalShotsThisWeek = useMemo(() => {
     return completedSessions.reduce((sum, s) => sum + (s.stats?.shots_fired || 0), 0);
   }, [completedSessions]);
+
+  const recentHomeSessions = useMemo(() => completedSessions.slice(0, 5).map(mapSessionToHomeSession), [completedSessions]);
+
+  const activeSessionForWidget = useMemo(() => {
+    const liveTraining = liveTrainings[0];
+    if (!liveTraining) return null;
+    return {
+      id: `training-${liveTraining.id}`,
+      state: 'active' as const,
+      origin: 'team' as const,
+      scheduledAt: liveTraining.scheduled_at ? new Date(liveTraining.scheduled_at) : null,
+      startedAt: liveTraining.started_at ? new Date(liveTraining.started_at) : null,
+      endedAt: null,
+      expiresAt: null,
+      trainingTitle: liveTraining.title,
+      teamName: activeTeam?.name,
+    };
+  }, [liveTrainings, activeTeam?.name]);
+
+  const nextSessionForWidget = useMemo(() => {
+    const nextTraining = upcomingTrainings[0];
+    if (!nextTraining) return null;
+    return {
+      id: `training-${nextTraining.id}`,
+      state: 'scheduled' as const,
+      origin: 'team' as const,
+      scheduledAt: nextTraining.scheduled_at ? new Date(nextTraining.scheduled_at) : null,
+      startedAt: null,
+      endedAt: null,
+      expiresAt: null,
+      trainingTitle: nextTraining.title,
+      teamName: activeTeam?.name,
+    };
+  }, [upcomingTrainings, activeTeam?.name]);
+
+  useEffect(() => {
+    void syncHomeWidgets({
+      activeSession: activeSessionForWidget,
+      nextSession: nextSessionForWidget,
+      weeklyStats,
+      streak,
+      recentSessions: recentHomeSessions,
+    });
+  }, [activeSessionForWidget, nextSessionForWidget, weeklyStats, streak, recentHomeSessions]);
 
   // Loading state - wait for all data including activeTeam details
   const shouldShowLoading =

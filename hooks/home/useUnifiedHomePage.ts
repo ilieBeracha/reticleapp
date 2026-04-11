@@ -19,6 +19,7 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 import { useModals } from '@/contexts/ModalContext';
 import { useHomeState } from '@/hooks/home/useHomeState';
+import { useWidgetSync } from '@/hooks/useWidgetSync';
 import { deleteSession } from '@/services/session/mutations';
 import { getMyActivePersonalSession, getRecentSessionsWithStats } from '@/services/session/queries';
 import { getDefaultWeapon, getWeaponStats, type UserWeapon, type WeaponStats } from '@/services/weaponService';
@@ -324,6 +325,14 @@ export function useUnifiedHomePage() {
     isContextSwitching || // Show loading during team/account switch
     (loadingAllSessions && allSessions.length === 0) ||
     (!initialized && sessionsLoading);
+
+  useWidgetSync({
+    activeSession: homeState.activeSession,
+    nextSession: homeState.nextSession,
+    weeklyStats,
+    streak,
+    recentSessions,
+  });
 
   // ═══════════════════════════════════════════════════════════════════════════
   // HANDLERS
