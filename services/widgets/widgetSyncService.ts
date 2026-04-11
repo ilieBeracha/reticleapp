@@ -460,9 +460,15 @@ export async function startActiveDrillActivity(
       wwarn('active-drill: factory.start is not a function');
       return;
     }
+    // NOTE: Deep link must point at a real Expo Router route. Groups like
+    // `(protected)` are stripped from URLs, so `app/(protected)/activeSession.tsx`
+    // is reachable at `retic:///activeSession`. We omit the sessionId here
+    // because the Live Activity payload does not currently carry one; the
+    // target route will fall back to the "resume/active" banner on the home
+    // tab if no sessionId is provided.
     activeDrillInstance = activityFactory.start(
       normalizeDrillPayload(payload),
-      'retic://active-session'
+      'retic:///activeSession'
     );
     wlog('active-drill: started');
   } catch (e) {

@@ -34,7 +34,7 @@ const TodayTrainingWidget = (props: TodayTrainingWidgetProps, environment: Widge
           padding({ all: isSmall ? 14 : 18 }),
           background('#F8FAFC'),
           cornerRadius(18),
-          widgetURL('retic://sessions/plan'),
+          widgetURL('retic:///createTraining'),
         ]}
       >
         <HStack spacing={6} alignment="center">
@@ -110,7 +110,7 @@ const TodayTrainingWidget = (props: TodayTrainingWidgetProps, environment: Widge
         padding({ all: isSmall ? 14 : 18 }),
         background('#FFFFFF'),
         cornerRadius(18),
-        widgetURL('retic://sessions/active'),
+        widgetURL('retic:///'),
       ]}
     >
       <HStack spacing={6} alignment="center">

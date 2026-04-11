@@ -38,7 +38,7 @@ const TrainingDashboardWidget = (
         padding({ all: 18 }),
         background('#FFFFFF'),
         cornerRadius(22),
-        widgetURL('retic://home'),
+        widgetURL('retic:///createTraining'),
       ]}
     >
       {/* ── Header ─────────────────────────────────────────────────────── */}

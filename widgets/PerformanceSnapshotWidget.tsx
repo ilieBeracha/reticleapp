@@ -35,7 +35,7 @@ const PerformanceSnapshotWidget = (
           padding({ all: isSmall ? 14 : 18 }),
           background('#F8FAFC'),
           cornerRadius(18),
-          widgetURL('retic://insights'),
+          widgetURL('retic:///insights'),
         ]}
       >
         <HStack spacing={6} alignment="center">
@@ -92,7 +92,7 @@ const PerformanceSnapshotWidget = (
         padding({ all: isSmall ? 14 : 18 }),
         background('#FFFFFF'),
         cornerRadius(18),
-        widgetURL('retic://insights'),
+        widgetURL('retic:///insights'),
       ]}
     >
       <HStack spacing={6} alignment="center">
