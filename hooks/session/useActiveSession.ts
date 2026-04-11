@@ -18,6 +18,7 @@ import { calculateSessionStats } from '@/services/session/stats';
 import { deleteSession, endSession, saveWatchSessionData, updateSession } from '@/services/session/mutations';
 import { getSessionById } from '@/services/session/queries';
 import { getSessionTargetsWithResults } from '@/services/session/targets';
+import { endActiveDrillActivity, updateActiveDrillActivity } from '@/services/widgets/widgetSyncService';
 import type { SessionStats, SessionTargetWithResults, SessionWithDetails } from '@/types/session';
 import { useGarminStore, useIsGarminConnected, useSessionStartStatus } from '@/stores/garminStore';
 import { useSessionStore } from '@/stores/sessionStore';
@@ -282,6 +283,32 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
     if (!stats) return null;
     return computeSessionScore(stats, drill);
   }, [stats, drill]);
+
+  useEffect(() => {
+    if (!session || session.status !== 'active') {
+      void endActiveDrillActivity();
+      return;
+    }
+
+    const remainingSeconds = Math.max(0, (drill?.time_limit_seconds ?? 0) - elapsedTime);
+    const stageLabel = `${targets.length} target${targets.length === 1 ? '' : 's'}`;
+
+    void updateActiveDrillActivity({
+      drillName: session.drill_name || drill?.name || 'Active Drill',
+      stage: stageLabel,
+      elapsedSeconds: elapsedTime,
+      remainingSeconds,
+      score: score?.value ?? Math.round(accuracy),
+    });
+  }, [
+    session,
+    drill?.name,
+    drill?.time_limit_seconds,
+    elapsedTime,
+    targets.length,
+    score?.value,
+    accuracy,
+  ]);
 
   // Input routes - user always chooses scan vs manual
   // Routes are always available (not determined by drill config)
@@ -786,6 +813,7 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
       await endSession(sessionId!);
+      await endActiveDrillActivity();
       await refreshSessionList(session?.team_id, loadTeamSessions, loadPersonalSessions);
       navigateAfterSessionEnd(session?.training_id, sessionId!, lastSessionData);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -819,6 +847,7 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
       try {
         console.log('[ActiveSession] Cancelling empty session - no targets recorded');
         await deleteSession(sessionId!);
+        await endActiveDrillActivity();
         await refreshSessionList(session?.team_id, loadTeamSessions, loadPersonalSessions);
         // Simply go back - user came from trainingDetail
         router.back();
@@ -836,6 +865,7 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
       setEnding(true);
       try {
         await endSession(sessionId!);
+        await endActiveDrillActivity();
 
         // Complete engagement for squad/group sessions
         const engagementId = session?.engagement?.id;
@@ -910,6 +940,7 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
               setEnding(true);
               try {
                 await endSession(sessionId!);
+                await endActiveDrillActivity();
                 await refreshSessionList(session?.team_id, loadTeamSessions, loadPersonalSessions);
                 navigateAfterSessionEnd(session?.training_id, sessionId!, lastSessionData);
                 Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -942,6 +973,7 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
             try {
               const { deleteSession } = await import('@/services/session/mutations');
               await deleteSession(sessionId!);
+              await endActiveDrillActivity();
               await refreshSessionList(session?.team_id, loadTeamSessions, loadPersonalSessions);
               navigateAfterSessionEnd(session?.training_id, sessionId!, null);
             } catch (error: any) {

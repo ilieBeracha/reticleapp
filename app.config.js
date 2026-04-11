@@ -27,6 +27,9 @@ const getSlug = () => {
   // All variants use same slug because they share the same EAS project
   return 'retic';
 };
+
+const getWidgetBundleIdentifier = () => `${getBundleIdentifier()}.widgets`;
+const getWidgetGroupIdentifier = () => `group.${getBundleIdentifier()}`;
 export default ({ config }) => {
   return {
     ...config,
@@ -73,10 +76,41 @@ export default ({ config }) => {
       './plugins/strip-bitcode',
       './plugins/withGarminUrlHandler',
       './plugins/withMicrophonePermission',
-      'expo-build-properties',
       'expo-secure-store',
+      [
+        'expo-widgets',
+        {
+          bundleIdentifier: getWidgetBundleIdentifier(),
+          groupIdentifier: getWidgetGroupIdentifier(),
+          enablePushNotifications: false,
+          widgets: [
+            {
+              name: 'TodayTrainingWidget',
+              displayName: 'Today Training',
+              description: 'Shows your next training session and status.',
+              supportedFamilies: ['systemSmall', 'systemMedium'],
+            },
+            {
+              name: 'PerformanceSnapshotWidget',
+              displayName: 'Performance Snapshot',
+              description: 'Shows your latest score, accuracy, and streak.',
+              supportedFamilies: ['systemSmall', 'systemMedium'],
+            },
+            {
+              name: 'ActiveDrillActivity',
+              displayName: 'Active Drill',
+              description: 'Tracks active drill progress as a Live Activity.',
+              supportedFamilies: ['systemSmall'],
+            },
+          ],
+        },
+      ],
       'expo-web-browser',
       'expo-localization',
+      [
+        'expo-build-properties',
+        {},
+      ],
       [
         'expo-local-authentication',
         {
