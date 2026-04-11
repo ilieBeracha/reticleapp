@@ -102,6 +102,13 @@ export default ({ config }) => {
               description: 'Tracks active drill progress as a Live Activity.',
               supportedFamilies: ['systemSmall'],
             },
+            {
+              name: 'TrainingDashboardWidget',
+              displayName: 'Training Dashboard',
+              description:
+                'Full view of upcoming trainings, weekly stats, and a quick action to start a session.',
+              supportedFamilies: ['systemLarge'],
+            },
           ],
         },
       ],

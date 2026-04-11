@@ -20,6 +20,15 @@ export function useWidgetSync({
   recentSessions,
 }: UseWidgetSyncParams) {
   useEffect(() => {
+    if (__DEV__) {
+      console.log('[useWidgetSync] effect fired', {
+        hasActive: !!activeSession,
+        hasNext: !!nextSession,
+        weeklyAccuracy: weeklyStats?.accuracy,
+        streak,
+        recentCount: recentSessions.length,
+      });
+    }
     void syncHomeWidgets({
       activeSession,
       nextSession,
