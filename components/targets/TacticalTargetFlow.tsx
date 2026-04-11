@@ -361,6 +361,8 @@ export function TacticalTargetFlow({
 
   // Setup state
   const [distance, setDistance] = useState(defaultDistance);
+  // Bullets = actual shots fired. Defaults to predefined value but is always
+  // editable in the results step (can be lower or higher than the default).
   const [bullets, setBullets] = useState(defaultBullets);
 
   const categoryLabel = distanceRange?.category === 'short'
@@ -373,6 +375,13 @@ export function TacticalTargetFlow({
 
   // Results state
   const [hits, setHits] = useState(0);
+
+  // Edit bullets in results step; keeps hits clamped to the new bullets value.
+  // The Stepper component already enforces min={1}, so no lower-bound clamp needed here.
+  const handleBulletsChange = useCallback((next: number) => {
+    setBullets(next);
+    setHits((prev) => Math.min(prev, next));
+  }, []);
   const [groupSizeCm, setGroupSizeCm] = useState(''); // For grouping mode
   const [groupingShots, setGroupingShots] = useState(0); // Shots in the group (required)
   const [time, setTime] = useState('');
@@ -503,12 +512,14 @@ export function TacticalTargetFlow({
           });
         }
       } else {
-        // Single-target engagement
+        // Single-target engagement.
+        // planned_shots = drill's predefined value (what was PLANNED).
+        // bullets_fired = actual shots fired (user-editable default of planned).
         await addTargetWithTacticalResult({
           session_id: sessionId,
           distance_m: distance,
           lane_number: null,
-          planned_shots: bullets,
+          planned_shots: defaultBullets,
           participant_id: participantId,
           bullets_fired: bullets,
           hits: hits,
@@ -536,6 +547,7 @@ export function TacticalTargetFlow({
     sessionId,
     distance,
     bullets,
+    defaultBullets,
     hits,
     groupSizeCm,
     groupingShots,
@@ -970,17 +982,31 @@ export function TacticalTargetFlow({
           })}
         </View>
       ) : (
-        // ENGAGEMENT: Show simple hits stepper
-        <View style={styles.hitsSection}>
-          <HitsStepper value={hits} onChange={setHits} bulletsFired={bullets} />
+        // ENGAGEMENT: Editable bullets fired + simple hits stepper
+        <>
+          {/* Editable bullets fired - defaults to predefined value, but user can edit freely */}
+          <View style={styles.bulletsSection}>
+            <Stepper
+              label={t('target.bulletsFired')}
+              value={bullets}
+              onChange={handleBulletsChange}
+              min={1}
+              max={999}
+              unit={t('target.bulletsUnit')}
+            />
+          </View>
 
-          {/* Hint: miss marker will pop up if there are misses */}
-          {missCount > 0 && (
-            <Text style={styles.missHint}>
-              {t('target.missMarkerHint', { count: missCount, defaultValue: `${missCount} misses - you'll mark where they went` })}
-            </Text>
-          )}
-        </View>
+          <View style={styles.hitsSection}>
+            <HitsStepper value={hits} onChange={setHits} bulletsFired={bullets} />
+
+            {/* Hint: miss marker will pop up if there are misses */}
+            {missCount > 0 && (
+              <Text style={styles.missHint}>
+                {t('target.missMarkerHint', { count: missCount, defaultValue: `${missCount} misses - you'll mark where they went` })}
+              </Text>
+            )}
+          </View>
+        </>
       )}
 
       {/* Time Input - only for engagement */}
@@ -1319,6 +1345,16 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     padding: 24,
     marginBottom: 16,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+
+  // Bullets-fired editor (results step)
+  bulletsSection: {
+    backgroundColor: COLORS.card,
+    borderRadius: 20,
+    padding: 24,
+    marginBottom: 12,
     borderWidth: 1,
     borderColor: COLORS.border,
   },

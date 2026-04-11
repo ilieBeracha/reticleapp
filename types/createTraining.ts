@@ -25,7 +25,8 @@ export interface TrainingDrillItem extends CreateTrainingDrillInput {
 export interface DrillConfig {
   distance_m: number;
   distance_category?: RangeCategory | null;
-  rounds_per_shooter: number;
+  /** Predefined shots. Null = not defined (soldier enters actual at execution time). */
+  rounds_per_shooter: number | null;
   time_limit_seconds: number | null;
   strings_count: number;
   weapon_category: WeaponCategory | null;

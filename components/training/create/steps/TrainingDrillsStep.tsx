@@ -87,8 +87,8 @@ export function TrainingDrillsStep({
     return true;
   });
 
-  // Calculate totals
-  const totalShots = drills.reduce((sum, d) => sum + d.rounds_per_shooter * (d.strings_count || 1), 0);
+  // Calculate totals (drills with null shots are treated as 0 in the rollup)
+  const totalShots = drills.reduce((sum, d) => sum + (d.rounds_per_shooter ?? 0) * (d.strings_count || 1), 0);
   const totalTime = drills.reduce((sum, d) => sum + (d.time_limit_seconds || 0), 0);
 
   return (
@@ -114,7 +114,9 @@ export function TrainingDrillsStep({
           <View style={styles.programList}>
             {drills.map((drill, index) => {
               const goal = GOAL_CONFIG[drill.drill_goal as keyof typeof GOAL_CONFIG] || GOAL_CONFIG.grouping;
-              const totalDrillShots = drill.rounds_per_shooter * (drill.strings_count || 1);
+              const totalDrillShots = drill.rounds_per_shooter != null
+                ? drill.rounds_per_shooter * (drill.strings_count || 1)
+                : null;
 
               return (
                 <Animated.View
@@ -134,7 +136,7 @@ export function TrainingDrillsStep({
                       {drill.name}
                     </Text>
                     <Text style={[styles.programItemMeta, { color: colors.textMuted }]}>
-                      {drill.distance_m}m • {totalDrillShots} shots
+                      {drill.distance_m}m • {totalDrillShots != null ? `${totalDrillShots} shots` : 'Any shots'}
                       {drill.time_limit_seconds ? ` • ${drill.time_limit_seconds}s` : ''}
                     </Text>
                   </View>

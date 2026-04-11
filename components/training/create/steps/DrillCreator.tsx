@@ -18,6 +18,7 @@ import {
 import { useColors } from '@/hooks/ui/useColors';
 import { getCategoryLabel, WEAPON_CATEGORIES } from '@/services/weaponService';
 import type { Drill, DrillGoal, WeaponCategory } from '@/types/workspace';
+import { isInfiniteShots, normalizeMaxShotsForStorage } from '@/utils/drillShots';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import {
@@ -69,7 +70,8 @@ interface DrillSaveData {
   drill_goal: DrillGoal;
   target_type: 'paper' | 'tactical';
   distance_m: number;
-  rounds_per_shooter: number;
+  /** Predefined shots. Null = not defined (stored as INFINITE_SHOTS_SENTINEL in library). */
+  rounds_per_shooter: number | null;
   time_limit_seconds?: number;
   strings_count?: number;
 }
@@ -108,7 +110,8 @@ export function DrillCreator({
   const [drillGoal, setDrillGoal] = useState<DrillGoal>('grouping');
   const [targetType, setTargetType] = useState<'paper' | 'tactical'>('paper');
   const [distance, setDistance] = useState(100);
-  const [shots, setShots] = useState(5);
+  // shots = null → predefined shots are optional (soldier decides at execution time)
+  const [shots, setShots] = useState<number | null>(5);
   const [timeLimit, setTimeLimit] = useState<number | null>(null);
   const [strings, setStrings] = useState(1);
   const [weaponCategory, setWeaponCategory] = useState<WeaponCategory | null>(null);
@@ -153,7 +156,8 @@ export function DrillCreator({
     setDrillGoal(drill.drill_goal);
     setTargetType(drill.target_type);
     setDistance(drill.distance_m);
-    setShots(drill.rounds_per_shooter);
+    // Treat "unlimited" sentinel as "no predefined shots"
+    setShots(isInfiniteShots(drill.rounds_per_shooter) ? null : drill.rounds_per_shooter);
     setTimeLimit(drill.time_limit_seconds || null);
     setStrings(drill.strings_count || 1);
     setWeaponCategory(drill.weapon_category || null);
@@ -206,7 +210,8 @@ export function DrillCreator({
             drill_goal: drillGoal,
             target_type: targetType,
             distance_m: distanceCategory ? 0 : distance,
-            rounds_per_shooter: shots,
+            // Library drills require a numeric value: normalize to sentinel for "unlimited".
+            rounds_per_shooter: normalizeMaxShotsForStorage(shots),
             time_limit_seconds: timeLimit || undefined,
             strings_count: strings,
           },
@@ -228,6 +233,7 @@ export function DrillCreator({
         input_method: inputMethod,
         distance_m: distanceCategory ? 0 : distance,
         distance_category: distanceCategory,
+        // null propagates — training_drills.rounds_per_shooter is nullable.
         rounds_per_shooter: shots,
         time_limit_seconds: timeLimit || undefined,
         strings_count: strings,
@@ -551,7 +557,7 @@ function ConfigureStep({
   targetType: 'paper' | 'tactical';
   distance: number;
   distanceCategory: RangeCategory | null;
-  shots: number;
+  shots: number | null;
   timeLimit: number | null;
   strings: number;
   weaponCategory: WeaponCategory | null;
@@ -565,7 +571,7 @@ function ConfigureStep({
   onTargetTypeChange: (t: 'paper' | 'tactical') => void;
   onDistanceChange: (d: number) => void;
   onDistanceCategoryChange: (c: RangeCategory | null) => void;
-  onShotsChange: (s: number) => void;
+  onShotsChange: (s: number | null) => void;
   onTimeLimitChange: (t: number | null) => void;
   onStringsChange: (s: number) => void;
   onWeaponCategoryChange: (c: WeaponCategory | null) => void;
@@ -579,7 +585,7 @@ function ConfigureStep({
   insets: ReturnType<typeof useSafeAreaInsets>;
 }) {
   const goalColor = GOAL_COLORS[drillGoal];
-  const totalShots = shots * strings;
+  const totalShots = shots != null ? shots * strings : null;
   const inputMethod = drillGoal === 'grouping' ? '📷 Scan' : '✋ Manual';
 
   return (
@@ -795,32 +801,34 @@ function ConfigureStep({
           <View style={styles.sectionHeader}>
             <Target size={14} color={colors.textMuted} />
             <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>Shots per round</Text>
-            <Text style={[styles.sectionValue, { color: colors.text }]}>{shots}</Text>
+            <Text style={[styles.sectionValue, { color: colors.text }]}>{shots ?? 'Any'}</Text>
           </View>
           <View style={styles.chipRow}>
-            {TRAINING_SHOTS_PRESETS.map((val) => (
-              <TouchableOpacity
-                key={val}
-                style={[
-                  styles.chip,
-                  {
-                    backgroundColor: shots === val && !customShots ? colors.text : 'transparent',
-                    borderColor: shots === val && !customShots ? colors.text : colors.border,
-                  },
-                ]}
-                onPress={() => {
-                  Haptics.selectionAsync();
-                  onShotsChange(val);
-                  onCustomShotsChange('');
-                }}
-              >
-                <Text
-                  style={[styles.chipText, { color: shots === val && !customShots ? colors.background : colors.text }]}
+            {/* First preset is null = "Any" (no predefined shots; soldier decides at execution time) */}
+            {TRAINING_SHOTS_PRESETS.map((val) => {
+              const isActive = shots === val && !customShots;
+              return (
+                <TouchableOpacity
+                  key={val ?? 'any'}
+                  style={[
+                    styles.chip,
+                    {
+                      backgroundColor: isActive ? colors.text : 'transparent',
+                      borderColor: isActive ? colors.text : colors.border,
+                    },
+                  ]}
+                  onPress={() => {
+                    Haptics.selectionAsync();
+                    onShotsChange(val);
+                    onCustomShotsChange('');
+                  }}
                 >
-                  {val}
-                </Text>
-              </TouchableOpacity>
-            ))}
+                  <Text style={[styles.chipText, { color: isActive ? colors.background : colors.text }]}>
+                    {val ?? 'Any'}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
             <TextInput
               style={[
                 styles.customInput,
@@ -837,6 +845,11 @@ function ConfigureStep({
               onChangeText={onCustomShotsChange}
             />
           </View>
+          {shots == null && (
+            <Text style={[styles.sectionHint, { color: colors.textMuted }]}>
+              Optional — soldier enters actual shots at execution time
+            </Text>
+          )}
         </View>
 
         {/* Strings */}
@@ -956,7 +969,7 @@ function ConfigureStep({
           <Text style={[styles.summaryTitle, { color: colors.textMuted }]}>Summary</Text>
           <View style={styles.summaryRow}>
             <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>Total shots:</Text>
-            <Text style={[styles.summaryValue, { color: colors.text }]}>{totalShots}</Text>
+            <Text style={[styles.summaryValue, { color: colors.text }]}>{totalShots ?? 'Any'}</Text>
           </View>
           <View style={styles.summaryRow}>
             <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>Input method:</Text>

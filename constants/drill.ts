@@ -181,7 +181,7 @@ export const RANGE_LABELS: Record<RangeCategory, string> = {
 // =============================================================================
 
 export const TRAINING_DISTANCE_PRESETS = [25, 50, 100, 200, 300];
-export const TRAINING_SHOTS_PRESETS = [3, 5, 10, 15, 20];
+export const TRAINING_SHOTS_PRESETS: (number | null)[] = [null, 3, 5, 10, 15, 20];
 export const TRAINING_TIME_PRESETS: (number | null)[] = [null, 30, 60, 90, 120, 180];
 export const TRAINING_STRINGS_PRESETS = [1, 2, 3, 5];
 

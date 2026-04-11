@@ -88,14 +88,14 @@ export function DrillAdjustModal({ visible, drill, onClose, onSave }: DrillAdjus
   const insets = useSafeAreaInsets();
 
   const [distance, setDistance] = useState(100);
-  const [rounds, setRounds] = useState(5);
+  const [rounds, setRounds] = useState<number | null>(5);
   const [timeLimit, setTimeLimit] = useState<number | null>(null);
 
   // Sync state when drill changes
   useEffect(() => {
     if (drill) {
-      setDistance(drill.distance_m);
-      setRounds(drill.rounds_per_shooter);
+      setDistance(drill.distance_m ?? 100);
+      setRounds(drill.rounds_per_shooter ?? null);
       setTimeLimit(drill.time_limit_seconds ?? null);
     }
   }, [drill]);
@@ -181,6 +181,12 @@ export function DrillAdjustModal({ visible, drill, onClose, onSave }: DrillAdjus
                 <Text style={[styles.fieldLabel, { color: colors.text }]}>Rounds</Text>
               </View>
               <View style={styles.optionsRow}>
+                <OptionButton
+                  label="Any"
+                  active={rounds == null}
+                  onPress={() => setRounds(null)}
+                  colors={colors}
+                />
                 {availableRounds.map((r) => (
                   <OptionButton
                     key={r}
@@ -215,7 +221,8 @@ export function DrillAdjustModal({ visible, drill, onClose, onSave }: DrillAdjus
             {/* Summary */}
             <View style={[styles.summary, { backgroundColor: colors.card }]}>
               <Text style={[styles.summaryText, { color: colors.text }]}>
-                {drill.name} · {distance}m · {rounds} rds{timeLimit ? ` · ${timeLimit}s` : ''}
+                {drill.name} · {distance}m · {rounds != null ? `${rounds} rds` : 'Any rds'}
+                {timeLimit ? ` · ${timeLimit}s` : ''}
               </Text>
             </View>
 

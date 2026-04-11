@@ -55,6 +55,11 @@ interface ResultCardProps {
   targetType?: TargetType;
   /** Current weather conditions */
   weather?: DecodedWeather | null;
+  /**
+   * Drill's predefined shots (if any). Used as the default value for the
+   * "how many shots did you fire?" input. User can still edit freely.
+   */
+  defaultActualShots?: number | null;
 }
 
 export const ResultCard = React.memo(function ResultCard({
@@ -66,6 +71,7 @@ export const ResultCard = React.memo(function ResultCard({
   onDetectionsChange,
   targetType = 'grouping',
   weather,
+  defaultActualShots,
 }: ResultCardProps) {
   const colors = useColors();
   const { t } = useTranslation();
@@ -83,8 +89,12 @@ export const ResultCard = React.memo(function ResultCard({
   const scaleAnim = useRef(new Animated.Value(0)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
 
-  // Actual shots declared by user (for accurate percentage on scanned targets)
-  const [actualShotsInput, setActualShotsInput] = useState<string>('');
+  // Actual shots declared by user (for accurate percentage on scanned targets).
+  // Pre-fill with the drill's predefined shots (if any) as a DEFAULT. User can
+  // edit freely — value can be lower or higher than the default.
+  const [actualShotsInput, setActualShotsInput] = useState<string>(
+    defaultActualShots != null && defaultActualShots > 0 ? String(defaultActualShots) : ''
+  );
 
   // Handle editor toggle with animation
   const handleToggleEditor = useCallback(() => {

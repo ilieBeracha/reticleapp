@@ -297,6 +297,9 @@ export function PaperTargetFlow({
 
   // Results view
   if (step === 'results' && result) {
+    // Pre-fill "how many shots" with the drill's predefined value (if any).
+    // User can still edit the value freely.
+    const defaultActualShots = finiteShotsOrNull(maxShots);
     return (
       <ResultCard
         result={result}
@@ -307,6 +310,7 @@ export function PaperTargetFlow({
         onDetectionsChange={setEditedDetections}
         targetType={paperType as TargetType} // Pass paper_type to show appropriate metrics
         weather={openWeather}
+        defaultActualShots={defaultActualShots}
       />
     );
   }
