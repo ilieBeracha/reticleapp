@@ -88,7 +88,8 @@ export function TeamTrainingView({
 
   const isGrouping = isGroupingSession(session);
   const drillComplete = drillProgress?.isComplete && drillProgress?.meetsAccuracy;
-  const bullets = session.soldier_bullets ?? drill?.rounds_per_shooter ?? 5;
+  // Predefined max shots from session/drill config - used as the baseline for warnings
+  const plannedMaxShots = session.soldier_bullets ?? drill?.rounds_per_shooter ?? 5;
 
   // Distance range
   const distanceRange = useMemo(() => {
@@ -121,10 +122,14 @@ export function TeamTrainingView({
   // Sheet state
   const [localDistance, setLocalDistance] = useState(effectiveDistance);
   const [hits, setHits] = useState(0);
+  const [shotsFired, setShotsFired] = useState(plannedMaxShots);
   const [groupSizeCm, setGroupSizeCm] = useState('');
   const [groupingShots, setGroupingShots] = useState(5);
   const [saving, setSaving] = useState(false);
   const [firstShotHit, setFirstShotHit] = useState<boolean | null>(null);
+
+  // True when the user has exceeded the session's planned max shots
+  const isShotsOverMax = shotsFired > plannedMaxShots;
 
   // Miss Marker modal state
   const [showMissMarker, setShowMissMarker] = useState(false);
@@ -143,18 +148,19 @@ export function TeamTrainingView({
     }
   }, [showSheet, pendingMissMarker]);
 
-  const accuracy = bullets > 0 ? Math.round((hits / bullets) * 100) : 0;
+  const accuracy = shotsFired > 0 ? Math.round((hits / shotsFired) * 100) : 0;
 
   const openSheet = useCallback(() => {
     // Reset state when opening - use last target's distance as default
     setLocalDistance(lastTargetDistance);
     setHits(0);
+    setShotsFired(plannedMaxShots);
     setGroupSizeCm('');
     setGroupingShots(5);
     setFirstShotHit(null);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setShowSheet(true);
-  }, [lastTargetDistance]);
+  }, [lastTargetDistance, plannedMaxShots]);
 
   const closeSheet = useCallback(() => {
     setShowSheet(false);
@@ -166,7 +172,7 @@ export function TeamTrainingView({
   const distanceStep = isDistanceOutOfRange ? 5 : 50;
   
   // Calculate misses for current entry
-  const missCount = bullets - hits;
+  const missCount = shotsFired - hits;
 
   // Save target immediately (without waiting for miss marking)
   const doSave = useCallback(async () => {
@@ -198,9 +204,9 @@ export function TeamTrainingView({
           session_id: session.id,
           distance_m: finalDistance,
           lane_number: null,
-          planned_shots: bullets,
+          planned_shots: shotsFired,
           participant_id: undefined,
-          bullets_fired: bullets,
+          bullets_fired: shotsFired,
           hits: hits,
           is_stage_cleared: false,
           time_seconds: null,
@@ -235,7 +241,7 @@ export function TeamTrainingView({
     isGrouping,
     groupingShots,
     groupSizeCm,
-    bullets,
+    shotsFired,
     hits,
     missCount,
     firstShotHit,
@@ -351,7 +357,7 @@ export function TeamTrainingView({
               </View>
               <View style={styles.param}>
                 <Zap size={14} color={colors.textMuted} />
-                <Text style={[styles.paramText, { color: colors.text }]}>{bullets} {t('target.shots')}</Text>
+                <Text style={[styles.paramText, { color: colors.text }]}>{plannedMaxShots} {t('target.shots')}</Text>
               </View>
             </View>
 
@@ -663,7 +669,7 @@ export function TeamTrainingView({
               // ENGAGEMENT
               <View style={[styles.sheetSection, { borderBottomWidth: 0 }]}>
                 <Text style={[styles.sheetLabel, { color: colors.textMuted }]}>
-                  {t('target.hitsOnTarget')} • {effectiveDistance}m • {bullets} {t('target.shots')}
+                  {t('target.hitsOnTarget')} • {effectiveDistance}m • {shotsFired} {t('target.shots')}
                 </Text>
                 <View style={styles.stepper}>
                   <TouchableOpacity
@@ -672,20 +678,26 @@ export function TeamTrainingView({
                   >
                     <Minus size={18} color={hits <= 0 ? colors.textMuted : colors.text} />
                   </TouchableOpacity>
-                  <View style={[styles.hitsRing, hits > 0 && { borderColor: colors.primary, backgroundColor: `${colors.primary}10` }]}>
+                  <View
+                    style={[
+                      styles.hitsRing,
+                      hits > 0 && { borderColor: colors.primary, backgroundColor: `${colors.primary}10` },
+                      isShotsOverMax && { borderColor: colors.orange, backgroundColor: `${colors.orange}10` },
+                    ]}
+                  >
                     <Text style={[styles.hitsValue, { color: colors.text }]}>{hits}</Text>
-                    <Text style={[styles.hitsMax, { color: colors.textMuted }]}>/{bullets}</Text>
+                    <Text style={[styles.hitsMax, { color: colors.textMuted }]}>/{shotsFired}</Text>
                   </View>
                   <TouchableOpacity
                     style={[styles.stepBtn, { backgroundColor: colors.secondary }]}
-                    onPress={() => { if (hits < bullets) { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setHits(hits + 1); } }}
+                    onPress={() => { if (hits < shotsFired) { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setHits(hits + 1); } }}
                   >
-                    <Plus size={18} color={hits >= bullets ? colors.textMuted : colors.text} />
+                    <Plus size={18} color={hits >= shotsFired ? colors.textMuted : colors.text} />
                   </TouchableOpacity>
                 </View>
                 <Text style={[styles.accuracyText, { color: colors.textMuted }]}>{accuracy}%</Text>
                 <View style={styles.quickRow}>
-                  {[0, Math.round(bullets * 0.5), Math.round(bullets * 0.75), bullets]
+                  {[0, Math.round(shotsFired * 0.5), Math.round(shotsFired * 0.75), shotsFired]
                     .filter((v, i, a) => a.indexOf(v) === i)
                     .map((val) => (
                       <TouchableOpacity
@@ -697,6 +709,53 @@ export function TeamTrainingView({
                       </TouchableOpacity>
                     ))}
                 </View>
+
+                {/* Shots fired stepper - allow exceeding the planned max */}
+                <View style={[styles.shotsRow, { borderTopColor: colors.border }]}>
+                  <Text style={[styles.shotsLabel, { color: colors.textMuted }]}>
+                    {t('target.totalShots')}
+                  </Text>
+                  <View style={styles.miniStepper}>
+                    <TouchableOpacity
+                      style={[styles.miniBtn, { backgroundColor: colors.secondary }]}
+                      onPress={() => {
+                        if (shotsFired > 1) {
+                          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                          const next = shotsFired - 1;
+                          setShotsFired(next);
+                          if (hits > next) setHits(next);
+                        }
+                      }}
+                    >
+                      <Minus size={14} color={shotsFired <= 1 ? colors.textMuted : colors.text} />
+                    </TouchableOpacity>
+                    <Text
+                      style={[
+                        styles.miniValue,
+                        { color: isShotsOverMax ? colors.orange : colors.text },
+                      ]}
+                    >
+                      {shotsFired}
+                    </Text>
+                    <TouchableOpacity
+                      style={[styles.miniBtn, { backgroundColor: colors.secondary }]}
+                      onPress={() => {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                        setShotsFired(shotsFired + 1);
+                      }}
+                    >
+                      <Plus size={14} color={colors.text} />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+                {isShotsOverMax && (
+                  <Text style={[styles.overMaxHint, { color: colors.orange }]}>
+                    {t('target.overPlannedShots', {
+                      planned: plannedMaxShots,
+                      defaultValue: `Exceeds planned ${plannedMaxShots} shots`,
+                    })}
+                  </Text>
+                )}
 
                 {/* First Shot Hit toggle */}
                 <View style={[styles.firstShotRow, { borderTopColor: colors.border }]}>
@@ -919,6 +978,14 @@ const styles = StyleSheet.create({
   // Save button
   saveBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, height: 46, borderRadius: 11 },
   saveBtnText: { fontSize: 15, fontWeight: '600', color: '#fff' },
+
+  // Over-max shots hint
+  overMaxHint: {
+    fontSize: 11,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginTop: 8,
+  },
 
   // Miss Marker
   missHint: {
