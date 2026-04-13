@@ -140,7 +140,7 @@ export default ({ config }) => {
           backgroundColor: '#221f20',
         },
       ],
-      ['react-native-bottom-tabs'],
+      ['./plugins/withBottomTabsTheme'],
       [
         'expo-camera',
         {
