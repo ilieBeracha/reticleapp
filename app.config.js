@@ -29,7 +29,7 @@ const getSlug = () => {
 };
 
 const getWidgetBundleIdentifier = () => `${getBundleIdentifier()}.widgets`;
-const getWidgetGroupIdentifier = () => `group.${getBundleIdentifier()}`;
+const getWidgetGroupIdentifier = () => `group.${getBundleIdentifier()}.shared`;
 export default ({ config }) => {
   return {
     ...config,
