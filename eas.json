@@ -9,6 +9,7 @@
       "distribution": "internal",
       "channel": "development",
       "environment": "development",
+      "node": "20.18.0",
       "env": {
         "APP_VARIANT": "development"
       },
@@ -21,6 +22,7 @@
       "distribution": "internal",
       "channel": "development",
       "environment": "development",
+      "node": "20.18.0",
       "env": {
         "APP_VARIANT": "development"
       },
@@ -33,6 +35,7 @@
       "distribution": "internal",
       "channel": "preview",
       "environment": "preview",
+      "node": "20.18.0",
       "env": {
         "APP_VARIANT": "preview"
       }
