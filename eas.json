@@ -41,6 +41,7 @@
       "autoIncrement": true,
       "channel": "production",
       "environment": "production",
+      "node": "20.18.0",
       "env": {
         "APP_VARIANT": "production"
       }
