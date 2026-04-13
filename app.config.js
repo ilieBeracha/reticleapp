@@ -179,7 +179,7 @@ export default ({ config }) => {
     },
     owner: 'ilieberacha',
     runtimeVersion: {
-      policy: 'appVersion',
+      policy: 'fingerprint',
     },
     updates: {
       url: 'https://u.expo.dev/a6389fa6-2be9-4cf2-803c-58ceab564997',
