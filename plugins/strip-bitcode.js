@@ -1,4 +1,4 @@
-const { withXcodeProject } = require('@expo/config-plugins');
+const { withXcodeProject } = require('expo/config-plugins');
 
 const withStripBitcode = (config) => {
   return withXcodeProject(config, async (config) => {

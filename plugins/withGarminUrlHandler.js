@@ -1,4 +1,4 @@
-const { withInfoPlist, withAppDelegate, withDangerousMod, withXcodeProject } = require('@expo/config-plugins');
+const { withInfoPlist, withAppDelegate, withDangerousMod, withXcodeProject } = require('expo/config-plugins');
 const fs = require('fs');
 const path = require('path');
 

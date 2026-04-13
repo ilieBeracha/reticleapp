@@ -1,4 +1,4 @@
-const { withInfoPlist } = require('@expo/config-plugins');
+const { withInfoPlist } = require('expo/config-plugins');
 
 /**
  * Expo config plugin to add microphone usage description for iOS

@@ -1,4 +1,4 @@
-const { createRunOncePlugin, withAndroidStyles } = require('@expo/config-plugins');
+const { createRunOncePlugin, withAndroidStyles } = require('expo/config-plugins');
 
 const MATERIAL3_THEME_DYNAMIC = 'Theme.Material3.DynamicColors.DayNight.NoActionBar';
 const MATERIAL3_THEME = 'Theme.Material3.DayNight.NoActionBar';
