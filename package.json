@@ -24,6 +24,8 @@
     "@expo/vector-icons": "^15.0.2",
     "@gluestack-ui/core": "^3.0.10",
     "@gorhom/bottom-sheet": "^5.2.6",
+    "@react-aria/ssr": "^3.9.10",
+    "@react-aria/utils": "^3.33.1",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@react-native-community/datetimepicker": "8.6.0",
     "@react-navigation/drawer": "^7.5.0",
