@@ -17,13 +17,27 @@ import type {
   ChannelStatus,
   UseRealtimeChannelReturn,
 } from '@/types/realtime.channel';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 const RECONNECT_DELAY_MS = 3000;
 const MAX_RECONNECT_ATTEMPTS = 5;
 
+// Monotonic counter so concurrent hook instances can share a logical channel
+// name (e.g. `notifications:<user>`) without colliding on the underlying
+// Supabase channel. Supabase throws if `.on('postgres_changes', ...)` is called
+// after a channel with the same name has already been subscribed, which can
+// happen when expo-router mounts multiple Headers (one per stack screen) that
+// each call a realtime hook with the same logical name.
+let channelInstanceCounter = 0;
+
 export function useRealtimeChannel(config: ChannelConfig): UseRealtimeChannelReturn {
   const { name, subscriptions, onStatusChange, onError } = config;
+
+  // Stable per-instance suffix so each hook instance gets its own Supabase
+  // channel, avoiding "cannot add postgres_changes callbacks after subscribe()"
+  // when the same logical name is used by multiple mounted components.
+  const instanceSuffix = useMemo(() => `#${++channelInstanceCounter}`, []);
+  const uniqueName = `${name}${instanceSuffix}`;
 
   const [status, setStatus] = useState<ChannelStatus | null>(null);
   const [error, setError] = useState<Error | null>(null);
@@ -37,13 +51,13 @@ export function useRealtimeChannel(config: ChannelConfig): UseRealtimeChannelRet
   const subscriptionsRef = useRef(subscriptions);
   const onStatusChangeRef = useRef(onStatusChange);
   const onErrorRef = useRef(onError);
-  const nameRef = useRef(name);
+  const nameRef = useRef(uniqueName);
 
   // Update refs when props change (no reconnection needed for callbacks)
   subscriptionsRef.current = subscriptions;
   onStatusChangeRef.current = onStatusChange;
   onErrorRef.current = onError;
-  nameRef.current = name;
+  nameRef.current = uniqueName;
 
   // ═══════════════════════════════════════════════════════════════════════════
   // STATUS MANAGEMENT
@@ -212,7 +226,7 @@ export function useRealtimeChannel(config: ChannelConfig): UseRealtimeChannelRet
       disconnect();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [name]); // Only depend on name - this triggers reconnect on team/user switch
+  }, [uniqueName]); // Only depend on name - this triggers reconnect on team/user switch
 
   return {
     channel: channelRef.current,
