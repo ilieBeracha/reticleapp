@@ -10,6 +10,7 @@ interface UseWidgetSyncParams {
   weeklyStats: WeeklyStats;
   streak: number;
   recentSessions: HomeSession[];
+  upcomingSessions: HomeSession[];
 }
 
 export function useWidgetSync({
@@ -18,6 +19,7 @@ export function useWidgetSync({
   weeklyStats,
   streak,
   recentSessions,
+  upcomingSessions,
 }: UseWidgetSyncParams) {
   useEffect(() => {
     if (__DEV__) {
@@ -27,6 +29,7 @@ export function useWidgetSync({
         weeklyAccuracy: weeklyStats?.accuracy,
         streak,
         recentCount: recentSessions.length,
+        upcomingCount: upcomingSessions.length,
       });
     }
     void syncHomeWidgets({
@@ -35,6 +38,7 @@ export function useWidgetSync({
       weeklyStats,
       streak,
       recentSessions,
+      upcomingSessions,
     });
-  }, [activeSession, nextSession, weeklyStats, streak, recentSessions]);
+  }, [activeSession, nextSession, weeklyStats, streak, recentSessions, upcomingSessions]);
 }
