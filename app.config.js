@@ -27,6 +27,11 @@ const getSlug = () => {
   // All variants use same slug because they share the same EAS project
   return 'retic';
 };
+const shouldEnableUpdates = !IS_PREVIEW;
+const getRuntimeVersion = () => {
+  if (IS_PREVIEW) return 'preview-no-ota-v1';
+  return { policy: 'nativeVersion' };
+};
 
 const getWidgetBundleIdentifier = () => `${getBundleIdentifier()}.widgets`;
 const getWidgetGroupIdentifier = () => `group.${getBundleIdentifier()}.shared`;
@@ -178,11 +183,12 @@ export default ({ config }) => {
       appVariant: process.env.APP_VARIANT || 'production',
     },
     owner: 'ilieberacha',
-    runtimeVersion: {
-      policy: 'fingerprint',
-    },
+    runtimeVersion: getRuntimeVersion(),
     updates: {
       url: 'https://u.expo.dev/a6389fa6-2be9-4cf2-803c-58ceab564997',
+      enabled: shouldEnableUpdates,
+      checkAutomatically: shouldEnableUpdates ? 'ON_LOAD' : 'NEVER',
+      fallbackToCacheTimeout: 0,
     },
   };
 };
