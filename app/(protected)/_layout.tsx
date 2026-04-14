@@ -319,6 +319,20 @@ export default function ProtectedLayout() {
           contentStyle: { backgroundColor: colors.background },
         }}
       />
+
+      <Stack.Screen
+        name="generateTeamReport"
+        options={{
+          headerShown: false,
+          presentation: 'formSheet',
+          gestureEnabled: true,
+          sheetGrabberVisible: true,
+          contentStyle: { backgroundColor: colors.card },
+          sheetAllowedDetents: [0.55, 0.85],
+          sheetInitialDetentIndex: 0,
+          sheetLargestUndimmedDetentIndex: -1,
+        }}
+      />
     </Stack>
   );
 }
