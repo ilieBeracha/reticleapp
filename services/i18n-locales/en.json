@@ -1064,7 +1064,21 @@
     "failedUpdateSquads": "Failed to update squads. Please try again.",
     "failedAssignMember": "Failed to assign member to squad.",
     "removeFromSquadTitle": "Remove from Squad",
-    "removeFromSquadConfirm": "Remove this soldier from the squad?"
+    "removeFromSquadConfirm": "Remove this soldier from the squad?",
+    "generateReport": "Generate Report",
+    "teamReport": "Team Report",
+    "generateTeamReport": "Generate Team Report",
+    "reportDateRange": "Date Range",
+    "reportStartDate": "Start Date",
+    "reportEndDate": "End Date",
+    "generatePdf": "Generate PDF",
+    "generatingReport": "Generating report…",
+    "reportGenerationFailed": "Could not generate report",
+    "reportNoData": "No activity in this date range",
+    "reportSectionGrouping": "Grouping Performance",
+    "reportSectionAccuracy": "Hit Accuracy",
+    "reportSectionWeapons": "Weapons",
+    "reportSectionSpotter": "Spotter Performance"
   },
   "account": {
     "personal": "Personal",

@@ -22,6 +22,7 @@ import {
     BarChart3,
     ChevronRight,
     Clock,
+    FileText,
     LogOut,
     Settings,
     Shield,
@@ -417,6 +418,23 @@ function TeamTabContent({
                 iconBg={colors.green + '12'}
                 label="Invite Member"
                 onPress={onInviteMember}
+                colors={colors}
+              />
+            </>
+          )}
+
+          {/* Generate Report - commander only */}
+          {canManage && (
+            <>
+              <View style={[ts.menuDivider, { backgroundColor: colors.border }]} />
+              <MenuItem
+                icon={<FileText size={15} color={colors.indigo} />}
+                iconBg={colors.indigo + '18'}
+                label={t('teams.generateReport')}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  router.push(`/(protected)/generateTeamReport?teamId=${activeTeamId ?? ''}&teamName=${encodeURIComponent(activeTeam?.name ?? '')}` as any);
+                }}
                 colors={colors}
               />
             </>

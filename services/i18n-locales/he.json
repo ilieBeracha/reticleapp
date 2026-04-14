@@ -1057,7 +1057,21 @@
     "failedUpdateSquads": "עדכון הכיתות נכשל. אנא נסה שוב.",
     "failedAssignMember": "הקצאת החבר לחוליה נכשלה.",
     "removeFromSquadTitle": "הסר מחוליה",
-    "removeFromSquadConfirm": "הסר את החייל הזה מהחוליה?"
+    "removeFromSquadConfirm": "הסר את החייל הזה מהחוליה?",
+    "generateReport": "צור דוח",
+    "teamReport": "דוח צוות",
+    "generateTeamReport": "צור דוח ביצועי צוות",
+    "reportDateRange": "טווח תאריכים",
+    "reportStartDate": "תאריך התחלה",
+    "reportEndDate": "תאריך סיום",
+    "generatePdf": "צור PDF",
+    "generatingReport": "יוצר דוח…",
+    "reportGenerationFailed": "לא ניתן היה ליצור דוח",
+    "reportNoData": "אין פעילות בטווח תאריכים זה",
+    "reportSectionGrouping": "ביצועי קיבוץ",
+    "reportSectionAccuracy": "דיוק פגיעות",
+    "reportSectionWeapons": "נשק",
+    "reportSectionSpotter": "ביצועי מכוון"
   },
   "account": {
     "personal": "אישי",
