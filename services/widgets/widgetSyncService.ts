@@ -250,7 +250,7 @@ const toDashboardRowState = (
 const buildDashboardItems = (params: {
   activeSession: HomeSession | null;
   nextSession: HomeSession | null;
-  recentSessions: HomeSession[];
+  upcomingSessions: HomeSession[];
 }): DashboardTrainingItem[] => {
   const collected: DashboardTrainingItem[] = [];
   const pushed = new Set<string>();
@@ -267,9 +267,13 @@ const buildDashboardItems = (params: {
     });
   };
 
+  // The widget's "UPCOMING" section must only contain upcoming items
+  // (live/active, next scheduled, and remaining planned trainings). Completed
+  // sessions are intentionally excluded here — the weekly KPI strip already
+  // reflects completed activity.
   push(params.activeSession);
   push(params.nextSession);
-  for (const s of params.recentSessions) {
+  for (const s of params.upcomingSessions) {
     if (collected.length >= 3) break;
     push(s);
   }
@@ -282,6 +286,7 @@ function buildRealPayloads(params: {
   weeklyStats: WeeklyStats;
   streak: number;
   recentSessions: HomeSession[];
+  upcomingSessions: HomeSession[];
 }): {
   today: TodayTrainingWidgetProps;
   performance: PerformanceSnapshotWidgetProps;
@@ -310,7 +315,11 @@ function buildRealPayloads(params: {
     hasData: hasPerformanceData,
   };
 
-  const items = buildDashboardItems(params);
+  const items = buildDashboardItems({
+    activeSession: params.activeSession,
+    nextSession: params.nextSession,
+    upcomingSessions: params.upcomingSessions,
+  });
   const dashboard: TrainingDashboardWidgetProps = {
     trainings: items,
     weeklySessions: Math.max(0, Math.round(params.weeklyStats.sessions ?? 0)),
@@ -382,7 +391,10 @@ export async function syncHomeWidgets(params: {
   nextSession: HomeSession | null;
   weeklyStats: WeeklyStats;
   streak: number;
+  /** Completed/unreviewed sessions — used for lastScore on the perf widget. */
   recentSessions: HomeSession[];
+  /** Planned/ongoing trainings — populates the dashboard UPCOMING list. */
+  upcomingSessions: HomeSession[];
 }): Promise<void> {
   if (!canUseWidgets()) {
     wlog('syncHomeWidgets: not iOS, skipping');

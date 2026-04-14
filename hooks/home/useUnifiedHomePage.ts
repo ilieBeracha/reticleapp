@@ -28,7 +28,7 @@ import { useSessionStore } from '@/stores/sessionStore';
 import { useTeamStore } from '@/stores/teamStore';
 import { useTrainingStore } from '@/stores/trainingStore';
 import type { HeroMode, WeeklyStats } from '@/types/home';
-import { mapSessionToHomeSession, type HomeSession } from '@/types/home.viewmodel';
+import { mapSessionToHomeSession, mapTrainingToScheduledSession, type HomeSession } from '@/types/home.viewmodel';
 import type { SessionWithDetails } from '@/types/session';
 import {
     calculateLastSessionDaysAgo,
@@ -326,12 +326,22 @@ export function useUnifiedHomePage() {
     (loadingAllSessions && allSessions.length === 0) ||
     (!initialized && sessionsLoading);
 
+  // Upcoming trainings for the widget's "UPCOMING" list — only real planned/
+  // ongoing trainings. We pull from `allTeamsUpcoming` (already filtered to
+  // status=planned|ongoing and sorted by date) so the widget reflects upcoming
+  // activity regardless of whether the user is in personal or team mode.
+  const upcomingSessionsForWidget = useMemo(
+    () => allTeamsUpcoming.slice(0, 5).map((t) => mapTrainingToScheduledSession(t)),
+    [allTeamsUpcoming]
+  );
+
   useWidgetSync({
     activeSession: homeState.activeSession,
     nextSession: homeState.nextSession,
     weeklyStats,
     streak,
     recentSessions,
+    upcomingSessions: upcomingSessionsForWidget,
   });
 
   // ═══════════════════════════════════════════════════════════════════════════

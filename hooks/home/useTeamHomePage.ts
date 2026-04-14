@@ -21,7 +21,7 @@ import { useGarminStore } from '@/stores/garminStore';
 import { useTeamStore } from '@/stores/teamStore';
 import { useTrainingStore } from '@/stores/trainingStore';
 import type { WeeklyStats } from '@/types/home';
-import { mapSessionToHomeSession } from '@/types/home.viewmodel';
+import { mapSessionToHomeSession, mapTrainingToScheduledSession } from '@/types/home.viewmodel';
 import type { SessionWithDetails } from '@/types/session';
 import type { TeamMemberWithProfile, TrainingWithDetails } from '@/types/workspace';
 import { isGroupingSessionWithFallback } from '@/utils/drillGoal';
@@ -288,6 +288,14 @@ export function useTeamHomePage() {
     };
   }, [upcomingTrainings, activeTeam?.name]);
 
+  // Upcoming trainings for the widget's "UPCOMING" list — real planned/ongoing
+  // trainings only (never completed sessions). These feed the dashboard widget
+  // after activeSession/nextSession are placed.
+  const upcomingSessionsForWidget = useMemo(
+    () => teamTrainings.slice(0, 5).map((t) => mapTrainingToScheduledSession(t)),
+    [teamTrainings]
+  );
+
   useEffect(() => {
     void syncHomeWidgets({
       activeSession: activeSessionForWidget,
@@ -295,8 +303,9 @@ export function useTeamHomePage() {
       weeklyStats,
       streak,
       recentSessions: recentHomeSessions,
+      upcomingSessions: upcomingSessionsForWidget,
     });
-  }, [activeSessionForWidget, nextSessionForWidget, weeklyStats, streak, recentHomeSessions]);
+  }, [activeSessionForWidget, nextSessionForWidget, weeklyStats, streak, recentHomeSessions, upcomingSessionsForWidget]);
 
   // Loading state - wait for all data including activeTeam details
   const shouldShowLoading =
