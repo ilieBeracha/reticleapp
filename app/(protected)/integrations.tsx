@@ -1,5 +1,6 @@
 import { useColors } from '@/hooks/ui/useColors';
 import { useGarminStore, useWatchEnabled } from '@/stores/garminStore';
+import { showToast } from '@/stores/toastStore';
 import { Ionicons } from '@expo/vector-icons';
 import { Stack } from 'expo-router';
 import { useTranslation } from 'react-i18next';
@@ -17,13 +18,17 @@ export default function IntegrationsScreen() {
 
   const handlePing = () => {
     send('PING', { time: Date.now() });
-    Alert.alert(t('integrations.sent'), t('integrations.pingSent'));
+    showToast({ title: t('integrations.sent'), description: t('integrations.pingSent'), variant: 'success' });
   };
 
   const handleToggleWatch = async (enabled: boolean) => {
     await setWatchEnabled(enabled);
     if (enabled) {
-      Alert.alert(t('integrations.garminEnabled'), t('integrations.garminEnabledMessage'));
+      showToast({
+        title: t('integrations.garminEnabled'),
+        description: t('integrations.garminEnabledMessage'),
+        variant: 'success',
+      });
     }
   };
 

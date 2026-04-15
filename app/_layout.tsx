@@ -1,5 +1,6 @@
 import { ContextSwitchOverlay } from '@/components/account';
 import { LoadingScreen } from '@/components/shared/LoadingScreen';
+import { ToastHost } from '@/components/shared/Toast';
 import { GluestackUIProvider } from '@/components/shared/ui/gluestack-ui-provider';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { LanguageProvider } from '@/contexts/LanguageContext';
@@ -117,6 +118,9 @@ function LayoutWithLoadingOverlay({ colorScheme }: { colorScheme: 'light' | 'dar
 
           {/* Global overlay for account/team context switching */}
           <ContextSwitchOverlay />
+
+          {/* Non-blocking toast notifications (must render above modal content) */}
+          <ToastHost />
         </BottomSheetModalProvider>
       </GestureHandlerRootView>
     </SafeAreaProvider>

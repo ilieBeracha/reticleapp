@@ -21,6 +21,7 @@ import type { SessionHistoryCatalogProps } from '@/types/sessionHistory';
 import { FilterSheet } from './FilterSheet';
 import { SessionCard } from './SessionCard';
 import { useSessionHistory } from '@/hooks/session/useSessionHistory';
+import { SkeletonList } from '@/components/shared/Skeleton';
 
 /**
  * SessionHistoryCatalog - Full session history with search, filters, and sorting
@@ -122,11 +123,11 @@ export function SessionHistoryCatalog({
     );
   }, [isLoading, searchQuery, activeFilterCount, colors, resetFilters]);
 
-  // Loading state
+  // Loading state (skeleton placeholder — much faster perceived load than a spinner)
   if (isLoading) {
     return (
-      <View style={[styles.container, styles.loadingContainer, { backgroundColor: colors.background }]}>
-        <ActivityIndicator size="large" color={colors.textMuted} />
+      <View style={[styles.container, { backgroundColor: colors.background, paddingHorizontal: 16, paddingTop: 16 }]}>
+        <SkeletonList count={8} />
       </View>
     );
   }

@@ -1,14 +1,14 @@
 import { AccountSwitcherSheet } from '@/components/account';
+import { PressableScale } from '@/components/shared/PressableScale';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNotificationRealtime } from '@/hooks/realtime/notification/useNotificationRealtime';
 import { useColors } from '@/hooks/ui/useColors';
 import { getUnreadCount } from '@/services/notifications';
 import { useTeamStore } from '@/stores/teamStore';
-import * as Haptics from 'expo-haptics';
 import { Bell, ChevronDown, User, Users } from 'lucide-react-native';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Image, StyleSheet, Text, View } from 'react-native';
 
 interface HeaderProps {
   onNotificationPress?: () => void;
@@ -55,13 +55,11 @@ export function Header({ onNotificationPress }: HeaderProps) {
   });
 
   const handleNotificationPress = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setNotificationCount(0);
     onNotificationPress?.();
   };
 
   const handleSwitcherPress = () => {
-    Haptics.selectionAsync();
     setAccountSwitcherVisible(true);
   };
 
@@ -78,19 +76,21 @@ export function Header({ onNotificationPress }: HeaderProps) {
 
         {/* Right - Action Buttons */}
         <View style={styles.actions}>
-          <TouchableOpacity
+          <PressableScale
             style={[styles.iconBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
             onPress={handleNotificationPress}
-            activeOpacity={0.7}
+            haptic="light"
+            accessibilityRole="button"
+            accessibilityLabel={t('common.notifications')}
           >
             <Bell size={18} color={colors.text} strokeWidth={2} />
             {notificationCount > 0 && (
               <View style={[styles.notifBadge, { backgroundColor: colors.red, borderColor: colors.background }]} />
             )}
-          </TouchableOpacity>
+          </PressableScale>
 
           {/* Context switcher trigger */}
-          <TouchableOpacity
+          <PressableScale
             style={[
               styles.contextBtn,
               {
@@ -99,7 +99,9 @@ export function Header({ onNotificationPress }: HeaderProps) {
               },
             ]}
             onPress={handleSwitcherPress}
-            activeOpacity={0.7}
+            haptic="selection"
+            accessibilityRole="button"
+            accessibilityLabel={isTeamMode ? activeTeam?.name || t('teamHome.team') : t('common.personal')}
           >
             <ContextIcon size={15} color={isTeamMode ? colors.primary : colors.textMuted} strokeWidth={2} />
             {isTeamMode && (
@@ -108,7 +110,7 @@ export function Header({ onNotificationPress }: HeaderProps) {
               </Text>
             )}
             <ChevronDown size={12} color={isTeamMode ? colors.primary : colors.textMuted} />
-          </TouchableOpacity>
+          </PressableScale>
         </View>
       </View>
 
