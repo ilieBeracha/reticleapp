@@ -10,6 +10,7 @@
  */
 
 import { ApproveRequestModal } from '@/components/weapons/ApproveRequestModal';
+import { CreateWeaponFlow } from '@/components/weapons/CreateWeaponFlow';
 import { RequestWeaponModal } from '@/components/weapons/RequestWeaponModal';
 import type { WeaponRequestRecord } from '@/hooks/realtime/records/weapon';
 import { useWeaponRealtime } from '@/hooks/realtime/weapon/useWeaponRealtime';
@@ -20,22 +21,17 @@ import {
     approveSharedWeapon,
     assignTeamWeapon,
     cancelWeaponRequest,
-    createTeamWeapon,
     getArmoryOverview,
     getCategoryLabel,
-    getGlobalWeapons,
     rejectSharedWeapon,
     setWeaponPoolAvailable,
     unassignTeamWeapon,
-    WEAPON_CATEGORIES,
     type ArmoryOverviewData,
-    type GlobalWeapon,
     type TeamWeapon,
     type UserWeapon,
     type WeaponRequest,
 } from '@/services/weaponService';
 import { useTeamStore } from '@/stores/teamStore';
-import type { WeaponCategory } from '@/types/workspace';
 import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from 'expo-router';
 import { t } from 'i18next';
@@ -47,7 +43,6 @@ import {
     Clock,
     Gift,
     Plus,
-    Search,
     Shield,
     ShieldCheck,
     User,
@@ -67,7 +62,6 @@ import {
     ScrollView,
     StyleSheet,
     Text,
-    TextInput,
     TouchableOpacity,
     View,
 } from 'react-native';
@@ -417,430 +411,6 @@ function MyPendingRequestCard({
         )}
       </TouchableOpacity>
     </View>
-  );
-}
-
-// ============================================================================
-// ADD WEAPON MODAL
-// ============================================================================
-
-function AddWeaponModal({
-  visible,
-  teamId,
-  colors,
-  onClose,
-  onSuccess,
-}: {
-  visible: boolean;
-  teamId: string;
-  colors: ReturnType<typeof useColors>;
-  onClose: () => void;
-  onSuccess: () => void;
-}) {
-  const { t } = useTranslation();
-  const [step, setStep] = useState<'choose' | 'catalog' | 'custom'>('choose');
-  const [catalogSearch, setCatalogSearch] = useState('');
-  const [catalogCategory, setCatalogCategory] = useState<WeaponCategory | null>(null);
-  const [allCatalogWeapons, setAllCatalogWeapons] = useState<GlobalWeapon[]>([]);
-  const [catalogLoading, setCatalogLoading] = useState(false);
-  const [selectedCatalogWeapon, setSelectedCatalogWeapon] = useState<GlobalWeapon | null>(null);
-
-  const [newWeaponName, setNewWeaponName] = useState('');
-  const [newWeaponCategory, setNewWeaponCategory] = useState<WeaponCategory>('rifle');
-  const [newWeaponCaliber, setNewWeaponCaliber] = useState('');
-  const [newWeaponSerial, setNewWeaponSerial] = useState('');
-  const [creating, setCreating] = useState(false);
-
-  const resetModal = () => {
-    setStep('choose');
-    setCatalogSearch('');
-    setCatalogCategory(null);
-    setSelectedCatalogWeapon(null);
-    setNewWeaponName('');
-    setNewWeaponCategory('rifle');
-    setNewWeaponCaliber('');
-    setNewWeaponSerial('');
-    onClose();
-  };
-
-  const loadCatalog = useCallback(async () => {
-    if (allCatalogWeapons.length > 0) return;
-    try {
-      setCatalogLoading(true);
-      const weapons = await getGlobalWeapons();
-      setAllCatalogWeapons(weapons);
-    } catch (err) {
-      console.error('Failed to load catalog:', err);
-    } finally {
-      setCatalogLoading(false);
-    }
-  }, [allCatalogWeapons.length]);
-
-  const filteredCatalog = allCatalogWeapons.filter((w) => {
-    if (catalogCategory && w.category !== catalogCategory) return false;
-    if (!catalogSearch.trim()) return true;
-    const q = catalogSearch.toLowerCase();
-    return (
-      w.name.toLowerCase().includes(q) ||
-      w.manufacturer?.toLowerCase().includes(q) ||
-      w.caliber?.toLowerCase().includes(q)
-    );
-  });
-
-  const groupedByManufacturer = filteredCatalog.reduce(
-    (acc, weapon) => {
-      const key = weapon.manufacturer || 'Other';
-      if (!acc[key]) acc[key] = [];
-      acc[key].push(weapon);
-      return acc;
-    },
-    {} as Record<string, GlobalWeapon[]>
-  );
-
-  const sortedManufacturers = Object.keys(groupedByManufacturer).sort((a, b) => {
-    if (a === 'Other') return 1;
-    if (b === 'Other') return -1;
-    return a.localeCompare(b);
-  });
-
-  const handleSelectCatalog = (weapon: GlobalWeapon) => {
-    setSelectedCatalogWeapon(weapon);
-    setNewWeaponName(weapon.name);
-    setNewWeaponCategory(weapon.category);
-    setNewWeaponCaliber(weapon.caliber || '');
-    setStep('custom');
-  };
-
-  const handleCreate = async () => {
-    if (!newWeaponName.trim()) {
-      Alert.alert(t('common.error'), t('weapons.nameRequired'));
-      return;
-    }
-    try {
-      setCreating(true);
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      await createTeamWeapon({
-        team_id: teamId,
-        base_weapon_id: selectedCatalogWeapon?.id,
-        name: newWeaponName.trim(),
-        category: newWeaponCategory,
-        caliber: newWeaponCaliber.trim() || undefined,
-        serial_number: newWeaponSerial.trim() || undefined,
-      });
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      onSuccess();
-      resetModal();
-    } catch (err: any) {
-      Alert.alert(t('common.error'), err.message || t('weapons.failedCreate'));
-    } finally {
-      setCreating(false);
-    }
-  };
-
-  return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={resetModal}>
-      <View style={[s.modalContainer, { backgroundColor: colors.background }]}>
-        {/* Modal Header */}
-        <View style={[s.modalHeader, { borderBottomColor: colors.border }]}>
-          <TouchableOpacity onPress={resetModal} hitSlop={8}>
-            <Text style={[s.modalCancel, { color: colors.primary }]}>{t('common.cancel')}</Text>
-          </TouchableOpacity>
-          <Text style={[s.modalTitle, { color: colors.text }]}>
-            {step === 'choose'
-              ? t('weapons.addWeapon')
-              : step === 'catalog'
-                ? t('weapons.searchCatalog')
-                : t('weapons.weaponDetails')}
-          </Text>
-          {step === 'custom' ? (
-            <TouchableOpacity onPress={handleCreate} disabled={creating || !newWeaponName.trim()} hitSlop={8}>
-              {creating ? (
-                <ActivityIndicator size="small" color={colors.primary} />
-              ) : (
-                <Text style={[s.modalSave, { color: newWeaponName.trim() ? colors.primary : colors.textMuted }]}>
-                  {t('common.add')}
-                </Text>
-              )}
-            </TouchableOpacity>
-          ) : (
-            <View style={{ width: 40 }} />
-          )}
-        </View>
-
-        {/* Step: Choose */}
-        {step === 'choose' && (
-          <View style={s.chooseContainer}>
-            <View style={[s.chooseCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <TouchableOpacity
-                style={s.chooseOption}
-                onPress={() => {
-                  setStep('catalog');
-                  loadCatalog();
-                }}
-                activeOpacity={0.7}
-              >
-                <View style={[s.chooseIcon, { backgroundColor: colors.primary + '12' }]}>
-                  <Search size={16} color={colors.primary} />
-                </View>
-                <View style={s.chooseContent}>
-                  <Text style={[s.chooseTitle, { color: colors.text }]}>{t('weapons.fromCatalog')}</Text>
-                  <Text style={[s.chooseDesc, { color: colors.textMuted }]}>{t('weapons.browseCatalog')}</Text>
-                </View>
-                <ChevronRight size={14} color={colors.textMuted} />
-              </TouchableOpacity>
-
-              <View style={[s.hairline, { backgroundColor: colors.border }]} />
-
-              <TouchableOpacity style={s.chooseOption} onPress={() => setStep('custom')} activeOpacity={0.7}>
-                <View style={[s.chooseIcon, { backgroundColor: colors.green + '12' }]}>
-                  <Plus size={16} color={colors.green} />
-                </View>
-                <View style={s.chooseContent}>
-                  <Text style={[s.chooseTitle, { color: colors.text }]}>{t('weapons.customWeapon')}</Text>
-                  <Text style={[s.chooseDesc, { color: colors.textMuted }]}>{t('weapons.createScratch')}</Text>
-                </View>
-                <ChevronRight size={14} color={colors.textMuted} />
-              </TouchableOpacity>
-            </View>
-          </View>
-        )}
-
-        {/* Step: Catalog */}
-        {step === 'catalog' && (
-          <View style={s.catalogContainer}>
-            {/* Search Bar */}
-            <View style={[s.searchBar, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <Search size={16} color={colors.textMuted} />
-              <TextInput
-                style={[s.searchInput, { color: colors.text }]}
-                placeholder={t('weapons.searchPlaceholder')}
-                placeholderTextColor={colors.textMuted}
-                value={catalogSearch}
-                onChangeText={setCatalogSearch}
-                autoFocus
-              />
-              {catalogSearch.length > 0 && (
-                <TouchableOpacity onPress={() => setCatalogSearch('')} hitSlop={8}>
-                  <X size={14} color={colors.textMuted} />
-                </TouchableOpacity>
-              )}
-            </View>
-
-            {/* Category Filter Chips */}
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              style={s.catalogFilterScroll}
-              contentContainerStyle={s.catalogFilterContent}
-            >
-              <TouchableOpacity
-                style={[
-                  s.catalogFilterChip,
-                  {
-                    backgroundColor: !catalogCategory ? colors.text : colors.card,
-                    borderColor: !catalogCategory ? colors.text : colors.border,
-                  },
-                ]}
-                onPress={() => setCatalogCategory(null)}
-              >
-                <Text style={[s.catalogFilterText, { color: !catalogCategory ? colors.background : colors.text }]}>
-                  {t('weapons.all')}
-                </Text>
-              </TouchableOpacity>
-              {WEAPON_CATEGORIES.map((cat) => (
-                <TouchableOpacity
-                  key={cat.value}
-                  style={[
-                    s.catalogFilterChip,
-                    {
-                      backgroundColor: catalogCategory === cat.value ? colors.text : colors.card,
-                      borderColor: catalogCategory === cat.value ? colors.text : colors.border,
-                    },
-                  ]}
-                  onPress={() => setCatalogCategory(catalogCategory === cat.value ? null : cat.value)}
-                >
-                  <Text
-                    style={[
-                      s.catalogFilterText,
-                      { color: catalogCategory === cat.value ? colors.background : colors.text },
-                    ]}
-                  >
-                    {cat.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-
-            {/* Results count */}
-            {!catalogLoading && (
-              <Text style={[s.catalogResultsCount, { color: colors.textMuted }]}>
-                {filteredCatalog.length} weapon{filteredCatalog.length !== 1 ? 's' : ''} found
-              </Text>
-            )}
-
-            {catalogLoading ? (
-              <View style={s.catalogLoadingContainer}>
-                <ActivityIndicator size="large" color={colors.primary} />
-                <Text style={[s.catalogLoadingText, { color: colors.textMuted }]}>Loading catalog...</Text>
-              </View>
-            ) : filteredCatalog.length === 0 ? (
-              <View style={s.catalogEmptyContainer}>
-                <View style={[s.catalogEmptyIcon, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                  <Search size={24} color={colors.textMuted} />
-                </View>
-                <Text style={[s.catalogEmptyTitle, { color: colors.text }]}>
-                  {catalogSearch || catalogCategory ? 'No matches found' : 'No weapons in catalog'}
-                </Text>
-                <Text style={[s.catalogEmptyDesc, { color: colors.textMuted }]}>
-                  {catalogSearch || catalogCategory
-                    ? 'Try adjusting your search or filters'
-                    : 'The weapon catalog is empty'}
-                </Text>
-                <TouchableOpacity
-                  style={[s.catalogEmptyBtn, { backgroundColor: colors.primary }]}
-                  onPress={() => setStep('custom')}
-                >
-                  <Plus size={14} color="#fff" />
-                  <Text style={s.catalogEmptyBtnText}>Create Custom Weapon</Text>
-                </TouchableOpacity>
-              </View>
-            ) : (
-              <ScrollView style={s.catalogScrollView} contentContainerStyle={s.catalogList}>
-                {sortedManufacturers.map((manufacturer) => (
-                  <View key={manufacturer} style={s.catalogManufacturerGroup}>
-                    <Text style={[s.catalogManufacturerTitle, { color: colors.textMuted }]}>
-                      {manufacturer.toUpperCase()}
-                    </Text>
-                    <View style={[s.groupCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                      {groupedByManufacturer[manufacturer].map((item, idx) => (
-                        <View key={item.id}>
-                          <TouchableOpacity
-                            style={s.catalogItem}
-                            onPress={() => handleSelectCatalog(item)}
-                            activeOpacity={0.7}
-                          >
-                            <View style={[s.catalogItemIcon, { backgroundColor: colors.primary + '12' }]}>
-                              <Shield size={14} color={colors.primary} />
-                            </View>
-                            <View style={s.catalogInfo}>
-                              <Text style={[s.catalogName, { color: colors.text }]}>{item.name}</Text>
-                              <Text style={[s.catalogMeta, { color: colors.textMuted }]}>
-                                {getCategoryLabel(item.category)}
-                                {item.caliber && ` \u2022 ${item.caliber}`}
-                              </Text>
-                            </View>
-                            <ChevronRight size={14} color={colors.textMuted} />
-                          </TouchableOpacity>
-                          {idx < groupedByManufacturer[manufacturer].length - 1 && (
-                            <View style={[s.hairline, { backgroundColor: colors.border }]} />
-                          )}
-                        </View>
-                      ))}
-                    </View>
-                  </View>
-                ))}
-              </ScrollView>
-            )}
-
-            {/* Skip to custom */}
-            {filteredCatalog.length > 0 && (
-              <TouchableOpacity
-                style={[s.skipCatalog, { backgroundColor: colors.card, borderColor: colors.border }]}
-                onPress={() => setStep('custom')}
-              >
-                <Plus size={14} color={colors.textMuted} />
-                <Text style={[s.skipCatalogText, { color: colors.text }]}>{t('weapons.createCustomInstead')}</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        )}
-
-        {/* Step: Custom Form */}
-        {step === 'custom' && (
-          <ScrollView style={s.formContainer} contentContainerStyle={s.formContent}>
-            {selectedCatalogWeapon && (
-              <View style={[s.basedOnBadge, { backgroundColor: colors.primary + '12' }]}>
-                <Text style={[s.basedOnText, { color: colors.primary }]}>
-                  {t('weapons.basedOn')} {selectedCatalogWeapon.name}
-                </Text>
-              </View>
-            )}
-
-            <View style={[s.formCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <View style={s.formGroup}>
-                <Text style={[s.formLabel, { color: colors.textMuted }]}>{t('weapons.nameLabel')}</Text>
-                <TextInput
-                  style={[s.formInput, { backgroundColor: colors.background, borderColor: colors.border, color: colors.text }]}
-                  value={newWeaponName}
-                  onChangeText={setNewWeaponName}
-                  placeholder={t('weapons.namePlaceholder')}
-                  placeholderTextColor={colors.textMuted}
-                  autoFocus={!selectedCatalogWeapon}
-                />
-              </View>
-
-              <View style={[s.formDivider, { backgroundColor: colors.border }]} />
-
-              <View style={s.formGroup}>
-                <Text style={[s.formLabel, { color: colors.textMuted }]}>{t('weapons.categoryLabel')}</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                  <View style={s.categoryRow}>
-                    {WEAPON_CATEGORIES.map((cat) => (
-                      <TouchableOpacity
-                        key={cat.value}
-                        style={[
-                          s.categoryChip,
-                          {
-                            backgroundColor: newWeaponCategory === cat.value ? colors.primary : colors.background,
-                            borderColor: newWeaponCategory === cat.value ? colors.primary : colors.border,
-                          },
-                        ]}
-                        onPress={() => setNewWeaponCategory(cat.value)}
-                      >
-                        <Text
-                          style={[
-                            s.categoryChipText,
-                            { color: newWeaponCategory === cat.value ? '#fff' : colors.text },
-                          ]}
-                        >
-                          {cat.label}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </ScrollView>
-              </View>
-
-              <View style={[s.formDivider, { backgroundColor: colors.border }]} />
-
-              <View style={s.formGroup}>
-                <Text style={[s.formLabel, { color: colors.textMuted }]}>{t('weapons.caliberLabel')}</Text>
-                <TextInput
-                  style={[s.formInput, { backgroundColor: colors.background, borderColor: colors.border, color: colors.text }]}
-                  value={newWeaponCaliber}
-                  onChangeText={setNewWeaponCaliber}
-                  placeholder={t('weapons.caliberPlaceholder')}
-                  placeholderTextColor={colors.textMuted}
-                />
-              </View>
-
-              <View style={[s.formDivider, { backgroundColor: colors.border }]} />
-
-              <View style={s.formGroup}>
-                <Text style={[s.formLabel, { color: colors.textMuted }]}>{t('weapons.serialLabel')}</Text>
-                <TextInput
-                  style={[s.formInput, { backgroundColor: colors.background, borderColor: colors.border, color: colors.text }]}
-                  value={newWeaponSerial}
-                  onChangeText={setNewWeaponSerial}
-                  placeholder={t('common.optional')}
-                  placeholderTextColor={colors.textMuted}
-                />
-              </View>
-            </View>
-          </ScrollView>
-        )}
-      </View>
-    </Modal>
   );
 }
 
@@ -1661,13 +1231,21 @@ export function TeamArmoryContent({ teamIdProp, embedded }: TeamArmoryProps) {
       </ScrollView>
 
       {/* Modals */}
-      <AddWeaponModal
+      <Modal
         visible={showAddWeapon}
-        teamId={teamId || ''}
-        colors={colors}
-        onClose={() => setShowAddWeapon(false)}
-        onSuccess={loadData}
-      />
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowAddWeapon(false)}
+      >
+        <CreateWeaponFlow
+          teamId={teamId || undefined}
+          onCancel={() => setShowAddWeapon(false)}
+          onComplete={() => {
+            setShowAddWeapon(false);
+            loadData();
+          }}
+        />
+      </Modal>
 
       <MemberPickerModal
         visible={!!selectedWeaponForAssign}
