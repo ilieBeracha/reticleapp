@@ -26,6 +26,7 @@ import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, Toucha
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { ActiveSessionBanner } from './components/ActiveSessionBanner';
 import { AllTeamsUpcomingCard } from './components/AllTeamsUpcomingCard';
+import { DailyTip } from './components/DailyTip';
 import { HomeHeader } from './components/HomeHeader';
 import { PersonalHeroSection } from './components/PersonalHeroSection';
 import { PersonalQuickActions } from './components/PersonalQuickActions';
@@ -165,6 +166,15 @@ export function UnifiedHomePage() {
             colors={colors}
           />
         )}
+
+        {/* Daily AI Tip (personalized from session history) */}
+        <DailyTip
+          colors={colors}
+          streak={streak}
+          accuracy={weeklyStats.accuracy}
+          sessionsThisWeek={weeklyStats.sessions}
+          totalSessions={allSessions.filter((s) => s.status === 'completed').length}
+        />
 
         {/* Section: This Week */}
         <Text style={[s.sectionLabel, { color: colors.textMuted }]}>
