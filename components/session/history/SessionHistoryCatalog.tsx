@@ -6,9 +6,9 @@ import { useRouter } from 'expo-router';
 import React, { useCallback, useMemo } from 'react';
 import {
   ActivityIndicator,
-  FlatList,
   Platform,
   RefreshControl,
+  SectionList,
   StyleSheet,
   Text,
   TextInput,
@@ -22,6 +22,7 @@ import { FilterSheet } from './FilterSheet';
 import { SessionCard } from './SessionCard';
 import { useSessionHistory } from '@/hooks/session/useSessionHistory';
 import { SkeletonList } from '@/components/shared/Skeleton';
+import { groupSessionsByDate } from '@/utils/sessionHistoryGrouping';
 
 /**
  * SessionHistoryCatalog - Full session history with search, filters, and sorting
@@ -76,10 +77,23 @@ export function SessionHistoryCatalog({
   // Active filter count
   const activeFilterCount = useMemo(() => countActiveFilters(filters), [filters]);
 
+  // Group sessions into date buckets (Today, Yesterday, This Week, This Month, Earlier)
+  const sections = useMemo(() => groupSessionsByDate(filteredSessions), [filteredSessions]);
+
   // Render session item
   const renderItem = useCallback(({ item }: { item: SessionWithDetails }) => (
     <SessionCard session={item} onPress={handleSessionPress} />
   ), [handleSessionPress]);
+
+  // Render section header with sticky date label
+  const renderSectionHeader = useCallback(
+    ({ section: { title } }: { section: { title: string } }) => (
+      <View style={[styles.sectionHeader, { backgroundColor: colors.background }]}>
+        <Text style={[styles.sectionHeaderText, { color: colors.textMuted }]}>{title}</Text>
+      </View>
+    ),
+    [colors.background, colors.textMuted]
+  );
 
   // Key extractor
   const keyExtractor = useCallback((item: SessionWithDetails) => item.id, []);
@@ -200,11 +214,13 @@ export function SessionHistoryCatalog({
         </TouchableOpacity>
       </View>
 
-      {/* Sessions List */}
-      <FlatList
-        data={filteredSessions}
+      {/* Sessions List (grouped by date) */}
+      <SectionList
+        sections={sections}
         renderItem={renderItem}
+        renderSectionHeader={renderSectionHeader}
         keyExtractor={keyExtractor}
+        stickySectionHeadersEnabled
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
         refreshControl={
@@ -328,6 +344,18 @@ const styles = StyleSheet.create({
   listContent: {
     paddingHorizontal: 16,
     paddingBottom: 100,
+  },
+  sectionHeader: {
+    paddingTop: 12,
+    paddingBottom: 6,
+    marginHorizontal: -16,
+    paddingHorizontal: 16,
+  },
+  sectionHeaderText: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
   },
   footerLoader: {
     paddingVertical: 20,

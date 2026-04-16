@@ -1,9 +1,12 @@
+import { WelcomeTour } from '@/components/onboarding/WelcomeTour';
+import { GlobalSearchSheet } from '@/components/search/GlobalSearchSheet';
 import { Header } from '@/components/shared/Header';
 import { useColors } from '@/hooks/ui/useColors';
 import { useOrphanedSessionCheck } from '@/hooks/useOrphanedSessionCheck';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { useGarminInitialize } from '@/stores/garminStore';
 import { router, Stack } from 'expo-router';
+import { Fragment } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function ProtectedLayout() {
@@ -14,6 +17,7 @@ export default function ProtectedLayout() {
   useOrphanedSessionCheck();
 
   return (
+    <Fragment>
     <Stack
       screenOptions={{
         headerShown: true,
@@ -334,5 +338,8 @@ export default function ProtectedLayout() {
         }}
       />
     </Stack>
+    <WelcomeTour />
+    <GlobalSearchSheet />
+    </Fragment>
   );
 }

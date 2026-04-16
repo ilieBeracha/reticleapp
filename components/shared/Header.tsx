@@ -4,8 +4,9 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useNotificationRealtime } from '@/hooks/realtime/notification/useNotificationRealtime';
 import { useColors } from '@/hooks/ui/useColors';
 import { getUnreadCount } from '@/services/notifications';
+import { openGlobalSearch } from '@/stores/globalSearchStore';
 import { useTeamStore } from '@/stores/teamStore';
-import { Bell, ChevronDown, User, Users } from 'lucide-react-native';
+import { Bell, ChevronDown, Search, User, Users } from 'lucide-react-native';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Image, StyleSheet, Text, View } from 'react-native';
@@ -76,6 +77,16 @@ export function Header({ onNotificationPress }: HeaderProps) {
 
         {/* Right - Action Buttons */}
         <View style={styles.actions}>
+          <PressableScale
+            style={[styles.iconBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
+            onPress={openGlobalSearch}
+            haptic="selection"
+            accessibilityRole="button"
+            accessibilityLabel={t('search.open', { defaultValue: 'Search' })}
+          >
+            <Search size={18} color={colors.text} strokeWidth={2} />
+          </PressableScale>
+
           <PressableScale
             style={[styles.iconBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
             onPress={handleNotificationPress}
