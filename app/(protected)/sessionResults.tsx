@@ -8,9 +8,11 @@
  * - Watch data details
  */
 
+import { Confetti } from '@/components/shared/Confetti';
 import { WeatherCard } from '@/components/session/WeatherDisplay';
 import { StandardsVerdict } from '@/components/standards/StandardsVerdict';
 import { useColors } from '@/hooks/ui/useColors';
+import { showToast } from '@/stores/toastStore';
 import type { GarminSessionData } from '@/services/garminService';
 import { getSessionById } from '@/services/session/queries';
 import { getSessionTargetsWithResults } from '@/services/session/targets';
@@ -96,6 +98,10 @@ export default function SessionResultsScreen() {
   const [targets, setTargets] = useState<SessionTargetWithResults[]>([]);
   const [verdict, setVerdict] = useState<SessionVerdict | null>(null);
   const [loading, setLoading] = useState(true);
+  // Celebration: fire confetti + success toast exactly once, right after the
+  // results load for the first time (not when the user re-visits the screen).
+  const [showConfetti, setShowConfetti] = useState(false);
+  const [hasCelebrated, setHasCelebrated] = useState(false);
 
   // Parse watch data from params
   const watchData: GarminSessionData | null = watchDataParam ? JSON.parse(watchDataParam) : null;
@@ -116,6 +122,18 @@ export default function SessionResultsScreen() {
         .finally(() => setLoading(false));
     }
   }, [sessionId]);
+
+  // Fire celebration once when we first render right after completion.
+  // Skipped when revisiting an older session from history (ended_at > 5 min ago).
+  useEffect(() => {
+    if (hasCelebrated || !session || session.status !== 'completed') return;
+    const endedAt = session.ended_at ? new Date(session.ended_at).getTime() : 0;
+    const isFreshCompletion = endedAt > 0 && Date.now() - endedAt < 5 * 60 * 1000;
+    if (!isFreshCompletion) return;
+    setHasCelebrated(true);
+    setShowConfetti(true);
+    showToast({ title: 'Session saved', variant: 'success' });
+  }, [session, hasCelebrated]);
 
   // ============================================================================
   // COMPUTED TARGET STATS - Separate SCAN vs MANUAL
@@ -581,6 +599,8 @@ export default function SessionResultsScreen() {
           </Text>
         </TouchableOpacity>
       </View>
+
+      {showConfetti && <Confetti onComplete={() => setShowConfetti(false)} />}
     </View>
   );
 }

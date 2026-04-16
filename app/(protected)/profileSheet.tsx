@@ -3,6 +3,7 @@
  *
  * Personal account settings displayed as a bottom sheet.
  */
+import { AchievementsSection } from '@/components/achievements/AchievementsSection';
 import { BaseAvatar } from '@/components/shared/Avatar';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -152,6 +153,11 @@ export default function ProfileSheet() {
         </View>
         <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
       </TouchableOpacity>
+
+      {/* Achievements */}
+      <View style={{ marginTop: 20, marginBottom: 8 }}>
+        <AchievementsSection />
+      </View>
 
       {/* Settings Section */}
       <View style={styles.section}>
