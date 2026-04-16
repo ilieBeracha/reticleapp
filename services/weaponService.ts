@@ -1016,7 +1016,9 @@ export async function approveSharedWeapon(
 
   if (updateError) throw updateError;
 
-  // Create a team weapon linked to this user weapon
+  // Create a team weapon linked to this user weapon. Carry forward the
+  // personal zero distance as the team default and the personal notes as
+  // team notes so approvals don't silently drop data the contributor entered.
   const { data: teamWeapon, error: createError } = await supabase
     .from('team_weapons')
     .insert({
@@ -1025,6 +1027,8 @@ export async function approveSharedWeapon(
       name: userWeapon.name,
       category: userWeapon.category,
       caliber: userWeapon.caliber,
+      default_zero_distance_m: userWeapon.personal_zero_distance_m ?? null,
+      notes: userWeapon.personal_notes ?? null,
       source_user_weapon_id: userWeaponId,
       contributed_by: userWeapon.user_id,
       contribution_status: 'approved',
@@ -1141,7 +1145,9 @@ export async function getOrCreatePersonalProfile(teamWeaponId: string): Promise<
   if (fetchError) throw fetchError;
   if (!teamWeapon) throw new Error('Team weapon not found');
 
-  // Create personal profile
+  // Create personal profile. Seed personal_zero_distance_m from the team's
+  // default so a soldier picking up a team weapon inherits the team standard
+  // rather than starting with a null zero.
   const { data: profile, error: createError } = await supabase
     .from('user_weapons')
     .insert({
@@ -1151,6 +1157,8 @@ export async function getOrCreatePersonalProfile(teamWeaponId: string): Promise<
       name: teamWeapon.name,
       category: teamWeapon.category,
       caliber: teamWeapon.caliber,
+      personal_zero_distance_m: teamWeapon.default_zero_distance_m ?? null,
+      personal_notes: teamWeapon.notes ?? null,
     })
     .select('*')
     .single();

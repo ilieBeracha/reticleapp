@@ -51,6 +51,7 @@ export function CreateWeaponFlow({ onComplete, onCancel, teamId }: CreateWeaponF
   const [name, setName] = useState('');
   const [category, setCategory] = useState<WeaponCategory>('precision_rifle');
   const [caliber, setCaliber] = useState('');
+  const [serial, setSerial] = useState('');
   const [notes, setNotes] = useState('');
   const [zeroDistance, setZeroDistance] = useState('');
 
@@ -97,14 +98,17 @@ export function CreateWeaponFlow({ onComplete, onCancel, teamId }: CreateWeaponF
     return () => clearTimeout(timer);
   }, [searchQuery, step, allWeapons]);
 
-  const handleSelectBase = useCallback((weapon: GlobalWeapon) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setSelectedBase(weapon);
-    setName(`My ${weapon.name}`);
-    setCategory(weapon.category);
-    setCaliber(weapon.caliber || '');
-    setStep('customize');
-  }, []);
+  const handleSelectBase = useCallback(
+    (weapon: GlobalWeapon) => {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      setSelectedBase(weapon);
+      setName(teamId ? weapon.name : `My ${weapon.name}`);
+      setCategory(weapon.category);
+      setCaliber(weapon.caliber || '');
+      setStep('customize');
+    },
+    [teamId]
+  );
 
   const handleSubmit = useCallback(async () => {
     if (!name.trim()) {
@@ -125,13 +129,16 @@ export function CreateWeaponFlow({ onComplete, onCancel, teamId }: CreateWeaponF
       let weaponId: string;
 
       if (teamId) {
-        // Create team weapon
+        // Create team weapon — captures the full team-inventory metadata so
+        // the training entry points match the Team Armory output.
         const teamWeapon = await createTeamWeapon({
           team_id: teamId,
           name: name.trim(),
           base_weapon_id: selectedBase?.id,
           category,
           caliber: caliber.trim() || undefined,
+          serial_number: serial.trim() || undefined,
+          default_zero_distance_m: zeroDistance ? parseInt(zeroDistance, 10) : undefined,
           notes: notes.trim() || undefined,
         });
         weaponId = teamWeapon.id;
@@ -167,6 +174,7 @@ export function CreateWeaponFlow({ onComplete, onCancel, teamId }: CreateWeaponF
     selectedBase,
     category,
     caliber,
+    serial,
     zeroDistance,
     notes,
     cleaningEnabled,
@@ -345,7 +353,23 @@ export function CreateWeaponFlow({ onComplete, onCancel, teamId }: CreateWeaponF
             />
           </FormField>
 
-          <FormField label="Zero Distance (m)" colors={colors}>
+          {teamId && (
+            <FormField label="Serial Number" colors={colors}>
+              <TextInput
+                style={[
+                  styles.input,
+                  { backgroundColor: colors.card, borderColor: colors.border, color: colors.text },
+                ]}
+                placeholder="Optional"
+                placeholderTextColor={colors.textMuted}
+                value={serial}
+                onChangeText={setSerial}
+                autoCapitalize="characters"
+              />
+            </FormField>
+          )}
+
+          <FormField label={teamId ? 'Default Zero Distance (m)' : 'Zero Distance (m)'} colors={colors}>
             <TextInput
               style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.text }]}
               placeholder="e.g., 100"
@@ -372,16 +396,18 @@ export function CreateWeaponFlow({ onComplete, onCancel, teamId }: CreateWeaponF
             />
           </FormField>
 
-          {/* Cleaning Routine */}
-          <CleaningRoutineSection
-            enabled={cleaningEnabled}
-            onToggle={() => setCleaningEnabled(!cleaningEnabled)}
-            intervalType={cleaningIntervalType}
-            onIntervalTypeChange={setCleaningIntervalType}
-            intervalValue={cleaningIntervalValue}
-            onIntervalValueChange={setCleaningIntervalValue}
-            colors={colors}
-          />
+          {/* Cleaning Routine — personal weapons only */}
+          {!teamId && (
+            <CleaningRoutineSection
+              enabled={cleaningEnabled}
+              onToggle={() => setCleaningEnabled(!cleaningEnabled)}
+              intervalType={cleaningIntervalType}
+              onIntervalTypeChange={setCleaningIntervalType}
+              intervalValue={cleaningIntervalValue}
+              onIntervalValueChange={setCleaningIntervalValue}
+              colors={colors}
+            />
+          )}
 
           {error && <Text style={[styles.errorText, { color: colors.destructive }]}>{error}</Text>}
         </ScrollView>
@@ -452,7 +478,20 @@ export function CreateWeaponFlow({ onComplete, onCancel, teamId }: CreateWeaponF
           />
         </FormField>
 
-        <FormField label="Zero Distance (m)" colors={colors}>
+        {teamId && (
+          <FormField label="Serial Number" colors={colors}>
+            <TextInput
+              style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.text }]}
+              placeholder="Optional"
+              placeholderTextColor={colors.textMuted}
+              value={serial}
+              onChangeText={setSerial}
+              autoCapitalize="characters"
+            />
+          </FormField>
+        )}
+
+        <FormField label={teamId ? 'Default Zero Distance (m)' : 'Zero Distance (m)'} colors={colors}>
           <TextInput
             style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.text }]}
             placeholder="e.g., 100"
@@ -463,7 +502,7 @@ export function CreateWeaponFlow({ onComplete, onCancel, teamId }: CreateWeaponF
           />
         </FormField>
 
-        <FormField label="Personal Notes" colors={colors}>
+        <FormField label={teamId ? 'Notes' : 'Personal Notes'} colors={colors}>
           <TextInput
             style={[
               styles.input,
@@ -479,16 +518,18 @@ export function CreateWeaponFlow({ onComplete, onCancel, teamId }: CreateWeaponF
           />
         </FormField>
 
-        {/* Cleaning Routine */}
-        <CleaningRoutineSection
-          enabled={cleaningEnabled}
-          onToggle={() => setCleaningEnabled(!cleaningEnabled)}
-          intervalType={cleaningIntervalType}
-          onIntervalTypeChange={setCleaningIntervalType}
-          intervalValue={cleaningIntervalValue}
-          onIntervalValueChange={setCleaningIntervalValue}
-          colors={colors}
-        />
+        {/* Cleaning Routine — personal weapons only */}
+        {!teamId && (
+          <CleaningRoutineSection
+            enabled={cleaningEnabled}
+            onToggle={() => setCleaningEnabled(!cleaningEnabled)}
+            intervalType={cleaningIntervalType}
+            onIntervalTypeChange={setCleaningIntervalType}
+            intervalValue={cleaningIntervalValue}
+            onIntervalValueChange={setCleaningIntervalValue}
+            colors={colors}
+          />
+        )}
 
         {error && <Text style={[styles.errorText, { color: colors.destructive }]}>{error}</Text>}
       </ScrollView>
