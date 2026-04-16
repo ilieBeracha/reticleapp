@@ -267,7 +267,7 @@ export default function TeamSquadsScreen() {
           </View>
           <Text style={[styles.title, { color: colors.text }]}>{t('teams.squadManagement')}</Text>
           <Text style={[styles.subtitle, { color: colors.textMuted }]}>
-            {t('teams.organizeIntoSquads', { teamName: team?.name })}
+            {t('teams.organizeIntoSquads', { teamName: team?.name || t('teams.team') })}
           </Text>
         </View>
 
